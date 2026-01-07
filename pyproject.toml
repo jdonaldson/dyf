@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dyf"
+version = "0.1.0"
+description = "Fast outlier classification using PCA-based LSH"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [
+    {name = "Justin Donaldson", email = "jdonaldson@gmail.com"}
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+keywords = ["outlier", "classification", "lsh", "pca", "embeddings", "machine-learning"]
+dependencies = [
+    "numpy>=1.20",
+    # dyf-rs>=0.1.0 required but installed separately (not on PyPI yet)
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pyarrow>=10.0",
+]
+full = [
+    "pyarrow>=10.0",
+    "polars>=0.19",
+    "scikit-learn>=1.0",
+    "sentence-transformers>=2.2",
+    "openai>=1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/jdonaldson/dyf"
+Repository = "https://github.com/jdonaldson/dyf"
+Issues = "https://github.com/jdonaldson/dyf/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
