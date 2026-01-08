@@ -27,7 +27,7 @@ classifiers = [
 keywords = ["outlier", "classification", "lsh", "pca", "embeddings", "machine-learning"]
 dependencies = [
     "numpy>=1.20",
-    # dyf-rs>=0.1.0 required but installed separately (not on PyPI yet)
+    "dyf-rs>=0.1.0",
 ]
 
 [project.optional-dependencies]
