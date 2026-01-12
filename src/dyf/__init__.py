@@ -42,7 +42,10 @@ from .classifier import (
     list_configs,
 )
 
-__version__ = "0.1.0"
+# Index serialization
+from .io import save_index, load_index, PrecomputedIndex
+
+__version__ = "0.1.1"
 __all__ = [
     # Fast Rust core
     "OutlierClassifier",
@@ -55,6 +58,10 @@ __all__ = [
     "EmbedderConfig",
     "LabelerConfig",
     "list_configs",
+    # Serialization
+    "save_index",
+    "load_index",
+    "PrecomputedIndex",
 ]
 
 def check_rust_available():

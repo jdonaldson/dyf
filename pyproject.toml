@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dyf"
-version = "0.1.0"
+version = "0.1.1"
 description = "Fast outlier classification using PCA-based LSH"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -27,7 +27,7 @@ classifiers = [
 keywords = ["outlier", "classification", "lsh", "pca", "embeddings", "machine-learning"]
 dependencies = [
     "numpy>=1.20",
-    "dyf-rs>=0.1.0",
+    "dyf-rs>=0.2.0",
 ]
 
 [project.optional-dependencies]
@@ -41,6 +41,9 @@ full = [
     "scikit-learn>=1.0",
     "sentence-transformers>=2.2",
     "openai>=1.0",
+]
+io = [
+    "safetensors>=0.4",
 ]
 
 [project.urls]
