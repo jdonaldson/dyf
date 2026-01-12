@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dyf"
-version = "0.1.1"
+version = "0.1.2"
 description = "Fast outlier classification using PCA-based LSH"
 readme = "README.md"
 requires-python = ">=3.9"

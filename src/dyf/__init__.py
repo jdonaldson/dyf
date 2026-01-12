@@ -45,7 +45,7 @@ from .classifier import (
 # Index serialization
 from .io import save_index, load_index, PrecomputedIndex
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 __all__ = [
     # Fast Rust core
     "OutlierClassifier",
