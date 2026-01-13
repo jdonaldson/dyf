@@ -1,19 +1,19 @@
 """
-Outlier Classifier: Distinguish Diaspora from Orphan outliers
+Density Classifier: Discover structure in embedding spaces
 
-Diaspora: Items misplaced by global PCA that find their true community
-          when given a second chance with outlier-specific hyperplanes.
+Bridge:   Transitional items connecting different semantic clusters.
+          Found via recovery PCA on sparse bucket items.
 
 Orphans:  Genuinely unique items that don't cluster anywhere, even after
           recovery attempts. They have no semantic neighbors.
 
 Example:
-    >>> classifier = OutlierClassifier(embedding_dim=384)
+    >>> classifier = DensityClassifier(embedding_dim=384)
     >>> classifier.fit(embeddings)
     >>> print(classifier.report())
 
 Configs:
-    >>> from outlier_classifier import EmbedderConfig, LabelerConfig
+    >>> from dyf import EmbedderConfig, LabelerConfig
     >>> embedder = EmbedderConfig.MEDIUM  # all-mpnet-base-v2
     >>> labeler = LabelerConfig.LOW       # phi3:mini
 """
@@ -351,7 +351,7 @@ def list_configs():
 # =============================================================================
 
 @dataclass
-class DiasporaCluster:
+class BridgeCluster:
     """A recovered cluster of diaspora items."""
     cluster_id: int
     size: int
@@ -363,7 +363,7 @@ class DiasporaCluster:
 
 
 @dataclass
-class OutlierReport:
+class DensityReport:
     """Complete report on outlier classification."""
     # Corpus stats
     corpus_size: int
@@ -415,7 +415,7 @@ class OutlierReport:
             "",
             "CLASSIFICATION RESULTS",
             "-" * 40,
-            f"  Diaspora (recovered):     {self.diaspora_count:,} ({self.diaspora_pct:.1%})",
+            f"  Bridge (recovered):     {self.diaspora_count:,} ({self.diaspora_pct:.1%})",
             f"  Orphans (truly unique):   {self.orphan_count:,} ({self.orphan_pct:.1%})",
             "",
             "RECOVERY STATS",
@@ -451,15 +451,15 @@ class OutlierReport:
         return "\n".join(lines)
 
 
-class OutlierClassifier:
+class DensityClassifier:
     """
-    Classify outliers as Diaspora or Orphans.
+    Classify outliers as Bridge or Orphans.
 
-    Diaspora: Misplaced items that find community with outlier-specific PCA
+    Bridge: Misplaced items that find community with outlier-specific PCA
     Orphans: Genuinely unique items with no semantic neighbors
 
     Example:
-        >>> classifier = OutlierClassifier(embedding_dim=384)
+        >>> classifier = DensityClassifier(embedding_dim=384)
         >>> classifier.fit(embeddings, categories=categories)
         >>> print(classifier.report())
         >>>
@@ -509,7 +509,7 @@ class OutlierClassifier:
         # Classification results
         self._diaspora_indices: List[int] = []
         self._orphan_indices: List[int] = []
-        self._diaspora_clusters: List[DiasporaCluster] = []
+        self._diaspora_clusters: List[BridgeCluster] = []
         self._outlier_source_buckets: Dict[int, int] = {}  # global_idx -> original bucket
 
         # Per-record labels (populated during fit)
@@ -518,12 +518,116 @@ class OutlierClassifier:
         self._recovery_bucket_ids: Optional[Dict[int, int]] = None  # For diaspora: recovery bucket
 
         # Stats
-        self._report: Optional[OutlierReport] = None
+        self._report: Optional[DensityReport] = None
         self._fitted = False
 
         # TF-IDF components (for from_texts)
         self._vectorizer = None
         self._svd = None
+
+        # Polars integration
+        self._source_df: Optional['pl.DataFrame'] = None
+        self._embedding_col: Optional[str] = None
+
+        # Density metrics (computed during fit)
+        self._bucket_sizes: Optional[np.ndarray] = None
+        self._centroid_similarities: Optional[np.ndarray] = None
+
+    @classmethod
+    def from_polars(
+        cls,
+        df: 'pl.DataFrame',
+        embedding_col: str,
+        category_col: Optional[str] = None,
+        text_col: Optional[str] = None,
+        **kwargs
+    ) -> 'DensityClassifier':
+        """
+        Create classifier from a Polars DataFrame.
+
+        Args:
+            df: Polars DataFrame with embeddings
+            embedding_col: Column name containing embedding vectors (list of floats)
+            category_col: Optional column name for category labels
+            text_col: Optional column name for text content (enables labeling)
+            **kwargs: Additional args passed to __init__ (initial_bits, dense_threshold, etc.)
+
+        Returns:
+            Fitted DensityClassifier instance
+
+        Example:
+            >>> df = pl.read_parquet("embeddings.parquet")
+            >>> classifier = DensityClassifier.from_polars(
+            ...     df,
+            ...     embedding_col="embedding",
+            ...     category_col="category"
+            ... )
+            >>> result = classifier.to_polars()
+        """
+        import polars as pl
+
+        # Extract embeddings
+        embeddings = np.array(df[embedding_col].to_list(), dtype=np.float32)
+
+        # Extract optional columns
+        categories = df[category_col].to_list() if category_col else None
+        texts = df[text_col].to_list() if text_col else None
+
+        # Create classifier
+        classifier = cls(embedding_dim=embeddings.shape[1], **kwargs)
+
+        # Store reference to source DataFrame
+        classifier._source_df = df
+        classifier._embedding_col = embedding_col
+
+        # Fit
+        classifier.fit(embeddings, categories=categories, texts=texts)
+
+        return classifier
+
+    def to_polars(self) -> 'pl.DataFrame':
+        """
+        Return source DataFrame with density classification columns added.
+
+        Returns DataFrame with original columns plus:
+            - bucket_id: LSH bucket ID
+            - status: 'dense', 'bridge', or 'orphan'
+            - bucket_size: Number of items in same bucket
+            - centroid_similarity: Cosine similarity to bucket centroid (0-1)
+            - recovery_bucket_id: For bridge items, their recovery bucket (null for others)
+
+        Example:
+            >>> classifier = DensityClassifier.from_polars(df, "embedding")
+            >>> result = classifier.to_polars()
+            >>> sparse = result.filter(pl.col("bucket_size") < 5)
+        """
+        import polars as pl
+
+        if not self._fitted:
+            raise ValueError("Must call fit() first")
+
+        n = len(self.embeddings)
+
+        # Build recovery bucket column (null for non-bridge)
+        recovery_buckets = [
+            self._recovery_bucket_ids.get(i) for i in range(n)
+        ]
+
+        # Create labels DataFrame
+        labels_df = pl.DataFrame({
+            'bucket_id': self._bucket_ids.tolist(),
+            'status': [s.replace('diaspora', 'bridge') for s in self._statuses],
+            'bucket_size': self._bucket_sizes.tolist(),
+            'centroid_similarity': self._centroid_similarities.tolist(),
+            'recovery_bucket_id': recovery_buckets,
+        })
+
+        # If we have source DataFrame, join to it
+        if self._source_df is not None:
+            return pl.concat([self._source_df, labels_df], how="horizontal")
+        else:
+            # Add index column for manual joining
+            return labels_df.with_columns(pl.Series("index", list(range(n))))
 
     @classmethod
     def from_texts(
@@ -540,7 +644,7 @@ class OutlierClassifier:
         dense_threshold: int = 10,
         verbose: bool = True,
         **kwargs
-    ) -> 'OutlierClassifier':
+    ) -> 'DensityClassifier':
         """
         Create classifier from raw texts using TF-IDF + SVD embeddings.
 
@@ -562,11 +666,11 @@ class OutlierClassifier:
             **kwargs: Additional args passed to __init__
 
         Returns:
-            Fitted OutlierClassifier instance
+            Fitted DensityClassifier instance
 
         Example:
             >>> texts = ["doc about machine learning", "another ml paper", ...]
-            >>> classifier = OutlierClassifier.from_texts(texts, categories=cats)
+            >>> classifier = DensityClassifier.from_texts(texts, categories=cats)
             >>> print(classifier.report())
         """
         from sklearn.feature_extraction.text import TfidfVectorizer
@@ -625,7 +729,7 @@ class OutlierClassifier:
         texts: Optional[List[str]] = None,
         normalize: bool = True,
         verbose: bool = True
-    ) -> 'OutlierClassifier':
+    ) -> 'DensityClassifier':
         """
         Fit the outlier classifier.
 
@@ -710,6 +814,31 @@ class OutlierClassifier:
 
         num_buckets = len(bucket_to_indices)
 
+        # Compute density metrics: bucket_size and centroid_similarity
+        self._bucket_sizes = np.zeros(len(embeddings), dtype=np.int32)
+        self._centroid_similarities = np.zeros(len(embeddings), dtype=np.float32)
+
+        for bid, indices in bucket_to_indices.items():
+            bucket_size = len(indices)
+
+            # Store bucket size for all items in this bucket
+            for idx in indices:
+                self._bucket_sizes[idx] = bucket_size
+
+            # Compute centroid similarity
+            if bucket_size >= 2:
+                bucket_embs = embeddings[indices]
+                centroid = bucket_embs.mean(axis=0)
+                norm = np.linalg.norm(centroid)
+                if norm > 0:
+                    centroid = centroid / norm
+                    sims = bucket_embs @ centroid
+                    for local_idx, idx in enumerate(indices):
+                        self._centroid_similarities[idx] = float(sims[local_idx])
+            elif bucket_size == 1:
+                # Single item is perfectly central to itself
+                self._centroid_similarities[indices[0]] = 1.0
+
         # Identify outliers
         sparse_bucket_outliers = []
         intra_bucket_outliers = []
@@ -779,7 +908,7 @@ class OutlierClassifier:
         hashes2 = (signs2 @ powers2).astype(np.uint64)
         counts2 = Counter(hashes2)
 
-        # Classify: Diaspora vs Orphans
+        # Classify: Bridge vs Orphans
         recovery_bucket_to_local = defaultdict(list)
         for local_idx, h in enumerate(hashes2):
             recovery_bucket_to_local[int(h)].append(local_idx)
@@ -807,7 +936,7 @@ class OutlierClassifier:
             self._statuses[idx] = 'orphan'
 
         if verbose:
-            print(f"  Diaspora (recovered): {len(diaspora_indices):,}")
+            print(f"  Bridge (recovered): {len(diaspora_indices):,}")
             print(f"  Orphans (unique): {len(orphan_indices):,}")
 
         # Build diaspora clusters
@@ -836,7 +965,7 @@ class OutlierClassifier:
             cat_counts = Counter(cluster_cats).most_common()
             dominant_cat = cat_counts[0][0] if cat_counts else "unknown"
 
-            self._diaspora_clusters.append(DiasporaCluster(
+            self._diaspora_clusters.append(BridgeCluster(
                 cluster_id=cluster_id,
                 size=len(global_indices),
                 coherence=coherence,
@@ -904,7 +1033,7 @@ class OutlierClassifier:
 
         dense_items = len(self.embeddings) - total_candidates
 
-        self._report = OutlierReport(
+        self._report = DensityReport(
             corpus_size=len(self.embeddings),
             num_buckets=num_buckets,
             dense_items=dense_items,
@@ -924,7 +1053,7 @@ class OutlierClassifier:
             orphan_categories=orphan_cats.most_common()
         )
 
-    def report(self) -> OutlierReport:
+    def report(self) -> DensityReport:
         """Get the outlier classification report."""
         if not self._fitted:
             raise ValueError("Must call fit() first")
@@ -942,7 +1071,7 @@ class OutlierClassifier:
             raise ValueError("Must call fit() first")
         return list(self._orphan_indices)
 
-    def get_diaspora_clusters(self, min_size: int = 3) -> List[DiasporaCluster]:
+    def get_diaspora_clusters(self, min_size: int = 3) -> List[BridgeCluster]:
         """Get diaspora clusters above min_size."""
         if not self._fitted:
             raise ValueError("Must call fit() first")
@@ -955,14 +1084,17 @@ class OutlierClassifier:
         Returns DataFrame with columns:
             - index: Record index (0-based)
             - bucket_id: Primary LSH bucket ID
-            - status: 'dense', 'diaspora', or 'orphan'
-            - recovery_bucket_id: For diaspora items, their recovery bucket (null for others)
+            - status: 'dense', 'bridge', or 'orphan'
+            - bucket_size: Number of items in same bucket
+            - centroid_similarity: Cosine similarity to bucket centroid (0-1)
+            - recovery_bucket_id: For bridge items, their recovery bucket (null for others)
             - category: Category label if provided during fit
 
         Example:
             >>> classifier.fit(embeddings, categories=categories)
             >>> labels = classifier.get_labels()
             >>> orphans = labels.filter(pl.col('status') == 'orphan')
+            >>> sparse = labels.filter(pl.col('bucket_size') < 5)
         """
         import polars as pl
 
@@ -971,7 +1103,7 @@ class OutlierClassifier:
 
         n = len(self.embeddings)
 
-        # Build recovery bucket column (null for non-diaspora)
+        # Build recovery bucket column (null for non-bridge)
         recovery_buckets = [
             self._recovery_bucket_ids.get(i) for i in range(n)
         ]
@@ -979,7 +1111,9 @@ class OutlierClassifier:
         return pl.DataFrame({
             'index': list(range(n)),
             'bucket_id': self._bucket_ids.tolist(),
-            'status': self._statuses,
+            'status': [s.replace('diaspora', 'bridge') for s in self._statuses],
+            'bucket_size': self._bucket_sizes.tolist(),
+            'centroid_similarity': self._centroid_similarities.tolist(),
             'recovery_bucket_id': recovery_buckets,
             'category': self.categories,
         })
@@ -1269,9 +1403,9 @@ Label:"""
 
         return results
 
-    def print_diaspora_cluster(self, cluster: DiasporaCluster, n_samples: int = 5):
+    def print_diaspora_cluster(self, cluster: BridgeCluster, n_samples: int = 5):
         """Print details of a diaspora cluster."""
-        print(f"\nDiaspora Cluster {cluster.cluster_id}")
+        print(f"\nBridge Cluster {cluster.cluster_id}")
         print(f"  Size: {cluster.size}")
         print(f"  Coherence: {cluster.coherence:.4f}")
         print(f"  From {len(cluster.source_buckets)} original buckets")
@@ -1332,7 +1466,7 @@ def demo():
     print(f"Loaded {len(embeddings):,} embeddings")
 
     # Run classifier
-    classifier = OutlierClassifier(embedding_dim=embeddings.shape[1])
+    classifier = DensityClassifier(embedding_dim=embeddings.shape[1])
     classifier.fit(embeddings, categories=categories, texts=texts)
 
     # Print report

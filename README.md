@@ -38,13 +38,13 @@ pip install dyf[full]
 
 ```python
 import numpy as np
-from dyf import OutlierClassifier
+from dyf import DensityClassifier
 
 # Your embeddings (e.g., from sentence-transformers)
 embeddings = np.random.randn(10000, 384).astype(np.float32)
 
 # Find structure
-classifier = OutlierClassifier(embedding_dim=384)
+classifier = DensityClassifier(embedding_dim=384)
 classifier.fit(embeddings)
 
 # What did we find?
@@ -80,10 +80,10 @@ bucket_5 = index.get_bucket(5)
 ### Full-Featured Usage
 
 ```python
-from dyf import OutlierClassifierFull, EmbedderConfig, LabelerConfig
+from dyf import DensityClassifierFull, EmbedderConfig, LabelerConfig
 
 # From raw texts
-classifier = OutlierClassifierFull.from_texts(
+classifier = DensityClassifierFull.from_texts(
     texts=documents,
     categories=categories,
 )
@@ -114,10 +114,10 @@ Rust-accelerated via PyO3. ~4x faster than pure Python.
 
 ## API
 
-### OutlierClassifier
+### DensityClassifier
 
 ```python
-OutlierClassifier(
+DensityClassifier(
     embedding_dim: int,
     initial_bits: int = 14,      # LSH resolution
     recovery_bits: int = 8,      # Coarser recovery resolution

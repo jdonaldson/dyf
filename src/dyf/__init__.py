@@ -1,42 +1,42 @@
 """
-DYF - Outlier Classification using PCA-based LSH
+DYF - Density Yields Features
 
-Fast identification of outliers in embedding spaces:
+Discover structure in embedding spaces using PCA-based LSH:
 - Dense: Items in well-populated semantic buckets
-- Diaspora: Sparse items that find community via recovery PCA
+- Bridge: Transitional items connecting different clusters
 - Orphan: Truly unique items with no semantic neighbors
 
 Quick Start:
-    >>> from dyf import OutlierClassifier
-    >>> classifier = OutlierClassifier(embedding_dim=384)
+    >>> from dyf import DensityClassifier
+    >>> classifier = DensityClassifier(embedding_dim=384)
     >>> classifier.fit(embeddings)
     >>> print(classifier.report())
 
 Full-Featured Usage:
-    >>> from dyf import OutlierClassifierFull, EmbedderConfig, LabelerConfig
-    >>> classifier = OutlierClassifierFull.from_texts(texts, categories=categories)
+    >>> from dyf import DensityClassifierFull, EmbedderConfig, LabelerConfig
+    >>> classifier = DensityClassifierFull.from_texts(texts, categories=categories)
     >>> labels = classifier.label_buckets(**LabelerConfig.MEDIUM.as_kwargs())
 """
 
 # Fast Rust implementation (core classifier)
 try:
     from dyf_rs import (
-        OutlierClassifier,
-        OutlierReport,
-        OutlierStatus,
+        DensityClassifier,
+        DensityReport,
+        DensityStatus,
     )
     _HAS_RUST = True
 except ImportError:
     _HAS_RUST = False
-    OutlierClassifier = None
-    OutlierReport = None
-    OutlierStatus = None
+    DensityClassifier = None
+    DensityReport = None
+    DensityStatus = None
 
 # Python wrapper with full features (embedder configs, labeling, etc.)
 from .classifier import (
-    OutlierClassifier as OutlierClassifierFull,
-    OutlierReport as OutlierReportFull,
-    DiasporaCluster,
+    DensityClassifier as DensityClassifierFull,
+    DensityReport as DensityReportFull,
+    BridgeCluster,
     EmbedderConfig,
     LabelerConfig,
     list_configs,
@@ -45,16 +45,16 @@ from .classifier import (
 # Index serialization
 from .io import save_index, load_index, PrecomputedIndex
 
-__version__ = "0.1.3"
+__version__ = "0.2.0"
 __all__ = [
     # Fast Rust core
-    "OutlierClassifier",
-    "OutlierReport",
-    "OutlierStatus",
+    "DensityClassifier",
+    "DensityReport",
+    "DensityStatus",
     # Full Python wrapper
-    "OutlierClassifierFull",
-    "OutlierReportFull",
-    "DiasporaCluster",
+    "DensityClassifierFull",
+    "DensityReportFull",
+    "BridgeCluster",
     "EmbedderConfig",
     "LabelerConfig",
     "list_configs",
