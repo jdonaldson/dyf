@@ -6,6 +6,7 @@ Returns raw density metrics per item - classification is up to you:
 - bucket_size: Number of items in the bucket
 - centroid_similarity: Cosine similarity to bucket centroid (0-1)
 - isolation_score: How isolated the item is (top_k_sim - median_sim)
+- stability_score: How stable bucket assignment is across multiple seeds (0-1)
 
 Example:
     >>> classifier = DensityClassifier(embedding_dim=384)
@@ -370,6 +371,7 @@ class DensityReport:
     # Density metrics
     mean_centroid_similarity: float
     mean_isolation_score: float
+    mean_stability_score: float
 
     # PCA stats
     pca_variance_explained: float
@@ -399,6 +401,7 @@ class DensityReport:
             "-" * 40,
             f"  Mean centroid similarity: {self.mean_centroid_similarity:.4f}",
             f"  Mean isolation score:     {self.mean_isolation_score:.4f}",
+            f"  Mean stability score:     {self.mean_stability_score:.4f}",
             f"  PCA variance explained:   {self.pca_variance_explained:.1%}",
         ]
 
@@ -440,6 +443,7 @@ class DensityClassifier:
         seed: int = 31,
         isolation_k: int = 10,
         isolation_sample_size: int = 1000,
+        num_stability_seeds: int = 3,
     ):
         """
         Initialize density classifier.
@@ -450,12 +454,14 @@ class DensityClassifier:
             seed: Random seed
             isolation_k: Number of top neighbors for isolation score
             isolation_sample_size: Sample size for median similarity computation
+            num_stability_seeds: Number of seeds for stability scoring (default: 3)
         """
         self.embedding_dim = embedding_dim
         self.num_bits = num_bits
         self.seed = seed
         self.isolation_k = isolation_k
         self.isolation_sample_size = isolation_sample_size
+        self.num_stability_seeds = num_stability_seeds
 
         # Populated during fit()
         self.embeddings: Optional[np.ndarray] = None
@@ -467,6 +473,7 @@ class DensityClassifier:
         self._bucket_sizes: Optional[np.ndarray] = None
         self._centroid_similarities: Optional[np.ndarray] = None
         self._isolation_scores: Optional[np.ndarray] = None
+        self._stability_scores: Optional[np.ndarray] = None
 
         # Stats
         self._report: Optional[DensityReport] = None
@@ -542,6 +549,7 @@ class DensityClassifier:
             - bucket_size: Number of items in same bucket
             - centroid_similarity: Cosine similarity to bucket centroid (0-1)
             - isolation_score: How isolated the item is
+            - stability_score: How stable bucket assignment is (0-1)
 
         Example:
             >>> classifier = DensityClassifier.from_polars(df, "embedding")
@@ -559,6 +567,7 @@ class DensityClassifier:
             'bucket_size': self._bucket_sizes.tolist(),
             'centroid_similarity': self._centroid_similarities.tolist(),
             'isolation_score': self._isolation_scores.tolist(),
+            'stability_score': self._stability_scores.tolist(),
         })
 
         # If we have source DataFrame, join to it
@@ -780,6 +789,11 @@ class DensityClassifier:
             print(f"  Computing isolation scores...")
         self._compute_isolation_scores()
 
+        # Compute stability scores
+        if verbose:
+            print(f"  Computing stability scores ({self.num_stability_seeds} seeds)...")
+        self._compute_stability_scores(hp)
+
         # Build report
         self._build_report(num_buckets)
 
@@ -825,6 +839,42 @@ class DensityClassifier:
 
             self._isolation_scores[i] = top_k_mean - median
 
+    def _compute_stability_scores(self, hp: np.ndarray):
+        """Compute stability score: how consistently items stay in same bucket across seeds."""
+        n = len(self.embeddings)
+        num_seeds = self.num_stability_seeds
+
+        if num_seeds < 2:
+            # No stability computation possible with fewer than 2 seeds
+            self._stability_scores = np.ones(n, dtype=np.float32)
+            return
+
+        powers = 2 ** np.arange(len(hp))
+
+        # Compute bucket assignments for each seed (including main seed)
+        all_bucket_ids = []
+        for seed_idx in range(num_seeds):
+            seed_offset = seed_idx * 1000
+            rng = np.random.default_rng(self.seed + seed_offset)
+
+            # Add small random perturbation to hyperplanes
+            perturbation = rng.standard_normal(hp.shape).astype(np.float32) * 0.01
+            perturbed_hp = hp + perturbation
+            perturbed_hp = perturbed_hp / np.linalg.norm(perturbed_hp, axis=1, keepdims=True)
+
+            signs = (self.embeddings @ perturbed_hp.T) >= 0
+            hashes = (signs @ powers).astype(np.uint64)
+            all_bucket_ids.append(hashes)
+
+        # Compute stability score per item
+        self._stability_scores = np.zeros(n, dtype=np.float32)
+        for i in range(n):
+            bucket_set = set(all_bucket_ids[s][i] for s in range(num_seeds))
+            unique_buckets = len(bucket_set)
+            # stability = 1 - (unique - 1) / (num_seeds - 1)
+            # 1.0 = same bucket in all seeds, 0.0 = different bucket each seed
+            self._stability_scores[i] = 1.0 - (unique_buckets - 1) / (num_seeds - 1)
+
     def _build_report(self, num_buckets: int):
         """Build the density report."""
         # Bucket statistics
@@ -850,6 +900,7 @@ class DensityClassifier:
             max_bucket_size=max_bucket,
             mean_centroid_similarity=float(self._centroid_similarities.mean()),
             mean_isolation_score=float(self._isolation_scores.mean()),
+            mean_stability_score=float(self._stability_scores.mean()),
             pca_variance_explained=self._pca_variance,
             category_counts=cat_counts,
         )
@@ -884,6 +935,12 @@ class DensityClassifier:
             raise ValueError("Must call fit() first")
         return self._isolation_scores.copy()
 
+    def get_stability_scores(self) -> np.ndarray:
+        """Get stability scores for all items (0-1, higher = more stable)."""
+        if not self._fitted:
+            raise ValueError("Must call fit() first")
+        return self._stability_scores.copy()
+
     def get_labels(self) -> 'pl.DataFrame':
         """
         Get per-record labels as a Polars DataFrame.
@@ -894,6 +951,7 @@ class DensityClassifier:
             - bucket_size: Number of items in same bucket
             - centroid_similarity: Cosine similarity to bucket centroid
             - isolation_score: How isolated the item is
+            - stability_score: How stable bucket assignment is (0-1)
             - category: Category label if provided during fit
 
         Example:
@@ -914,6 +972,7 @@ class DensityClassifier:
             'bucket_size': self._bucket_sizes.tolist(),
             'centroid_similarity': self._centroid_similarities.tolist(),
             'isolation_score': self._isolation_scores.tolist(),
+            'stability_score': self._stability_scores.tolist(),
             'category': self.categories,
         })
 

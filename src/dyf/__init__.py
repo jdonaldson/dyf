@@ -47,7 +47,8 @@ from .classifier import (
 # Index serialization
 from .io import save_index, load_index, PrecomputedIndex
 
-__version__ = "0.3.0"
+from importlib.metadata import version as _get_version
+__version__ = _get_version("dyf")
 __all__ = [
     # Fast Rust core
     "DensityClassifier",
