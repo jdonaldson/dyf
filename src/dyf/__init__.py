@@ -1,16 +1,21 @@
 """
 DYF - Density Yields Features
 
-Discover structure in embedding spaces using PCA-based LSH:
-- Dense: Items in well-populated semantic buckets
-- Bridge: Transitional items connecting different clusters
-- Orphan: Truly unique items with no semantic neighbors
+Discover structure in embedding spaces using PCA-based LSH.
+
+The Rust core returns raw density metrics per item - classification is up to you:
+- bucket_id: LSH bucket assignment
+- bucket_size: Number of items in the bucket
+- centroid_similarity: Cosine similarity to bucket centroid (0-1)
+- isolation_score: How isolated the item is (top_k_sim - median_sim)
 
 Quick Start:
     >>> from dyf import DensityClassifier
     >>> classifier = DensityClassifier(embedding_dim=384)
     >>> classifier.fit(embeddings)
     >>> print(classifier.report())
+    >>> bucket_sizes = classifier.get_bucket_sizes()
+    >>> isolation_scores = classifier.get_isolation_scores()
 
 Full-Featured Usage:
     >>> from dyf import DensityClassifierFull, EmbedderConfig, LabelerConfig
@@ -23,20 +28,17 @@ try:
     from dyf_rs import (
         DensityClassifier,
         DensityReport,
-        DensityStatus,
     )
     _HAS_RUST = True
 except ImportError:
     _HAS_RUST = False
     DensityClassifier = None
     DensityReport = None
-    DensityStatus = None
 
 # Python wrapper with full features (embedder configs, labeling, etc.)
 from .classifier import (
     DensityClassifier as DensityClassifierFull,
     DensityReport as DensityReportFull,
-    BridgeCluster,
     EmbedderConfig,
     LabelerConfig,
     list_configs,
@@ -45,16 +47,14 @@ from .classifier import (
 # Index serialization
 from .io import save_index, load_index, PrecomputedIndex
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 __all__ = [
     # Fast Rust core
     "DensityClassifier",
     "DensityReport",
-    "DensityStatus",
     # Full Python wrapper
     "DensityClassifierFull",
     "DensityReportFull",
-    "BridgeCluster",
     "EmbedderConfig",
     "LabelerConfig",
     "list_configs",

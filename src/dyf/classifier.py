@@ -1,11 +1,11 @@
 """
 Density Classifier: Discover structure in embedding spaces
 
-Bridge:   Transitional items connecting different semantic clusters.
-          Found via recovery PCA on sparse bucket items.
-
-Orphans:  Genuinely unique items that don't cluster anywhere, even after
-          recovery attempts. They have no semantic neighbors.
+Returns raw density metrics per item - classification is up to you:
+- bucket_id: LSH bucket assignment
+- bucket_size: Number of items in the bucket
+- centroid_similarity: Cosine similarity to bucket centroid (0-1)
+- isolation_score: How isolated the item is (top_k_sim - median_sim)
 
 Example:
     >>> classifier = DensityClassifier(embedding_dim=384)
@@ -19,12 +19,12 @@ Configs:
 """
 
 import numpy as np
-from typing import List, Dict, Optional, Tuple, TYPE_CHECKING, Union
+from typing import List, Dict, Optional, Tuple, TYPE_CHECKING
 from enum import Enum
 
 if TYPE_CHECKING:
     import polars as pl
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from collections import Counter, defaultdict
 from sklearn.decomposition import PCA
 
@@ -95,10 +95,9 @@ class EmbedderConfig:
 
     def _embed_bm25(self, texts: List[str], verbose: bool) -> np.ndarray:
         """BM25-weighted + SVD embeddings (saturated term frequencies)."""
-        from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
+        from sklearn.feature_extraction.text import CountVectorizer
         from sklearn.decomposition import TruncatedSVD
         from scipy import sparse
-        import math
 
         if verbose:
             print(f"Building BM25 embeddings ({len(texts):,} texts)...")
@@ -121,8 +120,7 @@ class EmbedderConfig:
         if verbose:
             print(f"  Vocabulary: {len(count_vectorizer.vocabulary_):,}, avg doc len: {avg_dl:.1f}")
 
-        # Apply BM25 saturation: tf_sat = (tf * (k1 + 1)) / (tf + k1 * (1 - b + b * dl/avgdl))
-        # Convert to lil_matrix for efficient element-wise modification
+        # Apply BM25 saturation
         tf_saturated = sparse.lil_matrix(tf_matrix.shape, dtype=np.float32)
 
         for i in range(tf_matrix.shape[0]):
@@ -140,13 +138,9 @@ class EmbedderConfig:
         # Apply IDF weighting
         n_docs = tf_matrix.shape[0]
         doc_freq = np.array((tf_matrix > 0).sum(axis=0)).flatten()
-        idf = np.log((n_docs + 1) / (doc_freq + 1)) + 1  # smoothed IDF
+        idf = np.log((n_docs + 1) / (doc_freq + 1)) + 1
 
-        # Multiply each column by its IDF weight
         bm25_matrix = tf_saturated.multiply(idf)
-
-        if verbose:
-            print(f"  BM25 matrix shape: {bm25_matrix.shape}")
 
         # SVD reduction
         n_components = min(self.dim, bm25_matrix.shape[1] - 1, len(texts) - 1)
@@ -242,7 +236,6 @@ class LabelerConfig:
 
     Example:
         >>> config = LabelerConfig.MEDIUM
-        >>> # Start server: ollama serve
         >>> labels = classifier.label_buckets(**config.as_kwargs())
     """
     name: str
@@ -352,100 +345,72 @@ def list_configs():
 
 @dataclass
 class BridgeCluster:
-    """A recovered cluster of diaspora items."""
+    """Legacy class - kept for backwards compatibility but no longer used."""
     cluster_id: int
     size: int
     coherence: float
     global_indices: List[int]
-    source_buckets: Dict[int, int]  # original_bucket_id -> count
+    source_buckets: Dict[int, int]
     dominant_category: str
     category_counts: List[Tuple[str, int]]
 
 
 @dataclass
 class DensityReport:
-    """Complete report on outlier classification."""
+    """Report on density classification."""
     # Corpus stats
     corpus_size: int
     num_buckets: int
 
-    # Stage 1: Initial bucketing
-    dense_items: int
-    sparse_bucket_outliers: int  # Items in small buckets
-    intra_bucket_outliers: int   # Items far from their bucket centroid
+    # Bucket statistics
+    mean_bucket_size: float
+    median_bucket_size: int
+    max_bucket_size: int
 
-    # Classification
-    total_outlier_candidates: int
-    diaspora_count: int
-    orphan_count: int
-    diaspora_pct: float
-    orphan_pct: float
+    # Density metrics
+    mean_centroid_similarity: float
+    mean_isolation_score: float
 
-    # Recovery stats
-    recovery_clusters: int
-    recovery_variance_explained: float
+    # PCA stats
+    pca_variance_explained: float
 
-    # Orphan analysis
-    orphan_avg_nn_similarity: float
-    corpus_avg_nn_similarity: float
-    orphan_isolation_score: float  # std below corpus average
-
-    # Category breakdown
-    diaspora_categories: List[Tuple[str, int]]
-    orphan_categories: List[Tuple[str, int]]
+    # Category breakdown (if provided)
+    category_counts: List[Tuple[str, int]]
 
     def __str__(self):
         lines = [
             "",
             "=" * 70,
-            "OUTLIER CLASSIFICATION REPORT",
+            "DENSITY CLASSIFICATION REPORT",
             "=" * 70,
             "",
             "CORPUS OVERVIEW",
             "-" * 40,
             f"  Corpus size:              {self.corpus_size:,}",
             f"  Buckets:                  {self.num_buckets:,}",
-            f"  Dense items:              {self.dense_items:,} ({self.dense_items/self.corpus_size:.1%})",
             "",
-            "OUTLIER IDENTIFICATION",
+            "BUCKET STATISTICS",
             "-" * 40,
-            f"  Sparse bucket outliers:   {self.sparse_bucket_outliers:,}",
-            f"  Intra-bucket outliers:    {self.intra_bucket_outliers:,}",
-            f"  Total candidates:         {self.total_outlier_candidates:,} ({self.total_outlier_candidates/self.corpus_size:.1%})",
+            f"  Mean bucket size:         {self.mean_bucket_size:.1f}",
+            f"  Median bucket size:       {self.median_bucket_size:,}",
+            f"  Max bucket size:          {self.max_bucket_size:,}",
             "",
-            "CLASSIFICATION RESULTS",
+            "DENSITY METRICS",
             "-" * 40,
-            f"  Bridge (recovered):     {self.diaspora_count:,} ({self.diaspora_pct:.1%})",
-            f"  Orphans (truly unique):   {self.orphan_count:,} ({self.orphan_pct:.1%})",
-            "",
-            "RECOVERY STATS",
-            "-" * 40,
-            f"  Recovery clusters:        {self.recovery_clusters:,}",
-            f"  PCA variance explained:   {self.recovery_variance_explained:.1%}",
-            "",
-            "ORPHAN ISOLATION",
-            "-" * 40,
-            f"  Orphan avg NN sim:        {self.orphan_avg_nn_similarity:.4f}",
-            f"  Corpus avg NN sim:        {self.corpus_avg_nn_similarity:.4f}",
-            f"  Isolation score:          {self.orphan_isolation_score:.1f} std below average",
-            "",
-            "DIASPORA BY CATEGORY",
-            "-" * 40,
+            f"  Mean centroid similarity: {self.mean_centroid_similarity:.4f}",
+            f"  Mean isolation score:     {self.mean_isolation_score:.4f}",
+            f"  PCA variance explained:   {self.pca_variance_explained:.1%}",
         ]
 
-        for cat, count in self.diaspora_categories[:7]:
-            pct = count / self.diaspora_count * 100 if self.diaspora_count > 0 else 0
-            lines.append(f"  {cat[:30]:<32} {count:>5} ({pct:>5.1f}%)")
-
-        lines.extend([
-            "",
-            "ORPHAN BY CATEGORY",
-            "-" * 40,
-        ])
-
-        for cat, count in self.orphan_categories[:7]:
-            pct = count / self.orphan_count * 100 if self.orphan_count > 0 else 0
-            lines.append(f"  {cat[:30]:<32} {count:>5} ({pct:>5.1f}%)")
+        if self.category_counts:
+            lines.extend([
+                "",
+                "TOP CATEGORIES",
+                "-" * 40,
+            ])
+            for cat, count in self.category_counts[:10]:
+                pct = count / self.corpus_size * 100
+                lines.append(f"  {cat[:30]:<32} {count:>5} ({pct:>5.1f}%)")
 
         lines.append("=" * 70)
         return "\n".join(lines)
@@ -453,72 +418,59 @@ class DensityReport:
 
 class DensityClassifier:
     """
-    Classify outliers as Bridge or Orphans.
+    Density Classifier using PCA-based LSH.
 
-    Bridge: Misplaced items that find community with outlier-specific PCA
-    Orphans: Genuinely unique items with no semantic neighbors
+    Returns raw density metrics per item - classification is up to you.
 
     Example:
         >>> classifier = DensityClassifier(embedding_dim=384)
         >>> classifier.fit(embeddings, categories=categories)
         >>> print(classifier.report())
         >>>
-        >>> # Get specific groups
-        >>> diaspora = classifier.get_diaspora()
-        >>> orphans = classifier.get_orphans()
-        >>>
-        >>> # Analyze diaspora clusters
-        >>> clusters = classifier.get_diaspora_clusters(min_size=5)
+        >>> # Get raw metrics
+        >>> labels = classifier.get_labels()
+        >>> sparse = labels.filter(pl.col('bucket_size') < 10)
+        >>> isolated = labels.filter(pl.col('isolation_score') > 0.5)
     """
 
     def __init__(
         self,
         embedding_dim: int = 384,
-        initial_bits: int = 14,
-        recovery_bits: int = 8,
-        dense_threshold: int = 10,
-        intra_outlier_std: float = 2.0,
-        recovery_cluster_min: int = 3,
-        seed: int = 31
+        num_bits: int = 14,
+        seed: int = 31,
+        isolation_k: int = 10,
+        isolation_sample_size: int = 1000,
     ):
         """
-        Initialize outlier classifier.
+        Initialize density classifier.
 
         Args:
             embedding_dim: Dimensionality of embeddings
-            initial_bits: Bits for initial PCA LSH
-            recovery_bits: Bits for recovery PCA (fewer = coarser)
-            dense_threshold: Min bucket size to be considered dense
-            intra_outlier_std: Std threshold for intra-bucket outliers
-            recovery_cluster_min: Min cluster size to be considered "recovered"
+            num_bits: Bits for PCA LSH (default: 14)
             seed: Random seed
+            isolation_k: Number of top neighbors for isolation score
+            isolation_sample_size: Sample size for median similarity computation
         """
         self.embedding_dim = embedding_dim
-        self.initial_bits = initial_bits
-        self.recovery_bits = recovery_bits
-        self.dense_threshold = dense_threshold
-        self.intra_outlier_std = intra_outlier_std
-        self.recovery_cluster_min = recovery_cluster_min
+        self.num_bits = num_bits
         self.seed = seed
+        self.isolation_k = isolation_k
+        self.isolation_sample_size = isolation_sample_size
 
         # Populated during fit()
         self.embeddings: Optional[np.ndarray] = None
         self.categories: Optional[List[str]] = None
         self.texts: Optional[List[str]] = None
 
-        # Classification results
-        self._diaspora_indices: List[int] = []
-        self._orphan_indices: List[int] = []
-        self._diaspora_clusters: List[BridgeCluster] = []
-        self._outlier_source_buckets: Dict[int, int] = {}  # global_idx -> original bucket
-
-        # Per-record labels (populated during fit)
-        self._bucket_ids: Optional[np.ndarray] = None  # Primary bucket for each record
-        self._statuses: Optional[List[str]] = None     # 'dense', 'diaspora', 'orphan'
-        self._recovery_bucket_ids: Optional[Dict[int, int]] = None  # For diaspora: recovery bucket
+        # Per-record metrics
+        self._bucket_ids: Optional[np.ndarray] = None
+        self._bucket_sizes: Optional[np.ndarray] = None
+        self._centroid_similarities: Optional[np.ndarray] = None
+        self._isolation_scores: Optional[np.ndarray] = None
 
         # Stats
         self._report: Optional[DensityReport] = None
+        self._pca_variance: float = 0.0
         self._fitted = False
 
         # TF-IDF components (for from_texts)
@@ -528,10 +480,6 @@ class DensityClassifier:
         # Polars integration
         self._source_df: Optional['pl.DataFrame'] = None
         self._embedding_col: Optional[str] = None
-
-        # Density metrics (computed during fit)
-        self._bucket_sizes: Optional[np.ndarray] = None
-        self._centroid_similarities: Optional[np.ndarray] = None
 
     @classmethod
     def from_polars(
@@ -550,7 +498,7 @@ class DensityClassifier:
             embedding_col: Column name containing embedding vectors (list of floats)
             category_col: Optional column name for category labels
             text_col: Optional column name for text content (enables labeling)
-            **kwargs: Additional args passed to __init__ (initial_bits, dense_threshold, etc.)
+            **kwargs: Additional args passed to __init__ (num_bits, seed, etc.)
 
         Returns:
             Fitted DensityClassifier instance
@@ -587,14 +535,13 @@ class DensityClassifier:
 
     def to_polars(self) -> 'pl.DataFrame':
         """
-        Return source DataFrame with density classification columns added.
+        Return source DataFrame with density metrics columns added.
 
         Returns DataFrame with original columns plus:
             - bucket_id: LSH bucket ID
-            - status: 'dense', 'bridge', or 'orphan'
             - bucket_size: Number of items in same bucket
             - centroid_similarity: Cosine similarity to bucket centroid (0-1)
-            - recovery_bucket_id: For bridge items, their recovery bucket (null for others)
+            - isolation_score: How isolated the item is
 
         Example:
             >>> classifier = DensityClassifier.from_polars(df, "embedding")
@@ -606,20 +553,12 @@ class DensityClassifier:
         if not self._fitted:
             raise ValueError("Must call fit() first")
 
-        n = len(self.embeddings)
-
-        # Build recovery bucket column (null for non-bridge)
-        recovery_buckets = [
-            self._recovery_bucket_ids.get(i) for i in range(n)
-        ]
-
         # Create labels DataFrame
         labels_df = pl.DataFrame({
             'bucket_id': self._bucket_ids.tolist(),
-            'status': [s.replace('diaspora', 'bridge') for s in self._statuses],
             'bucket_size': self._bucket_sizes.tolist(),
             'centroid_similarity': self._centroid_similarities.tolist(),
-            'recovery_bucket_id': recovery_buckets,
+            'isolation_score': self._isolation_scores.tolist(),
         })
 
         # If we have source DataFrame, join to it
@@ -627,6 +566,7 @@ class DensityClassifier:
             return pl.concat([self._source_df, labels_df], how="horizontal")
         else:
             # Add index column for manual joining
+            n = len(self.embeddings)
             return labels_df.with_columns(pl.Series("index", list(range(n))))
 
     @classmethod
@@ -639,9 +579,7 @@ class DensityClassifier:
         min_df: int = 2,
         max_df: float = 0.95,
         ngram_range: Tuple[int, int] = (1, 2),
-        initial_bits: int = 12,
-        recovery_bits: int = 8,
-        dense_threshold: int = 10,
+        num_bits: int = 12,
         verbose: bool = True,
         **kwargs
     ) -> 'DensityClassifier':
@@ -659,9 +597,7 @@ class DensityClassifier:
             min_df: Min document frequency for terms
             max_df: Max document frequency for terms
             ngram_range: N-gram range (default unigrams + bigrams)
-            initial_bits: Bits for initial LSH
-            recovery_bits: Bits for recovery LSH
-            dense_threshold: Min bucket size for dense
+            num_bits: Bits for PCA LSH
             verbose: Print progress
             **kwargs: Additional args passed to __init__
 
@@ -708,9 +644,7 @@ class DensityClassifier:
         # Create and fit classifier
         classifier = cls(
             embedding_dim=n_components,
-            initial_bits=initial_bits,
-            recovery_bits=recovery_bits,
-            dense_threshold=dense_threshold,
+            num_bits=num_bits,
             **kwargs
         )
 
@@ -731,7 +665,7 @@ class DensityClassifier:
         verbose: bool = True
     ) -> 'DensityClassifier':
         """
-        Fit the outlier classifier.
+        Fit the density classifier.
 
         Args:
             embeddings: (n, d) array of embedding vectors
@@ -754,21 +688,23 @@ class DensityClassifier:
         self.categories = categories or ["unknown"] * len(embeddings)
         self.texts = texts
 
+        n = len(embeddings)
+        d = embeddings.shape[1]
+
         if verbose:
-            print(f"Corpus size: {len(embeddings):,}")
+            print(f"Corpus size: {n:,}, dim: {d}")
 
         # Stage 1: Random hash → Centroids → PCA on centroids → Re-hash
-        # This is O(n*d*b + B*d²) instead of O(n*d²) where B << n
         if verbose:
-            print(f"\nStage 1: Centroid-based PCA LSH ({self.initial_bits} bits)...")
+            print(f"\nPCA-based LSH ({self.num_bits} bits)...")
 
         # Step 1a: Random hash
         rng = np.random.default_rng(self.seed)
-        random_hp = rng.standard_normal((self.initial_bits, embeddings.shape[1])).astype(np.float32)
+        random_hp = rng.standard_normal((self.num_bits, d)).astype(np.float32)
         random_hp = random_hp / np.linalg.norm(random_hp, axis=1, keepdims=True)
 
         signs_random = (embeddings @ random_hp.T) >= 0
-        powers = 2 ** np.arange(self.initial_bits)
+        powers = 2 ** np.arange(self.num_bits)
         hashes_random = (signs_random @ powers).astype(np.uint64)
 
         # Step 1b: Compute bucket centroids
@@ -779,7 +715,7 @@ class DensityClassifier:
         # Build centroid matrix (only for buckets with enough items)
         centroids = []
         for bid, indices in random_bucket_to_indices.items():
-            if len(indices) >= 2:  # Need at least 2 items for meaningful centroid
+            if len(indices) >= 2:
                 centroid = embeddings[indices].mean(axis=0)
                 norm = np.linalg.norm(centroid)
                 if norm > 0:
@@ -792,36 +728,37 @@ class DensityClassifier:
             print(f"  Centroids for PCA: {len(centroids):,}")
 
         # Step 1c: PCA on centroids
-        n_components = min(self.initial_bits, len(centroids) - 1)
-        pca1 = PCA(n_components=n_components)
-        pca1.fit(centroids)
-        hp1 = pca1.components_.astype(np.float32)
+        n_components = min(self.num_bits, len(centroids) - 1)
+        pca = PCA(n_components=n_components)
+        pca.fit(centroids)
+        hp = pca.components_.astype(np.float32)
+        self._pca_variance = float(pca.explained_variance_ratio_.sum())
 
         if verbose:
-            print(f"  Centroid PCA variance: {pca1.explained_variance_ratio_.sum():.1%}")
+            print(f"  Centroid PCA variance: {self._pca_variance:.1%}")
 
         # Step 1d: Re-hash with PCA hyperplanes
-        signs = (embeddings @ hp1.T) >= 0
-        hashes1 = (signs @ powers[:len(hp1)]).astype(np.uint64)
-        counts1 = Counter(hashes1)
+        signs = (embeddings @ hp.T) >= 0
+        hashes = (signs @ powers[:len(hp)]).astype(np.uint64)
 
-        # Store bucket IDs for all records
-        self._bucket_ids = hashes1.copy()
+        # Store bucket IDs
+        self._bucket_ids = hashes.copy()
 
+        # Build bucket mapping
         bucket_to_indices = defaultdict(list)
-        for idx, h in enumerate(hashes1):
+        for idx, h in enumerate(hashes):
             bucket_to_indices[int(h)].append(idx)
 
         num_buckets = len(bucket_to_indices)
 
-        # Compute density metrics: bucket_size and centroid_similarity
-        self._bucket_sizes = np.zeros(len(embeddings), dtype=np.int32)
-        self._centroid_similarities = np.zeros(len(embeddings), dtype=np.float32)
+        # Compute density metrics
+        self._bucket_sizes = np.zeros(n, dtype=np.int32)
+        self._centroid_similarities = np.zeros(n, dtype=np.float32)
 
         for bid, indices in bucket_to_indices.items():
             bucket_size = len(indices)
 
-            # Store bucket size for all items in this bucket
+            # Store bucket size
             for idx in indices:
                 self._bucket_sizes[idx] = bucket_size
 
@@ -836,246 +773,116 @@ class DensityClassifier:
                     for local_idx, idx in enumerate(indices):
                         self._centroid_similarities[idx] = float(sims[local_idx])
             elif bucket_size == 1:
-                # Single item is perfectly central to itself
                 self._centroid_similarities[indices[0]] = 1.0
 
-        # Identify outliers
-        sparse_bucket_outliers = []
-        intra_bucket_outliers = []
-        self._outlier_source_buckets = {}
-
-        for bid, indices in bucket_to_indices.items():
-            bucket_size = len(indices)
-
-            if bucket_size < self.dense_threshold:
-                # Entire bucket is sparse
-                for idx in indices:
-                    sparse_bucket_outliers.append(idx)
-                    self._outlier_source_buckets[idx] = bid
-            elif bucket_size >= 3:
-                # Check for intra-bucket outliers
-                bucket_embs = embeddings[indices]
-                centroid = bucket_embs.mean(axis=0)
-                centroid = centroid / np.linalg.norm(centroid)
-                sims = bucket_embs @ centroid
-
-                if sims.std() > 0.01:
-                    threshold = sims.mean() - self.intra_outlier_std * sims.std()
-                    for local_idx, sim in enumerate(sims):
-                        if sim < threshold:
-                            global_idx = indices[local_idx]
-                            intra_bucket_outliers.append(global_idx)
-                            self._outlier_source_buckets[global_idx] = bid
-
-        # Combine all outlier candidates
-        all_outliers = list(set(sparse_bucket_outliers + intra_bucket_outliers))
-
+        # Compute isolation scores
         if verbose:
-            print(f"  Sparse bucket outliers: {len(sparse_bucket_outliers):,}")
-            print(f"  Intra-bucket outliers: {len(intra_bucket_outliers):,}")
-            print(f"  Total candidates: {len(all_outliers):,}")
-
-        # Stage 2: Recovery attempt
-        if verbose:
-            print(f"\nStage 2: Recovery PCA ({self.recovery_bits} bits)...")
-
-        if len(all_outliers) < 10:
-            if verbose:
-                print("  Too few outliers for recovery analysis")
-            self._diaspora_indices = []
-            self._orphan_indices = all_outliers
-            self._recovery_bucket_ids = {}
-            # Build status labels
-            self._statuses = ['dense'] * len(embeddings)
-            for idx in all_outliers:
-                self._statuses[idx] = 'orphan'
-            self._fitted = True
-            self._build_report(
-                num_buckets, len(sparse_bucket_outliers),
-                len(intra_bucket_outliers), 0, 0.0
-            )
-            return self
-
-        outlier_embs = embeddings[all_outliers]
-
-        pca2 = PCA(n_components=min(self.recovery_bits, len(all_outliers) - 1))
-        pca2.fit(outlier_embs)
-        hp2 = pca2.components_[:self.recovery_bits].astype(np.float32)
-        recovery_variance = float(pca2.explained_variance_ratio_.sum())
-
-        signs2 = (outlier_embs @ hp2.T) >= 0
-        powers2 = 2 ** np.arange(hp2.shape[0])
-        hashes2 = (signs2 @ powers2).astype(np.uint64)
-        counts2 = Counter(hashes2)
-
-        # Classify: Bridge vs Orphans
-        recovery_bucket_to_local = defaultdict(list)
-        for local_idx, h in enumerate(hashes2):
-            recovery_bucket_to_local[int(h)].append(local_idx)
-
-        diaspora_indices = []
-        orphan_indices = []
-        self._recovery_bucket_ids = {}
-
-        for local_idx, h in enumerate(hashes2):
-            global_idx = all_outliers[local_idx]
-            if counts2[h] >= self.recovery_cluster_min:
-                diaspora_indices.append(global_idx)
-                self._recovery_bucket_ids[global_idx] = int(h)
-            else:
-                orphan_indices.append(global_idx)
-
-        self._diaspora_indices = diaspora_indices
-        self._orphan_indices = orphan_indices
-
-        # Build per-record status labels
-        self._statuses = ['dense'] * len(embeddings)
-        for idx in diaspora_indices:
-            self._statuses[idx] = 'diaspora'
-        for idx in orphan_indices:
-            self._statuses[idx] = 'orphan'
-
-        if verbose:
-            print(f"  Bridge (recovered): {len(diaspora_indices):,}")
-            print(f"  Orphans (unique): {len(orphan_indices):,}")
-
-        # Build diaspora clusters
-        self._diaspora_clusters = []
-        cluster_id = 0
-
-        for recovery_bid, local_indices in recovery_bucket_to_local.items():
-            if len(local_indices) < self.recovery_cluster_min:
-                continue
-
-            global_indices = [all_outliers[i] for i in local_indices]
-
-            # Coherence
-            cluster_embs = embeddings[global_indices]
-            n = len(cluster_embs)
-            sim_matrix = cluster_embs @ cluster_embs.T
-            coherence = float((sim_matrix.sum() - n) / (n * (n - 1)))
-
-            # Source buckets
-            source_buckets = Counter(
-                self._outlier_source_buckets[idx] for idx in global_indices
-            )
-
-            # Categories
-            cluster_cats = [self.categories[i] for i in global_indices]
-            cat_counts = Counter(cluster_cats).most_common()
-            dominant_cat = cat_counts[0][0] if cat_counts else "unknown"
-
-            self._diaspora_clusters.append(BridgeCluster(
-                cluster_id=cluster_id,
-                size=len(global_indices),
-                coherence=coherence,
-                global_indices=global_indices,
-                source_buckets=dict(source_buckets),
-                dominant_category=dominant_cat,
-                category_counts=cat_counts
-            ))
-            cluster_id += 1
-
-        self._diaspora_clusters.sort(key=lambda c: -c.size)
+            print(f"  Computing isolation scores...")
+        self._compute_isolation_scores()
 
         # Build report
-        recovery_clusters = sum(1 for c in counts2.values() if c >= self.recovery_cluster_min)
-        self._build_report(
-            num_buckets, len(sparse_bucket_outliers),
-            len(intra_bucket_outliers), recovery_clusters, recovery_variance
-        )
+        self._build_report(num_buckets)
+
+        if verbose:
+            print(f"  Buckets: {num_buckets:,}")
+            print(f"  Mean bucket size: {self._report.mean_bucket_size:.1f}")
+            print(f"  Mean isolation score: {self._report.mean_isolation_score:.4f}")
 
         self._fitted = True
         return self
 
-    def _build_report(
-        self,
-        num_buckets: int,
-        sparse_count: int,
-        intra_count: int,
-        recovery_clusters: int,
-        recovery_variance: float
-    ):
-        """Build the outlier report."""
-        total_candidates = len(self._diaspora_indices) + len(self._orphan_indices)
+    def _compute_isolation_scores(self):
+        """Compute isolation score for each item: top_k_mean - median."""
+        n = len(self.embeddings)
+        self._isolation_scores = np.zeros(n, dtype=np.float32)
 
-        # Orphan isolation analysis
-        if len(self._orphan_indices) > 0 and len(self.embeddings) > 100:
-            orphan_embs = self.embeddings[self._orphan_indices]
-            all_sims = orphan_embs @ self.embeddings.T
+        # Sample for median computation
+        rng = np.random.default_rng(self.seed + 12345)
+        sample_size = min(self.isolation_sample_size, n)
+        sample_indices = rng.choice(n, sample_size, replace=False)
 
-            for i, idx in enumerate(self._orphan_indices):
-                all_sims[i, idx] = -1  # Exclude self
+        k = self.isolation_k
 
-            orphan_nn_sims = all_sims.max(axis=1)
-            orphan_avg_nn = float(orphan_nn_sims.mean())
+        for i in range(n):
+            # Compute similarities to sample
+            sims = self.embeddings[i] @ self.embeddings[sample_indices].T
 
-            # Corpus baseline
-            rng = np.random.default_rng(42)
-            sample_indices = rng.choice(len(self.embeddings), min(1000, len(self.embeddings)), replace=False)
-            sample_embs = self.embeddings[sample_indices]
-            sample_sims = sample_embs @ self.embeddings.T
-            for i, idx in enumerate(sample_indices):
-                sample_sims[i, idx] = -1
-            corpus_nn_sims = sample_sims.max(axis=1)
-            corpus_avg_nn = float(corpus_nn_sims.mean())
-            corpus_std_nn = float(corpus_nn_sims.std())
+            # Exclude self if in sample
+            if i in sample_indices:
+                self_pos = np.where(sample_indices == i)[0]
+                if len(self_pos) > 0:
+                    sims[self_pos[0]] = -2.0
 
-            isolation_score = (corpus_avg_nn - orphan_avg_nn) / corpus_std_nn if corpus_std_nn > 0 else 0
-        else:
-            orphan_avg_nn = 0.0
-            corpus_avg_nn = 0.0
-            isolation_score = 0.0
+            # Sort descending
+            sorted_sims = np.sort(sims)[::-1]
 
-        # Category breakdowns
-        diaspora_cats = Counter(self.categories[i] for i in self._diaspora_indices)
-        orphan_cats = Counter(self.categories[i] for i in self._orphan_indices)
+            # Top-k mean (excluding self which would be 1.0)
+            top_k = sorted_sims[:k]
+            top_k_mean = top_k.mean()
 
-        dense_items = len(self.embeddings) - total_candidates
+            # Median
+            median = np.median(sorted_sims)
+
+            self._isolation_scores[i] = top_k_mean - median
+
+    def _build_report(self, num_buckets: int):
+        """Build the density report."""
+        # Bucket statistics
+        unique_bucket_sizes = {}
+        for bid, size in zip(self._bucket_ids, self._bucket_sizes):
+            unique_bucket_sizes[bid] = size
+
+        sizes = list(unique_bucket_sizes.values())
+        sizes.sort()
+
+        mean_bucket = np.mean(sizes) if sizes else 0.0
+        median_bucket = sizes[len(sizes) // 2] if sizes else 0
+        max_bucket = sizes[-1] if sizes else 0
+
+        # Category breakdown
+        cat_counts = Counter(self.categories).most_common()
 
         self._report = DensityReport(
             corpus_size=len(self.embeddings),
             num_buckets=num_buckets,
-            dense_items=dense_items,
-            sparse_bucket_outliers=sparse_count,
-            intra_bucket_outliers=intra_count,
-            total_outlier_candidates=total_candidates,
-            diaspora_count=len(self._diaspora_indices),
-            orphan_count=len(self._orphan_indices),
-            diaspora_pct=len(self._diaspora_indices) / total_candidates if total_candidates > 0 else 0,
-            orphan_pct=len(self._orphan_indices) / total_candidates if total_candidates > 0 else 0,
-            recovery_clusters=recovery_clusters,
-            recovery_variance_explained=recovery_variance,
-            orphan_avg_nn_similarity=orphan_avg_nn,
-            corpus_avg_nn_similarity=corpus_avg_nn,
-            orphan_isolation_score=isolation_score,
-            diaspora_categories=diaspora_cats.most_common(),
-            orphan_categories=orphan_cats.most_common()
+            mean_bucket_size=mean_bucket,
+            median_bucket_size=median_bucket,
+            max_bucket_size=max_bucket,
+            mean_centroid_similarity=float(self._centroid_similarities.mean()),
+            mean_isolation_score=float(self._isolation_scores.mean()),
+            pca_variance_explained=self._pca_variance,
+            category_counts=cat_counts,
         )
 
     def report(self) -> DensityReport:
-        """Get the outlier classification report."""
+        """Get the density classification report."""
         if not self._fitted:
             raise ValueError("Must call fit() first")
         return self._report
 
-    def get_diaspora(self) -> List[int]:
-        """Get indices of diaspora items."""
+    def get_bucket_ids(self) -> np.ndarray:
+        """Get bucket IDs for all items."""
         if not self._fitted:
             raise ValueError("Must call fit() first")
-        return list(self._diaspora_indices)
+        return self._bucket_ids.copy()
 
-    def get_orphans(self) -> List[int]:
-        """Get indices of orphan items."""
+    def get_bucket_sizes(self) -> np.ndarray:
+        """Get bucket sizes for all items."""
         if not self._fitted:
             raise ValueError("Must call fit() first")
-        return list(self._orphan_indices)
+        return self._bucket_sizes.copy()
 
-    def get_diaspora_clusters(self, min_size: int = 3) -> List[BridgeCluster]:
-        """Get diaspora clusters above min_size."""
+    def get_centroid_similarities(self) -> np.ndarray:
+        """Get centroid similarities for all items."""
         if not self._fitted:
             raise ValueError("Must call fit() first")
-        return [c for c in self._diaspora_clusters if c.size >= min_size]
+        return self._centroid_similarities.copy()
+
+    def get_isolation_scores(self) -> np.ndarray:
+        """Get isolation scores for all items."""
+        if not self._fitted:
+            raise ValueError("Must call fit() first")
+        return self._isolation_scores.copy()
 
     def get_labels(self) -> 'pl.DataFrame':
         """
@@ -1084,17 +891,15 @@ class DensityClassifier:
         Returns DataFrame with columns:
             - index: Record index (0-based)
             - bucket_id: Primary LSH bucket ID
-            - status: 'dense', 'bridge', or 'orphan'
             - bucket_size: Number of items in same bucket
-            - centroid_similarity: Cosine similarity to bucket centroid (0-1)
-            - recovery_bucket_id: For bridge items, their recovery bucket (null for others)
+            - centroid_similarity: Cosine similarity to bucket centroid
+            - isolation_score: How isolated the item is
             - category: Category label if provided during fit
 
         Example:
             >>> classifier.fit(embeddings, categories=categories)
             >>> labels = classifier.get_labels()
-            >>> orphans = labels.filter(pl.col('status') == 'orphan')
-            >>> sparse = labels.filter(pl.col('bucket_size') < 5)
+            >>> sparse = labels.filter(pl.col('bucket_size') < 10)
         """
         import polars as pl
 
@@ -1103,18 +908,12 @@ class DensityClassifier:
 
         n = len(self.embeddings)
 
-        # Build recovery bucket column (null for non-bridge)
-        recovery_buckets = [
-            self._recovery_bucket_ids.get(i) for i in range(n)
-        ]
-
         return pl.DataFrame({
             'index': list(range(n)),
             'bucket_id': self._bucket_ids.tolist(),
-            'status': [s.replace('diaspora', 'bridge') for s in self._statuses],
             'bucket_size': self._bucket_sizes.tolist(),
             'centroid_similarity': self._centroid_similarities.tolist(),
-            'recovery_bucket_id': recovery_buckets,
+            'isolation_score': self._isolation_scores.tolist(),
             'category': self.categories,
         })
 
@@ -1124,10 +923,9 @@ class DensityClassifier:
         model: str = "qwen2.5:7b",
         samples_per_bucket: int = 5,
         max_text_len: int = 200,
-        include_diaspora: bool = True,
         min_bucket_size: int = 5,
         verbose: bool = True
-    ) -> Dict[str, Dict]:
+    ) -> Dict[int, Dict]:
         """
         Generate descriptive labels for buckets using a local LLM.
 
@@ -1138,20 +936,18 @@ class DensityClassifier:
             model: Model name
             samples_per_bucket: Number of representative texts to send
             max_text_len: Max length of each sample text
-            include_diaspora: Also label diaspora recovery clusters
             min_bucket_size: Only label buckets with at least this many items
             verbose: Print progress
 
         Returns:
-            Dict with 'dense' and optionally 'diaspora' keys, each mapping
-            bucket_id -> {'label': str, 'size': int, 'samples': List[str]}
+            Dict mapping bucket_id -> {'label': str, 'size': int, 'samples': List[str]}
 
         Example:
             >>> labels = classifier.label_buckets(
             ...     base_url="http://localhost:11434/v1",
             ...     model="qwen2.5:7b"
             ... )
-            >>> print(labels['dense'][1234]['label'])
+            >>> print(labels[1234]['label'])
             'Reinforcement Learning'
         """
         from openai import OpenAI
@@ -1196,56 +992,31 @@ Label:"""
             top_local = np.argsort(sims)[-samples_per_bucket:][::-1]
             return [self.texts[indices[i]] for i in top_local]
 
-        results = {'dense': {}}
+        # Build bucket -> indices mapping
+        bucket_to_indices = defaultdict(list)
+        for idx, bucket_id in enumerate(self._bucket_ids):
+            bucket_to_indices[int(bucket_id)].append(idx)
 
-        # Build bucket -> indices mapping for dense buckets
-        dense_buckets = defaultdict(list)
-        for idx, (bucket_id, status) in enumerate(zip(self._bucket_ids, self._statuses)):
-            if status == 'dense':
-                dense_buckets[int(bucket_id)].append(idx)
-
-        # Label dense buckets
+        # Label buckets
         buckets_to_label = [
-            (bid, indices) for bid, indices in dense_buckets.items()
+            (bid, indices) for bid, indices in bucket_to_indices.items()
             if len(indices) >= min_bucket_size
         ]
 
         if verbose:
-            print(f"Labeling {len(buckets_to_label)} dense buckets...")
+            print(f"Labeling {len(buckets_to_label)} buckets...")
 
+        results = {}
         for i, (bucket_id, indices) in enumerate(buckets_to_label):
             samples = sample_from_indices(indices)
             label = get_label(samples)
-            results['dense'][bucket_id] = {
+            results[bucket_id] = {
                 'label': label,
                 'size': len(indices),
                 'samples': samples
             }
             if verbose and (i + 1) % 10 == 0:
                 print(f"  {i + 1}/{len(buckets_to_label)} buckets labeled")
-
-        # Label diaspora clusters
-        if include_diaspora and self._diaspora_clusters:
-            results['diaspora'] = {}
-            diaspora_to_label = [
-                c for c in self._diaspora_clusters
-                if c.size >= min_bucket_size
-            ]
-
-            if verbose:
-                print(f"Labeling {len(diaspora_to_label)} diaspora clusters...")
-
-            for i, cluster in enumerate(diaspora_to_label):
-                samples = sample_from_indices(cluster.global_indices)
-                label = get_label(samples)
-                results['diaspora'][cluster.cluster_id] = {
-                    'label': label,
-                    'size': cluster.size,
-                    'coherence': cluster.coherence,
-                    'samples': samples
-                }
-                if verbose and (i + 1) % 10 == 0:
-                    print(f"  {i + 1}/{len(diaspora_to_label)} diaspora clusters labeled")
 
         if verbose:
             print("Done.")
@@ -1256,11 +1027,10 @@ Label:"""
         self,
         top_k: int = 3,
         min_bucket_size: int = 5,
-        include_diaspora: bool = True,
         stopwords: Optional[set] = None,
         min_word_len: int = 3,
         use_tfidf: bool = True
-    ) -> Dict[str, Dict]:
+    ) -> Dict[int, Dict]:
         """
         Generate labels for buckets using keyword extraction (no LLM required).
 
@@ -1269,22 +1039,19 @@ Label:"""
         Args:
             top_k: Number of top keywords to include in label
             min_bucket_size: Only label buckets with at least this many items
-            include_diaspora: Also label diaspora recovery clusters
             stopwords: Set of words to exclude (uses default if None)
             min_word_len: Minimum word length to consider
             use_tfidf: Use TF-IDF weighting (vs simple frequency)
 
         Returns:
-            Dict with 'dense' and optionally 'diaspora' keys, each mapping
-            bucket_id -> {'label': str, 'keywords': List[Tuple[str, float]], 'size': int}
+            Dict mapping bucket_id -> {'label': str, 'keywords': List[Tuple[str, float]], 'size': int}
 
         Example:
             >>> labels = classifier.label_buckets_keywords()
-            >>> print(labels['dense'][1234]['label'])
+            >>> print(labels[1234]['label'])
             'neural network training'
         """
         import re
-        from collections import Counter
         import math
 
         if not self._fitted:
@@ -1292,7 +1059,7 @@ Label:"""
         if self.texts is None:
             raise ValueError("Texts required for labeling. Pass texts to fit().")
 
-        # Default stopwords (common English + academic)
+        # Default stopwords
         default_stopwords = {
             'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
             'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'been',
@@ -1305,7 +1072,6 @@ Label:"""
             'just', 'also', 'now', 'here', 'there', 'then', 'once', 'if', 'any',
             'about', 'into', 'through', 'during', 'before', 'after', 'above',
             'below', 'between', 'under', 'over', 'out', 'up', 'down', 'off',
-            # Academic common words
             'paper', 'study', 'research', 'results', 'method', 'methods', 'approach',
             'proposed', 'propose', 'show', 'shows', 'shown', 'using', 'used', 'use',
             'based', 'problem', 'problems', 'work', 'new', 'novel', 'present',
@@ -1323,14 +1089,11 @@ Label:"""
         stops = stopwords if stopwords is not None else default_stopwords
 
         def tokenize(text: str) -> List[str]:
-            """Extract words from text."""
             text = text.lower()
             words = re.findall(r'\b[a-z]+\b', text)
             return [w for w in words if len(w) >= min_word_len and w not in stops]
 
         def get_keywords(indices: List[int], corpus_freqs: Counter) -> List[Tuple[str, float]]:
-            """Extract top keywords from bucket texts."""
-            # Count words in this bucket
             bucket_words = []
             for idx in indices:
                 bucket_words.extend(tokenize(self.texts[idx]))
@@ -1341,7 +1104,6 @@ Label:"""
             word_counts = Counter(bucket_words)
 
             if use_tfidf and corpus_freqs:
-                # TF-IDF: upweight words rare in corpus but common in bucket
                 n_docs = len(self.texts)
                 scores = {}
                 for word, count in word_counts.items():
@@ -1351,99 +1113,35 @@ Label:"""
                     scores[word] = tf * idf
                 return sorted(scores.items(), key=lambda x: -x[1])[:top_k]
             else:
-                # Simple frequency
                 return word_counts.most_common(top_k)
 
-        # Build corpus document frequencies for TF-IDF
+        # Build corpus document frequencies
         corpus_freqs = Counter()
         if use_tfidf:
             for text in self.texts:
                 unique_words = set(tokenize(text))
                 corpus_freqs.update(unique_words)
 
-        results = {'dense': {}}
+        # Build bucket -> indices mapping
+        bucket_to_indices = defaultdict(list)
+        for idx, bucket_id in enumerate(self._bucket_ids):
+            bucket_to_indices[int(bucket_id)].append(idx)
 
-        # Build bucket -> indices mapping for dense buckets
-        dense_buckets = defaultdict(list)
-        for idx, (bucket_id, status) in enumerate(zip(self._bucket_ids, self._statuses)):
-            if status == 'dense':
-                dense_buckets[int(bucket_id)].append(idx)
-
-        # Label dense buckets
-        for bucket_id, indices in dense_buckets.items():
+        results = {}
+        for bucket_id, indices in bucket_to_indices.items():
             if len(indices) < min_bucket_size:
                 continue
 
             keywords = get_keywords(indices, corpus_freqs)
             label = ' '.join(kw for kw, _ in keywords) if keywords else '[no keywords]'
 
-            results['dense'][bucket_id] = {
+            results[bucket_id] = {
                 'label': label,
                 'keywords': keywords,
                 'size': len(indices)
             }
 
-        # Label diaspora clusters
-        if include_diaspora and self._diaspora_clusters:
-            results['diaspora'] = {}
-
-            for cluster in self._diaspora_clusters:
-                if cluster.size < min_bucket_size:
-                    continue
-
-                keywords = get_keywords(cluster.global_indices, corpus_freqs)
-                label = ' '.join(kw for kw, _ in keywords) if keywords else '[no keywords]'
-
-                results['diaspora'][cluster.cluster_id] = {
-                    'label': label,
-                    'keywords': keywords,
-                    'size': cluster.size,
-                    'coherence': cluster.coherence
-                }
-
         return results
-
-    def print_diaspora_cluster(self, cluster: BridgeCluster, n_samples: int = 5):
-        """Print details of a diaspora cluster."""
-        print(f"\nBridge Cluster {cluster.cluster_id}")
-        print(f"  Size: {cluster.size}")
-        print(f"  Coherence: {cluster.coherence:.4f}")
-        print(f"  From {len(cluster.source_buckets)} original buckets")
-        print(f"  Categories: {cluster.category_counts[:3]}")
-
-        if self.texts:
-            print(f"  Samples:")
-            centroid = self.embeddings[cluster.global_indices].mean(axis=0)
-            centroid = centroid / np.linalg.norm(centroid)
-            sims = self.embeddings[cluster.global_indices] @ centroid
-            top_local = np.argsort(sims)[-n_samples:][::-1]
-
-            for local_idx in top_local:
-                global_idx = cluster.global_indices[local_idx]
-                text = self.texts[global_idx][:70]
-                print(f"    - {text}...")
-
-    def print_orphans(self, n_samples: int = 10):
-        """Print sample orphan items."""
-        if not self._fitted:
-            raise ValueError("Must call fit() first")
-
-        print(f"\nSample Orphans ({len(self._orphan_indices)} total):")
-
-        # Sort by isolation (lowest NN similarity first)
-        if len(self._orphan_indices) > 0:
-            orphan_embs = self.embeddings[self._orphan_indices]
-            all_sims = orphan_embs @ self.embeddings.T
-            for i, idx in enumerate(self._orphan_indices):
-                all_sims[i, idx] = -1
-            nn_sims = all_sims.max(axis=1)
-            order = np.argsort(nn_sims)
-
-            for i in order[:n_samples]:
-                idx = self._orphan_indices[i]
-                cat = self.categories[idx][:25]
-                text = self.texts[idx][:50] if self.texts else ""
-                print(f"  [NN={nn_sims[i]:.3f}] {cat}: {text}...")
 
 
 def demo():
@@ -1472,33 +1170,19 @@ def demo():
     # Print report
     print(classifier.report())
 
-    # Show diaspora clusters
-    print("\n" + "=" * 70)
-    print("TOP DIASPORA CLUSTERS")
-    print("=" * 70)
-
-    clusters = classifier.get_diaspora_clusters(min_size=10)
-    for cluster in clusters[:3]:
-        classifier.print_diaspora_cluster(cluster)
-
-    # Show orphans
-    print("\n" + "=" * 70)
-    print("MOST ISOLATED ORPHANS")
-    print("=" * 70)
-    classifier.print_orphans(n_samples=10)
-
     # Show labels DataFrame
     print("\n" + "=" * 70)
     print("RECORD LABELS")
     print("=" * 70)
     labels = classifier.get_labels()
     print(f"\nDataFrame shape: {labels.shape}")
-    print(f"\nStatus counts:")
-    print(labels.group_by('status').len().sort('len', descending=True))
-    print(f"\nSample diaspora records:")
-    print(labels.filter(pl.col('status') == 'diaspora').head(5))
-    print(f"\nAll orphan records:")
-    print(labels.filter(pl.col('status') == 'orphan'))
+    print(f"\nBucket size distribution:")
+    print(labels.group_by(
+        pl.col('bucket_size').cut([1, 5, 10, 50, 100, 500])
+    ).len().sort('bucket_size'))
+
+    print(f"\nMost isolated items:")
+    print(labels.sort('isolation_score', descending=True).head(10))
 
 
 if __name__ == "__main__":
