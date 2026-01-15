@@ -851,10 +851,11 @@ class DensityClassifier:
 
         powers = 2 ** np.arange(len(hp))
 
-        # Compute bucket assignments for each seed (including main seed)
+        # Compute bucket assignments for each seed
+        # Start offset at 1 to avoid correlation with base hyperplanes
         all_bucket_ids = []
         for seed_idx in range(num_seeds):
-            seed_offset = seed_idx * 1000
+            seed_offset = (seed_idx + 1) * 1000
             rng = np.random.default_rng(self.seed + seed_offset)
 
             # Add small random perturbation to hyperplanes
