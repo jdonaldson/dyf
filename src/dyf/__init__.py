@@ -28,12 +28,14 @@ try:
     from dyf_rs import (
         DensityClassifier,
         DensityReport,
+        BridgeAnalysis,
     )
     _HAS_RUST = True
 except ImportError:
     _HAS_RUST = False
     DensityClassifier = None
     DensityReport = None
+    BridgeAnalysis = None
 
 # Python wrapper with full features (embedder configs, labeling, etc.)
 from .classifier import (
@@ -53,6 +55,7 @@ __all__ = [
     # Fast Rust core
     "DensityClassifier",
     "DensityReport",
+    "BridgeAnalysis",
     # Full Python wrapper
     "DensityClassifierFull",
     "DensityReportFull",
