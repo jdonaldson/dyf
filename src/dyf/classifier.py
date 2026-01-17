@@ -25,6 +25,7 @@ from enum import Enum
 
 if TYPE_CHECKING:
     import polars as pl
+    import pandas as pd
 from dataclasses import dataclass
 from collections import Counter, defaultdict
 from sklearn.decomposition import PCA
@@ -488,6 +489,9 @@ class DensityClassifier:
         self._source_df: Optional['pl.DataFrame'] = None
         self._embedding_col: Optional[str] = None
 
+        # Pandas integration
+        self._source_pandas_df: Optional['pd.DataFrame'] = None
+
     @classmethod
     def from_polars(
         cls,
@@ -577,6 +581,97 @@ class DensityClassifier:
             # Add index column for manual joining
             n = len(self.embeddings)
             return labels_df.with_columns(pl.Series("index", list(range(n))))
+
+    @classmethod
+    def from_pandas(
+        cls,
+        df: 'pd.DataFrame',
+        embedding_col: str,
+        category_col: Optional[str] = None,
+        text_col: Optional[str] = None,
+        **kwargs
+    ) -> 'DensityClassifier':
+        """
+        Create classifier from a Pandas DataFrame.
+
+        Args:
+            df: Pandas DataFrame with embeddings
+            embedding_col: Column name containing embedding vectors (list of floats)
+            category_col: Optional column name for category labels
+            text_col: Optional column name for text content (enables labeling)
+            **kwargs: Additional args passed to __init__ (num_bits, seed, etc.)
+
+        Returns:
+            Fitted DensityClassifier instance
+
+        Example:
+            >>> df = pd.read_parquet("embeddings.parquet")
+            >>> classifier = DensityClassifier.from_pandas(
+            ...     df,
+            ...     embedding_col="embedding",
+            ...     category_col="category"
+            ... )
+            >>> result = classifier.to_pandas()
+        """
+        # Extract embeddings
+        embeddings = np.array(df[embedding_col].tolist(), dtype=np.float32)
+
+        # Extract optional columns
+        categories = df[category_col].tolist() if category_col else None
+        texts = df[text_col].tolist() if text_col else None
+
+        # Create classifier
+        classifier = cls(embedding_dim=embeddings.shape[1], **kwargs)
+
+        # Store reference to source DataFrame
+        classifier._source_pandas_df = df
+        classifier._embedding_col = embedding_col
+
+        # Fit
+        classifier.fit(embeddings, categories=categories, texts=texts)
+
+        return classifier
+
+    def to_pandas(self) -> 'pd.DataFrame':
+        """
+        Return source DataFrame with density metrics columns added.
+
+        Returns DataFrame with original columns plus:
+            - bucket_id: LSH bucket ID
+            - bucket_size: Number of items in same bucket
+            - centroid_similarity: Cosine similarity to bucket centroid (0-1)
+            - isolation_score: How isolated the item is
+            - stability_score: How stable bucket assignment is (0-1)
+
+        Example:
+            >>> classifier = DensityClassifier.from_pandas(df, "embedding")
+            >>> result = classifier.to_pandas()
+            >>> sparse = result[result["bucket_size"] < 5]
+        """
+        import pandas as pd
+
+        if not self._fitted:
+            raise ValueError("Must call fit() first")
+
+        # Create labels DataFrame
+        labels_df = pd.DataFrame({
+            'bucket_id': self._bucket_ids.tolist(),
+            'bucket_size': self._bucket_sizes.tolist(),
+            'centroid_similarity': self._centroid_similarities.tolist(),
+            'isolation_score': self._isolation_scores.tolist(),
+            'stability_score': self._stability_scores.tolist(),
+        })
+
+        # If we have source DataFrame, join to it
+        if self._source_pandas_df is not None:
+            return pd.concat(
+                [self._source_pandas_df.reset_index(drop=True), labels_df],
+                axis=1
+            )
+        else:
+            # Add index column for manual joining
+            labels_df['index'] = range(len(self.embeddings))
+            return labels_df
 
     @classmethod
     def from_texts(

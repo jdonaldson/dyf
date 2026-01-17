@@ -38,6 +38,7 @@ dev = [
 full = [
     "pyarrow>=10.0",
     "polars>=0.19",
+    "pandas>=1.5",
     "scikit-learn>=1.0",
     "sentence-transformers>=2.2",
     "openai>=1.0",
