@@ -1,9 +1,5 @@
 # DYF - Density Yields Features
 
-[![Interactive Demo](assets/wiki_graph_header.png)](https://jdonaldson.github.io/dyf/)
-
-*50,000 Wikipedia articles clustered by semantic similarity. Bright lines show density-based bridges connecting clusters. [Try the interactive demo →](https://jdonaldson.github.io/dyf/)*
-
 Discover structure in embedding spaces. DYF uses density-based LSH to reveal the natural organization of your data:
 
 - **Dense**: Core items in well-populated semantic regions

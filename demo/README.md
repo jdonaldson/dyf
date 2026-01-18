@@ -42,6 +42,3 @@ Generates an interactive HTML file with:
 - Scroll to zoom, click+drag to pan
 - Hover for article titles
 
-### Live Demo
-
-See the visualization in action: https://jdonaldson.github.io/dyf/
