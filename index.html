@@ -14,6 +14,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
+            justify-content: center;
             padding: 2rem;
         }
         h1 {
@@ -27,34 +28,6 @@
             font-size: 1.2rem;
             color: #888;
             margin-bottom: 2rem;
-        }
-        .demo-link {
-            display: inline-block;
-            background: linear-gradient(135deg, #4ECDC4, #45B7D1);
-            color: #1a1a1a;
-            text-decoration: none;
-            padding: 1rem 2rem;
-            border-radius: 8px;
-            font-weight: 600;
-            font-size: 1.1rem;
-            margin-bottom: 2rem;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        .demo-link:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(78, 205, 196, 0.3);
-        }
-        .preview {
-            max-width: 900px;
-            width: 100%;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-            margin-bottom: 2rem;
-        }
-        .preview img {
-            width: 100%;
-            display: block;
         }
         .links {
             display: flex;
@@ -78,14 +51,6 @@
 <body>
     <h1><span>dyf</span></h1>
     <p class="tagline">Density-based classification with LSH</p>
-
-    <a href="wiki_visualization.html" class="demo-link">Explore Interactive Demo</a>
-
-    <div class="preview">
-        <a href="wiki_visualization.html">
-            <img src="wiki_knowledge_graph.png" alt="Wikipedia Knowledge Graph visualization">
-        </a>
-    </div>
 
     <div class="links">
         <a href="https://github.com/jdonaldson/dyf">GitHub</a>
