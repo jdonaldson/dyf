@@ -5,11 +5,12 @@ Generates an interactive visualization of Wikipedia article embeddings,
 showing clusters and density-based bridges between them.
 
 Requirements:
-    pip install dyf umap-learn plotly scikit-learn requests
+    pip install dyf umap-learn plotly scikit-learn requests datashader
 
 Usage:
     python wiki_visualization.py embeddings.parquet --output wiki_graph.html
     python wiki_visualization.py embeddings.parquet --label-with-ollama
+    python wiki_visualization.py embeddings.parquet --color-mode bridges  # Color by bridge connections
 """
 
 import argparse
@@ -171,6 +172,98 @@ def compute_edge_bundles(
                 heavy_y.append(y)
 
     return medium_x, medium_y, heavy_x, heavy_y
+
+
+def compute_bridge_connections(
+    bridge_analysis: BridgeAnalysis,
+    n_points: int
+) -> np.ndarray:
+    """Compute number of bucket connections per point.
+
+    Returns array where connection_counts[i] = number of buckets point i connects to.
+    Non-bridge points have 0 connections.
+    """
+    connection_counts = np.zeros(n_points, dtype=np.int32)
+    for i in range(len(bridge_analysis.bridge_indices)):
+        point_idx, primary_bucket, neighbor_buckets = bridge_analysis.get_bridge_connections(i)
+        connection_counts[point_idx] = len(neighbor_buckets) + 1  # primary + neighbors
+    return connection_counts
+
+
+def compute_weighted_edge_bundles(
+    coords_2d: np.ndarray,
+    bridge_analysis: BridgeAnalysis,
+    classifier: DensityClassifier,
+    n_top_pairs: int = 300,
+    max_edges_per_pair: int = 5
+) -> Tuple[List[Tuple[List[float], List[float]]], List[int], List[Tuple[int, int]]]:
+    """Compute edge-bundled paths with weights for variable styling.
+
+    Returns (edge_paths, edge_weights, edge_point_pairs) where:
+    - edge_paths: list of (x_coords, y_coords) for each bundled edge
+    - edge_weights: connection count for each edge
+    - edge_point_pairs: (point_idx1, point_idx2) for each edge
+    """
+    import pandas as pd
+    from datashader.bundling import hammer_bundle
+
+    bucket_ids = classifier.get_bucket_ids()
+    bridge_indices = set(bridge_analysis.bridge_indices)
+
+    bucket_to_bridges = defaultdict(list)
+    for idx in bridge_indices:
+        bucket_to_bridges[bucket_ids[idx]].append(idx)
+
+    top_pairs = bridge_analysis.top_connected_pairs(n_top_pairs)
+
+    all_bridge_indices = sorted(bridge_indices)
+    idx_to_node = {idx: i for i, idx in enumerate(all_bridge_indices)}
+    nodes_data = [{'x': coords_2d[idx, 0], 'y': coords_2d[idx, 1]} for idx in all_bridge_indices]
+    nodes_df = pd.DataFrame(nodes_data)
+
+    all_edges = []
+    edge_weights = []
+    edge_point_pairs = []
+    rng = np.random.default_rng(42)
+
+    for bucket1, bucket2, count in top_pairs:
+        bridges1 = bucket_to_bridges.get(bucket1, [])
+        bridges2 = bucket_to_bridges.get(bucket2, [])
+        if not bridges1 or not bridges2:
+            continue
+        sample1 = rng.choice(bridges1, min(max_edges_per_pair, len(bridges1)), replace=False)
+        sample2 = rng.choice(bridges2, min(max_edges_per_pair, len(bridges2)), replace=False)
+        for idx1 in sample1:
+            for idx2 in sample2:
+                all_edges.append({'source': idx_to_node[idx1], 'target': idx_to_node[idx2]})
+                edge_weights.append(count)
+                edge_point_pairs.append((int(idx1), int(idx2)))
+
+    if not all_edges:
+        return [], [], []
+
+    edges_df = pd.DataFrame(all_edges)
+    bundled = hammer_bundle(nodes_df, edges_df)
+
+    # Parse bundled paths
+    edge_paths = []
+    current_path_x = []
+    current_path_y = []
+
+    for x, y in zip(bundled['x'], bundled['y']):
+        if pd.isna(x):
+            if current_path_x:
+                edge_paths.append((current_path_x.copy(), current_path_y.copy()))
+                current_path_x = []
+                current_path_y = []
+        else:
+            current_path_x.append(float(x))
+            current_path_y.append(float(y))
+
+    if current_path_x:
+        edge_paths.append((current_path_x, current_path_y))
+
+    return edge_paths, edge_weights[:len(edge_paths)], edge_point_pairs[:len(edge_paths)]
 
 
 def cluster_points(
@@ -380,6 +473,171 @@ def create_visualization(
     return fig
 
 
+def create_bridge_visualization(
+    coords_2d: np.ndarray,
+    texts: List[str],
+    connection_counts: np.ndarray,
+    edge_paths: List[Tuple[List[float], List[float]]],
+    edge_weights: List[int],
+    edge_point_pairs: List[Tuple[int, int]],
+    title: str = "Wikipedia Knowledge Graph",
+    bg_color: str = "#2a2a2a"
+) -> str:
+    """Create visualization colored by bridge connections with hover highlighting.
+
+    Returns HTML string with embedded JavaScript for interactivity.
+    """
+    if go is None:
+        raise ImportError("plotly required: pip install plotly")
+
+    import matplotlib.pyplot as plt
+
+    max_conn = connection_counts.max() if connection_counts.max() > 0 else 1
+    cmap = plt.cm.plasma
+
+    # Colors by connection count
+    colors = []
+    for count in connection_counts:
+        if count == 0:
+            colors.append('rgba(60,60,70,0.4)')
+        else:
+            norm = count / max_conn
+            c = cmap(norm)
+            alpha = 0.5 + 0.4 * norm
+            colors.append(f'rgba({int(c[0]*255)},{int(c[1]*255)},{int(c[2]*255)},{alpha:.2f})')
+
+    sizes = np.where(connection_counts > 0, 3 + 5 * (connection_counts / max_conn), 2).tolist()
+
+    # Build point -> edge mapping for JS
+    point_to_edges = defaultdict(list)
+    for edge_idx, (p1, p2) in enumerate(edge_point_pairs):
+        point_to_edges[p1].append(edge_idx)
+        point_to_edges[p2].append(edge_idx)
+
+    # Normalize weights for styling
+    if edge_weights:
+        weights = np.array(edge_weights)
+        min_w, max_w = weights.min(), weights.max()
+        norm_weights = (weights - min_w) / (max_w - min_w) if max_w > min_w else np.ones_like(weights) * 0.5
+    else:
+        norm_weights = np.array([])
+
+    fig = go.Figure()
+
+    # Background edges with weighted opacity
+    n_bins = 5
+    if len(norm_weights) > 0:
+        weight_bins = np.digitize(norm_weights, np.linspace(0, 1, n_bins + 1)[1:-1])
+
+        for bin_idx in range(n_bins):
+            bin_mask = weight_bins == bin_idx
+            if not bin_mask.any():
+                continue
+
+            opacity = 0.005 + 0.02 * (bin_idx / (n_bins - 1))
+            width = 0.5 + 1.0 * (bin_idx / (n_bins - 1))
+
+            bin_x = []
+            bin_y = []
+            for i, (px, py) in enumerate(edge_paths):
+                if bin_mask[i]:
+                    bin_x.extend(list(px) + [None])
+                    bin_y.extend(list(py) + [None])
+
+            fig.add_trace(go.Scattergl(
+                x=bin_x, y=bin_y,
+                mode='lines',
+                line=dict(color=f'rgba(180,200,255,{opacity})', width=width),
+                hoverinfo='skip',
+                showlegend=False
+            ))
+
+    # Highlight trace (populated by JS on hover)
+    fig.add_trace(go.Scattergl(
+        x=[None], y=[None],
+        mode='lines',
+        line=dict(color='rgba(255,220,100,0.8)', width=2.5),
+        hoverinfo='skip',
+        showlegend=False,
+        name='highlight'
+    ))
+
+    # Points (on top for hover)
+    fig.add_trace(go.Scattergl(
+        x=coords_2d[:, 0].tolist(),
+        y=coords_2d[:, 1].tolist(),
+        mode='markers',
+        marker=dict(color=colors, size=sizes, line=dict(width=0)),
+        text=[f"{texts[i]} ({connection_counts[i]} connections)" for i in range(len(texts))],
+        customdata=list(range(len(texts))),
+        hovertemplate='%{text}<extra></extra>',
+        name='Points'
+    ))
+
+    fig.update_layout(
+        title=dict(
+            text=f'<b>{title}</b><br><sup>{len(texts):,} points | Colored by bridge connections | Hover to highlight edges</sup>',
+            font=dict(size=20, color='white', family='Arial'),
+            x=0.5, xanchor='center'
+        ),
+        showlegend=False,
+        dragmode='pan',
+        hovermode='closest',
+        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False, showline=False),
+        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False, showline=False),
+        plot_bgcolor=bg_color,
+        paper_bgcolor=bg_color,
+        width=1400, height=1000,
+        margin=dict(l=20, r=20, t=80, b=20)
+    )
+
+    # Generate HTML with custom JS for hover highlighting
+    html_content = fig.to_html(config={'scrollZoom': True}, include_plotlyjs=True, full_html=True)
+
+    # Prepare edge data for JS
+    edge_data_for_js = [{'x': list(px), 'y': list(py)} for px, py in edge_paths]
+
+    custom_js = f'''
+<script>
+const edgeData = {json.dumps(edge_data_for_js)};
+const pointToEdges = {json.dumps({{str(k): v for k, v in point_to_edges.items()}})};
+
+document.addEventListener('DOMContentLoaded', function() {{
+    const plotDiv = document.querySelector('.plotly-graph-div');
+    if (!plotDiv) return;
+
+    const numTraces = plotDiv.data.length;
+    const highlightTraceIdx = numTraces - 2;
+
+    plotDiv.on('plotly_hover', function(data) {{
+        if (!data.points || !data.points[0]) return;
+        const pt = data.points[0];
+        if (pt.curveNumber !== numTraces - 1) return;
+
+        const pointIdx = pt.customdata;
+        const edgeIndices = pointToEdges[String(pointIdx)] || [];
+        if (edgeIndices.length === 0) return;
+
+        let hx = [], hy = [];
+        for (const ei of edgeIndices) {{
+            if (ei < edgeData.length) {{
+                hx = hx.concat(edgeData[ei].x, [null]);
+                hy = hy.concat(edgeData[ei].y, [null]);
+            }}
+        }}
+        Plotly.restyle(plotDiv, {{x: [hx], y: [hy]}}, [highlightTraceIdx]);
+    }});
+
+    plotDiv.on('plotly_unhover', function() {{
+        Plotly.restyle(plotDiv, {{x: [[null]], y: [[null]]}}, [highlightTraceIdx]);
+    }});
+}});
+</script>
+'''
+    html_content = html_content.replace('</body>', custom_js + '</body>')
+    return html_content
+
+
 def main():
     parser = argparse.ArgumentParser(description='Generate Wikipedia knowledge graph visualization')
     parser.add_argument('input', help='Path to embeddings parquet file')
@@ -389,6 +647,8 @@ def main():
     parser.add_argument('--ollama-model', default='gemma2:9b', help='Ollama model for labeling')
     parser.add_argument('--title', default='Wikipedia Knowledge Graph', help='Visualization title')
     parser.add_argument('--seed', type=int, default=42, help='Random seed')
+    parser.add_argument('--color-mode', choices=['centroid', 'bridges'], default='centroid',
+                        help='Color mode: centroid (similarity) or bridges (connection count)')
     args = parser.parse_args()
 
     # Load data
@@ -427,30 +687,50 @@ def main():
     else:
         cluster_names = {i: f"Cluster {i}" for i in range(args.n_clusters)}
 
-    # Compute edge bundles
-    print("Computing edge bundles...")
-    medium_x, medium_y, heavy_x, heavy_y = compute_edge_bundles(
-        coords_2d, bridge_analysis, classifier
-    )
-    print(f"  Medium edges: {sum(1 for x in medium_x if x is None)} paths")
-    print(f"  Heavy edges: {sum(1 for x in heavy_x if x is None)} paths")
+    if args.color_mode == 'bridges':
+        # Bridge connections visualization with hover highlighting
+        print("Computing bridge connections...")
+        connection_counts = compute_bridge_connections(bridge_analysis, len(embeddings))
+        print(f"  {(connection_counts > 0).sum()} bridge points, max {connection_counts.max()} connections")
 
-    # Get centroid similarities and bucket sizes
-    centroid_similarities = np.array(classifier.get_centroid_similarities())
-    bucket_sizes = np.array(classifier.get_bucket_sizes())
+        print("Computing weighted edge bundles...")
+        edge_paths, edge_weights, edge_point_pairs = compute_weighted_edge_bundles(
+            coords_2d, bridge_analysis, classifier
+        )
+        print(f"  {len(edge_paths)} edge paths")
 
-    # Create visualization
-    print("Creating visualization...")
-    fig = create_visualization(
-        coords_2d, texts, cluster_labels, cluster_names, cluster_to_indices,
-        (medium_x, medium_y), (heavy_x, heavy_y),
-        centroid_similarities=centroid_similarities,
-        bucket_sizes=bucket_sizes,
-        title=args.title
-    )
+        print("Creating bridge visualization...")
+        html_content = create_bridge_visualization(
+            coords_2d, texts, connection_counts,
+            edge_paths, edge_weights, edge_point_pairs,
+            title=args.title
+        )
 
-    # Save
-    fig.write_html(args.output, config={'scrollZoom': True, 'displayModeBar': True})
+        with open(args.output, 'w') as f:
+            f.write(html_content)
+    else:
+        # Default centroid similarity visualization
+        print("Computing edge bundles...")
+        medium_x, medium_y, heavy_x, heavy_y = compute_edge_bundles(
+            coords_2d, bridge_analysis, classifier
+        )
+        print(f"  Medium edges: {sum(1 for x in medium_x if x is None)} paths")
+        print(f"  Heavy edges: {sum(1 for x in heavy_x if x is None)} paths")
+
+        centroid_similarities = np.array(classifier.get_centroid_similarities())
+        bucket_sizes = np.array(classifier.get_bucket_sizes())
+
+        print("Creating visualization...")
+        fig = create_visualization(
+            coords_2d, texts, cluster_labels, cluster_names, cluster_to_indices,
+            (medium_x, medium_y), (heavy_x, heavy_y),
+            centroid_similarities=centroid_similarities,
+            bucket_sizes=bucket_sizes,
+            title=args.title
+        )
+
+        fig.write_html(args.output, config={'scrollZoom': True, 'displayModeBar': True})
+
     print(f"Saved to {args.output}")
 
 
