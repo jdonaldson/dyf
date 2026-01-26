@@ -49,6 +49,31 @@ from .classifier import (
 # Index serialization
 from .io import save_index, load_index, PrecomputedIndex
 
+# RAG index
+from .rag import (
+    BridgeIndex,
+    SuperConnectorResult,
+    OrthogonalAnchorResult,
+    FacetDiverseResult,
+    DAGChain,
+    DAGMiningResult,
+    DAGTaxonomy,
+    UnifiedOntologyResult,
+    ROGLayer,
+    ROGResult,
+    HubScoreResult,
+    find_super_connectors,
+    select_orthogonal_anchors,
+    diversify_by_facet,
+    get_kmeans_init,
+    compute_neighbor_diversity,
+    compute_hub_score,
+    mine_dag_chains,
+    build_dag_taxonomy,
+    build_unified_ontology,
+    build_rog_ontology,
+)
+
 from importlib.metadata import version as _get_version
 __version__ = _get_version("dyf")
 __all__ = [
@@ -66,6 +91,28 @@ __all__ = [
     "save_index",
     "load_index",
     "PrecomputedIndex",
+    # RAG index
+    "BridgeIndex",
+    "SuperConnectorResult",
+    "OrthogonalAnchorResult",
+    "FacetDiverseResult",
+    "DAGChain",
+    "DAGMiningResult",
+    "find_super_connectors",
+    "select_orthogonal_anchors",
+    "diversify_by_facet",
+    "get_kmeans_init",
+    "compute_neighbor_diversity",
+    "compute_hub_score",
+    "HubScoreResult",
+    "mine_dag_chains",
+    "DAGTaxonomy",
+    "build_dag_taxonomy",
+    "UnifiedOntologyResult",
+    "build_unified_ontology",
+    "ROGLayer",
+    "ROGResult",
+    "build_rog_ontology",
 ]
 
 def check_rust_available():
