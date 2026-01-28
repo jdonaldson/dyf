@@ -20,6 +20,7 @@ from bokeh.plotting import figure, curdoc
 from bokeh.models import ColumnDataSource, LabelSet, Div, Toggle, TextInput, Button, TapTool
 from bokeh.layouts import column, row
 import colorcet as cc
+from scipy.cluster.hierarchy import fcluster
 
 # -----------------------------------------------------------------------------
 # Configuration
@@ -41,6 +42,15 @@ class ROGBrowser:
         self.titles = titles
         self.cluster_result = cluster_result
         self.edge_indices = edge_indices or []  # (source, target) pairs for edge highlighting
+
+        # Check if dendrogram data is available for dynamic cutting
+        self.dendrogram = cluster_result.get('dendrogram')
+        self.use_dynamic_dendrogram = self.dendrogram is not None
+        if self.use_dynamic_dendrogram:
+            print("Dendrogram data available - using dynamic cutting", flush=True)
+            self._dendrogram_cache = {}  # Cache for computed cuts: n_clusters -> (labels, centroids, names)
+        else:
+            self._dendrogram_cache = {}
 
         # Store ordered list of cluster pairs for edge highlighting
         # Edge i corresponds to cluster_pair_list[i]
@@ -204,8 +214,100 @@ class ROGBrowser:
             'label': padded_names,
         })
 
+    def _cut_dendrogram_dynamic(self, n_clusters: int) -> tuple[np.ndarray, np.ndarray, list[str]]:
+        """Dynamically cut the dendrogram to get n_clusters.
+
+        Uses caching to avoid recomputation for the same n_clusters.
+
+        Returns:
+            labels: Array of cluster assignments per point
+            centroids: Array of cluster centroids (n_clusters, 2)
+            names: List of cluster names
+        """
+        if not self.use_dynamic_dendrogram:
+            # Fallback to fixed levels
+            level = min(CLUSTER_LEVELS, key=lambda l: abs(l - n_clusters))
+            return (
+                self.cluster_result['labels'][level],
+                self.cluster_result['centroids'][level],
+                self.cluster_result['names'][level],
+            )
+
+        # Check cache
+        if n_clusters in self._dendrogram_cache:
+            return self._dendrogram_cache[n_clusters]
+
+        # Check if we have this level pre-computed
+        if n_clusters in self.cluster_result['labels']:
+            result = (
+                self.cluster_result['labels'][n_clusters],
+                self.cluster_result['centroids'][n_clusters],
+                self.cluster_result['names'][n_clusters],
+            )
+            self._dendrogram_cache[n_clusters] = result
+            return result
+
+        # Cut dendrogram dynamically
+        Z = self.dendrogram['Z']
+        kmeans_labels = self.dendrogram['kmeans_labels']
+        node_labels = self.dendrogram['node_labels']
+        node_points = self.dendrogram['node_points']
+        node_centroids = self.dendrogram['node_centroids']
+
+        # Cut at n_clusters
+        micro_cluster_labels = fcluster(Z, n_clusters, criterion='maxclust') - 1
+        point_labels = np.array([micro_cluster_labels[m] for m in kmeans_labels])
+
+        # Find representative nodes and compute names/centroids
+        from scipy.cluster.hierarchy import to_tree
+        tree = to_tree(Z, rd=True)
+        root, nodes = tree
+
+        cluster_names = [f"Cluster {i}" for i in range(n_clusters)]
+        cluster_centroids = []
+
+        for cluster_id in range(n_clusters):
+            mask = point_labels == cluster_id
+            cluster_point_indices = np.where(mask)[0]
+
+            if len(cluster_point_indices) == 0:
+                cluster_centroids.append(np.array([0.0, 0.0]))
+                continue
+
+            # Find best matching internal node
+            best_node = None
+            best_size = float('inf')
+            cluster_pts = set(cluster_point_indices)
+
+            for node in nodes:
+                if node.is_leaf():
+                    continue
+                node_pts = set(node_points[node.id])
+                if cluster_pts.issubset(node_pts) and len(node_pts) < best_size:
+                    best_size = len(node_pts)
+                    best_node = node
+
+            if best_node is not None and best_node.id in node_labels:
+                cluster_names[cluster_id] = node_labels[best_node.id]
+
+            # Compute centroid
+            if best_node is not None and best_node.id in node_centroids:
+                cx, cy = node_centroids[best_node.id]
+                cluster_centroids.append(np.array([cx, cy]))
+            else:
+                centroid = self.coords_2d[cluster_point_indices].mean(axis=0)
+                cluster_centroids.append(centroid)
+
+        result = (point_labels, np.array(cluster_centroids), cluster_names)
+        self._dendrogram_cache[n_clusters] = result
+        return result
+
     def _update_labels_for_viewport(self):
-        """Update labels based on viewport - show 2-12 labels, aggregating as needed."""
+        """Update labels based on viewport - show 2-12 labels, aggregating as needed.
+
+        If dendrogram data is available, uses dynamic cutting to find the optimal
+        number of clusters (any value from 2-100) that results in 2-12 visible labels.
+        """
         # Get current viewport bounds
         x_start = self.figure.x_range.start
         x_end = self.figure.x_range.end
@@ -218,28 +320,54 @@ class ROGBrowser:
         cx_view = (x_start + x_end) / 2
         cy_view = (y_start + y_end) / 2
 
-        # Count how many labels would be visible at each level
-        level_counts = {}
-        for level in CLUSTER_LEVELS:
-            centroids = self.cluster_result['centroids'][level]
-            count = sum(1 for cx, cy in centroids
-                       if x_start <= cx <= x_end and y_start <= cy <= y_end)
-            level_counts[level] = count
+        def count_in_view(centroids):
+            """Count centroids visible in viewport."""
+            return sum(1 for cx, cy in centroids
+                      if x_start <= cx <= x_end and y_start <= cy <= y_end)
 
-        # Choose level: use finest level where count <= 12
-        # If all levels have > 12 visible, use coarsest (5)
-        # If finest level (50) has few visible, still use it (zoomed in far)
-        chosen_level = 50  # Default to finest
+        if self.use_dynamic_dendrogram:
+            # Dynamic dendrogram: binary search for optimal n_clusters
+            # that gives us 2-12 visible labels
+            min_k, max_k = 2, 100
+            best_k = 5
+            best_count = 0
 
-        # Start from coarsest and find the finest that fits
-        for level in CLUSTER_LEVELS:  # 5, 12, 25, 50
-            if level_counts[level] <= 12:
-                chosen_level = level
-            else:
-                break  # This level has too many, use previous
+            # Binary search for the largest k that gives <= 12 visible
+            while min_k <= max_k:
+                mid_k = (min_k + max_k) // 2
+                _, centroids, _ = self._cut_dendrogram_dynamic(mid_k)
+                visible_count = count_in_view(centroids)
 
-        # Get centroids in view at chosen level
-        centroids = self.cluster_result['centroids'][chosen_level]
+                if visible_count <= 12:
+                    best_k = mid_k
+                    best_count = visible_count
+                    min_k = mid_k + 1  # Try more clusters
+                else:
+                    max_k = mid_k - 1  # Try fewer clusters
+
+            # Get the chosen cut
+            labels, centroids, names = self._cut_dendrogram_dynamic(best_k)
+            chosen_level = best_k
+        else:
+            # Fixed levels: use traditional approach
+            level_counts = {}
+            for level in CLUSTER_LEVELS:
+                centroids = self.cluster_result['centroids'][level]
+                level_counts[level] = count_in_view(centroids)
+
+            # Choose finest level where count <= 12
+            chosen_level = 50
+            for level in CLUSTER_LEVELS:
+                if level_counts[level] <= 12:
+                    chosen_level = level
+                else:
+                    break
+
+            centroids = self.cluster_result['centroids'][chosen_level]
+            names = self.cluster_result['names'][chosen_level]
+            labels = self.cluster_result['labels'][chosen_level]
+
+        # Get centroids in view
         in_view = [(i, cx, cy) for i, (cx, cy) in enumerate(centroids)
                    if x_start <= cx <= x_end and y_start <= cy <= y_end]
 
@@ -255,7 +383,6 @@ class ROGBrowser:
                 in_view.append((i, cx, cy))
 
         # Update label source with chosen labels
-        names = self.cluster_result['names'][chosen_level]
         label_x = [cx for _, cx, _ in in_view]
         label_y = [cy for _, _, cy in in_view]
         label_text = [f'  {names[i]}  ' for i, _, _ in in_view]
@@ -269,6 +396,9 @@ class ROGBrowser:
         # Update current level for coloring
         if chosen_level != self.current_level:
             self.current_level = chosen_level
+            # For dynamic dendrogram, we need to update colors based on the cut
+            if self.use_dynamic_dendrogram and chosen_level not in self.colors:
+                self.colors[chosen_level] = [COLORS_50[l % 50] for l in labels]
             self.source.data['color'] = self.colors[self.current_level]
             self.figure.title.text = f"ROG Browser - {len(self.titles):,} points - Level: {self.current_level} clusters"
 
