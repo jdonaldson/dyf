@@ -36,6 +36,7 @@ class ROGBrowser:
         self.titles = titles
         self.cluster_result = cluster_result
         self.current_level = CLUSTER_LEVELS[0]
+        self._programmatic_zoom = False  # Flag to skip _on_zoom during programmatic changes
 
         # Store original extent for zoom ratio calculation
         self.x_min, self.x_max = coords_2d[:, 0].min(), coords_2d[:, 0].max()
@@ -49,11 +50,14 @@ class ROGBrowser:
             self.colors[level] = [COLORS_30[l % 30] for l in labels]
 
         # Create data source
+        n = len(coords_2d)
         self.source = ColumnDataSource(data={
             'x': coords_2d[:, 0],
             'y': coords_2d[:, 1],
             'title': titles,
             'color': self.colors[self.current_level],
+            'alpha': [0.7] * n,
+            'size': [4] * n,
         })
 
         # Create label source
@@ -68,7 +72,9 @@ class ROGBrowser:
         xs, ys = self.bridge_edges[self.current_level]
         self.edge_source = ColumnDataSource(data={'xs': xs, 'ys': ys})
 
-        # Create figure with WebGL
+        # Create figure with WebGL and explicit ranges (no auto-ranging)
+        from bokeh.models import Range1d
+        padding = self.original_width * 0.05
         self.figure = figure(
             width=1200,
             height=800,
@@ -76,6 +82,8 @@ class ROGBrowser:
             active_scroll='wheel_zoom',
             output_backend='webgl',
             title=f"ROG Browser - {len(titles):,} points - Level: {self.current_level} clusters",
+            x_range=Range1d(self.x_min - padding, self.x_max + padding),
+            y_range=Range1d(self.y_min - padding, self.y_max + padding),
         )
 
         # Add bundled edges (rendered first, behind points)
@@ -91,9 +99,9 @@ class ROGBrowser:
         self.scatter_renderer = self.figure.scatter(
             'x', 'y',
             source=self.source,
-            size=4,
+            size='size',
             color='color',
-            alpha=0.7,
+            alpha='alpha',
         )
 
         # Add hover tool targeting only the scatter points
@@ -202,6 +210,8 @@ class ROGBrowser:
 
     def _on_zoom(self, attr, old, new):
         """Handle zoom changes."""
+        if self._programmatic_zoom:
+            return  # Skip during programmatic zoom changes
         zoom_ratio = self._get_zoom_ratio()
         new_level = self._get_level_for_zoom(zoom_ratio)
 
@@ -244,10 +254,22 @@ class ROGBrowser:
 
     def zoom_to(self, x: float, y: float, radius: float = 5.0):
         """Zoom to center on a point."""
-        self.figure.x_range.start = x - radius
-        self.figure.x_range.end = x + radius
-        self.figure.y_range.start = y - radius
-        self.figure.y_range.end = y + radius
+        self._programmatic_zoom = True
+        # Update all ranges at once using update() to minimize events
+        self.figure.x_range.update(start=x - radius, end=x + radius)
+        self.figure.y_range.update(start=y - radius, end=y + radius)
+        # Manually trigger view update for new zoom level
+        zoom_ratio = self._get_zoom_ratio()
+        new_level = self._get_level_for_zoom(zoom_ratio)
+        if new_level != self.current_level:
+            self.current_level = new_level
+            self._update_view()
+        # Keep flag set - will be cleared by a delayed callback
+        from functools import partial
+        from bokeh.io import curdoc
+        def clear_flag():
+            self._programmatic_zoom = False
+        curdoc().add_timeout_callback(clear_flag, 100)
 
     def reset_view(self):
         """Reset to original view."""
@@ -276,19 +298,31 @@ class ROGBrowser:
         for i in indices:
             if 0 <= i < n:
                 alphas[i] = 1.0
-                sizes[i] = 8
-        self.source.data['alpha'] = alphas
-        self.source.data['size'] = sizes
+                sizes[i] = 12
+        # Reassign entire data dict to trigger Bokeh update
+        self.source.data = {
+            **self.source.data,
+            'alpha': alphas,
+            'size': sizes,
+        }
 
     def clear_highlight(self):
         """Clear highlighting."""
         n = len(self.coords_2d)
-        self.source.data['alpha'] = [0.7] * n
-        self.source.data['size'] = [4] * n
+        self.source.data = {
+            **self.source.data,
+            'alpha': [0.7] * n,
+            'size': [4] * n,
+        }
 
 
-# Global browser instance for control API
-BROWSER = None
+# Shared state container (persists across Bokeh sessions)
+class AppState:
+    browser = None
+    doc = None
+    command_queue = []
+
+STATE = AppState()
 
 
 # -----------------------------------------------------------------------------
@@ -314,14 +348,12 @@ class ControlHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self):
-        global BROWSER
-
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
 
-        if BROWSER is None:
+        if STATE.browser is None or STATE.doc is None:
             self.wfile.write(json.dumps({"error": "Browser not initialized"}).encode())
             return
 
@@ -332,43 +364,38 @@ class ControlHandler(BaseHTTPRequestHandler):
             action = data.get("action")
             params = data.get("params", {})
 
-            # Schedule the action on Bokeh's document
-            doc = curdoc()
-
-            if action == "zoom_to":
-                doc.add_next_tick_callback(
-                    lambda: BROWSER.zoom_to(params["x"], params["y"], params.get("radius", 5))
-                )
-                result = {"status": "ok", "action": "zoom_to"}
-            elif action == "reset":
-                doc.add_next_tick_callback(BROWSER.reset_view)
-                result = {"status": "ok", "action": "reset"}
-            elif action == "set_level":
-                doc.add_next_tick_callback(lambda: BROWSER.set_level(params["level"]))
-                result = {"status": "ok", "action": "set_level", "level": params["level"]}
-            elif action == "toggle_edges":
-                doc.add_next_tick_callback(lambda: BROWSER.set_edges_visible(params["visible"]))
-                result = {"status": "ok", "action": "toggle_edges", "visible": params["visible"]}
-            elif action == "highlight":
-                doc.add_next_tick_callback(lambda: BROWSER.highlight_points(params["indices"]))
-                result = {"status": "ok", "action": "highlight", "count": len(params["indices"])}
-            elif action == "clear_highlight":
-                doc.add_next_tick_callback(BROWSER.clear_highlight)
-                result = {"status": "ok", "action": "clear_highlight"}
-            else:
-                result = {"error": f"Unknown action: {action}"}
+            # Add command to queue - will be processed by Bokeh's periodic callback
+            STATE.command_queue.append({"action": action, "params": params})
+            print(f"HTTP: Queued {action}, queue id={id(STATE.command_queue)}, len={len(STATE.command_queue)}", flush=True)
+            result = {"status": "ok", "action": action, "queued": True}
 
             self.wfile.write(json.dumps(result).encode())
         except Exception as e:
             self.wfile.write(json.dumps({"error": str(e)}).encode())
 
 
+_control_server_started = False
+
+
 def start_control_server(port: int = 5008):
-    """Start the control HTTP server in a background thread."""
-    server = HTTPServer(("localhost", port), ControlHandler)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    print(f"Control server: http://localhost:{port}/control")
+    """Start the control HTTP server in a background thread (only once)."""
+    global _control_server_started
+    if _control_server_started:
+        print(f"Control server already running on port {port}")
+        return
+
+    try:
+        server = HTTPServer(("localhost", port), ControlHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        _control_server_started = True
+        print(f"Control server: http://localhost:{port}/control")
+    except OSError as e:
+        if e.errno == 48:  # Address already in use
+            print(f"Control server port {port} already in use (likely from previous session)")
+            _control_server_started = True
+        else:
+            raise
 
 
 # -----------------------------------------------------------------------------
@@ -376,8 +403,6 @@ def start_control_server(port: int = 5008):
 # -----------------------------------------------------------------------------
 
 def main():
-    global BROWSER
-
     # Get cache path from command line args
     args = sys.argv[1:] if len(sys.argv) > 1 else []
 
@@ -405,15 +430,44 @@ def main():
         cache = pickle.load(f)
 
     print("Creating browser...")
-    BROWSER = ROGBrowser(
+    STATE.browser = ROGBrowser(
         cache['coords_2d'],
         cache['titles'],
         cache['cluster_result'],
         cache['bridge_edges'],
     )
 
-    curdoc().add_root(BROWSER.layout())
-    curdoc().title = "ROG Browser"
+    # Store document reference for control API
+    STATE.doc = curdoc()
+    STATE.doc.add_root(STATE.browser.layout())
+    STATE.doc.title = "ROG Browser"
+
+    # Periodic callback to process command queue
+    def process_commands():
+        if STATE.command_queue:
+            print(f"BOKEH: Processing {len(STATE.command_queue)} commands, queue id={id(STATE.command_queue)}", flush=True)
+        while STATE.command_queue:
+            cmd = STATE.command_queue.pop(0)
+            action = cmd["action"]
+            params = cmd.get("params", {})
+            print(f"  Executing: {action} with {params}")
+            try:
+                if action == "zoom_to":
+                    STATE.browser.zoom_to(params["x"], params["y"], params.get("radius", 5))
+                elif action == "reset":
+                    STATE.browser.reset_view()
+                elif action == "set_level":
+                    STATE.browser.set_level(params["level"])
+                elif action == "toggle_edges":
+                    STATE.browser.set_edges_visible(params["visible"])
+                elif action == "highlight":
+                    STATE.browser.highlight_points(params["indices"])
+                elif action == "clear_highlight":
+                    STATE.browser.clear_highlight()
+            except Exception as e:
+                print(f"Error processing command {action}: {e}")
+
+    STATE.doc.add_periodic_callback(process_commands, 100)  # Check every 100ms
 
     # Start control server for MCP
     start_control_server(port=5008)
