@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 from bokeh.plotting import figure, curdoc
-from bokeh.models import ColumnDataSource, LabelSet, Div, Toggle
+from bokeh.models import ColumnDataSource, LabelSet, Div, Toggle, TextInput, Button, TapTool
 from bokeh.layouts import column, row
 import colorcet as cc
 
@@ -43,6 +43,11 @@ class ROGBrowser:
         # Animation state
         self._animation = None  # Current animation target
         self._animation_callback = None  # Periodic callback for animation
+
+        # Highlight animation state
+        self._highlighted_indices = []
+        self._pulse_callback = None
+        self._pulse_phase = 0
 
         # Store original extent for zoom ratio calculation
         self.x_min, self.x_max = coords_2d[:, 0].min(), coords_2d[:, 0].max()
@@ -76,7 +81,13 @@ class ROGBrowser:
 
         # Initialize edge source with current level's bridges
         xs, ys = self.bridge_edges[self.current_level]
-        self.edge_source = ColumnDataSource(data={'xs': xs, 'ys': ys})
+        n_edges = len(xs)
+        self.edge_source = ColumnDataSource(data={
+            'xs': xs, 'ys': ys,
+            'line_color': ['#4488cc'] * n_edges,
+            'line_alpha': [0.15] * n_edges,
+            'line_width': [1] * n_edges,
+        })
 
         # Create figure with WebGL and explicit ranges (no auto-ranging)
         from bokeh.models import Range1d
@@ -85,6 +96,7 @@ class ROGBrowser:
             width=1200,
             height=800,
             tools='pan,wheel_zoom,reset',
+            background_fill_color='#2a2a2a',
             active_scroll='wheel_zoom',
             output_backend='webgl',
             title=f"ROG Browser - {len(titles):,} points - Level: {self.current_level} clusters",
@@ -96,10 +108,13 @@ class ROGBrowser:
         self.edge_renderer = self.figure.multi_line(
             'xs', 'ys',
             source=self.edge_source,
-            line_color='#4488cc',
-            line_alpha=0.15,
-            line_width=1,
+            line_color='line_color',
+            line_alpha='line_alpha',
+            line_width='line_width',
         )
+        self._default_edge_color = '#4488cc'
+        self._default_edge_alpha = 0.15
+        self._default_edge_width = 1
 
         # Add points
         self.scatter_renderer = self.figure.scatter(
@@ -115,14 +130,23 @@ class ROGBrowser:
         hover = HoverTool(tooltips=[("Title", "@title")], renderers=[self.scatter_renderer])
         self.figure.add_tools(hover)
 
-        # Add cluster labels
+        # Add tap tool for clicking to highlight
+        tap = TapTool(renderers=[self.scatter_renderer])
+        self.figure.add_tools(tap)
+        self.source.selected.on_change('indices', self._on_tap_select)
+
+        # Add cluster labels with styled background
         self.labels = LabelSet(
             x='x', y='y', text='label',
             source=self.label_source,
-            text_font_size='10pt',
+            text_font_size='11pt',
+            text_font_style='bold',
             text_color='white',
-            background_fill_color='rgba(0,0,0,0.7)',
-            background_fill_alpha=0.7,
+            background_fill_color='#2d2d2d',
+            background_fill_alpha=0.9,
+            border_line_color='#666666',
+            border_line_width=1,
+            border_line_alpha=0.8,
             text_align='center',
         )
         self.figure.add_layout(self.labels)
@@ -130,6 +154,14 @@ class ROGBrowser:
         # Toggle for edges
         self.edge_toggle = Toggle(label="Show Edges", active=True, width=100)
         self.edge_toggle.on_change('active', self._on_edge_toggle)
+
+        # Search box for finding articles
+        self.search_input = TextInput(title="Search articles:", placeholder="Type to search...", width=180)
+        self.search_input.on_change('value', self._on_search)
+
+        # Clear highlight button
+        self.clear_btn = Button(label="Clear Highlight", button_type="default", width=100)
+        self.clear_btn.on_click(self._on_clear_click)
 
         # Status display
         self.status = Div(text=self._get_status_html(), width=200)
@@ -176,6 +208,34 @@ class ROGBrowser:
     def _on_edge_toggle(self, attr, old, new):
         """Toggle edge visibility."""
         self.edge_renderer.visible = new
+
+    def _on_tap_select(self, attr, old, new):
+        """Handle tap selection on points."""
+        if new:
+            # Highlight selected points and their neighbors
+            self.highlight_points(list(new))
+
+    def _on_search(self, attr, old, new):
+        """Search for articles by title."""
+        if not new or len(new) < 2:
+            return
+        query = new.lower()
+        matches = []
+        for i, title in enumerate(self.titles):
+            if query in title.lower():
+                matches.append(i)
+                if len(matches) >= 50:  # Limit matches
+                    break
+        if matches:
+            self.highlight_points(matches)
+            # Zoom to first match
+            x, y = self.coords_2d[matches[0]]
+            self.zoom_to(x, y, radius=3)
+
+    def _on_clear_click(self):
+        """Clear highlight button handler."""
+        self.clear_highlight()
+        self.source.selected.indices = []  # Clear selection too
 
     def _get_status_html(self) -> str:
         """Generate status HTML."""
@@ -255,7 +315,13 @@ class ROGBrowser:
 
         # Update bridge edges for current level
         xs, ys = self.bridge_edges[self.current_level]
-        self.edge_source.data = {'xs': xs, 'ys': ys}
+        n_edges = len(xs)
+        self.edge_source.data = {
+            'xs': xs, 'ys': ys,
+            'line_color': ['#4488cc'] * n_edges,
+            'line_alpha': [0.15] * n_edges,
+            'line_width': [1] * n_edges,
+        }
 
         # Update title and status
         self.figure.title.text = f"ROG Browser - {len(self.titles):,} points - Level: {self.current_level} clusters"
@@ -263,7 +329,13 @@ class ROGBrowser:
 
     def layout(self):
         """Return the complete layout."""
-        controls = column(self.edge_toggle, self.status, width=200)
+        controls = column(
+            self.search_input,
+            self.clear_btn,
+            self.edge_toggle,
+            self.status,
+            width=200
+        )
         return row(self.figure, controls)
 
     # -------------------------------------------------------------------------
@@ -377,29 +449,73 @@ class ROGBrowser:
         self.edge_toggle.active = visible
 
     def highlight_points(self, indices: list[int]):
-        """Highlight specific points by making others semi-transparent."""
+        """Highlight specific points with pulsing animation."""
+        from bokeh.io import curdoc
+        import math
+
         n = len(self.coords_2d)
+        self._highlighted_indices = [i for i in indices if 0 <= i < n]
+
+        # Set initial highlight state
         alphas = [0.1] * n
         sizes = [3] * n
-        for i in indices:
-            if 0 <= i < n:
-                alphas[i] = 1.0
-                sizes[i] = 12
-        # Reassign entire data dict to trigger Bokeh update
-        self.source.data = {
-            **self.source.data,
-            'alpha': alphas,
-            'size': sizes,
-        }
+        for i in self._highlighted_indices:
+            alphas[i] = 1.0
+            sizes[i] = 12
+        self.source.data['alpha'] = alphas
+        self.source.data['size'] = sizes
+
+        # Brighten edges during highlight
+        n_edges = len(self.edge_source.data['xs'])
+        self.edge_source.data['line_color'] = ['#66aaff'] * n_edges
+        self.edge_source.data['line_alpha'] = [0.4] * n_edges
+        self.edge_source.data['line_width'] = [1.5] * n_edges
+
+        # Stop existing pulse animation
+        if self._pulse_callback:
+            try:
+                curdoc().remove_periodic_callback(self._pulse_callback)
+            except:
+                pass
+
+        # Start pulsing animation
+        self._pulse_phase = 0
+
+        def pulse():
+            if not self._highlighted_indices:
+                return
+            self._pulse_phase += 0.15
+            # Pulse size between 10 and 16
+            pulse_size = 13 + 3 * math.sin(self._pulse_phase)
+            sizes = [3] * n
+            for i in self._highlighted_indices:
+                sizes[i] = pulse_size
+            self.source.data['size'] = sizes
+
+        self._pulse_callback = curdoc().add_periodic_callback(pulse, 50)  # 20 FPS
 
     def clear_highlight(self):
-        """Clear highlighting."""
+        """Clear highlighting and stop animation."""
+        from bokeh.io import curdoc
+
+        # Stop pulse animation
+        if self._pulse_callback:
+            try:
+                curdoc().remove_periodic_callback(self._pulse_callback)
+            except:
+                pass
+            self._pulse_callback = None
+
+        self._highlighted_indices = []
         n = len(self.coords_2d)
-        self.source.data = {
-            **self.source.data,
-            'alpha': [0.7] * n,
-            'size': [4] * n,
-        }
+        self.source.data['alpha'] = [0.7] * n
+        self.source.data['size'] = [4] * n
+
+        # Reset edges to default
+        n_edges = len(self.edge_source.data['xs'])
+        self.edge_source.data['line_color'] = ['#4488cc'] * n_edges
+        self.edge_source.data['line_alpha'] = [0.15] * n_edges
+        self.edge_source.data['line_width'] = [1] * n_edges
 
 
 # Shared state container (persists across Bokeh sessions)
