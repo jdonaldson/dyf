@@ -185,9 +185,11 @@ class ROGBrowser:
         # Status display
         self.status = Div(text=self._get_status_html(), width=200)
 
-        # Set up zoom detection
+        # Set up zoom/pan detection (both x and y ranges)
         self.figure.x_range.on_change('start', self._on_zoom)
         self.figure.x_range.on_change('end', self._on_zoom)
+        self.figure.y_range.on_change('start', self._on_zoom)
+        self.figure.y_range.on_change('end', self._on_zoom)
 
     def _update_label_source(self):
         """Update the label data source for current level."""
@@ -201,6 +203,74 @@ class ROGBrowser:
             'y': centroids[:, 1],
             'label': padded_names,
         })
+
+    def _update_labels_for_viewport(self):
+        """Update labels based on viewport - show 2-12 labels, aggregating as needed."""
+        # Get current viewport bounds
+        x_start = self.figure.x_range.start
+        x_end = self.figure.x_range.end
+        y_start = self.figure.y_range.start
+        y_end = self.figure.y_range.end
+
+        if x_start is None or x_end is None or y_start is None or y_end is None:
+            return
+
+        cx_view = (x_start + x_end) / 2
+        cy_view = (y_start + y_end) / 2
+
+        # Count how many labels would be visible at each level
+        level_counts = {}
+        for level in CLUSTER_LEVELS:
+            centroids = self.cluster_result['centroids'][level]
+            count = sum(1 for cx, cy in centroids
+                       if x_start <= cx <= x_end and y_start <= cy <= y_end)
+            level_counts[level] = count
+
+        # Choose level: use finest level where count <= 12
+        # If all levels have > 12 visible, use coarsest (5)
+        # If finest level (50) has few visible, still use it (zoomed in far)
+        chosen_level = 50  # Default to finest
+
+        # Start from coarsest and find the finest that fits
+        for level in CLUSTER_LEVELS:  # 5, 12, 25, 50
+            if level_counts[level] <= 12:
+                chosen_level = level
+            else:
+                break  # This level has too many, use previous
+
+        # Get centroids in view at chosen level
+        centroids = self.cluster_result['centroids'][chosen_level]
+        in_view = [(i, cx, cy) for i, (cx, cy) in enumerate(centroids)
+                   if x_start <= cx <= x_end and y_start <= cy <= y_end]
+
+        # If < 2 in view, add nearest centroids to get at least 2
+        if len(in_view) < 2:
+            in_view_ids = {i for i, _, _ in in_view}
+            distances = [(i, (cx - cx_view)**2 + (cy - cy_view)**2, cx, cy)
+                        for i, (cx, cy) in enumerate(centroids)
+                        if i not in in_view_ids]
+            distances.sort(key=lambda x: x[1])
+            needed = 2 - len(in_view)
+            for i, _, cx, cy in distances[:needed]:
+                in_view.append((i, cx, cy))
+
+        # Update label source with chosen labels
+        names = self.cluster_result['names'][chosen_level]
+        label_x = [cx for _, cx, _ in in_view]
+        label_y = [cy for _, _, cy in in_view]
+        label_text = [f'  {names[i]}  ' for i, _, _ in in_view]
+
+        self.label_source.data = {
+            'x': label_x,
+            'y': label_y,
+            'label': label_text,
+        }
+
+        # Update current level for coloring
+        if chosen_level != self.current_level:
+            self.current_level = chosen_level
+            self.source.data['color'] = self.colors[self.current_level]
+            self.figure.title.text = f"ROG Browser - {len(self.titles):,} points - Level: {self.current_level} clusters"
 
     def _process_bundled_edges(self, bundled: pd.DataFrame) -> tuple[list, list]:
         """Convert hammer_bundle output to multi_line format."""
@@ -308,32 +378,19 @@ class ROGBrowser:
             return 50
 
     def _on_zoom(self, attr, old, new):
-        """Handle zoom changes."""
+        """Handle zoom changes - update labels based on viewport."""
         if self._programmatic_zoom:
             return  # Skip during programmatic zoom changes
-        zoom_ratio = self._get_zoom_ratio()
-        new_level = self._get_level_for_zoom(zoom_ratio)
-
-        if new_level != self.current_level:
-            print(f"Zoom ratio: {zoom_ratio:.2f} -> switching to {new_level} clusters")
-            self.current_level = new_level
-            self._update_view()
+        # Use viewport-aware label aggregation
+        self._update_labels_for_viewport()
 
     def _update_view(self):
         """Update points, labels, and bridge edges for current level."""
         # Update point colors
         self.source.data['color'] = self.colors[self.current_level]
 
-        # Update labels
-        centroids = self.cluster_result['centroids'][self.current_level]
-        names = self.cluster_result['names'][self.current_level]
-        padded_names = [f'  {name}  ' for name in names]
-
-        self.label_source.data = {
-            'x': centroids[:, 0],
-            'y': centroids[:, 1],
-            'label': padded_names,
-        }
+        # Update labels using viewport-aware aggregation
+        self._update_labels_for_viewport()
 
         # Update bridge edges for current level
         # If there's an active highlight, reapply it instead of resetting to default
