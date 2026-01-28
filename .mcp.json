@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "rog-browser": {
+      "command": "python",
+      "args": [
+        "/Users/jdonaldson/Projects/dyf/demo/rog_mcp.py",
+        "/Users/jdonaldson/Projects/dyf/demo/wiki_simple_50k_rog_cache.pkl"
+      ]
+    }
+  }
+}
