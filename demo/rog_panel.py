@@ -174,11 +174,13 @@ class ROGBrowser:
         """Update the label data source for current level."""
         centroids = self.cluster_result['centroids'][self.current_level]
         names = self.cluster_result['names'][self.current_level]
+        # Add padding spaces around label text
+        padded_names = [f'  {name}  ' for name in names]
 
         self.label_source = ColumnDataSource(data={
             'x': centroids[:, 0],
             'y': centroids[:, 1],
-            'label': names,
+            'label': padded_names,
         })
 
     def _process_bundled_edges(self, bundled: pd.DataFrame) -> tuple[list, list]:
@@ -306,11 +308,12 @@ class ROGBrowser:
         # Update labels
         centroids = self.cluster_result['centroids'][self.current_level]
         names = self.cluster_result['names'][self.current_level]
+        padded_names = [f'  {name}  ' for name in names]
 
         self.label_source.data = {
             'x': centroids[:, 0],
             'y': centroids[:, 1],
-            'label': names,
+            'label': padded_names,
         }
 
         # Update bridge edges for current level
