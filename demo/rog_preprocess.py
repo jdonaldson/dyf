@@ -122,12 +122,20 @@ Reply with ONLY the label, nothing else."""
 
 
 def compute_bridge_edges(coords_2d: np.ndarray, embeddings: np.ndarray, cluster_labels: dict,
-                         sim_threshold: float = 0.45):
+                         bridge_cluster_level: int = 5):
     """Compute bridge edges using dyf ROG ontology.
 
-    Filters to edges with similarity below threshold - these are the weaker
-    cross-region connections that bridge different semantic areas.
+    Aggregates individual cross-cluster connections into cluster-to-cluster edges.
+    This shows which knowledge regions connect without overwhelming detail.
+
+    Args:
+        coords_2d: UMAP coordinates for bundling
+        embeddings: Original embeddings for ROG
+        cluster_labels: Dict mapping cluster level -> array of labels per point
+        bridge_cluster_level: Which cluster level to use for bridge detection (default: coarsest)
     """
+    from collections import defaultdict
+
     print("Building ROG ontology for bridge detection...")
 
     # Build ROG ontology
@@ -139,49 +147,119 @@ def compute_bridge_edges(coords_2d: np.ndarray, embeddings: np.ndarray, cluster_
         verbose=True,
     )
 
-    # Extract edges with lower similarity (cross-region bridges)
+    # Get cluster labels at the bridge detection level
+    labels = cluster_labels[bridge_cluster_level]
+    print(f"Using {bridge_cluster_level}-cluster level for bridge detection")
+
+    # Count connections between cluster pairs
     ont = result.ontology
-    bridge_edges = []
-    all_sims = []
+    cluster_pair_counts = defaultdict(int)
+    cluster_pair_points = defaultdict(list)  # Track actual point pairs for highlighting
+    within_cluster = 0
+    cross_cluster = 0
 
     for parent, children_list in ont.children.items():
         for child, sim, div_gap in children_list:
-            all_sims.append(sim)
-            # Keep only weaker edges (bridges across regions)
-            if sim < sim_threshold:
+            c1, c2 = labels[parent], labels[child]
+            if c1 != c2:
+                cross_cluster += 1
+                # Normalize pair order
+                pair = (min(c1, c2), max(c1, c2))
+                cluster_pair_counts[pair] += 1
+                # Store point pair for highlighting
                 if parent < child:
-                    bridge_edges.append((parent, child))
+                    cluster_pair_points[pair].append((parent, child))
                 else:
-                    bridge_edges.append((child, parent))
+                    cluster_pair_points[pair].append((child, parent))
+            else:
+                within_cluster += 1
 
-    # Deduplicate
-    bridge_edges = list(set(bridge_edges))
+    total_edges = within_cluster + cross_cluster
+    print(f"Edge analysis: {within_cluster:,} within-cluster, {cross_cluster:,} cross-cluster")
+    print(f"Found {len(cluster_pair_counts)} unique cluster pairs with connections")
 
-    total_edges = sum(len(v) for v in ont.children.values())
-    mean_sim = np.mean(all_sims) if all_sims else 0
-    print(f"Edge similarity: mean={mean_sim:.3f}, threshold={sim_threshold}")
-    print(f"Extracted {len(bridge_edges):,} bridge edges (sim < {sim_threshold}) from {total_edges:,} total")
-
-    if not bridge_edges:
+    if not cluster_pair_counts:
         print("No bridge edges found")
-        return {level: pd.DataFrame({'x': [], 'y': []}) for level in cluster_labels.keys()}, ont.diversity
+        return {level: ([], []) for level in cluster_labels.keys()}, [], {}, result.ontology.diversity
 
-    # Bundle edges
-    print("Bundling edges...")
-    nodes = pd.DataFrame({'x': coords_2d[:, 0], 'y': coords_2d[:, 1]})
+    # Compute cluster centroids
+    n_clusters = bridge_cluster_level
+    centroids = []
+    for c in range(n_clusters):
+        mask = labels == c
+        if mask.any():
+            centroids.append(coords_2d[mask].mean(axis=0))
+        else:
+            centroids.append(np.array([0.0, 0.0]))
+    centroids = np.array(centroids)
+
+    # Create edges between cluster centroids
+    # We'll create multiple edges for pairs with more connections (visual weight)
+    print("Creating cluster-to-cluster edges...")
+    cluster_edges = []
+    for (c1, c2), count in sorted(cluster_pair_counts.items(), key=lambda x: -x[1]):
+        print(f"  Cluster {c1} <-> Cluster {c2}: {count:,} connections")
+        cluster_edges.append((c1, c2))
+
+    # Bundle edges using centroid positions
+    print(f"Bundling {len(cluster_edges)} cluster-to-cluster edges...")
+    nodes = pd.DataFrame({'x': centroids[:, 0], 'y': centroids[:, 1]})
     nodes.index.name = 'id'
 
-    edges_df = pd.DataFrame(bridge_edges, columns=['source', 'target'])
+    edges_df = pd.DataFrame(cluster_edges, columns=['source', 'target'])
     bundled = hammer_bundle(
         nodes, edges_df,
         iterations=BUNDLE_ITERATIONS,
-        batch_size=min(20000, len(bridge_edges)),
+        batch_size=min(20000, len(cluster_edges)),
     )
 
-    # Return same bundled edges for all levels (ROG bridges are independent of cluster level)
-    edges_result = {level: bundled for level in cluster_labels.keys()}
+    # Convert to multi_line format
+    print("Converting to multi_line format...")
+    xs, ys = _bundled_to_multiline(bundled)
+    print(f"Converted to {len(xs):,} edge paths")
 
-    return edges_result, ont.diversity  # Return diversity for visualization
+    # Return same processed edges for all levels
+    edges_result = {level: (xs, ys) for level in cluster_labels.keys()}
+
+    # Flatten all point pairs for highlighting (edge_indices)
+    edge_indices = []
+    for pair_list in cluster_pair_points.values():
+        edge_indices.extend(pair_list)
+
+    # Return cluster pair info for potential use (edge weights, etc.)
+    cluster_pair_info = dict(cluster_pair_counts)
+
+    return edges_result, edge_indices, cluster_pair_info, result.ontology.diversity
+
+
+def _bundled_to_multiline(bundled: pd.DataFrame) -> tuple[list, list]:
+    """Convert hammer_bundle DataFrame to multi_line format (xs, ys lists)."""
+    if bundled.empty:
+        return [], []
+
+    # Faster vectorized approach: find NaN boundaries and split
+    x_vals = bundled['x'].values
+    y_vals = bundled['y'].values
+    nan_mask = np.isnan(x_vals) | np.isnan(y_vals)
+
+    # Find indices where NaN occurs (edge boundaries)
+    nan_indices = np.where(nan_mask)[0]
+
+    xs, ys = [], []
+    start = 0
+
+    for end in nan_indices:
+        if end > start:
+            xs.append(x_vals[start:end].tolist())
+            ys.append(y_vals[start:end].tolist())
+        start = end + 1
+
+    # Handle final segment
+    if start < len(x_vals):
+        xs.append(x_vals[start:].tolist())
+        ys.append(y_vals[start:].tolist())
+
+    return xs, ys
 
 
 def main():
@@ -189,6 +267,8 @@ def main():
     parser.add_argument("data_path", default="demo/wiki_simple_50k.parquet")
     parser.add_argument("--sample", type=int, default=10000)
     parser.add_argument("--output", type=str, default=None)
+    parser.add_argument("--bridge-level", type=int, default=50,
+                        help="Cluster level for bridge detection (5, 12, 25, or 50)")
     args = parser.parse_args()
 
     # Generate output path
@@ -203,7 +283,10 @@ def main():
     # Process
     coords_2d, titles, embeddings = load_data(args.data_path, args.sample)
     cluster_result = compute_hierarchical_clusters(coords_2d, titles)
-    bridge_edges, diversity = compute_bridge_edges(coords_2d, embeddings, cluster_result['labels'])
+    bridge_edges, edge_indices, cluster_pairs, diversity = compute_bridge_edges(
+        coords_2d, embeddings, cluster_result['labels'],
+        bridge_cluster_level=args.bridge_level
+    )
 
     # Save
     cache = {
@@ -211,6 +294,8 @@ def main():
         'titles': titles,
         'cluster_result': cluster_result,
         'bridge_edges': bridge_edges,
+        'edge_indices': edge_indices,  # (source, target) pairs for highlighting
+        'cluster_pairs': cluster_pairs,  # {(c1, c2): count} for edge weights
         'diversity': diversity,  # For visualization (ROG diversity scores)
     }
 

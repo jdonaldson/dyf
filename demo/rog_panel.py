@@ -10,9 +10,12 @@ Then start server:
 
 import sys
 import pickle
+import json
+import threading
 import numpy as np
 import pandas as pd
 from pathlib import Path
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from bokeh.plotting import figure, curdoc
 from bokeh.models import ColumnDataSource, LabelSet, Div, Toggle, TextInput, Button, TapTool
 from bokeh.layouts import column, row
@@ -31,10 +34,24 @@ COLORS_50 = cc.glasbey_light[:50]
 # -----------------------------------------------------------------------------
 
 class ROGBrowser:
-    def __init__(self, coords_2d: np.ndarray, titles: list[str], cluster_result: dict, bridge_edges: dict):
+    def __init__(self, coords_2d: np.ndarray, titles: list[str], cluster_result: dict,
+                 bridge_edges: dict, edge_indices: list[tuple[int, int]] | None = None,
+                 cluster_pairs: dict | None = None):
         self.coords_2d = coords_2d
         self.titles = titles
         self.cluster_result = cluster_result
+        self.edge_indices = edge_indices or []  # (source, target) pairs for edge highlighting
+
+        # Store ordered list of cluster pairs for edge highlighting
+        # Edge i corresponds to cluster_pair_list[i]
+        # IMPORTANT: Must be sorted by count descending to match preprocessing order
+        self.cluster_pairs = cluster_pairs or {}
+        if cluster_pairs:
+            sorted_pairs = sorted(cluster_pairs.items(), key=lambda x: -x[1])
+            self.cluster_pair_list = [pair for pair, count in sorted_pairs]
+        else:
+            self.cluster_pair_list = []
+
         self.current_level = CLUSTER_LEVELS[0]
         self._programmatic_zoom = False  # Flag to skip _on_zoom during programmatic changes
         self.last_command = None  # Track last command received
@@ -69,15 +86,15 @@ class ROGBrowser:
             'color': self.colors[self.current_level],
             'alpha': [0.7] * n,
             'size': [4] * n,
+            'line_color': ['rgba(0,0,0,0)'] * n,  # Transparent outline by default
+            'line_width': [1] * n,
         })
 
         # Create label source
         self._update_label_source()
 
-        # Process bundled bridge edges into multi_line format for each level
-        self.bridge_edges = {}
-        for level, bundled in bridge_edges.items():
-            self.bridge_edges[level] = self._process_bundled_edges(bundled)
+        # Bridge edges are pre-processed into (xs, ys) format during preprocessing
+        self.bridge_edges = bridge_edges
 
         # Initialize edge source with current level's bridges
         xs, ys = self.bridge_edges[self.current_level]
@@ -123,6 +140,8 @@ class ROGBrowser:
             size='size',
             color='color',
             alpha='alpha',
+            line_color='line_color',
+            line_width='line_width',
         )
 
         # Add hover tool targeting only the scatter points
@@ -317,14 +336,18 @@ class ROGBrowser:
         }
 
         # Update bridge edges for current level
-        xs, ys = self.bridge_edges[self.current_level]
-        n_edges = len(xs)
-        self.edge_source.data = {
-            'xs': xs, 'ys': ys,
-            'line_color': ['#4488cc'] * n_edges,
-            'line_alpha': [0.15] * n_edges,
-            'line_width': [1] * n_edges,
-        }
+        # If there's an active highlight, reapply it instead of resetting to default
+        if self._highlighted_indices:
+            self.highlight_points(self._highlighted_indices)
+        else:
+            xs, ys = self.bridge_edges[self.current_level]
+            n_edges = len(xs)
+            self.edge_source.data = {
+                'xs': xs, 'ys': ys,
+                'line_color': ['#4488cc'] * n_edges,
+                'line_alpha': [0.15] * n_edges,
+                'line_width': [1] * n_edges,
+            }
 
         # Update title and status
         self.figure.title.text = f"ROG Browser - {len(self.titles):,} points - Level: {self.current_level} clusters"
@@ -458,21 +481,62 @@ class ROGBrowser:
 
         n = len(self.coords_2d)
         self._highlighted_indices = [i for i in indices if 0 <= i < n]
+        highlighted_set = set(self._highlighted_indices)
 
         # Set initial highlight state
         alphas = [0.1] * n
         sizes = [3] * n
+        line_colors = ['rgba(0,0,0,0)'] * n  # Transparent by default
+        line_widths = [1] * n
         for i in self._highlighted_indices:
             alphas[i] = 1.0
-            sizes[i] = 12
+            sizes[i] = 14
+            line_colors[i] = '#ffaa33'  # Orange outline (same as edge highlight)
+            line_widths[i] = 3
         self.source.data['alpha'] = alphas
         self.source.data['size'] = sizes
+        self.source.data['line_color'] = line_colors
+        self.source.data['line_width'] = line_widths
 
-        # Brighten edges during highlight
-        n_edges = len(self.edge_source.data['xs'])
-        self.edge_source.data['line_color'] = ['#66aaff'] * n_edges
-        self.edge_source.data['line_alpha'] = [0.4] * n_edges
-        self.edge_source.data['line_width'] = [1.5] * n_edges
+        # Find which buckets the highlighted points belong to (at 50-cluster level)
+        highlighted_buckets = set()
+        if 50 in self.cluster_result['labels'] and highlighted_set:
+            labels_50 = self.cluster_result['labels'][50]
+            for idx in self._highlighted_indices:
+                highlighted_buckets.add(int(labels_50[idx]))
+
+        # Highlight bucket-to-bucket edges connected to highlighted buckets
+        # Use original edge count, not filtered edge_source
+        orig_xs, orig_ys = self.bridge_edges[self.current_level]
+        n_edges = len(orig_xs)
+
+        # When highlighting, dim non-connected edges (but keep them visible)
+        if highlighted_buckets:
+            edge_colors = ['#666666'] * n_edges  # Grey for non-connected
+            edge_alphas = [0.08] * n_edges  # Very faint
+            edge_widths = [0.5] * n_edges
+        else:
+            edge_colors = [self._default_edge_color] * n_edges
+            edge_alphas = [self._default_edge_alpha] * n_edges
+            edge_widths = [self._default_edge_width] * n_edges
+
+        matched_edges = 0
+        if self.cluster_pair_list and highlighted_buckets:
+            for edge_idx, (c1, c2) in enumerate(self.cluster_pair_list):
+                if edge_idx < n_edges and (int(c1) in highlighted_buckets or int(c2) in highlighted_buckets):
+                    edge_colors[edge_idx] = '#ffaa33'  # Orange for connected edges
+                    edge_alphas[edge_idx] = 0.9
+                    edge_widths[edge_idx] = 3.0
+                    matched_edges += 1
+
+        # Show all edges - highlighted ones in orange, others dimmed
+        self.edge_source.data = {
+            'xs': list(orig_xs),
+            'ys': list(orig_ys),
+            'line_color': edge_colors,
+            'line_alpha': edge_alphas,
+            'line_width': edge_widths,
+        }
 
         # Stop existing pulse animation
         if self._pulse_callback:
@@ -513,6 +577,8 @@ class ROGBrowser:
         n = len(self.coords_2d)
         self.source.data['alpha'] = [0.7] * n
         self.source.data['size'] = [4] * n
+        self.source.data['line_color'] = ['rgba(0,0,0,0)'] * n
+        self.source.data['line_width'] = [1] * n
 
         # Reset edges to default
         n_edges = len(self.edge_source.data['xs'])
@@ -533,10 +599,6 @@ STATE = AppState()
 # -----------------------------------------------------------------------------
 # Control HTTP Handler
 # -----------------------------------------------------------------------------
-
-import json
-from http.server import HTTPServer, BaseHTTPRequestHandler
-import threading
 
 
 class ControlHandler(BaseHTTPRequestHandler):
@@ -640,6 +702,8 @@ def main():
         cache['titles'],
         cache['cluster_result'],
         cache['bridge_edges'],
+        cache.get('edge_indices'),  # May be None for old caches
+        cache.get('cluster_pairs'),  # (bucket1, bucket2) -> count for edge highlighting
     )
 
     # Store document reference for control API
