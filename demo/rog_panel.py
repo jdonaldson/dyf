@@ -81,19 +81,25 @@ class ROGBrowser:
         self.y_min, self.y_max = coords_2d[:, 1].min(), coords_2d[:, 1].max()
         self.original_width = self.x_max - self.x_min
 
-        # Build color arrays for each level
+        # Build STABLE hierarchical colors:
+        # - Top-level cluster (5) determines base hue
+        # - Micro-cluster determines variation within that hue
+        # This keeps boundaries visible while preventing color flashing
+        self.stable_colors = self._build_hierarchical_colors(cluster_result)
+
+        # Legacy: keep colors dict for compatibility but won't be used for updates
         self.colors = {}
         for level in CLUSTER_LEVELS:
             labels = cluster_result['labels'][level]
             self.colors[level] = [COLORS_50[l % 50] for l in labels]
 
-        # Create data source
+        # Create data source with stable colors
         n = len(coords_2d)
         self.source = ColumnDataSource(data={
             'x': coords_2d[:, 0],
             'y': coords_2d[:, 1],
             'title': titles,
-            'color': self.colors[self.current_level],
+            'color': self.stable_colors,  # Use stable colors, not level-dependent
             'alpha': [0.7] * n,
             'size': [4] * n,
             'line_color': ['rgba(0,0,0,0)'] * n,  # Transparent outline by default
@@ -200,6 +206,52 @@ class ROGBrowser:
         self.figure.x_range.on_change('end', self._on_zoom)
         self.figure.y_range.on_change('start', self._on_zoom)
         self.figure.y_range.on_change('end', self._on_zoom)
+
+    def _build_hierarchical_colors(self, cluster_result: dict) -> list[str]:
+        """Build stable colors with hierarchical structure.
+
+        Top-level cluster (5) determines base hue, micro-cluster adds variation.
+        This makes cluster boundaries visible while keeping colors stable.
+        """
+        import colorsys
+
+        n_points = len(self.coords_2d)
+
+        # Get top-level (5) cluster assignments for base hue
+        top_labels = cluster_result['labels'][5]
+
+        # Get micro-cluster assignments for variation
+        if self.use_dynamic_dendrogram:
+            micro_labels = self.dendrogram['kmeans_labels']
+            n_micro = self.dendrogram['n_micro']
+        else:
+            micro_labels = cluster_result['labels'][50]
+            n_micro = 50
+
+        # Define 5 distinct base hues (well-separated on color wheel)
+        base_hues = [0.0, 0.15, 0.35, 0.55, 0.75]  # Red, Orange, Green, Cyan, Purple
+
+        colors = []
+        for i in range(n_points):
+            top_cluster = int(top_labels[i])
+            micro_cluster = int(micro_labels[i])
+
+            # Base hue from top-level cluster
+            base_hue = base_hues[top_cluster % len(base_hues)]
+
+            # Small hue variation from micro-cluster (±0.05)
+            hue_variation = ((micro_cluster % 10) - 5) * 0.01
+            hue = (base_hue + hue_variation) % 1.0
+
+            # Saturation/lightness variation from micro-cluster
+            sat = 0.5 + (micro_cluster % 7) * 0.07  # 0.5-0.92
+            light = 0.45 + (micro_cluster % 5) * 0.08  # 0.45-0.77
+
+            # Convert HSL to RGB
+            r, g, b = colorsys.hls_to_rgb(hue, light, sat)
+            colors.append(f'#{int(r*255):02x}{int(g*255):02x}{int(b*255):02x}')
+
+        return colors
 
     def _update_label_source(self):
         """Update the label data source for current level."""
@@ -393,13 +445,9 @@ class ROGBrowser:
             'label': label_text,
         }
 
-        # Update current level for coloring
+        # Update current level (colors stay stable - only labels change)
         if chosen_level != self.current_level:
             self.current_level = chosen_level
-            # For dynamic dendrogram, we need to update colors based on the cut
-            if self.use_dynamic_dendrogram and chosen_level not in self.colors:
-                self.colors[chosen_level] = [COLORS_50[l % 50] for l in labels]
-            self.source.data['color'] = self.colors[self.current_level]
             self.figure.title.text = f"ROG Browser - {len(self.titles):,} points - Level: {self.current_level} clusters"
 
     def _process_bundled_edges(self, bundled: pd.DataFrame) -> tuple[list, list]:
@@ -515,9 +563,8 @@ class ROGBrowser:
         self._update_labels_for_viewport()
 
     def _update_view(self):
-        """Update points, labels, and bridge edges for current level."""
-        # Update point colors
-        self.source.data['color'] = self.colors[self.current_level]
+        """Update labels and bridge edges for current level (colors stay stable)."""
+        # Note: Colors are stable based on micro-clusters, so no color update needed
 
         # Update labels using viewport-aware aggregation
         self._update_labels_for_viewport()
