@@ -12,19 +12,20 @@ import pandas as pd
 import pickle
 from pathlib import Path
 from sklearn.cluster import KMeans
-from sklearn.neighbors import NearestNeighbors
 from scipy.cluster.hierarchy import linkage, fcluster
 import umap
 from datashader.bundling import hammer_bundle
 import subprocess
 
-CLUSTER_LEVELS = (8, 15, 30)
-EDGE_K = 5
+# Import dyf for bridge detection via ROG ontology
+import dyf
+
+CLUSTER_LEVELS = (5, 12, 25, 50)
 BUNDLE_ITERATIONS = 4
 
 
 def load_data(path: str, sample: int | None = None):
-    """Load parquet and run UMAP."""
+    """Load parquet and run UMAP. Returns coords, titles, and embeddings."""
     print(f"Loading {path}...")
     df = pl.read_parquet(path)
 
@@ -34,11 +35,11 @@ def load_data(path: str, sample: int | None = None):
     titles = df["title"].to_list()
     embeddings = np.array(df["embedding"].to_list())
 
-    print(f"Running UMAP on {len(titles)} points...")
-    reducer = umap.UMAP(n_components=2, random_state=42, n_neighbors=15, min_dist=0.1)
+    print(f"Running UMAP on {len(titles)} points (parallel)...")
+    reducer = umap.UMAP(n_components=2, n_neighbors=15, min_dist=0.1, n_jobs=-1)
     coords_2d = reducer.fit_transform(embeddings)
 
-    return coords_2d, titles
+    return coords_2d, titles, embeddings
 
 
 def compute_hierarchical_clusters(coords_2d: np.ndarray, titles: list[str]):
@@ -120,43 +121,67 @@ Reply with ONLY the label, nothing else."""
     return cluster_names
 
 
-def compute_bridge_edges(coords_2d: np.ndarray, cluster_labels: dict):
-    """Compute bridge edges for each cluster level."""
-    print(f"Computing {EDGE_K}-NN graph...")
+def compute_bridge_edges(coords_2d: np.ndarray, embeddings: np.ndarray, cluster_labels: dict,
+                         sim_threshold: float = 0.45):
+    """Compute bridge edges using dyf ROG ontology.
 
-    nn = NearestNeighbors(n_neighbors=EDGE_K + 1, algorithm='auto')
-    nn.fit(coords_2d)
-    _, indices = nn.kneighbors(coords_2d)
+    Filters to edges with similarity below threshold - these are the weaker
+    cross-region connections that bridge different semantic areas.
+    """
+    print("Building ROG ontology for bridge detection...")
 
-    all_edges = []
-    for i in range(len(coords_2d)):
-        for j in indices[i, 1:]:
-            if i < j:
-                all_edges.append((i, j))
+    # Build ROG ontology
+    result = dyf.build_rog_ontology(
+        embeddings,
+        initial_threshold=0.55,
+        min_threshold=0.35,
+        target_coverage=0.95,
+        verbose=True,
+    )
 
-    print(f"Found {len(all_edges)} total k-NN edges")
+    # Extract edges with lower similarity (cross-region bridges)
+    ont = result.ontology
+    bridge_edges = []
+    all_sims = []
 
+    for parent, children_list in ont.children.items():
+        for child, sim, div_gap in children_list:
+            all_sims.append(sim)
+            # Keep only weaker edges (bridges across regions)
+            if sim < sim_threshold:
+                if parent < child:
+                    bridge_edges.append((parent, child))
+                else:
+                    bridge_edges.append((child, parent))
+
+    # Deduplicate
+    bridge_edges = list(set(bridge_edges))
+
+    total_edges = sum(len(v) for v in ont.children.values())
+    mean_sim = np.mean(all_sims) if all_sims else 0
+    print(f"Edge similarity: mean={mean_sim:.3f}, threshold={sim_threshold}")
+    print(f"Extracted {len(bridge_edges):,} bridge edges (sim < {sim_threshold}) from {total_edges:,} total")
+
+    if not bridge_edges:
+        print("No bridge edges found")
+        return {level: pd.DataFrame({'x': [], 'y': []}) for level in cluster_labels.keys()}, ont.diversity
+
+    # Bundle edges
+    print("Bundling edges...")
     nodes = pd.DataFrame({'x': coords_2d[:, 0], 'y': coords_2d[:, 1]})
     nodes.index.name = 'id'
 
-    result = {}
-    for level, labels in cluster_labels.items():
-        bridge_edges = [(i, j) for i, j in all_edges if labels[i] != labels[j]]
-        print(f"Level {level}: {len(bridge_edges)} bridge edges")
+    edges_df = pd.DataFrame(bridge_edges, columns=['source', 'target'])
+    bundled = hammer_bundle(
+        nodes, edges_df,
+        iterations=BUNDLE_ITERATIONS,
+        batch_size=min(20000, len(bridge_edges)),
+    )
 
-        if not bridge_edges:
-            result[level] = pd.DataFrame({'x': [], 'y': []})
-            continue
+    # Return same bundled edges for all levels (ROG bridges are independent of cluster level)
+    edges_result = {level: bundled for level in cluster_labels.keys()}
 
-        edges_df = pd.DataFrame(bridge_edges, columns=['source', 'target'])
-        bundled = hammer_bundle(
-            nodes, edges_df,
-            iterations=BUNDLE_ITERATIONS,
-            batch_size=min(20000, len(bridge_edges)),
-        )
-        result[level] = bundled
-
-    return result
+    return edges_result, ont.diversity  # Return diversity for visualization
 
 
 def main():
@@ -176,9 +201,9 @@ def main():
     print(f"Will save to: {output_path}")
 
     # Process
-    coords_2d, titles = load_data(args.data_path, args.sample)
+    coords_2d, titles, embeddings = load_data(args.data_path, args.sample)
     cluster_result = compute_hierarchical_clusters(coords_2d, titles)
-    bridge_edges = compute_bridge_edges(coords_2d, cluster_result['labels'])
+    bridge_edges, diversity = compute_bridge_edges(coords_2d, embeddings, cluster_result['labels'])
 
     # Save
     cache = {
@@ -186,6 +211,7 @@ def main():
         'titles': titles,
         'cluster_result': cluster_result,
         'bridge_edges': bridge_edges,
+        'diversity': diversity,  # For visualization (ROG diversity scores)
     }
 
     with open(output_path, 'wb') as f:

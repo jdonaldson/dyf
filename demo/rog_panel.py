@@ -22,9 +22,9 @@ import colorcet as cc
 # Configuration
 # -----------------------------------------------------------------------------
 
-CLUSTER_LEVELS = (8, 15, 30)
-ZOOM_THRESHOLDS = (1.5, 3.0)
-COLORS_30 = cc.glasbey_light[:30]
+CLUSTER_LEVELS = (5, 12, 25, 50)
+ZOOM_THRESHOLDS = (1.5, 3.0, 6.0)
+COLORS_50 = cc.glasbey_light[:50]
 
 # -----------------------------------------------------------------------------
 # Bokeh Application
@@ -37,6 +37,12 @@ class ROGBrowser:
         self.cluster_result = cluster_result
         self.current_level = CLUSTER_LEVELS[0]
         self._programmatic_zoom = False  # Flag to skip _on_zoom during programmatic changes
+        self.last_command = None  # Track last command received
+        self.connected = True  # Connection status
+
+        # Animation state
+        self._animation = None  # Current animation target
+        self._animation_callback = None  # Periodic callback for animation
 
         # Store original extent for zoom ratio calculation
         self.x_min, self.x_max = coords_2d[:, 0].min(), coords_2d[:, 0].max()
@@ -47,7 +53,7 @@ class ROGBrowser:
         self.colors = {}
         for level in CLUSTER_LEVELS:
             labels = cluster_result['labels'][level]
-            self.colors[level] = [COLORS_30[l % 30] for l in labels]
+            self.colors[level] = [COLORS_50[l % 50] for l in labels]
 
         # Create data source
         n = len(coords_2d)
@@ -173,14 +179,24 @@ class ROGBrowser:
 
     def _get_status_html(self) -> str:
         """Generate status HTML."""
+        status_color = "#28a745" if self.connected else "#dc3545"
+        status_text = "Connected" if self.connected else "Disconnected"
+        last_cmd = self.last_command or "None"
         return f"""
         <div style="font-family: sans-serif; padding: 10px;">
+            <div style="margin-bottom: 10px; padding: 8px; background: #f8f9fa; border-radius: 4px;">
+                <span style="display: inline-block; width: 10px; height: 10px;
+                       background: {status_color}; border-radius: 50%; margin-right: 6px;"></span>
+                <strong>Control API:</strong> {status_text}<br>
+                <small style="color: #666;">Last: {last_cmd}</small>
+            </div>
             <h3>Cluster Level: {self.current_level}</h3>
             <p>Zoom to change detail level:</p>
             <ul>
-                <li>Zoomed out: 8 clusters</li>
-                <li>Mid zoom: 15 clusters</li>
-                <li>Zoomed in: 30 clusters</li>
+                <li>Zoomed out: 5 clusters</li>
+                <li>Light zoom: 12 clusters</li>
+                <li>Mid zoom: 25 clusters</li>
+                <li>Zoomed in: 50 clusters</li>
             </ul>
         </div>
         """
@@ -202,11 +218,13 @@ class ROGBrowser:
     def _get_level_for_zoom(self, zoom_ratio: float) -> int:
         """Map zoom ratio to cluster level."""
         if zoom_ratio < ZOOM_THRESHOLDS[0]:
-            return 8
+            return 5
         elif zoom_ratio < ZOOM_THRESHOLDS[1]:
-            return 15
+            return 12
+        elif zoom_ratio < ZOOM_THRESHOLDS[2]:
+            return 25
         else:
-            return 30
+            return 50
 
     def _on_zoom(self, attr, old, new):
         """Handle zoom changes."""
@@ -252,32 +270,100 @@ class ROGBrowser:
     # Control API (for MCP server)
     # -------------------------------------------------------------------------
 
-    def zoom_to(self, x: float, y: float, radius: float = 5.0):
-        """Zoom to center on a point."""
+    def zoom_to(self, x: float, y: float, radius: float = 5.0, animate: bool = True, duration: int = 500):
+        """Zoom to center on a point with optional animation.
+
+        Args:
+            x, y: Target center coordinates
+            radius: Target view radius
+            animate: Whether to animate the transition
+            duration: Animation duration in milliseconds
+        """
+        from bokeh.io import curdoc
+
+        target_x_start, target_x_end = x - radius, x + radius
+        target_y_start, target_y_end = y - radius, y + radius
+
+        if not animate:
+            # Instant zoom
+            self._programmatic_zoom = True
+            self.figure.x_range.update(start=target_x_start, end=target_x_end)
+            self.figure.y_range.update(start=target_y_start, end=target_y_end)
+            self._update_zoom_level()
+            def clear_flag():
+                self._programmatic_zoom = False
+            curdoc().add_timeout_callback(clear_flag, 100)
+            return
+
+        # Animated zoom
         self._programmatic_zoom = True
-        # Update all ranges at once using update() to minimize events
-        self.figure.x_range.update(start=x - radius, end=x + radius)
-        self.figure.y_range.update(start=y - radius, end=y + radius)
-        # Manually trigger view update for new zoom level
+
+        # Cancel any existing animation
+        if self._animation_callback:
+            try:
+                curdoc().remove_periodic_callback(self._animation_callback)
+            except:
+                pass
+
+        # Animation parameters
+        fps = 60
+        frames = max(1, int(duration * fps / 1000))
+        frame = [0]  # Use list for mutable closure
+
+        # Capture starting positions
+        start_x_start = float(self.figure.x_range.start)
+        start_x_end = float(self.figure.x_range.end)
+        start_y_start = float(self.figure.y_range.start)
+        start_y_end = float(self.figure.y_range.end)
+
+        def ease_out_cubic(t):
+            """Cubic ease-out for smooth deceleration."""
+            return 1 - (1 - t) ** 3
+
+        def animate_step():
+            frame[0] += 1
+            t = ease_out_cubic(frame[0] / frames)
+
+            # Interpolate all range values
+            new_x_start = start_x_start + (target_x_start - start_x_start) * t
+            new_x_end = start_x_end + (target_x_end - start_x_end) * t
+            new_y_start = start_y_start + (target_y_start - start_y_start) * t
+            new_y_end = start_y_end + (target_y_end - start_y_end) * t
+
+            self.figure.x_range.update(start=new_x_start, end=new_x_end)
+            self.figure.y_range.update(start=new_y_start, end=new_y_end)
+
+            # Check for level changes during animation
+            self._update_zoom_level()
+
+            if frame[0] >= frames:
+                # Animation complete
+                try:
+                    curdoc().remove_periodic_callback(self._animation_callback)
+                except:
+                    pass
+                self._animation_callback = None
+                self._programmatic_zoom = False
+
+        self._animation_callback = curdoc().add_periodic_callback(animate_step, int(1000 / fps))
+
+    def _update_zoom_level(self):
+        """Update cluster level based on current zoom."""
         zoom_ratio = self._get_zoom_ratio()
         new_level = self._get_level_for_zoom(zoom_ratio)
         if new_level != self.current_level:
             self.current_level = new_level
             self._update_view()
-        # Keep flag set - will be cleared by a delayed callback
-        from functools import partial
-        from bokeh.io import curdoc
-        def clear_flag():
-            self._programmatic_zoom = False
-        curdoc().add_timeout_callback(clear_flag, 100)
 
-    def reset_view(self):
-        """Reset to original view."""
+    def reset_view(self, animate: bool = True):
+        """Reset to original view with optional animation."""
         padding = self.original_width * 0.05
-        self.figure.x_range.start = self.x_min - padding
-        self.figure.x_range.end = self.x_max + padding
-        self.figure.y_range.start = self.y_min - padding
-        self.figure.y_range.end = self.y_max + padding
+        center_x = (self.x_min + self.x_max) / 2
+        center_y = (self.y_min + self.y_max) / 2
+        radius_x = (self.x_max - self.x_min) / 2 + padding
+        radius_y = (self.y_max - self.y_min) / 2 + padding
+        radius = max(radius_x, radius_y)
+        self.zoom_to(center_x, center_y, radius, animate=animate)
 
     def set_level(self, level: int):
         """Set cluster level manually."""
@@ -464,6 +550,9 @@ def main():
                     STATE.browser.highlight_points(params["indices"])
                 elif action == "clear_highlight":
                     STATE.browser.clear_highlight()
+                # Update last command and refresh status
+                STATE.browser.last_command = action
+                STATE.browser.status.text = STATE.browser._get_status_html()
             except Exception as e:
                 print(f"Error processing command {action}: {e}")
 
