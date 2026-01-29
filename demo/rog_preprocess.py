@@ -1,5 +1,5 @@
 """
-Preprocess wiki data for ROG Browser.
+Preprocess wiki data for ROG (Recursive Ontological Graph) Browser.
 Generates UMAP coords, clusters, LLM labels, and bundled edges.
 
 Run: python demo/rog_preprocess.py demo/wiki_simple_50k.parquet --sample 10000
@@ -571,6 +571,129 @@ Reply with ONLY the label, nothing else."""
     return cluster_names
 
 
+def compute_lsh_visualization(coords_2d: np.ndarray, embeddings: np.ndarray, num_bits: int = 12):
+    """Compute LSH bucket assignments and hyperplane projections for visualization.
+
+    Args:
+        coords_2d: UMAP 2D coordinates
+        embeddings: Original high-dim embeddings
+        num_bits: Number of LSH bits (determines number of hyperplanes)
+
+    Returns:
+        dict with:
+        - 'bucket_ids': LSH bucket ID per point
+        - 'hyperplanes_2d': Projected hyperplanes as line segments in 2D
+        - 'bucket_centroids': Centroid of each bucket in 2D
+        - 'bucket_sizes': Number of points per bucket
+        - 'boundary_points': Points near bucket boundaries
+    """
+    from sklearn.decomposition import PCA
+    from collections import defaultdict
+
+    print(f"Computing LSH visualization ({num_bits} bits)...")
+    n, d = embeddings.shape
+
+    # Step 1: Random hyperplanes -> initial buckets
+    rng = np.random.default_rng(42)
+    random_hp = rng.standard_normal((num_bits, d)).astype(np.float32)
+    random_hp = random_hp / np.linalg.norm(random_hp, axis=1, keepdims=True)
+
+    signs_random = (embeddings @ random_hp.T) >= 0
+    powers = 2 ** np.arange(num_bits)
+    hashes_random = (signs_random @ powers).astype(np.uint64)
+
+    # Compute random bucket centroids
+    random_bucket_to_indices = defaultdict(list)
+    for idx, h in enumerate(hashes_random):
+        random_bucket_to_indices[int(h)].append(idx)
+
+    centroids = []
+    for bid, indices in random_bucket_to_indices.items():
+        if len(indices) >= 2:
+            centroid = embeddings[indices].mean(axis=0)
+            norm = np.linalg.norm(centroid)
+            if norm > 0:
+                centroids.append(centroid / norm)
+
+    centroids = np.array(centroids, dtype=np.float32)
+    print(f"  Random hash: {len(random_bucket_to_indices):,} buckets, {len(centroids)} centroids")
+
+    # Step 2: PCA on centroids -> data-adapted hyperplanes
+    n_components = min(num_bits, len(centroids) - 1)
+    pca = PCA(n_components=n_components)
+    pca.fit(centroids)
+    hp = pca.components_.astype(np.float32)  # Shape: (n_components, d)
+    print(f"  PCA variance explained: {pca.explained_variance_ratio_.sum():.1%}")
+
+    # Step 3: Re-hash with PCA hyperplanes
+    signs = (embeddings @ hp.T) >= 0
+    bucket_ids = (signs @ powers[:len(hp)]).astype(np.uint64)
+
+    # Step 4: Compute bucket centroids in 2D
+    bucket_to_indices = defaultdict(list)
+    for idx, h in enumerate(bucket_ids):
+        bucket_to_indices[int(h)].append(idx)
+
+    bucket_centroids_2d = {}
+    bucket_sizes = {}
+    for bid, indices in bucket_to_indices.items():
+        bucket_sizes[bid] = len(indices)
+        if indices:
+            bucket_centroids_2d[bid] = coords_2d[indices].mean(axis=0)
+
+    print(f"  Final: {len(bucket_to_indices):,} buckets")
+
+    # Step 5: Project hyperplanes to 2D for visualization
+    # Use linear regression to find best 2D representation of hyperplane cuts
+    # For each hyperplane, find points just above/below threshold and draw separator
+    hyperplanes_2d = []
+    for hp_idx in range(len(hp)):
+        # Get projections onto this hyperplane
+        projections = embeddings @ hp[hp_idx]
+
+        # Find points near the boundary (within 10% of range around 0)
+        proj_range = projections.max() - projections.min()
+        near_boundary = np.abs(projections) < 0.1 * proj_range
+
+        if near_boundary.sum() > 10:
+            # Fit a line through boundary points in 2D
+            boundary_coords = coords_2d[near_boundary]
+            # Use PCA to find principal direction of boundary points
+            if len(boundary_coords) > 2:
+                pca_2d = PCA(n_components=1)
+                pca_2d.fit(boundary_coords)
+                direction = pca_2d.components_[0]
+                center = boundary_coords.mean(axis=0)
+
+                # Extend line across the plot
+                extent = 20  # How far to extend
+                p1 = center - direction * extent
+                p2 = center + direction * extent
+                hyperplanes_2d.append({
+                    'x': [float(p1[0]), float(p2[0])],
+                    'y': [float(p1[1]), float(p2[1])],
+                    'bit': hp_idx,
+                })
+
+    print(f"  Projected {len(hyperplanes_2d)} hyperplanes to 2D")
+
+    # Step 6: Find boundary points (points with low margin to any hyperplane)
+    margins = np.abs(embeddings @ hp.T)
+    min_margins = margins.min(axis=1)
+    margin_threshold = np.percentile(min_margins, 20)  # Bottom 20%
+    boundary_points = np.where(min_margins < margin_threshold)[0]
+    print(f"  Found {len(boundary_points)} boundary points")
+
+    return {
+        'bucket_ids': bucket_ids,
+        'hyperplanes_2d': hyperplanes_2d,
+        'bucket_centroids_2d': bucket_centroids_2d,
+        'bucket_sizes': bucket_sizes,
+        'boundary_points': boundary_points.tolist(),
+        'num_bits': num_bits,
+    }
+
+
 def compute_bridge_edges(coords_2d: np.ndarray, embeddings: np.ndarray, cluster_labels: dict,
                          bridge_cluster_level: int = 5):
     """Compute bridge edges using dyf ROG ontology.
@@ -842,6 +965,9 @@ def main():
         bridge_cluster_level=args.bridge_level
     )
 
+    # Compute LSH visualization data
+    lsh_data = compute_lsh_visualization(coords_2d, embeddings, num_bits=12)
+
     # Save
     cache = {
         'coords_2d': coords_2d,
@@ -851,6 +977,7 @@ def main():
         'edge_indices': edge_indices,  # (source, target) pairs for highlighting
         'cluster_pairs': cluster_pairs,  # {(c1, c2): count} for edge weights
         'diversity': diversity,  # For visualization (ROG diversity scores)
+        'lsh_data': lsh_data,  # LSH bucket visualization data
     }
 
     with open(output_path, 'wb') as f:
@@ -860,6 +987,7 @@ def main():
     print(f"Run server with: bokeh serve demo/rog_panel.py --port 5007 --args {output_path}")
     if args.use_dendrogram:
         print("Note: Dendrogram data included - panel can dynamically cut at any level")
+    print("Note: LSH data included - toggle LSH mode to see bucket assignments")
 
 
 if __name__ == "__main__":

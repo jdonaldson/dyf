@@ -1,5 +1,5 @@
 """
-MCP Server for ROG Browser.
+MCP Server for ROG (Recursive Ontological Graph) Browser.
 
 Provides tools to search, explore clusters, and control the visualization.
 

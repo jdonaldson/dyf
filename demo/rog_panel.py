@@ -1,5 +1,5 @@
 """
-ROG Browser - Bokeh implementation with multi-level hierarchical clustering.
+ROG (Recursive Ontological Graph) Browser - Bokeh visualization with multi-level hierarchical clustering.
 
 Run preprocessing first:
   python demo/rog_preprocess.py demo/wiki_simple_50k.parquet --sample 10000
@@ -37,7 +37,7 @@ COLORS_50 = cc.glasbey_light[:50]
 class ROGBrowser:
     def __init__(self, coords_2d: np.ndarray, titles: list[str], cluster_result: dict,
                  bridge_edges: dict, edge_indices: list[tuple[int, int]] | None = None,
-                 cluster_pairs: dict | None = None):
+                 cluster_pairs: dict | None = None, lsh_data: dict | None = None):
         self.coords_2d = coords_2d
         self.titles = titles
         self.cluster_result = cluster_result
@@ -51,6 +51,17 @@ class ROGBrowser:
             self._dendrogram_cache = {}  # Cache for computed cuts: n_clusters -> (labels, centroids, names)
         else:
             self._dendrogram_cache = {}
+
+        # LSH visualization data
+        self.lsh_data = lsh_data
+        self.lsh_mode = False  # Toggle between cluster view and LSH view
+        self.lsh_density_mode = False  # Show density coloring instead of bucket coloring
+        if lsh_data:
+            print(f"LSH data available - {lsh_data['num_bits']} bits, {len(lsh_data['bucket_centroids_2d'])} buckets", flush=True)
+            # Build LSH bucket colors
+            self.lsh_colors = self._build_lsh_colors(lsh_data)
+            # Build LSH density colors (by bucket size)
+            self.lsh_density_colors, self.lsh_density_sizes = self._build_lsh_density_colors(lsh_data)
 
         # Store ordered list of cluster pairs for edge highlighting
         # Edge i corresponds to cluster_pair_list[i]
@@ -190,6 +201,29 @@ class ROGBrowser:
         self.edge_toggle = Toggle(label="Show Edges", active=True, width=100)
         self.edge_toggle.on_change('active', self._on_edge_toggle)
 
+        # Toggle for LSH mode (if LSH data available)
+        self.lsh_toggle = Toggle(label="LSH Mode", active=False, width=100)
+        self.lsh_toggle.on_change('active', self._on_lsh_toggle)
+        if not self.lsh_data:
+            self.lsh_toggle.disabled = True
+
+        # Toggle for LSH density coloring (only active in LSH mode)
+        self.density_toggle = Toggle(label="Density", active=False, width=80)
+        self.density_toggle.on_change('active', self._on_density_toggle)
+        self.density_toggle.disabled = True  # Enable only when LSH mode is active
+
+        # Add hyperplane lines (hidden by default, shown in LSH mode)
+        self.hyperplane_source = ColumnDataSource(data={'xs': [], 'ys': []})
+        self.hyperplane_renderer = self.figure.multi_line(
+            'xs', 'ys',
+            source=self.hyperplane_source,
+            line_color='#ff6600',
+            line_alpha=0.6,
+            line_width=2,
+            line_dash='dashed',
+        )
+        self.hyperplane_renderer.visible = False
+
         # Search box for finding articles
         self.search_input = TextInput(title="Search articles:", placeholder="Type to search...", width=180)
         self.search_input.on_change('value', self._on_search)
@@ -206,6 +240,75 @@ class ROGBrowser:
         self.figure.x_range.on_change('end', self._on_zoom)
         self.figure.y_range.on_change('start', self._on_zoom)
         self.figure.y_range.on_change('end', self._on_zoom)
+
+    def _build_lsh_colors(self, lsh_data: dict) -> list[str]:
+        """Build colors based on LSH bucket assignments."""
+        import colorsys
+
+        bucket_ids = lsh_data['bucket_ids']
+        unique_buckets = sorted(set(bucket_ids))
+        n_buckets = len(unique_buckets)
+        bucket_to_idx = {b: i for i, b in enumerate(unique_buckets)}
+
+        colors = []
+        for bid in bucket_ids:
+            idx = bucket_to_idx[int(bid)]
+            # Use golden ratio for hue distribution
+            hue = (idx * 0.618033988749895) % 1.0
+            r, g, b = colorsys.hls_to_rgb(hue, 0.5, 0.7)
+            colors.append(f'#{int(r*255):02x}{int(g*255):02x}{int(b*255):02x}')
+
+        return colors
+
+    def _build_lsh_density_colors(self, lsh_data: dict) -> tuple[list[str], list[float]]:
+        """Build colors based on LSH bucket density (size).
+
+        Returns colors and point sizes based on bucket density.
+        Uses a perceptual colormap: sparse (blue) → medium (green) → dense (yellow).
+        """
+        bucket_ids = lsh_data['bucket_ids']
+        bucket_sizes = lsh_data['bucket_sizes']
+
+        # Get size for each point
+        point_sizes = [bucket_sizes.get(int(bid), 1) for bid in bucket_ids]
+
+        # Compute log-scale density for better visual distribution
+        log_sizes = [np.log1p(s) for s in point_sizes]
+        min_log, max_log = min(log_sizes), max(log_sizes)
+        range_log = max_log - min_log if max_log > min_log else 1.0
+
+        # Viridis-inspired colormap (sparse → dense)
+        # Purple/blue for sparse, green for medium, yellow for dense
+        def density_to_color(normalized: float) -> str:
+            """Map normalized density [0,1] to color."""
+            if normalized < 0.25:
+                # Dark blue to blue
+                t = normalized / 0.25
+                r, g, b = int(68 + t * 20), int(1 + t * 80), int(84 + t * 80)
+            elif normalized < 0.5:
+                # Blue to teal/green
+                t = (normalized - 0.25) / 0.25
+                r, g, b = int(88 - t * 55), int(81 + t * 90), int(164 - t * 50)
+            elif normalized < 0.75:
+                # Green to yellow-green
+                t = (normalized - 0.5) / 0.25
+                r, g, b = int(33 + t * 100), int(171 + t * 30), int(114 - t * 60)
+            else:
+                # Yellow-green to yellow
+                t = (normalized - 0.75) / 0.25
+                r, g, b = int(133 + t * 120), int(201 + t * 50), int(54 - t * 30)
+
+            return f'#{r:02x}{g:02x}{b:02x}'
+
+        colors = []
+        sizes = []
+        for log_size in log_sizes:
+            normalized = (log_size - min_log) / range_log
+            colors.append(density_to_color(normalized))
+            # Size: sparse = 4, dense = 12
+            sizes.append(4 + normalized * 8)
+
+        return colors, sizes
 
     def _build_hierarchical_colors(self, cluster_result: dict) -> list[str]:
         """Build stable colors with hierarchical structure.
@@ -478,6 +581,106 @@ class ROGBrowser:
         """Toggle edge visibility."""
         self.edge_renderer.visible = new
 
+    def _on_lsh_toggle(self, attr, old, new):
+        """Toggle between cluster view and LSH bucket view."""
+        self.lsh_mode = new
+
+        if new and self.lsh_data:
+            # Switch to LSH mode
+            # Enable density toggle
+            self.density_toggle.disabled = False
+
+            # Update colors to LSH bucket colors (or density if enabled)
+            if self.lsh_density_mode:
+                self.source.data['color'] = self.lsh_density_colors
+                self.source.data['size'] = self.lsh_density_sizes
+            else:
+                self.source.data['color'] = self.lsh_colors
+
+            # Show hyperplane lines
+            hyperplanes = self.lsh_data['hyperplanes_2d']
+            xs = [hp['x'] for hp in hyperplanes]
+            ys = [hp['y'] for hp in hyperplanes]
+            self.hyperplane_source.data = {'xs': xs, 'ys': ys}
+            self.hyperplane_renderer.visible = True
+
+            # Update labels to show bucket info
+            bucket_centroids = self.lsh_data['bucket_centroids_2d']
+            bucket_sizes = self.lsh_data['bucket_sizes']
+            # Show top 10 largest buckets
+            top_buckets = sorted(bucket_sizes.items(), key=lambda x: -x[1])[:12]
+            label_x = [bucket_centroids[bid][0] for bid, _ in top_buckets if bid in bucket_centroids]
+            label_y = [bucket_centroids[bid][1] for bid, _ in top_buckets if bid in bucket_centroids]
+            label_text = [f'  B{bid} ({sz})  ' for bid, sz in top_buckets if bid in bucket_centroids]
+            self.label_source.data = {'x': label_x, 'y': label_y, 'label': label_text}
+
+            # Hide cluster edges, show boundary points
+            self.edge_renderer.visible = False
+            self.edge_toggle.active = False
+
+            self.figure.title.text = f"LSH Mode - {self.lsh_data['num_bits']} bits, {len(bucket_centroids)} buckets"
+        else:
+            # Switch back to cluster mode
+            # Disable and reset density toggle
+            self.density_toggle.disabled = True
+            self.density_toggle.active = False
+            self.lsh_density_mode = False
+
+            self.source.data['color'] = self.stable_colors
+            # Reset point sizes to default
+            self.source.data['size'] = [4] * len(self.titles)
+            self.hyperplane_renderer.visible = False
+            self._update_labels_for_viewport()
+            self.figure.title.text = f"ROG Browser - {len(self.titles):,} points - Level: {self.current_level} clusters"
+
+    def _on_density_toggle(self, attr, old, new):
+        """Toggle between bucket coloring and density coloring in LSH mode."""
+        self.lsh_density_mode = new
+
+        if not self.lsh_mode or not self.lsh_data:
+            return
+
+        bucket_centroids = self.lsh_data['bucket_centroids_2d']
+        bucket_sizes = self.lsh_data['bucket_sizes']
+
+        if new:
+            # Switch to density coloring
+            self.source.data['color'] = self.lsh_density_colors
+            self.source.data['size'] = self.lsh_density_sizes
+
+            # Update labels to show density distribution
+            # Sort by size and show range
+            sizes = list(bucket_sizes.values())
+            min_sz, max_sz = min(sizes), max(sizes)
+            median_sz = sorted(sizes)[len(sizes)//2]
+
+            # Show sparse, medium, and dense bucket examples
+            sorted_buckets = sorted(bucket_sizes.items(), key=lambda x: x[1])
+            sparse_buckets = sorted_buckets[:3]  # Smallest
+            dense_buckets = sorted_buckets[-5:]  # Largest
+
+            label_x, label_y, label_text = [], [], []
+            for bid, sz in dense_buckets:
+                if bid in bucket_centroids:
+                    label_x.append(bucket_centroids[bid][0])
+                    label_y.append(bucket_centroids[bid][1])
+                    label_text.append(f'  Dense: {sz}  ')
+
+            self.label_source.data = {'x': label_x, 'y': label_y, 'label': label_text}
+            self.figure.title.text = f"LSH Density - Range: {min_sz} to {max_sz} (median: {median_sz})"
+        else:
+            # Switch back to bucket coloring
+            self.source.data['color'] = self.lsh_colors
+            self.source.data['size'] = [4] * len(self.titles)
+
+            # Restore bucket labels
+            top_buckets = sorted(bucket_sizes.items(), key=lambda x: -x[1])[:12]
+            label_x = [bucket_centroids[bid][0] for bid, _ in top_buckets if bid in bucket_centroids]
+            label_y = [bucket_centroids[bid][1] for bid, _ in top_buckets if bid in bucket_centroids]
+            label_text = [f'  B{bid} ({sz})  ' for bid, sz in top_buckets if bid in bucket_centroids]
+            self.label_source.data = {'x': label_x, 'y': label_y, 'label': label_text}
+            self.figure.title.text = f"LSH Mode - {self.lsh_data['num_bits']} bits, {len(bucket_centroids)} buckets"
+
     def _on_tap_select(self, attr, old, new):
         """Handle tap selection on points."""
         if new:
@@ -593,6 +796,7 @@ class ROGBrowser:
             self.search_input,
             self.clear_btn,
             self.edge_toggle,
+            row(self.lsh_toggle, self.density_toggle),
             self.status,
             width=200
         )
@@ -820,6 +1024,107 @@ class ROGBrowser:
         self.edge_source.data['line_alpha'] = [0.15] * n_edges
         self.edge_source.data['line_width'] = [1] * n_edges
 
+    def animate_lsh_explanation(self, step_delay_ms: int = 1500):
+        """Animate LSH explanation by adding hyperplanes one at a time.
+
+        Shows how each hyperplane bisects the space and creates new buckets.
+        """
+        from bokeh.io import curdoc
+        import colorsys
+
+        if not self.lsh_data:
+            return
+
+        # Stop any existing animation
+        if hasattr(self, '_lsh_anim_callback') and self._lsh_anim_callback:
+            try:
+                curdoc().remove_periodic_callback(self._lsh_anim_callback)
+            except:
+                pass
+
+        # Get LSH data
+        bucket_ids = self.lsh_data['bucket_ids']
+        hyperplanes = self.lsh_data['hyperplanes_2d']
+        num_bits = self.lsh_data['num_bits']
+        n = len(self.coords_2d)
+
+        # Animation state
+        self._lsh_anim_step = 0
+        self._lsh_anim_max = num_bits
+
+        # Reset view
+        self.reset_view(animate=False)
+
+        # Hide cluster edges
+        self.edge_renderer.visible = False
+        self.edge_toggle.active = False
+
+        # Start with all points grey
+        self.source.data['color'] = ['#888888'] * n
+        self.source.data['alpha'] = [0.6] * n
+        self.source.data['size'] = [5] * n
+
+        # Clear hyperplane display
+        self.hyperplane_source.data = {'xs': [], 'ys': []}
+        self.hyperplane_renderer.visible = True
+
+        # Clear labels initially
+        self.label_source.data = {'x': [], 'y': [], 'label': []}
+
+        self.figure.title.text = "LSH Explanation - Starting with all points"
+
+        def animation_step():
+            step = self._lsh_anim_step
+
+            if step >= self._lsh_anim_max:
+                # Animation complete - show final state
+                self.figure.title.text = f"LSH Complete - {num_bits} bits = {len(set(bucket_ids))} buckets"
+                try:
+                    curdoc().remove_periodic_callback(self._lsh_anim_callback)
+                except:
+                    pass
+                self._lsh_anim_callback = None
+                return
+
+            # Compute partial bucket IDs using only bits 0..step
+            # Each bucket_id is a num_bits-bit number; mask to keep only first (step+1) bits
+            mask = (1 << (step + 1)) - 1  # e.g., step=0 -> mask=1, step=1 -> mask=3
+            partial_ids = [(int(bid) >> (num_bits - step - 1)) & mask for bid in bucket_ids]
+
+            # Count unique partial buckets
+            unique_partial = len(set(partial_ids))
+
+            # Color points by partial bucket ID
+            colors = []
+            for pid in partial_ids:
+                # Use golden ratio for distinct colors
+                hue = (pid * 0.618033988749895) % 1.0
+                r, g, b = colorsys.hls_to_rgb(hue, 0.5, 0.8)
+                colors.append(f'#{int(r*255):02x}{int(g*255):02x}{int(b*255):02x}')
+
+            self.source.data['color'] = colors
+            self.source.data['alpha'] = [0.7] * n
+
+            # Show hyperplanes up to current step
+            xs = [hyperplanes[i]['x'] for i in range(step + 1)]
+            ys = [hyperplanes[i]['y'] for i in range(step + 1)]
+            self.hyperplane_source.data = {'xs': xs, 'ys': ys}
+
+            # Update title
+            bit_str = f"Bit {step}" if step == 0 else f"Bits 0-{step}"
+            self.figure.title.text = f"LSH Explanation - {bit_str} → {unique_partial} buckets"
+
+            # Highlight the newest hyperplane by making it brighter
+            # (This would require multiple renderers, skip for now)
+
+            self._lsh_anim_step += 1
+
+        # Start animation
+        self._lsh_anim_callback = curdoc().add_periodic_callback(animation_step, step_delay_ms)
+
+        # Run first step immediately
+        animation_step()
+
 
 # Shared state container (persists across Bokeh sessions)
 class AppState:
@@ -938,6 +1243,7 @@ def main():
         cache['bridge_edges'],
         cache.get('edge_indices'),  # May be None for old caches
         cache.get('cluster_pairs'),  # (bucket1, bucket2) -> count for edge highlighting
+        cache.get('lsh_data'),  # LSH bucket visualization data
     )
 
     # Store document reference for control API
@@ -963,6 +1269,11 @@ def main():
                     STATE.browser.set_level(params["level"])
                 elif action == "toggle_edges":
                     STATE.browser.set_edges_visible(params["visible"])
+                elif action == "set_lsh_mode":
+                    STATE.browser.lsh_toggle.active = params.get("active", True)
+                elif action == "animate_lsh":
+                    delay = params.get("step_delay_ms", 1500)
+                    STATE.browser.animate_lsh_explanation(step_delay_ms=delay)
                 elif action == "highlight":
                     STATE.browser.highlight_points(params["indices"])
                 elif action == "clear_highlight":
