@@ -21,6 +21,7 @@ from bokeh.models import ColumnDataSource, LabelSet, Div, Toggle, TextInput, But
 from bokeh.layouts import column, row
 import colorcet as cc
 from scipy.cluster.hierarchy import fcluster
+from rog_preprocess import disambiguate_cluster_names
 
 # -----------------------------------------------------------------------------
 # Configuration
@@ -85,6 +86,7 @@ class ROGBrowser:
 
         self.current_level = CLUSTER_LEVELS[0]
         self._programmatic_zoom = False  # Flag to skip _on_zoom during programmatic changes
+        self._label_update_callback = None  # Pending debounced label update
         self.last_command = None  # Track last command received
         self.connected = True  # Connection status
 
@@ -568,6 +570,9 @@ class ROGBrowser:
                 centroid = self.coords_2d[cluster_point_indices].mean(axis=0)
                 cluster_centroids.append(centroid)
 
+        # Disambiguate duplicate cluster names with TF-IDF keywords
+        cluster_names = disambiguate_cluster_names(cluster_names, self.titles, point_labels)
+
         result = (point_labels, np.array(cluster_centroids), cluster_names)
         self._dendrogram_cache[n_clusters] = result
         return result
@@ -597,18 +602,24 @@ class ROGBrowser:
 
         if self.use_dynamic_dendrogram:
             # Dynamic dendrogram: binary search for optimal n_clusters
-            # that gives us 2-12 visible labels
+            # that gives us an appropriate number of visible labels.
+            # Scale target from 5 (fully zoomed out) to 12 (zoomed in)
+            # based on viewport width relative to full data extent.
+            viewport_width = x_end - x_start
+            zoom_ratio = max(0.0, min(1.0, 1.0 - viewport_width / (self.original_width * 1.1)))
+            max_visible = int(5 + 7 * zoom_ratio)  # 5 at full zoom-out, 12 at max zoom
+
             min_k, max_k = 2, 100
             best_k = 5
             best_count = 0
 
-            # Binary search for the largest k that gives <= 12 visible
+            # Binary search for the largest k that gives <= max_visible visible
             while min_k <= max_k:
                 mid_k = (min_k + max_k) // 2
                 _, centroids, _ = self._cut_dendrogram_dynamic(mid_k)
                 visible_count = count_in_view(centroids)
 
-                if visible_count <= 12:
+                if visible_count <= max_visible:
                     best_k = mid_k
                     best_count = visible_count
                     min_k = mid_k + 1  # Try more clusters
@@ -995,12 +1006,27 @@ class ROGBrowser:
         else:
             return 50
 
+    def _schedule_label_update(self):
+        """Debounce label updates — only process the latest viewport."""
+        if self._label_update_callback is not None:
+            try:
+                curdoc().remove_timeout_callback(self._label_update_callback)
+            except ValueError:
+                pass
+        self._label_update_callback = curdoc().add_timeout_callback(
+            self._do_label_update, 150
+        )
+
+    def _do_label_update(self):
+        self._label_update_callback = None
+        self._update_labels_for_viewport()
+
     def _on_zoom(self, attr, old, new):
         """Handle zoom changes - update labels based on viewport."""
         if self._programmatic_zoom:
             return  # Skip during programmatic zoom changes
-        # Use viewport-aware label aggregation
-        self._update_labels_for_viewport()
+        # Debounce: only update labels after zoom gestures settle
+        self._schedule_label_update()
 
     def _update_view(self):
         """Update labels and bridge edges for current level (colors stay stable)."""
@@ -1380,7 +1406,12 @@ STATE = AppState()
 
 
 class ControlHandler(BaseHTTPRequestHandler):
-    """HTTP handler for control commands from MCP server."""
+    """HTTP handler for control commands from MCP server.
+
+    All methods use local imports and self.server for state access because
+    bokeh serve re-executes the script in fresh exec() namespaces per session,
+    which clears the globals dict that this class's methods reference.
+    """
 
     def log_message(self, format, *args):
         pass  # Suppress default logging
@@ -1393,52 +1424,63 @@ class ControlHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self):
+        import json as _json
+
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
 
-        if STATE.browser is None or STATE.doc is None:
-            self.wfile.write(json.dumps({"error": "Browser not initialized"}).encode())
+        state = getattr(self.server, "app_state", None)
+        if state is None or state.browser is None or state.doc is None:
+            self.wfile.write(_json.dumps({"error": "Browser not initialized"}).encode())
             return
 
         try:
             content_length = int(self.headers.get('Content-Length', 0))
             body = self.rfile.read(content_length)
-            data = json.loads(body)
+            data = _json.loads(body)
             action = data.get("action")
             params = data.get("params", {})
 
             # Add command to queue - will be processed by Bokeh's periodic callback
-            STATE.command_queue.append({"action": action, "params": params})
-            print(f"HTTP: Queued {action}, queue id={id(STATE.command_queue)}, len={len(STATE.command_queue)}", flush=True)
+            state.command_queue.append({"action": action, "params": params})
+            print(f"HTTP: Queued {action}, queue id={id(state.command_queue)}, len={len(state.command_queue)}", flush=True)
             result = {"status": "ok", "action": action, "queued": True}
 
-            self.wfile.write(json.dumps(result).encode())
+            self.wfile.write(_json.dumps(result).encode())
         except Exception as e:
-            self.wfile.write(json.dumps({"error": str(e)}).encode())
+            self.wfile.write(_json.dumps({"error": str(e)}).encode())
 
 
-_control_server_started = False
+def start_control_server(state, port: int = 5008):
+    """Start the control HTTP server in a background thread (only once).
 
+    Uses sys._rog_control_server to persist the HTTPServer reference across
+    bokeh serve's per-session exec() calls. The sys module is a real import
+    that survives namespace resets. State is stored on the HTTPServer instance
+    so the handler accesses it via self.server.app_state.
+    """
+    import sys as _sys
 
-def start_control_server(port: int = 5008):
-    """Start the control HTTP server in a background thread (only once)."""
-    global _control_server_started
-    if _control_server_started:
-        print(f"Control server already running on port {port}")
+    existing = getattr(_sys, '_rog_control_server', None)
+
+    if existing is not None:
+        # Server already running from a previous session — update its state
+        existing.app_state = state
+        print(f"Control server already running on port {port} (state updated)")
         return
 
     try:
         server = HTTPServer(("localhost", port), ControlHandler)
+        server.app_state = state
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
-        _control_server_started = True
+        _sys._rog_control_server = server
         print(f"Control server: http://localhost:{port}/control")
     except OSError as e:
         if e.errno == 48:  # Address already in use
-            print(f"Control server port {port} already in use (likely from previous session)")
-            _control_server_started = True
+            print(f"Control server port {port} already in use (stale from previous process)")
         else:
             raise
 
@@ -1530,7 +1572,7 @@ def main():
     STATE.doc.add_periodic_callback(process_commands, 100)  # Check every 100ms
 
     # Start control server for MCP
-    start_control_server(port=5008)
+    start_control_server(STATE, port=5008)
 
     print("Ready!")
 
