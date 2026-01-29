@@ -29,6 +29,8 @@ try:
         DensityClassifier,
         DensityReport,
         BridgeAnalysis,
+        BridgePersistence,
+        MultiResolutionAnalysis,
     )
     _HAS_RUST = True
 except ImportError:
@@ -36,6 +38,8 @@ except ImportError:
     DensityClassifier = None
     DensityReport = None
     BridgeAnalysis = None
+    BridgePersistence = None
+    MultiResolutionAnalysis = None
 
 # Python wrapper with full features (embedder configs, labeling, etc.)
 from .classifier import (
@@ -81,6 +85,8 @@ __all__ = [
     "DensityClassifier",
     "DensityReport",
     "BridgeAnalysis",
+    "BridgePersistence",
+    "MultiResolutionAnalysis",
     # Full Python wrapper
     "DensityClassifierFull",
     "DensityReportFull",

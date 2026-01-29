@@ -56,12 +56,22 @@ class ROGBrowser:
         self.lsh_data = lsh_data
         self.lsh_mode = False  # Toggle between cluster view and LSH view
         self.lsh_density_mode = False  # Show density coloring instead of bucket coloring
+        self.lsh_recovery_mode = False  # Show recovery depth coloring
+        self.lsh_persistence_mode = False  # Show bridge persistence coloring
         if lsh_data:
             print(f"LSH data available - {lsh_data['num_bits']} bits, {len(lsh_data['bucket_centroids_2d'])} buckets", flush=True)
             # Build LSH bucket colors
             self.lsh_colors = self._build_lsh_colors(lsh_data)
             # Build LSH density colors (by bucket size)
             self.lsh_density_colors, self.lsh_density_sizes = self._build_lsh_density_colors(lsh_data)
+            # Build recovery colors (if multi-resolution data available)
+            if 'recovery_depth' in lsh_data:
+                self.lsh_recovery_colors, self.lsh_recovery_sizes = self._build_recovery_colors(lsh_data)
+                print(f"  Recovery data available - threshold={lsh_data.get('mra_dense_threshold', '?')}", flush=True)
+            # Build persistence colors (if bridge persistence data available)
+            if 'bridge_persistence' in lsh_data:
+                self.lsh_persistence_colors, self.lsh_persistence_sizes = self._build_persistence_colors(lsh_data)
+                print(f"  Persistence data available", flush=True)
 
         # Store ordered list of cluster pairs for edge highlighting
         # Edge i corresponds to cluster_pair_list[i]
@@ -212,6 +222,18 @@ class ROGBrowser:
         self.density_toggle.on_change('active', self._on_density_toggle)
         self.density_toggle.disabled = True  # Enable only when LSH mode is active
 
+        # Toggle for recovery depth coloring (only active in LSH mode, if data available)
+        self.recovery_toggle = Toggle(label="Recovery", active=False, width=80)
+        self.recovery_toggle.on_change('active', self._on_recovery_toggle)
+        has_recovery = lsh_data and 'recovery_depth' in lsh_data
+        self.recovery_toggle.disabled = not has_recovery
+
+        # Toggle for bridge persistence coloring (only active in LSH mode, if data available)
+        self.persistence_toggle = Toggle(label="Persistence", active=False, width=90)
+        self.persistence_toggle.on_change('active', self._on_persistence_toggle)
+        has_persistence = lsh_data and 'bridge_persistence' in lsh_data
+        self.persistence_toggle.disabled = not has_persistence
+
         # Add hyperplane lines (hidden by default, shown in LSH mode)
         self.hyperplane_source = ColumnDataSource(data={'xs': [], 'ys': []})
         self.hyperplane_renderer = self.figure.multi_line(
@@ -307,6 +329,99 @@ class ROGBrowser:
             colors.append(density_to_color(normalized))
             # Size: sparse = 4, dense = 12
             sizes.append(4 + normalized * 8)
+
+        return colors, sizes
+
+    def _build_recovery_colors(self, lsh_data: dict) -> tuple[list[str], list[float]]:
+        """Build colors based on multi-resolution recovery depth.
+
+        Colors: grey (already dense, depth=0) -> green (early recovery) ->
+                orange (late recovery) -> red (never recovered).
+        Size scales with recovery_ratio.
+        """
+        recovery_depth = lsh_data['recovery_depth']
+        recovery_ratio = lsh_data['recovery_ratio']
+        num_bits = lsh_data['num_bits']
+
+        colors = []
+        sizes = []
+        for depth, ratio in zip(recovery_depth, recovery_ratio):
+            if depth == 0:
+                # Already dense at full resolution - grey
+                colors.append('#aaaaaa')
+                sizes.append(4)
+            elif depth > num_bits:
+                # Never recovered - red
+                colors.append('#cc2222')
+                sizes.append(6)
+            else:
+                # Recovered at some depth - green to orange gradient
+                # depth 1 = earliest recovery (best) -> green
+                # depth num_bits = latest recovery (worst) -> orange
+                t = (depth - 1) / max(num_bits - 1, 1)  # 0=early, 1=late
+                if t < 0.5:
+                    # Green to yellow
+                    s = t / 0.5
+                    r = int(40 + s * 180)
+                    g = int(180 - s * 40)
+                    b = int(40)
+                else:
+                    # Yellow to orange
+                    s = (t - 0.5) / 0.5
+                    r = int(220 + s * 30)
+                    g = int(140 - s * 80)
+                    b = int(40 - s * 20)
+                colors.append(f'#{r:02x}{g:02x}{b:02x}')
+                # Size based on recovery ratio (larger = denser than expected)
+                sizes.append(4 + min(ratio, 5.0) * 2)
+
+        return colors, sizes
+
+    def _build_persistence_colors(self, lsh_data: dict) -> tuple[list[str], list[float]]:
+        """Build colors based on bridge persistence across depths.
+
+        Uses relative threshold detection: connectors are items where
+        max_other_sim / own_sim >= threshold at some depth.
+
+        Colors: grey (never connector) -> blue (low persistence) ->
+                purple (medium) -> red (high persistence).
+        Size scales with bridge_ratio (peak relative similarity).
+        """
+        persistence = lsh_data['bridge_persistence']
+        bridge_ratio = lsh_data.get('bridge_ratio', [0.0] * len(persistence))
+        num_bits = lsh_data['num_bits']
+
+        colors = []
+        sizes = []
+        for p, ratio in zip(persistence, bridge_ratio):
+            if p == 0:
+                # Never a connector - grey
+                colors.append('#aaaaaa')
+                sizes.append(3)
+            else:
+                # Connector at p depths - blue to purple to red gradient
+                t = (p - 1) / max(num_bits - 1, 1)  # 0=low persistence, 1=high
+                if t < 0.33:
+                    # Blue
+                    s = t / 0.33
+                    r = int(40 + s * 60)
+                    g = int(80 + s * 20)
+                    b = int(220 - s * 40)
+                elif t < 0.66:
+                    # Blue to purple
+                    s = (t - 0.33) / 0.33
+                    r = int(100 + s * 80)
+                    g = int(100 - s * 60)
+                    b = int(180 - s * 30)
+                else:
+                    # Purple to red
+                    s = (t - 0.66) / 0.34
+                    r = int(180 + s * 60)
+                    g = int(40 - s * 20)
+                    b = int(150 - s * 120)
+                colors.append(f'#{r:02x}{g:02x}{b:02x}')
+                # Size: 5-12 scaling with peak ratio (stronger connector = larger)
+                sizes.append(5 + min(ratio, 1.5) / 1.5 * 7)
 
         return colors, sizes
 
@@ -589,6 +704,12 @@ class ROGBrowser:
             # Switch to LSH mode
             # Enable density toggle
             self.density_toggle.disabled = False
+            # Enable recovery toggle if data available
+            if 'recovery_depth' in self.lsh_data:
+                self.recovery_toggle.disabled = False
+            # Enable persistence toggle if data available
+            if 'bridge_persistence' in self.lsh_data:
+                self.persistence_toggle.disabled = False
 
             # Update colors to LSH bucket colors (or density if enabled)
             if self.lsh_density_mode:
@@ -625,6 +746,14 @@ class ROGBrowser:
             self.density_toggle.disabled = True
             self.density_toggle.active = False
             self.lsh_density_mode = False
+            # Disable and reset recovery toggle
+            self.recovery_toggle.disabled = True
+            self.recovery_toggle.active = False
+            self.lsh_recovery_mode = False
+            # Disable and reset persistence toggle
+            self.persistence_toggle.disabled = True
+            self.persistence_toggle.active = False
+            self.lsh_persistence_mode = False
 
             self.source.data['color'] = self.stable_colors
             # Reset point sizes to default
@@ -639,6 +768,14 @@ class ROGBrowser:
 
         if not self.lsh_mode or not self.lsh_data:
             return
+
+        # Deactivate recovery and persistence if density is turned on
+        if new and self.lsh_recovery_mode:
+            self.recovery_toggle.active = False
+            self.lsh_recovery_mode = False
+        if new and self.lsh_persistence_mode:
+            self.persistence_toggle.active = False
+            self.lsh_persistence_mode = False
 
         bucket_centroids = self.lsh_data['bucket_centroids_2d']
         bucket_sizes = self.lsh_data['bucket_sizes']
@@ -680,6 +817,106 @@ class ROGBrowser:
             label_text = [f'  B{bid} ({sz})  ' for bid, sz in top_buckets if bid in bucket_centroids]
             self.label_source.data = {'x': label_x, 'y': label_y, 'label': label_text}
             self.figure.title.text = f"LSH Mode - {self.lsh_data['num_bits']} bits, {len(bucket_centroids)} buckets"
+
+    def _on_recovery_toggle(self, attr, old, new):
+        """Toggle between bucket/density coloring and recovery depth coloring in LSH mode."""
+        self.lsh_recovery_mode = new
+
+        if not self.lsh_data or 'recovery_depth' not in self.lsh_data:
+            return
+
+        if new:
+            # Switch to recovery coloring - deactivate density and persistence if on
+            if self.lsh_density_mode:
+                self.density_toggle.active = False
+                self.lsh_density_mode = False
+            if self.lsh_persistence_mode:
+                self.persistence_toggle.active = False
+                self.lsh_persistence_mode = False
+
+            self.source.data['color'] = self.lsh_recovery_colors
+            self.source.data['size'] = self.lsh_recovery_sizes
+
+            # Update labels to show recovery stats
+            recovery_depth = self.lsh_data['recovery_depth']
+            num_bits = self.lsh_data['num_bits']
+            already_dense = sum(1 for d in recovery_depth if d == 0)
+            recovered = sum(1 for d in recovery_depth if 0 < d <= num_bits)
+            never = sum(1 for d in recovery_depth if d > num_bits)
+
+            self.label_source.data = {'x': [], 'y': [], 'label': []}
+            self.figure.title.text = (
+                f"Recovery View - Dense: {already_dense}, "
+                f"Recovered: {recovered}, Never: {never} "
+                f"(threshold={self.lsh_data.get('mra_dense_threshold', '?')})"
+            )
+        else:
+            # Switch back to current LSH mode (bucket or density)
+            if self.lsh_mode:
+                self.source.data['color'] = self.lsh_colors
+                self.source.data['size'] = [4] * len(self.titles)
+
+                bucket_centroids = self.lsh_data['bucket_centroids_2d']
+                bucket_sizes = self.lsh_data['bucket_sizes']
+                top_buckets = sorted(bucket_sizes.items(), key=lambda x: -x[1])[:12]
+                label_x = [bucket_centroids[bid][0] for bid, _ in top_buckets if bid in bucket_centroids]
+                label_y = [bucket_centroids[bid][1] for bid, _ in top_buckets if bid in bucket_centroids]
+                label_text = [f'  B{bid} ({sz})  ' for bid, sz in top_buckets if bid in bucket_centroids]
+                self.label_source.data = {'x': label_x, 'y': label_y, 'label': label_text}
+                self.figure.title.text = f"LSH Mode - {self.lsh_data['num_bits']} bits, {len(bucket_centroids)} buckets"
+            else:
+                self.source.data['color'] = self.stable_colors
+                self.source.data['size'] = [4] * len(self.titles)
+                self._update_labels_for_viewport()
+
+    def _on_persistence_toggle(self, attr, old, new):
+        """Toggle between bucket/density coloring and bridge persistence coloring in LSH mode."""
+        self.lsh_persistence_mode = new
+
+        if not self.lsh_data or 'bridge_persistence' not in self.lsh_data:
+            return
+
+        if new:
+            # Switch to persistence coloring - deactivate density and recovery if on
+            if self.lsh_density_mode:
+                self.density_toggle.active = False
+                self.lsh_density_mode = False
+            if self.lsh_recovery_mode:
+                self.recovery_toggle.active = False
+                self.lsh_recovery_mode = False
+
+            self.source.data['color'] = self.lsh_persistence_colors
+            self.source.data['size'] = self.lsh_persistence_sizes
+
+            # Update title with persistence stats
+            persistence = self.lsh_data['bridge_persistence']
+            total_bridges = sum(1 for p in persistence if p > 0)
+            max_p = max(persistence) if persistence else 0
+            num_bits = self.lsh_data['num_bits']
+
+            self.label_source.data = {'x': [], 'y': [], 'label': []}
+            self.figure.title.text = (
+                f"Persistence View - Bridges: {total_bridges}, "
+                f"Max depth span: {max_p}/{num_bits}"
+            )
+        else:
+            # Switch back to current LSH mode (bucket or density)
+            if self.lsh_mode:
+                self.source.data['color'] = self.lsh_colors
+                self.source.data['size'] = [4] * len(self.titles)
+
+                bucket_centroids = self.lsh_data['bucket_centroids_2d']
+                bucket_sizes = self.lsh_data['bucket_sizes']
+                top_buckets = sorted(bucket_sizes.items(), key=lambda x: -x[1])[:12]
+                label_x = [bucket_centroids[bid][0] for bid, _ in top_buckets if bid in bucket_centroids]
+                label_y = [bucket_centroids[bid][1] for bid, _ in top_buckets if bid in bucket_centroids]
+                label_text = [f'  B{bid} ({sz})  ' for bid, sz in top_buckets if bid in bucket_centroids]
+                self.label_source.data = {'x': label_x, 'y': label_y, 'label': label_text}
+                self.figure.title.text = f"LSH Mode - {self.lsh_data['num_bits']} bits, {len(bucket_centroids)} buckets"
+            else:
+                self.source.data['color'] = self.stable_colors
+                self.source.data['size'] = [4] * len(self.titles)
+                self._update_labels_for_viewport()
 
     def _on_tap_select(self, attr, old, new):
         """Handle tap selection on points."""
@@ -797,6 +1034,7 @@ class ROGBrowser:
             self.clear_btn,
             self.edge_toggle,
             row(self.lsh_toggle, self.density_toggle),
+            row(self.recovery_toggle, self.persistence_toggle),
             self.status,
             width=200
         )
@@ -1086,10 +1324,11 @@ class ROGBrowser:
                 self._lsh_anim_callback = None
                 return
 
-            # Compute partial bucket IDs using only bits 0..step
-            # Each bucket_id is a num_bits-bit number; mask to keep only first (step+1) bits
+            # Compute partial bucket IDs using low (step+1) bits (LSB-first).
+            # Bit 0 (LSB) = first PCA component = highest variance, so masking
+            # low bits gives the most informative bits first.
             mask = (1 << (step + 1)) - 1  # e.g., step=0 -> mask=1, step=1 -> mask=3
-            partial_ids = [(int(bid) >> (num_bits - step - 1)) & mask for bid in bucket_ids]
+            partial_ids = [int(bid) & mask for bid in bucket_ids]
 
             # Count unique partial buckets
             unique_partial = len(set(partial_ids))
@@ -1271,6 +1510,10 @@ def main():
                     STATE.browser.set_edges_visible(params["visible"])
                 elif action == "set_lsh_mode":
                     STATE.browser.lsh_toggle.active = params.get("active", True)
+                elif action == "set_recovery_mode":
+                    STATE.browser.recovery_toggle.active = params.get("active", True)
+                elif action == "set_persistence_mode":
+                    STATE.browser.persistence_toggle.active = params.get("active", True)
                 elif action == "animate_lsh":
                     delay = params.get("step_delay_ms", 1500)
                     STATE.browser.animate_lsh_explanation(step_delay_ms=delay)

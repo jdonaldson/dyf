@@ -968,6 +968,37 @@ def main():
     # Compute LSH visualization data
     lsh_data = compute_lsh_visualization(coords_2d, embeddings, num_bits=12)
 
+    # Compute multi-resolution analysis using Rust DensityClassifier
+    print("Computing multi-resolution analysis...")
+    from dyf_rs import DensityClassifier as RustClassifier
+    num_bits = 12
+    rust_clf = RustClassifier(embedding_dim=embeddings.shape[1], num_bits=num_bits, seed=42)
+    rust_clf.fit(embeddings.astype(np.float32))
+    mra = rust_clf.multi_resolution_analysis(dense_threshold=10)
+    lsh_data['recovery_depth'] = mra.recovery_depth
+    lsh_data['recovery_ratio'] = mra.recovery_ratio
+    lsh_data['buckets_per_depth'] = mra.buckets_per_depth
+    lsh_data['mean_size_per_depth'] = mra.mean_size_per_depth
+    lsh_data['mra_dense_threshold'] = mra.dense_threshold
+    # Also store the Rust bucket IDs for consistency with multi-resolution masking
+    lsh_data['rust_bucket_ids'] = rust_clf.get_bucket_ids()
+    print(f"  Multi-resolution: {sum(1 for d in mra.recovery_depth if d == 0)} already dense, "
+          f"{sum(1 for d in mra.recovery_depth if 0 < d <= num_bits)} recovered, "
+          f"{sum(1 for d in mra.recovery_depth if d > num_bits)} never recovered")
+
+    # Compute bridge persistence analysis (relative threshold: other_sim/own_sim >= 0.8)
+    print("Computing bridge persistence analysis...")
+    bp = rust_clf.bridge_persistence(embeddings.astype(np.float32), relative_threshold=0.8)
+    lsh_data['bridge_persistence'] = bp.bridge_persistence
+    lsh_data['max_bridge_depth'] = bp.max_bridge_depth
+    lsh_data['min_bridge_depth'] = bp.min_bridge_depth
+    lsh_data['bridge_ratio'] = bp.bridge_ratio
+    lsh_data['bridges_per_depth'] = bp.bridges_per_depth
+    total_connectors = sum(1 for p in bp.bridge_persistence if p > 0)
+    max_p = max(bp.bridge_persistence) if bp.bridge_persistence else 0
+    print(f"  Connectors: {total_connectors}, max persistence={max_p}, threshold={bp.relative_threshold}")
+    print(f"  Connectors per depth: {bp.bridges_per_depth}")
+
     # Save
     cache = {
         'coords_2d': coords_2d,
