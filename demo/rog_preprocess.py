@@ -106,10 +106,13 @@ def suggest_n_neighbors(embeddings: np.ndarray, num_bits: int = 12,
 
 
 def load_data(path: str, sample: int | None = None,
-              n_neighbors: int | None = None, densmap: bool = False):
+              n_neighbors: int | None = None, densmap: bool = False,
+              dedup: bool = True):
     """Load parquet and run UMAP. Returns coords, titles, and embeddings.
 
     If n_neighbors is None, uses dyf density analysis to pick an optimal value.
+    If dedup is True, removes redundant same-doc chunks in the same LSH bucket
+    before running UMAP so the projection isn't distorted by duplicate neighbors.
     """
     print(f"Loading {path}...")
     df = pl.read_parquet(path)
@@ -119,6 +122,22 @@ def load_data(path: str, sample: int | None = None,
 
     titles = df["title"].to_list()
     embeddings = np.array(df["embedding"].to_list())
+
+    # Pre-UMAP dedup: remove redundant same-doc chunks in same LSH bucket
+    if dedup:
+        from dyf_rs import DensityClassifier as RustClassifier
+        from dyf.chunks import deduplicate_chunks
+
+        clf = RustClassifier(embedding_dim=embeddings.shape[1], num_bits=12, seed=42)
+        clf.fit(embeddings.astype(np.float32))
+        bucket_ids = np.asarray(clf.get_bucket_ids())
+        dedup_mask = deduplicate_chunks(bucket_ids, np.asarray(titles))
+
+        n_before = len(titles)
+        titles = [t for t, keep in zip(titles, dedup_mask) if keep]
+        embeddings = embeddings[dedup_mask]
+        print(f"  Pre-UMAP dedup: {n_before} → {len(titles)} points "
+              f"({100*len(titles)/n_before:.1f}%)")
 
     if n_neighbors is None:
         n_neighbors = suggest_n_neighbors(embeddings)
@@ -1414,6 +1433,8 @@ def main():
                         help="UMAP n_neighbors (default: auto via dyf density)")
     parser.add_argument("--densmap", action="store_true",
                         help="Use DENSMAP for density-preserving projection")
+    parser.add_argument("--no-dedup", action="store_true",
+                        help="Skip pre-UMAP chunk deduplication")
     args = parser.parse_args()
 
     # Generate output path
@@ -1428,7 +1449,8 @@ def main():
     # Process
     coords_2d, titles, embeddings = load_data(
         args.data_path, args.sample,
-        n_neighbors=args.umap_neighbors, densmap=args.densmap)
+        n_neighbors=args.umap_neighbors, densmap=args.densmap,
+        dedup=not args.no_dedup)
 
     # Compute LSH visualization data first (needed for LSH-based hierarchy)
     lsh_data = compute_lsh_visualization(coords_2d, embeddings, num_bits=12)
@@ -1506,6 +1528,44 @@ def main():
         print(f"  Connectors per depth: {bp.bridges_per_depth}")
     else:
         print("Skipping bridge persistence analysis (not available in this dyf_rs version)")
+
+    # Chunk analysis (redundancy, dedup, doc spread)
+    from dyf.chunks import chunk_redundancy, deduplicate_chunks, doc_spread
+
+    bucket_ids_arr = np.asarray(lsh_data['rust_bucket_ids'])
+    doc_ids_arr = np.asarray(titles)  # Each title is a doc_id
+
+    print("Computing chunk analysis...")
+    redundancy = chunk_redundancy(bucket_ids_arr, doc_ids_arr)
+    dedup_mask = deduplicate_chunks(bucket_ids_arr, doc_ids_arr)
+    spread = doc_spread(bucket_ids_arr, doc_ids_arr)
+
+    # Map per-doc spread metrics back to per-point arrays
+    n_points = len(titles)
+    concentration = np.zeros(n_points, dtype=np.float64)
+    n_buckets = np.zeros(n_points, dtype=np.int64)
+    n_chunks = np.zeros(n_points, dtype=np.int64)
+    for i, title in enumerate(titles):
+        if title in spread:
+            ds = spread[title]
+            concentration[i] = ds.concentration
+            n_buckets[i] = ds.n_buckets
+            n_chunks[i] = ds.n_chunks
+
+    n_unique_docs = len(spread)
+    kept = int(dedup_mask.sum())
+    print(f"  Redundancy: max={redundancy.max()}, mean={redundancy.mean():.1f}")
+    print(f"  Dedup: {kept}/{n_points} kept ({100*kept/n_points:.1f}%)")
+    print(f"  Unique docs: {n_unique_docs}")
+
+    lsh_data['chunk_data'] = {
+        'redundancy': redundancy,
+        'dedup_mask': dedup_mask,
+        'concentration': concentration,
+        'n_buckets': n_buckets,
+        'n_chunks': n_chunks,
+        'n_unique_docs': n_unique_docs,
+    }
 
     # Save
     cache = {
