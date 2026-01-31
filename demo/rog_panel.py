@@ -205,16 +205,18 @@ class ROGBrowser:
         self.source.selected.on_change('indices', self._on_tap_select)
 
         # Add cluster labels with styled background
+        # border_width, border_color, font_size are per-label fields
+        # driven by cluster level (coarser = more prominent)
         self.labels = LabelSet(
             x='x', y='y', text='label',
             source=self.label_source,
-            text_font_size='11pt',
+            text_font_size='font_size',
             text_font_style='bold',
             text_color='white',
             background_fill_color='bg_color',
             background_fill_alpha=0.9,
-            border_line_color='#666666',
-            border_line_width=1,
+            border_line_color='border_color',
+            border_line_width='border_width',
             border_line_alpha=0.8,
             text_align='center',
         )
@@ -608,12 +610,16 @@ class ROGBrowser:
         labels = self.cluster_result['labels'][self.current_level]
         padded_names = [f'  {name}  ' for name in names]
         bg_colors = self._get_cluster_bg_colors(list(range(len(names))), labels)
+        n = len(names)
 
         self.label_source = ColumnDataSource(data={
             'x': centroids[:, 0],
             'y': centroids[:, 1],
             'label': padded_names,
             'bg_color': bg_colors,
+            'border_width': [2] * n,
+            'border_color': ['#999999'] * n,
+            'font_size': ['11pt'] * n,
         })
 
     def _cut_dendrogram_dynamic(self, n_clusters: int) -> tuple[np.ndarray, np.ndarray, list[str]]:
@@ -691,13 +697,21 @@ class ROGBrowser:
         self._dendrogram_cache[n_clusters] = result
         return result
 
-    def _update_labels_for_viewport(self):
-        """Update labels based on viewport - show 2-12 labels, aggregating as needed.
+    # Visual style per cluster level (coarser = more prominent)
+    _LEVEL_STYLE = {
+        12:  {'border_width': 3, 'border_color': '#ffffff', 'font_size': '13pt'},
+        25:  {'border_width': 2, 'border_color': '#bbbbbb', 'font_size': '11pt'},
+        50:  {'border_width': 1, 'border_color': '#888888', 'font_size': '10pt'},
+        100: {'border_width': 1, 'border_color': '#666666', 'font_size': '9pt'},
+    }
 
-        If dendrogram data is available, uses dynamic cutting to find the optimal
-        number of clusters (any value from 2-100) that results in 2-12 visible labels.
+    def _update_labels_for_viewport(self):
+        """Update labels based on viewport with multi-level visual hierarchy.
+
+        Shows labels from multiple pre-computed levels simultaneously.
+        Coarser levels are placed first with thicker borders and larger font.
+        Finer levels fill in detail, skipping positions too close to existing labels.
         """
-        # Get current viewport bounds
         x_start = self.figure.x_range.start
         x_end = self.figure.x_range.end
         y_start = self.figure.y_range.start
@@ -706,97 +720,93 @@ class ROGBrowser:
         if x_start is None or x_end is None or y_start is None or y_end is None:
             return
 
-        cx_view = (x_start + x_end) / 2
-        cy_view = (y_start + y_end) / 2
+        viewport_width = x_end - x_start
+        viewport_height = y_end - y_start
+        # Minimum separation between labels (fraction of viewport diagonal)
+        min_sep_sq = (0.08 * (viewport_width**2 + viewport_height**2))
 
-        def count_in_view(centroids):
-            """Count centroids visible in viewport."""
-            return sum(1 for cx, cy in centroids
-                      if x_start <= cx <= x_end and y_start <= cy <= y_end)
+        # Max labels on screen: scale from 6 (zoomed out) to 18 (zoomed in)
+        zoom_frac = max(0.0, min(1.0, 1.0 - viewport_width / (self.original_width * 1.1)))
+        max_labels = int(6 + 12 * zoom_frac)
 
-        if self.use_dynamic_dendrogram:
-            # Dynamic dendrogram: binary search for optimal n_clusters
-            # that gives us an appropriate number of visible labels.
-            # Scale target from 5 (fully zoomed out) to 12 (zoomed in)
-            # based on viewport width relative to full data extent.
-            viewport_width = x_end - x_start
-            zoom_ratio = max(0.0, min(1.0, 1.0 - viewport_width / (self.original_width * 1.1)))
-            max_visible = int(5 + 7 * zoom_ratio)  # 5 at full zoom-out, 12 at max zoom
+        # Collect labels from all levels, coarsest first.
+        # Coarse labels anchor the layout; finer labels fill gaps.
+        placed = []  # (x, y, name, level, cluster_id, labels_array)
 
-            min_k, max_k = 2, 100
-            best_k = 5
-            best_count = 0
+        for level in CLUSTER_LEVELS:
+            centroids = self.cluster_result['centroids'][level]
+            names = self.cluster_result['names'][level]
+            labels = self.cluster_result['labels'][level]
 
-            # Binary search for the largest k that gives <= max_visible visible
-            while min_k <= max_k:
-                mid_k = (min_k + max_k) // 2
-                _, centroids, _ = self._cut_dendrogram_dynamic(mid_k)
-                visible_count = count_in_view(centroids)
+            # Positions from coarser levels already placed
+            coarser = [(px, py) for px, py, _, lvl, _, _ in placed]
 
-                if visible_count <= max_visible:
-                    best_k = mid_k
-                    best_count = visible_count
-                    min_k = mid_k + 1  # Try more clusters
-                else:
-                    max_k = mid_k - 1  # Try fewer clusters
+            for i, (cx, cy) in enumerate(centroids):
+                if not (x_start <= cx <= x_end and y_start <= cy <= y_end):
+                    continue
 
-            # Get the chosen cut
-            labels, centroids, names = self._cut_dendrogram_dynamic(best_k)
-            chosen_level = best_k
-        else:
-            # Fixed levels: use traditional approach
-            level_counts = {}
-            for level in CLUSTER_LEVELS:
-                centroids = self.cluster_result['centroids'][level]
-                level_counts[level] = count_in_view(centroids)
+                # Only check separation against coarser-level labels.
+                # Within the same level, show all visible labels.
+                too_close = False
+                for px, py in coarser:
+                    if (cx - px)**2 + (cy - py)**2 < min_sep_sq:
+                        too_close = True
+                        break
 
-            # Choose finest level where count <= 12
-            chosen_level = max(CLUSTER_LEVELS)
-            for level in CLUSTER_LEVELS:
-                if level_counts[level] <= 12:
-                    chosen_level = level
-                else:
-                    break
+                if not too_close:
+                    placed.append((cx, cy, names[i], level, i, labels))
 
-            centroids = self.cluster_result['centroids'][chosen_level]
-            names = self.cluster_result['names'][chosen_level]
-            labels = self.cluster_result['labels'][chosen_level]
+            if len(placed) >= max_labels:
+                break
 
-        # Get centroids in view
-        in_view = [(i, cx, cy) for i, (cx, cy) in enumerate(centroids)
-                   if x_start <= cx <= x_end and y_start <= cy <= y_end]
+        # If < 2 labels, add nearest from coarsest level
+        if len(placed) < 2:
+            cx_view = (x_start + x_end) / 2
+            cy_view = (y_start + y_end) / 2
+            coarsest = CLUSTER_LEVELS[0]
+            centroids = self.cluster_result['centroids'][coarsest]
+            names = self.cluster_result['names'][coarsest]
+            labels = self.cluster_result['labels'][coarsest]
+            placed_set = {(p[0], p[1]) for p in placed}
+            dists = [(i, (cx - cx_view)**2 + (cy - cy_view)**2)
+                     for i, (cx, cy) in enumerate(centroids)
+                     if (cx, cy) not in placed_set]
+            dists.sort(key=lambda x: x[1])
+            for i, _ in dists[:2 - len(placed)]:
+                cx, cy = centroids[i]
+                placed.append((cx, cy, names[i], coarsest, i, labels))
 
-        # If < 2 in view, add nearest centroids to get at least 2
-        if len(in_view) < 2:
-            in_view_ids = {i for i, _, _ in in_view}
-            distances = [(i, (cx - cx_view)**2 + (cy - cy_view)**2, cx, cy)
-                        for i, (cx, cy) in enumerate(centroids)
-                        if i not in in_view_ids]
-            distances.sort(key=lambda x: x[1])
-            needed = 2 - len(in_view)
-            for i, _, cx, cy in distances[:needed]:
-                in_view.append((i, cx, cy))
+        # Build data source with visual hierarchy
+        label_x, label_y, label_text = [], [], []
+        border_widths, border_colors, font_sizes, bg_colors = [], [], [], []
 
-        # Update label source with chosen labels
-        label_x = [cx for _, cx, _ in in_view]
-        label_y = [cy for _, _, cy in in_view]
-        label_text = [f'  {names[i]}  ' for i, _, _ in in_view]
-        label_ids = [i for i, _, _ in in_view]
-        bg_colors = self._get_cluster_bg_colors(label_ids, labels)
+        for cx, cy, name, level, cid, lbls in placed:
+            label_x.append(cx)
+            label_y.append(cy)
+            label_text.append(f'  {name}  ')
+            style = self._LEVEL_STYLE.get(level, self._LEVEL_STYLE[100])
+            border_widths.append(style['border_width'])
+            border_colors.append(style['border_color'])
+            font_sizes.append(style['font_size'])
+            bg_colors.append(self._get_cluster_bg_colors([cid], lbls)[0])
 
         self.label_source.data = {
             'x': label_x,
             'y': label_y,
             'label': label_text,
             'bg_color': bg_colors,
+            'border_width': border_widths,
+            'border_color': border_colors,
+            'font_size': font_sizes,
         }
 
-        # Update title to reflect label granularity (but don't overwrite
-        # current_level — that controls bridge edges and must stay in
-        # CLUSTER_LEVELS; chosen_level from dynamic cutting can be any 2-100)
-        if chosen_level != getattr(self, '_label_level', None):
-            self._label_level = chosen_level
-            self.figure.title.text = f"ROG Browser - {len(self.titles):,} points - Level: {chosen_level} clusters"
+        # Count levels represented
+        levels_shown = sorted(set(p[3] for p in placed))
+        level_str = '/'.join(str(l) for l in levels_shown)
+        self.figure.title.text = (
+            f"ROG Browser - {len(self.titles):,} points - "
+            f"Levels: {level_str} ({len(placed)} labels)"
+        )
 
     def _process_bundled_edges(self, bundled: pd.DataFrame) -> tuple[list, list]:
         """Convert hammer_bundle output to multi_line format."""

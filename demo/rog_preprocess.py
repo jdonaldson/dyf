@@ -79,9 +79,38 @@ def compute_density_knn(embeddings: np.ndarray, num_bits: int = 12, min_k: int =
     return indices, dists
 
 
+def suggest_n_neighbors(embeddings: np.ndarray, num_bits: int = 12,
+                        min_k: int = 15, max_k: int = 100) -> int:
+    """Use dyf bucket density to suggest n_neighbors for UMAP.
+
+    Computes LSH bucket sizes and uses the mean bucket size as n_neighbors.
+    Each point should be able to "see" its full bucket of natural peers
+    in the neighbor graph.
+
+    This is O(n) — just LSH hashing + bucket counting, no KNN graph.
+    """
+    from dyf_rs import DensityClassifier
+
+    clf = DensityClassifier(embedding_dim=embeddings.shape[1], num_bits=num_bits, seed=42)
+    clf.fit(embeddings.astype(np.float32))
+    bucket_sizes = np.array(clf.get_bucket_sizes())
+
+    # Set k to the mean LSH bucket size: each point should be able to
+    # "see" its full bucket of natural peers in the neighbor graph.
+    n_buckets = len(set(clf.get_bucket_ids()))
+    mean_size = bucket_sizes.mean()
+    suggested = int(np.clip(mean_size, min_k, max_k))
+    print(f"  dyf density analysis: {n_buckets} buckets, "
+          f"mean_size={mean_size:.0f}, suggested n_neighbors={suggested}")
+    return suggested
+
+
 def load_data(path: str, sample: int | None = None,
-              n_neighbors: int = 15, densmap: bool = False):
-    """Load parquet and run UMAP. Returns coords, titles, and embeddings."""
+              n_neighbors: int | None = None, densmap: bool = False):
+    """Load parquet and run UMAP. Returns coords, titles, and embeddings.
+
+    If n_neighbors is None, uses dyf density analysis to pick an optimal value.
+    """
     print(f"Loading {path}...")
     df = pl.read_parquet(path)
 
@@ -90,6 +119,9 @@ def load_data(path: str, sample: int | None = None,
 
     titles = df["title"].to_list()
     embeddings = np.array(df["embedding"].to_list())
+
+    if n_neighbors is None:
+        n_neighbors = suggest_n_neighbors(embeddings)
 
     mode = "densmap" if densmap else "standard"
     print(f"Running UMAP on {len(titles)} points ({mode}, n_neighbors={n_neighbors})...")
@@ -1378,8 +1410,8 @@ def main():
                         help="Cluster level for bridge detection (12, 25, 50, or 100)")
     parser.add_argument("--use-dendrogram", action="store_true",
                         help="Use dynamic dendrogram hierarchy (labels all internal nodes)")
-    parser.add_argument("--umap-neighbors", type=int, default=15,
-                        help="UMAP n_neighbors (default: 15)")
+    parser.add_argument("--umap-neighbors", type=int, default=None,
+                        help="UMAP n_neighbors (default: auto via dyf density)")
     parser.add_argument("--densmap", action="store_true",
                         help="Use DENSMAP for density-preserving projection")
     args = parser.parse_args()
