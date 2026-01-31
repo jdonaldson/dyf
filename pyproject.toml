@@ -46,6 +46,18 @@ full = [
 io = [
     "safetensors>=0.4",
 ]
+viz = [
+    "panel>=1.3",
+    "holoviews>=1.18",
+    "datashader>=0.16",
+    "bokeh>=3.3",
+    "umap-learn>=0.5",
+    "polars>=0.19",
+    "pandas>=1.5",
+]
+mcp = [
+    "mcp>=1.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/jdonaldson/dyf"

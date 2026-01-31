@@ -17,7 +17,7 @@ import pandas as pd
 from pathlib import Path
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from bokeh.plotting import figure, curdoc
-from bokeh.models import ColumnDataSource, LabelSet, Div, Toggle, TextInput, Button, TapTool
+from bokeh.models import ColumnDataSource, CustomJS, Label, LabelSet, Div, Toggle, TextInput, Button, TapTool
 from bokeh.layouts import column, row
 import colorcet as cc
 from scipy.cluster.hierarchy import fcluster
@@ -27,7 +27,7 @@ from rog_preprocess import disambiguate_cluster_names
 # Configuration
 # -----------------------------------------------------------------------------
 
-CLUSTER_LEVELS = (5, 12, 25, 50)
+CLUSTER_LEVELS = (12, 25, 50, 100)
 ZOOM_THRESHOLDS = (1.5, 3.0, 6.0)
 COLORS_50 = cc.glasbey_light[:50]
 
@@ -99,13 +99,17 @@ class ROGBrowser:
         self._pulse_callback = None
         self._pulse_phase = 0
 
+        # Annotation state
+        self._annotation_callbacks = []  # Pending timeout callbacks for auto-clear
+
+
         # Store original extent for zoom ratio calculation
         self.x_min, self.x_max = coords_2d[:, 0].min(), coords_2d[:, 0].max()
         self.y_min, self.y_max = coords_2d[:, 1].min(), coords_2d[:, 1].max()
         self.original_width = self.x_max - self.x_min
 
         # Build STABLE hierarchical colors:
-        # - Top-level cluster (5) determines base hue
+        # - Coarsest cluster level determines base hue (golden ratio spacing)
         # - Micro-cluster determines variation within that hue
         # This keeps boundaries visible while preventing color flashing
         self.stable_colors = self._build_hierarchical_colors(cluster_result)
@@ -132,8 +136,8 @@ class ROGBrowser:
         # Create label source
         self._update_label_source()
 
-        # Bridge edges are pre-processed into (xs, ys) format during preprocessing
-        self.bridge_edges = bridge_edges
+        # Bridge edges: simplify paths and cap count for rendering performance
+        self.bridge_edges = self._simplify_bridge_edges(bridge_edges)
 
         # Initialize edge source with current level's bridges
         xs, ys = self.bridge_edges[self.current_level]
@@ -148,9 +152,16 @@ class ROGBrowser:
         # Create figure with WebGL and explicit ranges (no auto-ranging)
         from bokeh.models import Range1d
         padding = self.original_width * 0.05
+
+        # Broadcast title-safe zone (10% inset from each edge)
+        self.plot_width = 1200
+        self.plot_height = 800
+        self.title_safe_x = int(self.plot_width * 0.10)   # 120px
+        self.title_safe_y = int(self.plot_height * 0.90)   # 720px (from bottom)
+
         self.figure = figure(
-            width=1200,
-            height=800,
+            width=self.plot_width,
+            height=self.plot_height,
             tools='pan,wheel_zoom,reset',
             background_fill_color='#2a2a2a',
             active_scroll='wheel_zoom',
@@ -200,7 +211,7 @@ class ROGBrowser:
             text_font_size='11pt',
             text_font_style='bold',
             text_color='white',
-            background_fill_color='#2d2d2d',
+            background_fill_color='bg_color',
             background_fill_alpha=0.9,
             border_line_color='#666666',
             border_line_width=1,
@@ -209,9 +220,99 @@ class ROGBrowser:
         )
         self.figure.add_layout(self.labels)
 
+        # --- Annotation layer (ephemeral overlays driven by control API) ---
+
+        # Circle annotations (unfilled rings with optional labels)
+        self.annotation_source = ColumnDataSource(data={
+            'x': [], 'y': [], 'width': [], 'height': [],
+            'line_color': [], 'line_width': [], 'fill_alpha': [],
+            'label': [], 'label_y': [],
+            'label': [], 'label_y': [],
+        })
+        self.figure.ellipse(
+            'x', 'y', 'width', 'height',
+            source=self.annotation_source,
+            line_color='line_color',
+            line_width='line_width',
+            fill_alpha='fill_alpha',
+            fill_color=None,
+        )
+        self.annotation_circle_labels = LabelSet(
+            x='x', y='label_y', text='label',
+            source=self.annotation_source,
+            text_font_size='13pt',
+            text_font_style='bold',
+            text_color='#ffdd44',
+            text_align='center',
+        )
+        self.figure.add_layout(self.annotation_circle_labels)
+
+        # Title overlay (Label at data coordinates, upper-left of plot)
+        self.annotation_title = Label(
+            x=self.title_safe_x, y=self.title_safe_y,
+            x_units='screen', y_units='screen',
+            text='',
+            text_font_size='28pt',
+            text_font_style='bold',
+            text_color='white',
+            text_baseline='top',
+            background_fill_color='#1a1a1a',
+            background_fill_alpha=0.85,
+        )
+        self.figure.add_layout(self.annotation_title)
+
+        # Sketch annotation layer (hand-drawn strokes via multi_line)
+        self.sketch_source = ColumnDataSource(data={
+            'xs': [], 'ys': [],
+            'line_color': [], 'line_alpha': [], 'line_width': [],
+        })
+        self.sketch_renderer = self.figure.multi_line(
+            'xs', 'ys',
+            source=self.sketch_source,
+            line_color='line_color',
+            line_alpha='line_alpha',
+            line_width='line_width',
+            line_cap='round',
+            line_join='round',
+        )
+        self._sketch_callback = None  # Periodic callback for draw animation
+
         # Toggle for edges
         self.edge_toggle = Toggle(label="Show Edges", active=True, width=100)
         self.edge_toggle.on_change('active', self._on_edge_toggle)
+
+        # Hide edges during any interaction (pan or zoom), fade back in after idle
+        hide_edges_js = CustomJS(
+            args=dict(renderer=self.edge_renderer, toggle=self.edge_toggle,
+                      source=self.edge_source),
+            code="""
+                if (!toggle.active) return;
+                renderer.visible = false;
+                clearTimeout(window._edge_show_timer);
+                clearInterval(window._edge_fade_interval);
+                window._edge_show_timer = setTimeout(() => {
+                    if (!toggle.active) return;
+                    // Fade in: start at 0 alpha, step up over ~250ms
+                    const n = source.data['line_alpha'].length;
+                    const targets = source.data['line_alpha'].slice();
+                    for (let i = 0; i < n; i++) source.data['line_alpha'][i] = 0;
+                    renderer.visible = true;
+                    source.change.emit();
+                    let step = 0;
+                    const steps = 5;
+                    window._edge_fade_interval = setInterval(() => {
+                        step++;
+                        const frac = step / steps;
+                        for (let i = 0; i < n; i++)
+                            source.data['line_alpha'][i] = targets[i] * frac;
+                        source.change.emit();
+                        if (step >= steps) clearInterval(window._edge_fade_interval);
+                    }, 50);
+                }, 200);
+            """,
+        )
+        self.figure.x_range.js_on_change('start', hide_edges_js)
+        self.figure.y_range.js_on_change('start', hide_edges_js)
 
         # Toggle for LSH mode (if LSH data available)
         self.lsh_toggle = Toggle(label="LSH Mode", active=False, width=100)
@@ -430,26 +531,28 @@ class ROGBrowser:
     def _build_hierarchical_colors(self, cluster_result: dict) -> list[str]:
         """Build stable colors with hierarchical structure.
 
-        Top-level cluster (5) determines base hue, micro-cluster adds variation.
-        This makes cluster boundaries visible while keeping colors stable.
+        Coarsest-level cluster determines base hue (golden ratio spacing),
+        micro-cluster adds variation. This makes cluster boundaries visible
+        while keeping colors stable across zoom levels.
         """
         import colorsys
 
         n_points = len(self.coords_2d)
 
-        # Get top-level (5) cluster assignments for base hue
-        top_labels = cluster_result['labels'][5]
+        # Get coarsest-level cluster assignments for base hue
+        coarsest_level = min(cluster_result['labels'].keys())
+        top_labels = cluster_result['labels'][coarsest_level]
+        n_top = len(set(top_labels))
 
         # Get micro-cluster assignments for variation
         if self.use_dynamic_dendrogram:
             micro_labels = self.dendrogram['kmeans_labels']
-            n_micro = self.dendrogram['n_micro']
         else:
-            micro_labels = cluster_result['labels'][50]
-            n_micro = 50
+            finest_level = max(cluster_result['labels'].keys())
+            micro_labels = cluster_result['labels'][finest_level]
 
-        # Define 5 distinct base hues (well-separated on color wheel)
-        base_hues = [0.0, 0.15, 0.35, 0.55, 0.75]  # Red, Orange, Green, Cyan, Purple
+        # Golden ratio hues for top-level clusters (well-distributed)
+        base_hues = [(i * 0.618033988749895) % 1.0 for i in range(n_top)]
 
         colors = []
         for i in range(n_points):
@@ -473,17 +576,44 @@ class ROGBrowser:
 
         return colors
 
+    @staticmethod
+    def _darken_hex(hex_color: str, factor: float = 0.5) -> str:
+        """Darken a hex color by the given factor (0=black, 1=unchanged)."""
+        hex_color = hex_color.lstrip('#')
+        r = int(int(hex_color[0:2], 16) * factor)
+        g = int(int(hex_color[2:4], 16) * factor)
+        b = int(int(hex_color[4:6], 16) * factor)
+        return f'#{r:02x}{g:02x}{b:02x}'
+
+    def _get_cluster_bg_colors(self, cluster_ids: list[int], labels: np.ndarray) -> list[str]:
+        """Get darkened background colors for cluster labels.
+
+        For each cluster_id, finds a representative point and darkens its stable color.
+        """
+        bg_colors = []
+        for cid in cluster_ids:
+            # Find first point in this cluster
+            match = np.where(labels == cid)[0]
+            if len(match) > 0:
+                point_color = self.stable_colors[match[0]]
+                bg_colors.append(self._darken_hex(point_color))
+            else:
+                bg_colors.append('#2d2d2d')
+        return bg_colors
+
     def _update_label_source(self):
         """Update the label data source for current level."""
         centroids = self.cluster_result['centroids'][self.current_level]
         names = self.cluster_result['names'][self.current_level]
-        # Add padding spaces around label text
+        labels = self.cluster_result['labels'][self.current_level]
         padded_names = [f'  {name}  ' for name in names]
+        bg_colors = self._get_cluster_bg_colors(list(range(len(names))), labels)
 
         self.label_source = ColumnDataSource(data={
             'x': centroids[:, 0],
             'y': centroids[:, 1],
             'label': padded_names,
+            'bg_color': bg_colors,
         })
 
     def _cut_dendrogram_dynamic(self, n_clusters: int) -> tuple[np.ndarray, np.ndarray, list[str]]:
@@ -522,53 +652,37 @@ class ROGBrowser:
         # Cut dendrogram dynamically
         Z = self.dendrogram['Z']
         kmeans_labels = self.dendrogram['kmeans_labels']
-        node_labels = self.dendrogram['node_labels']
-        node_points = self.dendrogram['node_points']
-        node_centroids = self.dendrogram['node_centroids']
 
         # Cut at n_clusters
         micro_cluster_labels = fcluster(Z, n_clusters, criterion='maxclust') - 1
         point_labels = np.array([micro_cluster_labels[m] for m in kmeans_labels])
 
-        # Find representative nodes and compute names/centroids
-        from scipy.cluster.hierarchy import to_tree
-        tree = to_tree(Z, rd=True)
-        root, nodes = tree
-
-        cluster_names = [f"Cluster {i}" for i in range(n_clusters)]
+        # Compute centroids from point positions
         cluster_centroids = []
-
         for cluster_id in range(n_clusters):
             mask = point_labels == cluster_id
-            cluster_point_indices = np.where(mask)[0]
-
-            if len(cluster_point_indices) == 0:
+            pts = np.where(mask)[0]
+            if len(pts) == 0:
                 cluster_centroids.append(np.array([0.0, 0.0]))
-                continue
-
-            # Find best matching internal node
-            best_node = None
-            best_size = float('inf')
-            cluster_pts = set(cluster_point_indices)
-
-            for node in nodes:
-                if node.is_leaf():
-                    continue
-                node_pts = set(node_points[node.id])
-                if cluster_pts.issubset(node_pts) and len(node_pts) < best_size:
-                    best_size = len(node_pts)
-                    best_node = node
-
-            if best_node is not None and best_node.id in node_labels:
-                cluster_names[cluster_id] = node_labels[best_node.id]
-
-            # Compute centroid
-            if best_node is not None and best_node.id in node_centroids:
-                cx, cy = node_centroids[best_node.id]
-                cluster_centroids.append(np.array([cx, cy]))
             else:
-                centroid = self.coords_2d[cluster_point_indices].mean(axis=0)
-                cluster_centroids.append(centroid)
+                cluster_centroids.append(self.coords_2d[pts].mean(axis=0))
+
+        # Transfer labels from nearest pre-computed level by majority overlap
+        ref_level = min(CLUSTER_LEVELS, key=lambda l: abs(l - n_clusters))
+        ref_labels = self.cluster_result['labels'][ref_level]
+        ref_names = self.cluster_result['names'][ref_level]
+
+        cluster_names = []
+        for cluster_id in range(n_clusters):
+            mask = point_labels == cluster_id
+            if not mask.any():
+                cluster_names.append(f"Cluster {cluster_id}")
+                continue
+            # Find which pre-computed cluster has the most overlap
+            ref_subset = ref_labels[mask]
+            counts = np.bincount(ref_subset, minlength=len(ref_names))
+            best_ref = int(np.argmax(counts))
+            cluster_names.append(ref_names[best_ref])
 
         # Disambiguate duplicate cluster names with TF-IDF keywords
         cluster_names = disambiguate_cluster_names(cluster_names, self.titles, point_labels)
@@ -637,7 +751,7 @@ class ROGBrowser:
                 level_counts[level] = count_in_view(centroids)
 
             # Choose finest level where count <= 12
-            chosen_level = 50
+            chosen_level = max(CLUSTER_LEVELS)
             for level in CLUSTER_LEVELS:
                 if level_counts[level] <= 12:
                     chosen_level = level
@@ -667,17 +781,22 @@ class ROGBrowser:
         label_x = [cx for _, cx, _ in in_view]
         label_y = [cy for _, _, cy in in_view]
         label_text = [f'  {names[i]}  ' for i, _, _ in in_view]
+        label_ids = [i for i, _, _ in in_view]
+        bg_colors = self._get_cluster_bg_colors(label_ids, labels)
 
         self.label_source.data = {
             'x': label_x,
             'y': label_y,
             'label': label_text,
+            'bg_color': bg_colors,
         }
 
-        # Update current level (colors stay stable - only labels change)
-        if chosen_level != self.current_level:
-            self.current_level = chosen_level
-            self.figure.title.text = f"ROG Browser - {len(self.titles):,} points - Level: {self.current_level} clusters"
+        # Update title to reflect label granularity (but don't overwrite
+        # current_level — that controls bridge edges and must stay in
+        # CLUSTER_LEVELS; chosen_level from dynamic cutting can be any 2-100)
+        if chosen_level != getattr(self, '_label_level', None):
+            self._label_level = chosen_level
+            self.figure.title.text = f"ROG Browser - {len(self.titles):,} points - Level: {chosen_level} clusters"
 
     def _process_bundled_edges(self, bundled: pd.DataFrame) -> tuple[list, list]:
         """Convert hammer_bundle output to multi_line format."""
@@ -744,7 +863,7 @@ class ROGBrowser:
             label_x = [bucket_centroids[bid][0] for bid, _ in top_buckets if bid in bucket_centroids]
             label_y = [bucket_centroids[bid][1] for bid, _ in top_buckets if bid in bucket_centroids]
             label_text = [f'  B{bid} ({sz})  ' for bid, sz in top_buckets if bid in bucket_centroids]
-            self.label_source.data = {'x': label_x, 'y': label_y, 'label': label_text}
+            self.label_source.data = {'x': label_x, 'y': label_y, 'label': label_text, 'bg_color': ['#2d2d2d'] * len(label_x)}
 
             # Hide cluster edges, show boundary points
             self.edge_renderer.visible = False
@@ -814,7 +933,7 @@ class ROGBrowser:
                     label_y.append(bucket_centroids[bid][1])
                     label_text.append(f'  Dense: {sz}  ')
 
-            self.label_source.data = {'x': label_x, 'y': label_y, 'label': label_text}
+            self.label_source.data = {'x': label_x, 'y': label_y, 'label': label_text, 'bg_color': ['#2d2d2d'] * len(label_x)}
             self.figure.title.text = f"LSH Density - Range: {min_sz} to {max_sz} (median: {median_sz})"
         else:
             # Switch back to bucket coloring
@@ -826,7 +945,7 @@ class ROGBrowser:
             label_x = [bucket_centroids[bid][0] for bid, _ in top_buckets if bid in bucket_centroids]
             label_y = [bucket_centroids[bid][1] for bid, _ in top_buckets if bid in bucket_centroids]
             label_text = [f'  B{bid} ({sz})  ' for bid, sz in top_buckets if bid in bucket_centroids]
-            self.label_source.data = {'x': label_x, 'y': label_y, 'label': label_text}
+            self.label_source.data = {'x': label_x, 'y': label_y, 'label': label_text, 'bg_color': ['#2d2d2d'] * len(label_x)}
             self.figure.title.text = f"LSH Mode - {self.lsh_data['num_bits']} bits, {len(bucket_centroids)} buckets"
 
     def _on_recovery_toggle(self, attr, old, new):
@@ -855,7 +974,7 @@ class ROGBrowser:
             recovered = sum(1 for d in recovery_depth if 0 < d <= num_bits)
             never = sum(1 for d in recovery_depth if d > num_bits)
 
-            self.label_source.data = {'x': [], 'y': [], 'label': []}
+            self.label_source.data = {'x': [], 'y': [], 'label': [], 'bg_color': []}
             self.figure.title.text = (
                 f"Recovery View - Dense: {already_dense}, "
                 f"Recovered: {recovered}, Never: {never} "
@@ -873,7 +992,7 @@ class ROGBrowser:
                 label_x = [bucket_centroids[bid][0] for bid, _ in top_buckets if bid in bucket_centroids]
                 label_y = [bucket_centroids[bid][1] for bid, _ in top_buckets if bid in bucket_centroids]
                 label_text = [f'  B{bid} ({sz})  ' for bid, sz in top_buckets if bid in bucket_centroids]
-                self.label_source.data = {'x': label_x, 'y': label_y, 'label': label_text}
+                self.label_source.data = {'x': label_x, 'y': label_y, 'label': label_text, 'bg_color': ['#2d2d2d'] * len(label_x)}
                 self.figure.title.text = f"LSH Mode - {self.lsh_data['num_bits']} bits, {len(bucket_centroids)} buckets"
             else:
                 self.source.data['color'] = self.stable_colors
@@ -905,7 +1024,7 @@ class ROGBrowser:
             max_p = max(persistence) if persistence else 0
             num_bits = self.lsh_data['num_bits']
 
-            self.label_source.data = {'x': [], 'y': [], 'label': []}
+            self.label_source.data = {'x': [], 'y': [], 'label': [], 'bg_color': []}
             self.figure.title.text = (
                 f"Persistence View - Bridges: {total_bridges}, "
                 f"Max depth span: {max_p}/{num_bits}"
@@ -922,7 +1041,7 @@ class ROGBrowser:
                 label_x = [bucket_centroids[bid][0] for bid, _ in top_buckets if bid in bucket_centroids]
                 label_y = [bucket_centroids[bid][1] for bid, _ in top_buckets if bid in bucket_centroids]
                 label_text = [f'  B{bid} ({sz})  ' for bid, sz in top_buckets if bid in bucket_centroids]
-                self.label_source.data = {'x': label_x, 'y': label_y, 'label': label_text}
+                self.label_source.data = {'x': label_x, 'y': label_y, 'label': label_text, 'bg_color': ['#2d2d2d'] * len(label_x)}
                 self.figure.title.text = f"LSH Mode - {self.lsh_data['num_bits']} bits, {len(bucket_centroids)} buckets"
             else:
                 self.source.data['color'] = self.stable_colors
@@ -973,10 +1092,10 @@ class ROGBrowser:
             <h3>Cluster Level: {self.current_level}</h3>
             <p>Zoom to change detail level:</p>
             <ul>
-                <li>Zoomed out: 5 clusters</li>
-                <li>Light zoom: 12 clusters</li>
-                <li>Mid zoom: 25 clusters</li>
-                <li>Zoomed in: 50 clusters</li>
+                <li>Zoomed out: 12 clusters</li>
+                <li>Light zoom: 25 clusters</li>
+                <li>Mid zoom: 50 clusters</li>
+                <li>Zoomed in: 100 clusters</li>
             </ul>
         </div>
         """
@@ -998,13 +1117,13 @@ class ROGBrowser:
     def _get_level_for_zoom(self, zoom_ratio: float) -> int:
         """Map zoom ratio to cluster level."""
         if zoom_ratio < ZOOM_THRESHOLDS[0]:
-            return 5
-        elif zoom_ratio < ZOOM_THRESHOLDS[1]:
             return 12
-        elif zoom_ratio < ZOOM_THRESHOLDS[2]:
+        elif zoom_ratio < ZOOM_THRESHOLDS[1]:
             return 25
-        else:
+        elif zoom_ratio < ZOOM_THRESHOLDS[2]:
             return 50
+        else:
+            return 100
 
     def _schedule_label_update(self):
         """Debounce label updates — only process the latest viewport."""
@@ -1028,6 +1147,38 @@ class ROGBrowser:
         # Debounce: only update labels after zoom gestures settle
         self._schedule_label_update()
 
+    @staticmethod
+    def _simplify_bridge_edges(bridge_edges, max_edges=500):
+        """Cap edge count for rendering performance.
+
+        Edges are hidden during interaction and only rendered on idle,
+        so full control points are fine — just limit total edge count.
+        """
+        simplified = {}
+        for level, (xs, ys) in bridge_edges.items():
+            simplified[level] = (xs[:max_edges], ys[:max_edges])
+        return simplified
+
+    def _cull_edges_to_viewport(self, xs, ys):
+        """Filter edges to only those intersecting the current viewport."""
+        x0 = self.figure.x_range.start
+        x1 = self.figure.x_range.end
+        y0 = self.figure.y_range.start
+        y1 = self.figure.y_range.end
+        # Pad viewport by 20% to keep edges that are partially visible
+        dx, dy = (x1 - x0) * 0.2, (y1 - y0) * 0.2
+        x0, x1, y0, y1 = x0 - dx, x1 + dx, y0 - dy, y1 + dy
+
+        vxs, vys = [], []
+        for ex, ey in zip(xs, ys):
+            # Check if any control point of this edge is within the padded viewport
+            for px, py in zip(ex, ey):
+                if x0 <= px <= x1 and y0 <= py <= y1:
+                    vxs.append(ex)
+                    vys.append(ey)
+                    break
+        return vxs, vys
+
     def _update_view(self):
         """Update labels and bridge edges for current level (colors stay stable)."""
         # Note: Colors are stable based on micro-clusters, so no color update needed
@@ -1035,15 +1186,17 @@ class ROGBrowser:
         # Update labels using viewport-aware aggregation
         self._update_labels_for_viewport()
 
-        # Update bridge edges for current level
+        # Update bridge edges for current level (viewport-culled)
         # If there's an active highlight, reapply it instead of resetting to default
         if self._highlighted_indices:
             self.highlight_points(self._highlighted_indices)
         else:
             xs, ys = self.bridge_edges[self.current_level]
-            n_edges = len(xs)
+            # Viewport culling: only include edges that intersect the visible area
+            vxs, vys = self._cull_edges_to_viewport(xs, ys)
+            n_edges = len(vxs)
             self.edge_source.data = {
-                'xs': xs, 'ys': ys,
+                'xs': vxs, 'ys': vys,
                 'line_color': ['#4488cc'] * n_edges,
                 'line_alpha': [0.15] * n_edges,
                 'line_width': [1] * n_edges,
@@ -1110,11 +1263,22 @@ class ROGBrowser:
         frames = max(1, int(duration * fps / 1000))
         frame = [0]  # Use list for mutable closure
 
-        # Capture starting positions
+        # Capture starting positions — fall back to instant zoom if NaN
+        import math
         start_x_start = float(self.figure.x_range.start)
         start_x_end = float(self.figure.x_range.end)
         start_y_start = float(self.figure.y_range.start)
         start_y_end = float(self.figure.y_range.end)
+
+        if any(math.isnan(v) for v in [start_x_start, start_x_end, start_y_start, start_y_end]):
+            print(f"  zoom_to: NaN starting positions, falling back to instant zoom", flush=True)
+            self.figure.x_range.update(start=target_x_start, end=target_x_end)
+            self.figure.y_range.update(start=target_y_start, end=target_y_end)
+            self._update_zoom_level()
+            def clear_flag_nan():
+                self._programmatic_zoom = False
+            curdoc().add_timeout_callback(clear_flag_nan, 100)
+            return
 
         def ease_out_cubic(t):
             """Cubic ease-out for smooth deceleration."""
@@ -1200,12 +1364,13 @@ class ROGBrowser:
         self.source.data['line_color'] = line_colors
         self.source.data['line_width'] = line_widths
 
-        # Find which buckets the highlighted points belong to (at 50-cluster level)
+        # Find which clusters the highlighted points belong to (at finest level)
         highlighted_buckets = set()
-        if 50 in self.cluster_result['labels'] and highlighted_set:
-            labels_50 = self.cluster_result['labels'][50]
+        finest_level = max(self.cluster_result['labels'].keys())
+        if finest_level in self.cluster_result['labels'] and highlighted_set:
+            labels_finest = self.cluster_result['labels'][finest_level]
             for idx in self._highlighted_indices:
-                highlighted_buckets.add(int(labels_50[idx]))
+                highlighted_buckets.add(int(labels_finest[idx]))
 
         # Highlight bucket-to-bucket edges connected to highlighted buckets
         # Use original edge count, not filtered edge_source
@@ -1288,6 +1453,443 @@ class ROGBrowser:
         self.edge_source.data['line_alpha'] = [0.15] * n_edges
         self.edge_source.data['line_width'] = [1] * n_edges
 
+    # -------------------------------------------------------------------------
+    # Annotation API (ephemeral overlays)
+    # -------------------------------------------------------------------------
+
+    def annotate(self, annotation_type: str, params: dict):
+        """Add an ephemeral annotation.
+
+        Types:
+            title  — HTML title bar above plot (params: text, duration_ms=3000)
+            circle — dashed ring with optional label (params: x, y, radius, label="", color="#ffaa33", duration_ms=5000)
+            clear  — remove all annotations immediately
+        """
+        if annotation_type == "clear":
+            self._clear_annotations()
+            return
+
+        if annotation_type == "title":
+            text = params.get("text", "")
+            duration_ms = params.get("duration_ms", 3000)
+            self.annotation_title.text = f"  {text}  " if text else ""
+            if duration_ms > 0:
+                self._schedule_annotation_clear(duration_ms, "title")
+
+        elif annotation_type == "circle":
+            x = float(params["x"])
+            y = float(params["y"])
+            radius = float(params.get("radius", 1.0))
+            color = params.get("color", "#ffaa33")
+            label = params.get("label", "")
+            duration_ms = params.get("duration_ms", 5000)
+            # Replace previous circles
+            self.annotation_source.data = {
+                'x': [x], 'y': [y],
+                'width': [radius * 2], 'height': [radius * 2],
+                'line_color': [color], 'line_width': [2],
+                'fill_alpha': [0],
+                'label': [label], 'label_y': [y + radius],
+            }
+            if duration_ms > 0:
+                self._schedule_annotation_clear(duration_ms, "circle")
+
+        elif annotation_type == "sketch_circle":
+            x = float(params["x"])
+            y = float(params["y"])
+            radius = float(params.get("radius", 1.0))
+            color = params.get("color", "#ffff44")
+            width = float(params.get("width", 12.0))
+            draw_ms = int(params.get("draw_ms", 600))
+            hold_ms = int(params.get("hold_ms", 4000))
+            label = params.get("label", "")
+            self.sketch_circle(x, y, radius, color=color, width=width,
+                               duration_ms=draw_ms, hold_ms=hold_ms, label=label)
+
+        elif annotation_type == "sketch_arc":
+            x = float(params["x"])
+            y = float(params["y"])
+            radius = float(params.get("radius", 1.0))
+            start_angle = float(params.get("start_angle", 0))
+            end_angle = float(params.get("end_angle", np.pi))
+            color = params.get("color", "#ffff44")
+            width = float(params.get("width", 12.0))
+            draw_ms = int(params.get("draw_ms", 400))
+            hold_ms = int(params.get("hold_ms", 0))
+            self.sketch_arc(x, y, radius, start_angle, end_angle,
+                            color=color, width=width, duration_ms=draw_ms,
+                            hold_ms=hold_ms)
+
+        elif annotation_type == "sketch_line":
+            x1 = float(params["x1"])
+            y1 = float(params["y1"])
+            x2 = float(params["x2"])
+            y2 = float(params["y2"])
+            color = params.get("color", "#ffff44")
+            width = float(params.get("width", 12.0))
+            draw_ms = int(params.get("draw_ms", 300))
+            hold_ms = int(params.get("hold_ms", 0))
+            self.sketch_line(x1, y1, x2, y2, color=color, width=width,
+                             duration_ms=draw_ms, hold_ms=hold_ms)
+
+        elif annotation_type == "sketch_dot":
+            x = float(params["x"])
+            y = float(params["y"])
+            radius = float(params.get("radius", 0.15))
+            color = params.get("color", "#ffff44")
+            width = float(params.get("width", 12.0))
+            draw_ms = int(params.get("draw_ms", 300))
+            hold_ms = int(params.get("hold_ms", 0))
+            # A dot is just a tiny filled circle
+            self.sketch_circle(x, y, radius, color=color, width=width,
+                               duration_ms=draw_ms, hold_ms=hold_ms)
+
+    def _clear_annotations(self):
+        """Clear all annotation renderers."""
+        self.annotation_title.text = ""
+        self.annotation_source.data = {
+            'x': [], 'y': [], 'width': [], 'height': [],
+            'line_color': [], 'line_width': [], 'fill_alpha': [],
+            'label': [], 'label_y': [],
+        }
+        self._clear_sketch()
+        # Cancel all pending auto-clear callbacks
+        for cb in self._annotation_callbacks:
+            try:
+                curdoc().remove_timeout_callback(cb)
+            except (ValueError, AttributeError):
+                pass
+        self._annotation_callbacks = []
+
+    def _clear_sketch(self):
+        """Clear sketch strokes and stop any draw animation."""
+        if self._sketch_callback is not None:
+            try:
+                curdoc().remove_periodic_callback(self._sketch_callback)
+            except (ValueError, AttributeError):
+                pass
+            self._sketch_callback = None
+        self.sketch_source.data = {
+            'xs': [], 'ys': [],
+            'line_color': [], 'line_alpha': [], 'line_width': [],
+        }
+
+    def _generate_brush_circle(self, x, y, radius, n_points=100, overshoot=0.12,
+                               base_width=12.0):
+        """Generate a hand-drawn circle as segments with varying brush width.
+
+        Returns (seg_xs, seg_ys, seg_widths) — per-segment 2-point polylines.
+        Use with line_alpha=1.0 so overlapping round caps don't cause darkening.
+        """
+        total_angle = 2 * np.pi * (1 + overshoot)
+        angles = np.linspace(0, total_angle, n_points)
+
+        # Random walk for radius drift (organic, not periodic)
+        steps = np.random.randn(n_points) * 0.006
+        drift = np.cumsum(steps)
+        kernel = np.ones(7) / 7
+        drift = np.convolve(drift, kernel, mode='same')
+        drift *= np.exp(-0.3 * np.abs(drift))
+
+        radii = radius * (1 + drift)
+
+        # Slight angular speed variation (hand doesn't move at constant speed)
+        speed_drift = np.cumsum(np.random.randn(n_points) * 0.003)
+        speed_drift = np.convolve(speed_drift, kernel, mode='same')
+        adjusted_angles = angles + speed_drift
+
+        pts_x = x + radii * np.cos(adjusted_angles)
+        pts_y = y + radii * np.sin(adjusted_angles)
+
+        # Width envelope: ease in, sustained, ease out + pressure variation
+        seg_xs, seg_ys, seg_widths = [], [], []
+        t = np.linspace(0, 1, n_points)
+        envelope = np.clip(np.minimum(t * 6, (1 - t) * 5), 0, 1)
+        pressure = 1.0 + 0.3 * np.convolve(
+            np.random.randn(n_points), np.ones(5) / 5, mode='same'
+        )
+        widths = base_width * envelope * pressure
+
+        for i in range(n_points - 1):
+            seg_xs.append([float(pts_x[i]), float(pts_x[i + 1])])
+            seg_ys.append([float(pts_y[i]), float(pts_y[i + 1])])
+            seg_widths.append(float(widths[i]))
+
+        return seg_xs, seg_ys, seg_widths
+
+    def _generate_brush_arc(self, x, y, radius, start_angle, end_angle,
+                            n_points=60, base_width=12.0):
+        """Generate a hand-drawn arc as segments with varying brush width."""
+        angles = np.linspace(start_angle, end_angle, n_points)
+
+        # Random walk drift
+        steps = np.random.randn(n_points) * 0.006
+        drift = np.cumsum(steps)
+        kernel = np.ones(7) / 7
+        drift = np.convolve(drift, kernel, mode='same')
+        drift *= np.exp(-0.3 * np.abs(drift))
+
+        radii = radius * (1 + drift)
+
+        pts_x = x + radii * np.cos(angles)
+        pts_y = y + radii * np.sin(angles)
+
+        seg_xs, seg_ys, seg_widths = [], [], []
+        t = np.linspace(0, 1, n_points)
+        envelope = np.clip(np.minimum(t * 6, (1 - t) * 5), 0, 1)
+        pressure = 1.0 + 0.3 * np.convolve(
+            np.random.randn(n_points), np.ones(5) / 5, mode='same'
+        )
+        widths = base_width * envelope * pressure
+
+        for i in range(n_points - 1):
+            seg_xs.append([float(pts_x[i]), float(pts_x[i + 1])])
+            seg_ys.append([float(pts_y[i]), float(pts_y[i + 1])])
+            seg_widths.append(float(widths[i]))
+
+        return seg_xs, seg_ys, seg_widths
+
+    def sketch_arc(self, x, y, radius, start_angle, end_angle,
+                   color='#ffff44', width=12.0, duration_ms=400,
+                   hold_ms=0, label=''):
+        """Draw an animated hand-sketched arc annotation."""
+        from bokeh.io import curdoc
+
+        # Stop existing draw animation but keep existing strokes
+        if self._sketch_callback is not None:
+            try:
+                curdoc().remove_periodic_callback(self._sketch_callback)
+            except (ValueError, AttributeError):
+                pass
+            self._sketch_callback = None
+
+        seg_xs, seg_ys, seg_widths = self._generate_brush_arc(
+            x, y, radius, start_angle, end_angle, base_width=width
+        )
+        n_total = len(seg_xs)
+
+        fps = 30
+        n_frames = max(1, int(duration_ms * fps / 1000))
+        segs_per_frame = max(1, n_total / n_frames)
+        frame = [0]
+
+        prev_xs = list(self.sketch_source.data['xs'])
+        prev_ys = list(self.sketch_source.data['ys'])
+        prev_colors = list(self.sketch_source.data['line_color'])
+        prev_alphas = list(self.sketch_source.data['line_alpha'])
+        prev_widths = list(self.sketch_source.data['line_width'])
+
+        def draw_step():
+            frame[0] += 1
+            n_reveal = min(n_total, int(frame[0] * segs_per_frame))
+
+            self.sketch_source.data = {
+                'xs': prev_xs + seg_xs[:n_reveal],
+                'ys': prev_ys + seg_ys[:n_reveal],
+                'line_color': prev_colors + [color] * n_reveal,
+                'line_alpha': prev_alphas + [1.0] * n_reveal,
+                'line_width': prev_widths + seg_widths[:n_reveal],
+            }
+
+            if n_reveal >= n_total:
+                try:
+                    curdoc().remove_periodic_callback(self._sketch_callback)
+                except (ValueError, AttributeError):
+                    pass
+                self._sketch_callback = None
+
+                if hold_ms > 0:
+                    self._schedule_annotation_clear(hold_ms, "sketch")
+
+        interval_ms = int(1000 / fps)
+        self._sketch_callback = curdoc().add_periodic_callback(draw_step, interval_ms)
+
+    def _generate_brush_line(self, x1, y1, x2, y2, n_points=40, base_width=12.0):
+        """Generate a hand-drawn line as segments with varying brush width."""
+        t = np.linspace(0, 1, n_points)
+
+        # Random walk perpendicular drift
+        steps = np.random.randn(n_points) * 0.004
+        drift = np.cumsum(steps)
+        kernel = np.ones(5) / 5
+        drift = np.convolve(drift, kernel, mode='same')
+        drift *= np.exp(-0.3 * np.abs(drift))
+
+        # Direction vector and perpendicular
+        dx, dy = x2 - x1, y2 - y1
+        length = np.sqrt(dx * dx + dy * dy)
+        if length > 0:
+            px, py = -dy / length, dx / length  # perpendicular
+        else:
+            px, py = 0, 1
+
+        pts_x = x1 + t * dx + drift * length * px
+        pts_y = y1 + t * dy + drift * length * py
+
+        seg_xs, seg_ys, seg_widths = [], [], []
+        envelope = np.clip(np.minimum(t * 6, (1 - t) * 5), 0, 1)
+        pressure = 1.0 + 0.25 * np.convolve(
+            np.random.randn(n_points), np.ones(5) / 5, mode='same'
+        )
+        widths = base_width * envelope * pressure
+
+        for i in range(n_points - 1):
+            seg_xs.append([float(pts_x[i]), float(pts_x[i + 1])])
+            seg_ys.append([float(pts_y[i]), float(pts_y[i + 1])])
+            seg_widths.append(float(widths[i]))
+
+        return seg_xs, seg_ys, seg_widths
+
+    def sketch_line(self, x1, y1, x2, y2, color='#ffff44', width=12.0,
+                    duration_ms=300, hold_ms=0):
+        """Draw an animated hand-sketched line."""
+        from bokeh.io import curdoc
+
+        if self._sketch_callback is not None:
+            try:
+                curdoc().remove_periodic_callback(self._sketch_callback)
+            except (ValueError, AttributeError):
+                pass
+            self._sketch_callback = None
+
+        seg_xs, seg_ys, seg_widths = self._generate_brush_line(
+            x1, y1, x2, y2, base_width=width
+        )
+        n_total = len(seg_xs)
+
+        fps = 30
+        n_frames = max(1, int(duration_ms * fps / 1000))
+        segs_per_frame = max(1, n_total / n_frames)
+        frame = [0]
+
+        prev_xs = list(self.sketch_source.data['xs'])
+        prev_ys = list(self.sketch_source.data['ys'])
+        prev_colors = list(self.sketch_source.data['line_color'])
+        prev_alphas = list(self.sketch_source.data['line_alpha'])
+        prev_widths = list(self.sketch_source.data['line_width'])
+
+        def draw_step():
+            frame[0] += 1
+            n_reveal = min(n_total, int(frame[0] * segs_per_frame))
+
+            self.sketch_source.data = {
+                'xs': prev_xs + seg_xs[:n_reveal],
+                'ys': prev_ys + seg_ys[:n_reveal],
+                'line_color': prev_colors + [color] * n_reveal,
+                'line_alpha': prev_alphas + [1.0] * n_reveal,
+                'line_width': prev_widths + seg_widths[:n_reveal],
+            }
+
+            if n_reveal >= n_total:
+                try:
+                    curdoc().remove_periodic_callback(self._sketch_callback)
+                except (ValueError, AttributeError):
+                    pass
+                self._sketch_callback = None
+
+                if hold_ms > 0:
+                    self._schedule_annotation_clear(hold_ms, "sketch")
+
+        interval_ms = int(1000 / fps)
+        self._sketch_callback = curdoc().add_periodic_callback(draw_step, interval_ms)
+
+    def sketch_circle(self, x, y, radius, color='#ffff44', width=12.0,
+                      duration_ms=600, hold_ms=4000, label=''):
+        """Draw an animated hand-sketched circle annotation.
+
+        Args:
+            x, y: Center of the circle
+            radius: Radius in data coordinates
+            color: Stroke color
+            width: Stroke width
+            duration_ms: Time to draw the circle
+            hold_ms: Time to hold before fading (0 = persistent)
+            label: Optional text label above the circle
+        """
+        from bokeh.io import curdoc
+
+        # Stop any in-progress draw animation, but keep existing strokes
+        if self._sketch_callback is not None:
+            try:
+                curdoc().remove_periodic_callback(self._sketch_callback)
+            except (ValueError, AttributeError):
+                pass
+            self._sketch_callback = None
+
+        seg_xs, seg_ys, seg_widths = self._generate_brush_circle(
+            x, y, radius, base_width=width
+        )
+        n_total = len(seg_xs)
+
+        fps = 30
+        n_frames = max(1, int(duration_ms * fps / 1000))
+        segs_per_frame = max(1, n_total / n_frames)
+        frame = [0]
+
+        # Show label immediately if provided
+        if label:
+            self.annotation_source.data = {
+                'x': [x], 'y': [y],
+                'width': [0], 'height': [0],
+                'line_color': ['rgba(0,0,0,0)'], 'line_width': [0],
+                'fill_alpha': [0],
+                'label': [label], 'label_y': [y + radius * 1.15],
+            }
+
+        # Snapshot existing strokes so new ones accumulate
+        prev_xs = list(self.sketch_source.data['xs'])
+        prev_ys = list(self.sketch_source.data['ys'])
+        prev_colors = list(self.sketch_source.data['line_color'])
+        prev_alphas = list(self.sketch_source.data['line_alpha'])
+        prev_widths = list(self.sketch_source.data['line_width'])
+
+        def draw_step():
+            frame[0] += 1
+            n_reveal = min(n_total, int(frame[0] * segs_per_frame))
+
+            self.sketch_source.data = {
+                'xs': prev_xs + seg_xs[:n_reveal],
+                'ys': prev_ys + seg_ys[:n_reveal],
+                'line_color': prev_colors + [color] * n_reveal,
+                'line_alpha': prev_alphas + [1.0] * n_reveal,
+                'line_width': prev_widths + seg_widths[:n_reveal],
+            }
+
+            if n_reveal >= n_total:
+                try:
+                    curdoc().remove_periodic_callback(self._sketch_callback)
+                except (ValueError, AttributeError):
+                    pass
+                self._sketch_callback = None
+
+                if hold_ms > 0:
+                    self._schedule_annotation_clear(hold_ms, "sketch")
+
+        interval_ms = int(1000 / fps)
+        self._sketch_callback = curdoc().add_periodic_callback(draw_step, interval_ms)
+
+    def _schedule_annotation_clear(self, duration_ms: int, annotation_type: str):
+        """Schedule auto-clear of a specific annotation type after duration_ms."""
+        def do_clear():
+            if annotation_type == "title":
+                self.annotation_title.text = ""
+            elif annotation_type == "circle":
+                self.annotation_source.data = {
+                    'x': [], 'y': [], 'width': [], 'height': [],
+                    'line_color': [], 'line_width': [], 'fill_alpha': [],
+                }
+            elif annotation_type == "sketch":
+                self._clear_sketch()
+                # Also clear associated label
+                self.annotation_source.data = {
+                    'x': [], 'y': [], 'width': [], 'height': [],
+                    'line_color': [], 'line_width': [], 'fill_alpha': [],
+                    'label': [], 'label_y': [],
+                }
+
+        cb = curdoc().add_timeout_callback(do_clear, duration_ms)
+        self._annotation_callbacks.append(cb)
+
     def animate_lsh_explanation(self, step_delay_ms: int = 1500):
         """Animate LSH explanation by adding hyperplanes one at a time.
 
@@ -1333,7 +1935,7 @@ class ROGBrowser:
         self.hyperplane_renderer.visible = True
 
         # Clear labels initially
-        self.label_source.data = {'x': [], 'y': [], 'label': []}
+        self.label_source.data = {'x': [], 'y': [], 'label': [], 'bg_color': []}
 
         self.figure.title.text = "LSH Explanation - Starting with all points"
 
@@ -1422,6 +2024,48 @@ class ControlHandler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
+
+    def do_GET(self):
+        import json as _json
+
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+
+        try:
+            state = getattr(self.server, "app_state", None)
+            if state is None:
+                self.wfile.write(_json.dumps({"status": "no_state"}).encode())
+                return
+
+            status = {
+                "status": "ok" if (state.browser and state.doc) else "not_ready",
+                "browser_initialized": state.browser is not None,
+                "doc_initialized": state.doc is not None,
+                "queue_length": len(state.command_queue),
+            }
+
+            if state.browser:
+                b = state.browser
+                status["sketch_strokes"] = len(b.sketch_source.data.get("xs", []))
+                status["annotations"] = len(b.annotation_source.data.get("x", []))
+                status["sketch_animating"] = b._sketch_callback is not None
+                status["edges_visible"] = b.edge_renderer.visible if hasattr(b, "edge_renderer") else None
+                status["current_level"] = getattr(b, "current_level", None)
+                # View bounds for zoom verification
+                try:
+                    status["x_range"] = {"start": float(b.figure.x_range.start), "end": float(b.figure.x_range.end)}
+                    status["y_range"] = {"start": float(b.figure.y_range.start), "end": float(b.figure.y_range.end)}
+                except Exception:
+                    pass
+
+            self.wfile.write(_json.dumps(status, indent=2).encode())
+        except Exception as e:
+            import traceback
+            print(f"STATUS ERROR: {e}", flush=True)
+            traceback.print_exc()
+            self.wfile.write(_json.dumps({"error": str(e)}).encode())
 
     def do_POST(self):
         import json as _json
@@ -1540,7 +2184,7 @@ def main():
             cmd = STATE.command_queue.pop(0)
             action = cmd["action"]
             params = cmd.get("params", {})
-            print(f"  Executing: {action} with {params}")
+            print(f"  Executing: {action} with {params}", flush=True)
             try:
                 if action == "zoom_to":
                     STATE.browser.zoom_to(params["x"], params["y"], params.get("radius", 5))
@@ -1563,11 +2207,17 @@ def main():
                     STATE.browser.highlight_points(params["indices"])
                 elif action == "clear_highlight":
                     STATE.browser.clear_highlight()
+                elif action == "annotate":
+                    STATE.browser.annotate(params.get("type", "title"), params)
+                    print(f"  Sketch source has {len(STATE.browser.sketch_source.data['xs'])} entries", flush=True)
+                    print(f"  Annotation source has {len(STATE.browser.annotation_source.data['x'])} items", flush=True)
                 # Update last command and refresh status
                 STATE.browser.last_command = action
                 STATE.browser.status.text = STATE.browser._get_status_html()
             except Exception as e:
-                print(f"Error processing command {action}: {e}")
+                import traceback
+                print(f"Error processing command {action}: {e}", flush=True)
+                traceback.print_exc()
 
     STATE.doc.add_periodic_callback(process_commands, 100)  # Check every 100ms
 

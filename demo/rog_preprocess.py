@@ -2,7 +2,7 @@
 Preprocess wiki data for ROG (Recursive Ontological Graph) Browser.
 Generates UMAP coords, clusters, LLM labels, and bundled edges.
 
-Run: python demo/rog_preprocess.py demo/wiki_simple_50k.parquet --sample 10000
+Run: python demo/rog_preprocess.py demo/wiki_simple_50k.parquet --sample 50000
 """
 
 import argparse
@@ -20,11 +20,67 @@ import subprocess
 # Import dyf for bridge detection via ROG ontology
 import dyf
 
-CLUSTER_LEVELS = (5, 12, 25, 50)
+CLUSTER_LEVELS = (12, 25, 50, 100)
 BUNDLE_ITERATIONS = 4
 
 
-def load_data(path: str, sample: int | None = None):
+def compute_density_knn(embeddings: np.ndarray, num_bits: int = 12, min_k: int = 15, max_k: int = 100):
+    """Build variable-k neighbor graph using dyf bucket density.
+
+    Points in sparse LSH buckets get more neighbors (need global context),
+    points in dense buckets get fewer (local structure is clear).
+
+    Returns (knn_indices, knn_dists) padded to max_k, suitable for UMAP precomputed_knn.
+    """
+    from sklearn.neighbors import NearestNeighbors
+    from dyf_rs import DensityClassifier
+
+    n = len(embeddings)
+    print(f"  Building density-aware kNN (min_k={min_k}, max_k={max_k}, bits={num_bits})...")
+
+    # Step 1: Get bucket densities from dyf
+    clf = DensityClassifier(embedding_dim=embeddings.shape[1], num_bits=num_bits, seed=42)
+    clf.fit(embeddings.astype(np.float32))
+    bucket_sizes = np.array(clf.get_bucket_sizes())
+
+    # Step 2: Map bucket size → local k (inverse: sparse → high k, dense → low k)
+    log_sizes = np.log1p(bucket_sizes)
+    log_min, log_max = log_sizes.min(), log_sizes.max()
+    if log_max > log_min:
+        # Normalize to [0, 1] where 0=smallest bucket, 1=largest
+        density_frac = (log_sizes - log_min) / (log_max - log_min)
+    else:
+        density_frac = np.zeros(n)
+
+    # Invert: dense points get low k, sparse points get high k
+    local_k = (min_k + (max_k - min_k) * (1 - density_frac)).astype(int)
+    local_k = np.clip(local_k, min_k, max_k)
+
+    print(f"  Local k distribution: min={local_k.min()}, median={int(np.median(local_k))}, "
+          f"max={local_k.max()}, mean={local_k.mean():.0f}")
+    print(f"  Bucket size distribution: min={bucket_sizes.min()}, median={int(np.median(bucket_sizes))}, "
+          f"max={bucket_sizes.max()}")
+
+    # Step 3: Build full kNN with max_k
+    print(f"  Computing {max_k}-NN graph...")
+    nn = NearestNeighbors(n_neighbors=max_k, metric='cosine', n_jobs=-1)
+    nn.fit(embeddings)
+    dists, indices = nn.kneighbors(embeddings)
+
+    # Step 4: Mask out neighbors beyond each point's local k
+    # Duplicate the last valid neighbor (UMAP needs valid indices, not self-refs at dist 0)
+    for i in range(n):
+        k_i = local_k[i]
+        if k_i < max_k:
+            indices[i, k_i:] = indices[i, k_i - 1]
+            dists[i, k_i:] = dists[i, k_i - 1]
+
+    print(f"  Density-aware kNN complete")
+    return indices, dists
+
+
+def load_data(path: str, sample: int | None = None,
+              n_neighbors: int = 15, densmap: bool = False):
     """Load parquet and run UMAP. Returns coords, titles, and embeddings."""
     print(f"Loading {path}...")
     df = pl.read_parquet(path)
@@ -35,9 +91,41 @@ def load_data(path: str, sample: int | None = None):
     titles = df["title"].to_list()
     embeddings = np.array(df["embedding"].to_list())
 
-    print(f"Running UMAP on {len(titles)} points (parallel)...")
-    reducer = umap.UMAP(n_components=2, n_neighbors=15, min_dist=0.1, n_jobs=-1)
+    mode = "densmap" if densmap else "standard"
+    print(f"Running UMAP on {len(titles)} points ({mode}, n_neighbors={n_neighbors})...")
+    reducer = umap.UMAP(
+        n_components=2,
+        n_neighbors=n_neighbors,
+        min_dist=0.1,
+        n_jobs=-1,
+        verbose=True,
+        densmap=densmap,
+    )
     coords_2d = reducer.fit_transform(embeddings)
+
+    # Replace NaN coords (disconnected UMAP vertices) with nearest valid neighbor
+    nan_mask = np.isnan(coords_2d).any(axis=1)
+    if nan_mask.any():
+        n_nan = nan_mask.sum()
+        print(f"  Replacing {n_nan} NaN coordinates with nearest valid neighbors")
+        from sklearn.neighbors import NearestNeighbors
+        valid = ~nan_mask
+        nn = NearestNeighbors(n_neighbors=1, metric='cosine')
+        nn.fit(embeddings[valid])
+        _, idx = nn.kneighbors(embeddings[nan_mask])
+        valid_coords = coords_2d[valid]
+        coords_2d[nan_mask] = valid_coords[idx.ravel()]
+
+    # Normalize to (0,0) center with robust scaling.
+    # Median-center (outlier-robust), then scale by the max MAD across axes
+    # to preserve aspect ratio. Result: ~68% of points within radius 1.
+    median = np.nanmedian(coords_2d, axis=0)
+    mad = np.nanmedian(np.abs(coords_2d - median), axis=0)
+    scale = float(np.fmax(np.nanmax(mad), 1e-8))
+    coords_2d = (coords_2d - median) / scale
+    print(f"Normalized coords: median-centered, MAD scale={scale:.3f}, "
+          f"range x=[{coords_2d[:,0].min():.1f}, {coords_2d[:,0].max():.1f}] "
+          f"y=[{coords_2d[:,1].min():.1f}, {coords_2d[:,1].max():.1f}]")
 
     return coords_2d, titles, embeddings
 
@@ -167,13 +255,13 @@ def compute_dendrogram_hierarchy(
 
     print("Computing dendrogram hierarchy...")
 
-    # Step 1: K-means to get micro-clusters
+    # Step 1: K-means on high-dim embeddings (semantic clustering, not spatial)
     initial_k = min(100, len(coords_2d) // 50)
-    print(f"  K-means with k={initial_k}...")
+    print(f"  K-means with k={initial_k} on embeddings...")
     kmeans = KMeans(n_clusters=initial_k, random_state=42, n_init=10)
-    kmeans.fit(coords_2d)
+    kmeans.fit(embeddings)
 
-    # Step 2: Hierarchical clustering on micro-cluster centroids
+    # Step 2: Hierarchical clustering on micro-cluster centroids (in embedding space)
     print("  Building dendrogram...")
     Z = linkage(kmeans.cluster_centers_, method='ward')
 
@@ -247,7 +335,7 @@ def compute_dendrogram_hierarchy(
             else:
                 node_labels[node.id] = f"Micro {node.id}"
 
-    # Label internal nodes with LLM using representative samples
+    # Label internal nodes with LLM using representative samples + TF-IDF keywords
     for i, node in enumerate(internal_nodes):
         if i % 10 == 0:
             print(f"    Labeling node {i+1}/{len(internal_nodes)}...")
@@ -277,17 +365,28 @@ def compute_dendrogram_hierarchy(
         left_sample = [titles[p] for p in left_sample_pts]
         right_sample = [titles[p] for p in right_sample_pts]
 
-        # Generate label using LLM with better prompt
-        prompt = f"""You are labeling clusters of Wikipedia articles for a visualization.
+        # Compute TF-IDF keywords for left vs right child
+        node_titles_list = [titles[p] for p in left_pts] + [titles[p] for p in right_pts]
+        node_labels_arr = np.zeros(len(left_pts) + len(right_pts), dtype=int)
+        node_labels_arr[len(left_pts):] = 1
+        node_kw = compute_tfidf_keywords(node_titles_list, node_labels_arr, 2, top_k=5, min_df=1)
+        left_keywords = [w for w, _ in node_kw.get(0, [])][:5]
+        right_keywords = [w for w, _ in node_kw.get(1, [])][:5]
 
-CLUSTER A ({len(left_pts)} articles) - representative samples:
-{chr(10).join(f'- {t}' for t in left_sample)}
+        # Generate label using LLM with contrastive TF-IDF prompt
+        all_kw = left_keywords + right_keywords
+        kw_str = f"\nDistinguishing keywords: {', '.join(all_kw)}" if all_kw else ""
+        all_sample = left_sample + right_sample
 
-CLUSTER B ({len(right_pts)} articles) - representative samples:
-{chr(10).join(f'- {t}' for t in right_sample)}
+        prompt = f"""Label this cluster of {len(left_pts) + len(right_pts)} items for a map visualization.
+{kw_str}
+Sample items:
+{chr(10).join(f'- {t}' for t in all_sample)}
 
-These two clusters are being merged. Give a 2-4 word label that describes what BOTH clusters have in common.
-The label should be specific enough to distinguish this group from others.
+What broad TOPIC or THEME connects these items? Give a 2-4 word label like:
+"European History", "Marine Biology", "Computer Science", "Popular Music", "Ancient Civilizations"
+
+Be specific enough to distinguish from neighboring clusters. Avoid generic labels like "Historical Events" or "Various Topics".
 
 Reply with ONLY the label, nothing else."""
 
@@ -298,7 +397,7 @@ Reply with ONLY the label, nothing else."""
                 text=True,
                 timeout=30,
             )
-            label = result.stdout.strip().split('\n')[0][:30]
+            label = result.stdout.strip().split('\n')[0][:50]
             # Clean up common LLM artifacts
             label = label.strip('"\'').strip()
             node_labels[node.id] = label if label else f"Node {node.id}"
@@ -310,10 +409,17 @@ Reply with ONLY the label, nothing else."""
     # Get max distance for normalization
     max_dist = float(Z[:, 2].max()) if len(Z) > 0 else 1.0
 
+    # Compute 2D centroids for each micro-cluster (for label placement)
+    kmeans_centroids_2d = np.zeros((initial_k, 2))
+    for micro_id in range(initial_k):
+        pts = micro_to_points[micro_id]
+        if pts:
+            kmeans_centroids_2d[micro_id] = coords_2d[pts].mean(axis=0)
+
     return {
         'Z': Z,
         'kmeans_labels': point_to_micro,
-        'kmeans_centroids': kmeans.cluster_centers_,
+        'kmeans_centroids': kmeans_centroids_2d,  # 2D centroids for label placement
         'node_labels': node_labels,
         'node_points': {k: v for k, v in node_points.items()},  # Convert to regular dict
         'node_centroids': node_centroids,
@@ -423,6 +529,92 @@ def compute_tfidf_keywords(
     return cluster_keywords
 
 
+def disambiguate_cluster_names(
+    names: list[str],
+    titles: list[str],
+    labels: np.ndarray,
+) -> list[str]:
+    """Append TF-IDF keywords to duplicate cluster names.
+
+    After cut_dendrogram() assigns labels from dendrogram nodes, multiple clusters
+    may end up with the same generic name (e.g., "Surgical Instruments").
+    This function detects duplicates and appends distinguishing TF-IDF keywords.
+
+    Args:
+        names: List of cluster names (one per cluster)
+        titles: List of all item titles
+        labels: Cluster assignment for each title
+
+    Returns:
+        Updated names list with disambiguated duplicates
+    """
+    from collections import Counter
+
+    name_counts = Counter(names)
+    duplicates = {name for name, count in name_counts.items() if count > 1}
+
+    if not duplicates:
+        return names
+
+    print(f"  Disambiguating {len(duplicates)} duplicate name(s)...")
+
+    names = list(names)  # copy
+
+    for dup_name in duplicates:
+        # Find cluster IDs sharing this name
+        dup_cluster_ids = [i for i, n in enumerate(names) if n == dup_name]
+        print(f"    '{dup_name}' appears in clusters: {dup_cluster_ids}")
+
+        # Build a sub-problem: only the points in these clusters, remapped to 0..k
+        sub_titles = []
+        sub_labels = []
+        for new_id, cluster_id in enumerate(dup_cluster_ids):
+            mask = labels == cluster_id
+            cluster_titles = [titles[i] for i in range(len(titles)) if mask[i]]
+            sub_titles.extend(cluster_titles)
+            sub_labels.extend([new_id] * len(cluster_titles))
+
+        sub_labels_arr = np.array(sub_labels, dtype=int)
+        k = len(dup_cluster_ids)
+
+        # Compute TF-IDF keywords across only the duplicate clusters
+        sub_keywords = compute_tfidf_keywords(sub_titles, sub_labels_arr, k, top_k=5, min_df=1)
+
+        # Assign top distinguishing keyword to each
+        used_suffixes = set()
+        for new_id, cluster_id in enumerate(dup_cluster_ids):
+            kw_list = sub_keywords.get(new_id, [])
+            suffix = None
+            for word, score in kw_list:
+                candidate = word
+                if candidate not in used_suffixes:
+                    suffix = candidate
+                    used_suffixes.add(candidate)
+                    break
+
+            if suffix is None:
+                # All single keywords taken; try two-word suffix
+                for word, score in kw_list:
+                    for word2, score2 in kw_list:
+                        if word != word2:
+                            candidate = f"{word}, {word2}"
+                            if candidate not in used_suffixes:
+                                suffix = candidate
+                                used_suffixes.add(candidate)
+                                break
+                    if suffix:
+                        break
+
+            if suffix:
+                names[cluster_id] = f"{dup_name} ({suffix})"
+                print(f"      Cluster {cluster_id} -> '{names[cluster_id]}'")
+            else:
+                # Last resort: append cluster ID
+                names[cluster_id] = f"{dup_name} ({cluster_id})"
+
+    return names
+
+
 def find_nearest_cluster(cluster_id: int, centroids: np.ndarray) -> int:
     """Find the nearest cluster to a given cluster (by centroid distance)."""
     target = centroids[cluster_id]
@@ -435,6 +627,149 @@ def find_nearest_cluster(cluster_id: int, centroids: np.ndarray) -> int:
                 min_dist = dist
                 nearest = i
     return nearest
+
+
+def label_flat_clusters(
+    titles: list[str],
+    coords_2d: np.ndarray,
+    labels: np.ndarray,
+    centroids: np.ndarray,
+    n_clusters: int,
+    model: str = "gemma2:9b",
+    n_samples: int = 20,
+) -> list[str]:
+    """Label flat clusters by sampling from their 2D spatial extent.
+
+    Instead of inheriting labels from dendrogram nodes, this function
+    directly labels each cluster at a given cut level by:
+    1. Sampling titles from the cluster's 2D spatial extent (not embedding centrality)
+    2. Computing contrastive TF-IDF keywords against the spatially nearest cluster
+    3. Asking the LLM to produce a topic label
+
+    Args:
+        titles: List of all titles
+        coords_2d: 2D coordinates for all points
+        labels: Cluster assignment for each point (from fcluster)
+        centroids: 2D centroids for each cluster
+        n_clusters: Number of clusters
+        model: Ollama model name
+        n_samples: Number of sample titles per cluster
+
+    Returns:
+        List of cluster names (one per cluster)
+    """
+    from collections import defaultdict
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    print(f"  Labeling {n_clusters} clusters (post-hoc, spatial sampling)...")
+
+    # Group point indices by cluster
+    cluster_points = defaultdict(list)
+    for i, cid in enumerate(labels):
+        cluster_points[int(cid)].append(i)
+
+    def _sample_spatial(point_indices, k):
+        """Sample points spread across the 2D spatial extent of a cluster."""
+        pts = np.array(point_indices)
+        if len(pts) <= k:
+            return pts.tolist()
+
+        cluster_coords = coords_2d[pts]
+        # Farthest-point sampling in 2D for spatial coverage
+        chosen = [np.random.randint(len(pts))]  # random seed point
+        for _ in range(k - 1):
+            chosen_coords = cluster_coords[chosen]
+            # Distance from each candidate to nearest chosen point
+            dists = np.min(
+                np.linalg.norm(
+                    cluster_coords[:, None, :] - chosen_coords[None, :, :],
+                    axis=2
+                ),
+                axis=1
+            )
+            dists[chosen] = -1  # exclude already chosen
+            chosen.append(int(np.argmax(dists)))
+
+        return pts[chosen].tolist()
+
+    # Build all prompts
+    label_tasks = []  # (cluster_id, prompt)
+    for cluster_id in range(n_clusters):
+        pts = cluster_points[cluster_id]
+        if not pts:
+            continue
+
+        # Sample from 2D spatial extent, then deduplicate titles
+        sample_indices = _sample_spatial(pts, n_samples * 3)  # oversample to survive dedup
+        seen = set()
+        sample_titles = []
+        for i in sample_indices:
+            t = titles[i]
+            if t not in seen:
+                seen.add(t)
+                sample_titles.append(t)
+                if len(sample_titles) >= n_samples:
+                    break
+
+        # Contrastive TF-IDF against nearest spatial neighbor
+        nearest_id = find_nearest_cluster(cluster_id, centroids)
+        neighbor_pts = cluster_points[nearest_id]
+
+        kw_str = ""
+        if neighbor_pts:
+            combined_titles = [titles[p] for p in pts] + [titles[p] for p in neighbor_pts]
+            combined_labels_arr = np.zeros(len(pts) + len(neighbor_pts), dtype=int)
+            combined_labels_arr[len(pts):] = 1
+            kw = compute_tfidf_keywords(combined_titles, combined_labels_arr, 2, top_k=8, min_df=1)
+            keywords = [w for w, _ in kw.get(0, [])][:8]
+            if keywords:
+                kw_str = f"\nDistinguishing keywords (vs neighbor): {', '.join(keywords)}"
+
+        prompt = f"""You are labeling clusters on a Wikipedia article map. This cluster has {len(pts)} articles.
+{kw_str}
+Sample articles from across this cluster:
+{chr(10).join(f'- {t}' for t in sample_titles)}
+
+Give a short (2-5 word) label for this cluster. The label should name the SPECIFIC subject area, not a vague category.
+
+BAD labels (too vague): "Human Knowledge", "Historical Events", "Human Culture", "Various Topics", "Human Civilization"
+GOOD labels: "Anatomy & Medicine", "Cold War Politics", "European Monarchs", "Programming Languages", "Olympic Sports", "African Geography"
+
+Reply with ONLY the label, nothing else."""
+
+        label_tasks.append((cluster_id, prompt))
+
+    # Call LLM in parallel
+    cluster_names = [f"Cluster {i}" for i in range(n_clusters)]
+
+    def _call_ollama(task):
+        node_id, prompt = task
+        try:
+            result = subprocess.run(
+                ["ollama", "run", model, prompt],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            label = result.stdout.strip().split('\n')[0][:50]
+            label = label.strip('"\'').strip()
+            return node_id, label if label else f"Cluster {node_id}"
+        except Exception:
+            return node_id, f"Cluster {node_id}"
+
+    n_workers = min(4, len(label_tasks))
+    completed = 0
+    with ThreadPoolExecutor(max_workers=n_workers) as executor:
+        futures = {executor.submit(_call_ollama, task): task for task in label_tasks}
+        for future in as_completed(futures):
+            cid, label = future.result()
+            cluster_names[cid] = label
+            completed += 1
+            if completed % 10 == 0:
+                print(f"    Labeled {completed}/{len(label_tasks)} clusters...", flush=True)
+
+    print(f"  Done labeling {n_clusters} clusters.")
+    return cluster_names
 
 
 def label_clusters_contrastive(
@@ -691,11 +1026,129 @@ def compute_lsh_visualization(coords_2d: np.ndarray, embeddings: np.ndarray, num
         'bucket_sizes': bucket_sizes,
         'boundary_points': boundary_points.tolist(),
         'num_bits': num_bits,
+        'bucket_to_indices': dict(bucket_to_indices),
+    }
+
+
+def compute_lsh_hierarchy(
+    coords_2d: np.ndarray,
+    titles: list[str],
+    embeddings: np.ndarray,
+    n_micro_clusters: int = 1000,
+) -> dict:
+    """Build dendrogram hierarchy using k-means micro-clusters on 2D coords.
+
+    K-means on 2D UMAP coordinates produces spatially contiguous micro-clusters.
+    Ward linkage on their 2D centroids builds the hierarchy. Node labels are
+    cheap placeholders; real labels come from post-hoc label_flat_clusters().
+
+    Returns the same dict contract as compute_dendrogram_hierarchy() for
+    panel compatibility.
+    """
+    from scipy.cluster.hierarchy import to_tree
+    from collections import defaultdict
+
+    print("Computing spatial hierarchy...")
+
+    # K-means on 2D coords for spatially contiguous micro-clusters
+    n_micro = min(n_micro_clusters, len(coords_2d) // 10)
+    print(f"  K-means with k={n_micro} on 2D coordinates...")
+    kmeans = KMeans(n_clusters=n_micro, random_state=42, n_init=10)
+    kmeans.fit(coords_2d)
+
+    point_to_micro = kmeans.labels_
+
+    # Ward linkage on 2D micro-cluster centroids
+    print("  Building dendrogram (Ward linkage on 2D centroids)...")
+    Z = linkage(kmeans.cluster_centers_, method='ward')
+
+    # Build tree and collect node info
+    tree = to_tree(Z, rd=True)
+    root, nodes = tree
+
+    micro_to_points = defaultdict(list)
+    for i, micro_id in enumerate(point_to_micro):
+        micro_to_points[micro_id].append(i)
+
+    node_points = {}
+    node_centroids = {}
+
+    def get_node_points(node):
+        if node.is_leaf():
+            return micro_to_points[node.id]
+        return get_node_points(node.left) + get_node_points(node.right)
+
+    print("  Collecting node info...")
+    for node in nodes:
+        points = get_node_points(node)
+        node_points[node.id] = points
+        if points:
+            centroid = coords_2d[points].mean(axis=0)
+            node_centroids[node.id] = (float(centroid[0]), float(centroid[1]))
+        else:
+            node_centroids[node.id] = (0.0, 0.0)
+
+    # Build parent map from Z for label inheritance
+    parent_map = {}
+    for i, row in enumerate(Z):
+        node_id = n_micro + i
+        parent_map[int(row[0])] = node_id
+        parent_map[int(row[1])] = node_id
+
+    # Label leaf nodes cheaply (representative title, no LLM)
+    node_labels = {}
+    for node in nodes:
+        if node.is_leaf():
+            pts = node_points[node.id]
+            if pts:
+                # Use embedding-based representative if enough points
+                if len(pts) > 3:
+                    sample_pts = sample_representative_points(pts, embeddings, n_samples=3, method="central")
+                else:
+                    sample_pts = pts[:3]
+                node_labels[node.id] = titles[sample_pts[0]][:25]
+            else:
+                node_labels[node.id] = f"Bucket {node.id}"
+
+    # Label internal nodes cheaply (for panel's dynamic cutting fallback).
+    # Real labels come from post-hoc label_flat_clusters() on the cut results.
+    for node in nodes:
+        if not node.is_leaf() and node.id not in node_labels:
+            pts = node_points[node.id]
+            if pts:
+                # Use the title of a spatially central point as placeholder
+                cluster_coords = coords_2d[pts]
+                centroid = cluster_coords.mean(axis=0)
+                dists = np.linalg.norm(cluster_coords - centroid, axis=1)
+                node_labels[node.id] = titles[pts[int(np.argmin(dists))]][:25]
+            else:
+                node_labels[node.id] = f"Node {node.id}"
+
+    print("  Tree labels assigned (placeholders for dynamic cutting).")
+
+    max_dist = float(Z[:, 2].max()) if len(Z) > 0 else 1.0
+
+    # Compute 2D centroids for each micro-cluster (for label placement)
+    kmeans_centroids_2d = np.zeros((n_micro, 2))
+    for leaf_idx in range(n_micro):
+        pts = micro_to_points[leaf_idx]
+        if pts:
+            kmeans_centroids_2d[leaf_idx] = coords_2d[pts].mean(axis=0)
+
+    return {
+        'Z': Z,
+        'kmeans_labels': point_to_micro,           # compat: point -> micro-cluster index
+        'kmeans_centroids': kmeans_centroids_2d,    # compat: 2D centroids for label placement
+        'node_labels': node_labels,
+        'node_points': {k: v for k, v in node_points.items()},
+        'node_centroids': node_centroids,
+        'n_micro': n_micro,
+        'max_dist': max_dist,
     }
 
 
 def compute_bridge_edges(coords_2d: np.ndarray, embeddings: np.ndarray, cluster_labels: dict,
-                         bridge_cluster_level: int = 5):
+                         bridge_cluster_level: int = 12):
     """Compute bridge edges using dyf ROG ontology.
 
     Aggregates individual cross-cluster connections into cluster-to-cluster edges.
@@ -705,7 +1158,7 @@ def compute_bridge_edges(coords_2d: np.ndarray, embeddings: np.ndarray, cluster_
         coords_2d: UMAP coordinates for bundling
         embeddings: Original embeddings for ROG
         cluster_labels: Dict mapping cluster level -> array of labels per point
-        bridge_cluster_level: Which cluster level to use for bridge detection (default: coarsest)
+        bridge_cluster_level: Which cluster level to use for bridge detection (default: 12)
     """
     from collections import defaultdict
 
@@ -919,12 +1372,16 @@ def cut_dendrogram(dendrogram: dict, n_clusters: int) -> tuple[np.ndarray, np.nd
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("data_path", default="demo/wiki_simple_50k.parquet")
-    parser.add_argument("--sample", type=int, default=10000)
+    parser.add_argument("--sample", type=int, default=None)
     parser.add_argument("--output", type=str, default=None)
-    parser.add_argument("--bridge-level", type=int, default=50,
-                        help="Cluster level for bridge detection (5, 12, 25, or 50)")
+    parser.add_argument("--bridge-level", type=int, default=100,
+                        help="Cluster level for bridge detection (12, 25, 50, or 100)")
     parser.add_argument("--use-dendrogram", action="store_true",
                         help="Use dynamic dendrogram hierarchy (labels all internal nodes)")
+    parser.add_argument("--umap-neighbors", type=int, default=15,
+                        help="UMAP n_neighbors (default: 15)")
+    parser.add_argument("--densmap", action="store_true",
+                        help="Use DENSMAP for density-preserving projection")
     args = parser.parse_args()
 
     # Generate output path
@@ -937,20 +1394,35 @@ def main():
     print(f"Will save to: {output_path}")
 
     # Process
-    coords_2d, titles, embeddings = load_data(args.data_path, args.sample)
+    coords_2d, titles, embeddings = load_data(
+        args.data_path, args.sample,
+        n_neighbors=args.umap_neighbors, densmap=args.densmap)
+
+    # Compute LSH visualization data first (needed for LSH-based hierarchy)
+    lsh_data = compute_lsh_visualization(coords_2d, embeddings, num_bits=12)
 
     if args.use_dendrogram:
-        # New dynamic dendrogram approach
-        print("\n=== Using dynamic dendrogram hierarchy ===")
-        dendrogram = compute_dendrogram_hierarchy(coords_2d, titles, embeddings=embeddings)
+        # LSH-based hierarchy: uses LSH buckets as micro-clusters
+        print("\n=== Using LSH-based dendrogram hierarchy ===")
+        dendrogram = compute_lsh_hierarchy(coords_2d, titles, embeddings)
 
-        # Pre-compute cluster results for standard levels (for backwards compatibility)
+        # Pre-compute cluster results for standard levels
         cluster_result = {'labels': {}, 'names': {}, 'centroids': {}}
         for n_clusters in CLUSTER_LEVELS:
             print(f"Cutting dendrogram at {n_clusters} clusters...")
             labels, centroids, names = cut_dendrogram(dendrogram, n_clusters)
             cluster_result['labels'][n_clusters] = labels
             cluster_result['centroids'][n_clusters] = centroids
+            cluster_result['names'][n_clusters] = names  # placeholder
+
+        # Post-hoc labeling: label flat clusters directly from their spatial contents
+        print("\n=== Post-hoc cluster labeling ===")
+        for n_clusters in CLUSTER_LEVELS:
+            labels = cluster_result['labels'][n_clusters]
+            centroids = cluster_result['centroids'][n_clusters]
+            names = label_flat_clusters(
+                titles, coords_2d, labels, centroids, n_clusters)
+            names = disambiguate_cluster_names(names, titles, labels)
             cluster_result['names'][n_clusters] = names
 
         # Add dendrogram to cluster_result for dynamic cutting
@@ -965,39 +1437,43 @@ def main():
         bridge_cluster_level=args.bridge_level
     )
 
-    # Compute LSH visualization data
-    lsh_data = compute_lsh_visualization(coords_2d, embeddings, num_bits=12)
-
     # Compute multi-resolution analysis using Rust DensityClassifier
-    print("Computing multi-resolution analysis...")
     from dyf_rs import DensityClassifier as RustClassifier
     num_bits = 12
     rust_clf = RustClassifier(embedding_dim=embeddings.shape[1], num_bits=num_bits, seed=42)
     rust_clf.fit(embeddings.astype(np.float32))
-    mra = rust_clf.multi_resolution_analysis(dense_threshold=10)
-    lsh_data['recovery_depth'] = mra.recovery_depth
-    lsh_data['recovery_ratio'] = mra.recovery_ratio
-    lsh_data['buckets_per_depth'] = mra.buckets_per_depth
-    lsh_data['mean_size_per_depth'] = mra.mean_size_per_depth
-    lsh_data['mra_dense_threshold'] = mra.dense_threshold
-    # Also store the Rust bucket IDs for consistency with multi-resolution masking
     lsh_data['rust_bucket_ids'] = rust_clf.get_bucket_ids()
-    print(f"  Multi-resolution: {sum(1 for d in mra.recovery_depth if d == 0)} already dense, "
-          f"{sum(1 for d in mra.recovery_depth if 0 < d <= num_bits)} recovered, "
-          f"{sum(1 for d in mra.recovery_depth if d > num_bits)} never recovered")
 
-    # Compute bridge persistence analysis (relative threshold: other_sim/own_sim >= 0.8)
-    print("Computing bridge persistence analysis...")
-    bp = rust_clf.bridge_persistence(embeddings.astype(np.float32), relative_threshold=0.8)
-    lsh_data['bridge_persistence'] = bp.bridge_persistence
-    lsh_data['max_bridge_depth'] = bp.max_bridge_depth
-    lsh_data['min_bridge_depth'] = bp.min_bridge_depth
-    lsh_data['bridge_ratio'] = bp.bridge_ratio
-    lsh_data['bridges_per_depth'] = bp.bridges_per_depth
-    total_connectors = sum(1 for p in bp.bridge_persistence if p > 0)
-    max_p = max(bp.bridge_persistence) if bp.bridge_persistence else 0
-    print(f"  Connectors: {total_connectors}, max persistence={max_p}, threshold={bp.relative_threshold}")
-    print(f"  Connectors per depth: {bp.bridges_per_depth}")
+    # Multi-resolution analysis (may not be available in all dyf_rs versions)
+    if hasattr(rust_clf, 'multi_resolution_analysis'):
+        print("Computing multi-resolution analysis...")
+        mra = rust_clf.multi_resolution_analysis(dense_threshold=10)
+        lsh_data['recovery_depth'] = mra.recovery_depth
+        lsh_data['recovery_ratio'] = mra.recovery_ratio
+        lsh_data['buckets_per_depth'] = mra.buckets_per_depth
+        lsh_data['mean_size_per_depth'] = mra.mean_size_per_depth
+        lsh_data['mra_dense_threshold'] = mra.dense_threshold
+        print(f"  Multi-resolution: {sum(1 for d in mra.recovery_depth if d == 0)} already dense, "
+              f"{sum(1 for d in mra.recovery_depth if 0 < d <= num_bits)} recovered, "
+              f"{sum(1 for d in mra.recovery_depth if d > num_bits)} never recovered")
+    else:
+        print("Skipping multi-resolution analysis (not available in this dyf_rs version)")
+
+    # Bridge persistence analysis (may not be available in all dyf_rs versions)
+    if hasattr(rust_clf, 'bridge_persistence'):
+        print("Computing bridge persistence analysis...")
+        bp = rust_clf.bridge_persistence(embeddings.astype(np.float32), relative_threshold=0.8)
+        lsh_data['bridge_persistence'] = bp.bridge_persistence
+        lsh_data['max_bridge_depth'] = bp.max_bridge_depth
+        lsh_data['min_bridge_depth'] = bp.min_bridge_depth
+        lsh_data['bridge_ratio'] = bp.bridge_ratio
+        lsh_data['bridges_per_depth'] = bp.bridges_per_depth
+        total_connectors = sum(1 for p in bp.bridge_persistence if p > 0)
+        max_p = max(bp.bridge_persistence) if bp.bridge_persistence else 0
+        print(f"  Connectors: {total_connectors}, max persistence={max_p}, threshold={bp.relative_threshold}")
+        print(f"  Connectors per depth: {bp.bridges_per_depth}")
+    else:
+        print("Skipping bridge persistence analysis (not available in this dyf_rs version)")
 
     # Save
     cache = {

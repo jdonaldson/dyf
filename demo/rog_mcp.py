@@ -410,11 +410,18 @@ async def call_tool(name: str, arguments: dict):
     elif name == "zoom_to_cluster":
         cluster_id = arguments["cluster_id"]
         level = arguments.get("level", 5)
-        # Get cluster centroid and zoom there
+        # Get cluster centroid and compute radius from actual point spread
         centroids = CACHE['cluster_result']['centroids'][level]
         if cluster_id < len(centroids):
             cx, cy = centroids[cluster_id]
-            result = await control_viz("zoom_to", {"x": float(cx), "y": float(cy), "radius": 10})
+            # Compute radius from cluster member spread
+            labels = CACHE['cluster_result']['labels'][level]
+            mask = labels == cluster_id
+            coords = CACHE['coords_2d'][mask]
+            dists = np.sqrt((coords[:, 0] - cx) ** 2 + (coords[:, 1] - cy) ** 2)
+            radius = float(np.percentile(dists, 95)) * 1.3  # 95th pct + padding
+            radius = max(radius, 0.5)  # Floor to avoid extreme zoom
+            result = await control_viz("zoom_to", {"x": float(cx), "y": float(cy), "radius": radius})
         else:
             result = {"error": f"Invalid cluster_id {cluster_id}"}
     elif name == "zoom_to_point":
@@ -439,7 +446,13 @@ async def call_tool(name: str, arguments: dict):
                 centroids = CACHE['cluster_result']['centroids'][50]
                 if bucket_id < len(centroids):
                     cx, cy = centroids[bucket_id]
-                    await control_viz("zoom_to", {"x": float(cx), "y": float(cy), "radius": 8})
+                    labels = CACHE['cluster_result']['labels'][50]
+                    mask = labels == bucket_id
+                    coords = CACHE['coords_2d'][mask]
+                    dists = np.sqrt((coords[:, 0] - cx) ** 2 + (coords[:, 1] - cy) ** 2)
+                    radius = float(np.percentile(dists, 95)) * 1.3
+                    radius = max(radius, 0.5)
+                    await control_viz("zoom_to", {"x": float(cx), "y": float(cy), "radius": radius})
             # Include connection info in result
             connections = get_bucket_connections(bucket_id)
             result = {"highlight": result, "connections": connections}
