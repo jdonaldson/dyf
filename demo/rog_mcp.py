@@ -380,6 +380,39 @@ async def list_tools():
                 "required": ["visible"],
             },
         ),
+        Tool(
+            name="toggle_dedup",
+            description="Toggle chunk deduplication overlay (hides redundant same-doc chunks in same bucket)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "active": {"type": "boolean", "description": "Whether dedup mode should be active"},
+                },
+                "required": ["active"],
+            },
+        ),
+        Tool(
+            name="toggle_redundancy",
+            description="Toggle chunk redundancy overlay (dims points by number of same-doc siblings in bucket)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "active": {"type": "boolean", "description": "Whether redundancy mode should be active"},
+                },
+                "required": ["active"],
+            },
+        ),
+        Tool(
+            name="toggle_doc_spread",
+            description="Toggle document spread color mode (warm=bridge docs spanning many buckets, cool=focused docs)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "active": {"type": "boolean", "description": "Whether doc spread mode should be active"},
+                },
+                "required": ["active"],
+            },
+        ),
     ]
 
 
@@ -466,6 +499,12 @@ async def call_tool(name: str, arguments: dict):
         result = await control_viz("set_level", {"level": arguments["level"]})
     elif name == "toggle_edges":
         result = await control_viz("toggle_edges", {"visible": arguments["visible"]})
+    elif name == "toggle_dedup":
+        result = await control_viz("set_dedup_mode", {"active": arguments["active"]})
+    elif name == "toggle_redundancy":
+        result = await control_viz("set_redundancy_mode", {"active": arguments["active"]})
+    elif name == "toggle_doc_spread":
+        result = await control_viz("set_spread_mode", {"active": arguments["active"]})
     else:
         result = {"error": f"Unknown tool: {name}"}
 

@@ -53,6 +53,14 @@ from .classifier import (
 # Index serialization
 from .io import save_index, load_index, PrecomputedIndex
 
+# Chunk analysis
+from .chunks import (
+    DocSpread,
+    chunk_redundancy,
+    deduplicate_chunks,
+    doc_spread,
+)
+
 # RAG index
 from .rag import (
     BridgeIndex,
@@ -119,6 +127,11 @@ __all__ = [
     "ROGLayer",
     "ROGResult",
     "build_rog_ontology",
+    # Chunk analysis
+    "DocSpread",
+    "chunk_redundancy",
+    "deduplicate_chunks",
+    "doc_spread",
 ]
 
 def check_rust_available():
