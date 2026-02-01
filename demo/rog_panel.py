@@ -68,6 +68,7 @@ class ROGBrowser:
         self.lsh_density_mode = False  # Show density coloring instead of bucket coloring
         self.lsh_recovery_mode = False  # Show recovery depth coloring
         self.lsh_persistence_mode = False  # Show bridge persistence coloring
+        self.lsh_summary_mode = False  # Show bucket summary circles
         if lsh_data:
             print(f"LSH data available - {lsh_data['num_bits']} bits, {len(lsh_data['bucket_centroids_2d'])} buckets", flush=True)
             # Build LSH bucket colors
@@ -144,10 +145,28 @@ class ROGBrowser:
 
         # Create data source with stable colors
         n = len(coords_2d)
+
+        # Per-point cluster name (coarsest level)
+        coarsest = min(cluster_result['labels'].keys())
+        point_cluster = [
+            cluster_result['names'][coarsest][cluster_result['labels'][coarsest][i]]
+            for i in range(n)
+        ]
+
+        # Per-point bucket name (from LSH data if available)
+        if lsh_data and 'bucket_names' in lsh_data:
+            bucket_names_map = lsh_data['bucket_names']
+            bucket_ids = lsh_data['bucket_ids']
+            point_bucket = [bucket_names_map.get(int(bucket_ids[i]), '') for i in range(n)]
+        else:
+            point_bucket = [''] * n
+
         self.source = ColumnDataSource(data={
             'x': coords_2d[:, 0],
             'y': coords_2d[:, 1],
             'title': titles,
+            'cluster': point_cluster,
+            'bucket': point_bucket,
             'color': self.stable_colors,  # Use stable colors, not level-dependent
             'alpha': [0.7] * n,
             'size': [4] * n,
@@ -242,7 +261,11 @@ class ROGBrowser:
 
         # Add hover tool targeting only the scatter points
         from bokeh.models import HoverTool
-        hover = HoverTool(tooltips=[("Title", "@title")], renderers=[self.scatter_renderer])
+        hover = HoverTool(tooltips=[
+            ("Title", "@title"),
+            ("Cluster", "@cluster"),
+            ("Bucket", "@bucket"),
+        ], renderers=[self.scatter_renderer])
         self.figure.add_tools(hover)
 
         # Add tap tool for clicking to highlight
@@ -391,6 +414,11 @@ class ROGBrowser:
         self.density_toggle.on_change('active', self._on_density_toggle)
         self.density_toggle.disabled = True  # Enable only when LSH mode is active
 
+        # Toggle for LSH bucket summary view (only active in LSH mode)
+        self.summary_toggle = Toggle(label="Summary", active=False, width=80)
+        self.summary_toggle.on_change('active', self._on_summary_toggle)
+        self.summary_toggle.disabled = True  # Enable only when LSH mode is active
+
         # Toggle for recovery depth coloring (only active in LSH mode, if data available)
         self.recovery_toggle = Toggle(label="Recovery", active=False, width=80)
         self.recovery_toggle.on_change('active', self._on_recovery_toggle)
@@ -428,6 +456,27 @@ class ROGBrowser:
             line_dash='dashed',
         )
         self.hyperplane_renderer.visible = False
+
+        # --- Bucket summary overlay (LSH summary mode) ---
+        self.bucket_summary_source = ColumnDataSource(data={
+            'x': [], 'y': [], 'size': [], 'color': [],
+            'name': [], 'count': [], 'alpha': [],
+        })
+        self.bucket_summary_renderer = self.figure.circle(
+            'x', 'y',
+            source=self.bucket_summary_source,
+            size='size', color='color', alpha='alpha',
+            line_color='white', line_width=1.5,
+        )
+        self.bucket_summary_renderer.visible = False
+
+        # Hover tooltip for bucket summary circles
+        from bokeh.models import HoverTool as BucketHT
+        bucket_summary_hover = BucketHT(
+            tooltips=[("Bucket", "@name"), ("Points", "@count")],
+            renderers=[self.bucket_summary_renderer],
+        )
+        self.figure.add_tools(bucket_summary_hover)
 
         # --- Gradient DAG overlay ---
         self.gradient_dag_mode = False
@@ -562,22 +611,69 @@ class ROGBrowser:
         self.figure.y_range.on_change('end', self._on_zoom)
 
     def _build_lsh_colors(self, lsh_data: dict) -> list[str]:
-        """Build colors based on LSH bucket assignments."""
+        """Build colors based on LSH bucket assignments, with hierarchical hue grouping.
+
+        Each bucket's base hue comes from its dominant coarsest-level cluster,
+        so spatially related buckets get similar colors. Per-bucket variation
+        within the same cluster group provides distinctness.
+        """
         import colorsys
+        from collections import Counter
 
         bucket_ids = lsh_data['bucket_ids']
         unique_buckets = sorted(set(bucket_ids))
-        n_buckets = len(unique_buckets)
-        bucket_to_idx = {b: i for i, b in enumerate(unique_buckets)}
 
-        colors = []
-        for bid in bucket_ids:
-            idx = bucket_to_idx[int(bid)]
-            # Use golden ratio for hue distribution
-            hue = (idx * 0.618033988749895) % 1.0
-            r, g, b = colorsys.hls_to_rgb(hue, 0.5, 0.7)
-            colors.append(f'#{int(r*255):02x}{int(g*255):02x}{int(b*255):02x}')
+        # Get coarsest-level cluster labels for all points
+        coarsest_level = min(self.cluster_result['labels'].keys())
+        top_labels = self.cluster_result['labels'][coarsest_level]
+        n_top = len(set(top_labels))
 
+        # Golden ratio hues for top-level clusters (same as _build_hierarchical_colors)
+        base_hues = [(i * 0.618033988749895) % 1.0 for i in range(n_top)]
+
+        # For each bucket, find dominant coarsest-level cluster (majority vote)
+        bucket_members = {}  # bucket_id -> list of point indices
+        for i, bid in enumerate(bucket_ids):
+            bucket_members.setdefault(int(bid), []).append(i)
+
+        bucket_dominant_cluster = {}
+        bucket_within_idx = {}  # bucket's index within its cluster group
+        cluster_bucket_counts = Counter()  # how many buckets per cluster
+        for bid in unique_buckets:
+            members = bucket_members.get(int(bid), [])
+            if members:
+                cluster_votes = Counter(int(top_labels[i]) for i in members)
+                dominant = cluster_votes.most_common(1)[0][0]
+            else:
+                dominant = 0
+            bucket_dominant_cluster[int(bid)] = dominant
+            bucket_within_idx[int(bid)] = cluster_bucket_counts[dominant]
+            cluster_bucket_counts[dominant] += 1
+
+        # Build per-bucket color: base hue from dominant cluster, variation from within-group index
+        self.lsh_bucket_color_map = {}
+        for bid in unique_buckets:
+            bid_int = int(bid)
+            dominant = bucket_dominant_cluster[bid_int]
+            within_idx = bucket_within_idx[bid_int]
+            n_in_group = cluster_bucket_counts[dominant]
+
+            base_hue = base_hues[dominant % len(base_hues)]
+            # Spread variation across ±0.06 hue range within the group
+            if n_in_group > 1:
+                hue_variation = ((within_idx / (n_in_group - 1)) - 0.5) * 0.12
+            else:
+                hue_variation = 0.0
+            hue = (base_hue + hue_variation) % 1.0
+
+            sat = 0.5 + (within_idx % 7) * 0.06  # 0.5-0.86
+            light = 0.45 + (within_idx % 5) * 0.07  # 0.45-0.73
+
+            r, g, b = colorsys.hls_to_rgb(hue, light, sat)
+            self.lsh_bucket_color_map[bid_int] = f'#{int(r*255):02x}{int(g*255):02x}{int(b*255):02x}'
+
+        # Assign per-point colors from bucket map
+        colors = [self.lsh_bucket_color_map[int(bid)] for bid in bucket_ids]
         return colors
 
     def _build_lsh_density_colors(self, lsh_data: dict) -> tuple[list[str], list[float]]:
@@ -1132,8 +1228,9 @@ class ROGBrowser:
 
         if new and self.lsh_data:
             # Switch to LSH mode
-            # Enable density toggle
+            # Enable density and summary toggles
             self.density_toggle.disabled = False
+            self.summary_toggle.disabled = False
             # Enable recovery toggle if data available
             if 'recovery_depth' in self.lsh_data:
                 self.recovery_toggle.disabled = False
@@ -1158,11 +1255,15 @@ class ROGBrowser:
             # Update labels to show bucket info
             bucket_centroids = self.lsh_data['bucket_centroids_2d']
             bucket_sizes = self.lsh_data['bucket_sizes']
-            # Show top 10 largest buckets
+            bucket_names = self.lsh_data.get('bucket_names', {})
+            # Show top 12 largest buckets with semantic names
             top_buckets = sorted(bucket_sizes.items(), key=lambda x: -x[1])[:12]
             label_x = [bucket_centroids[bid][0] for bid, _ in top_buckets if bid in bucket_centroids]
             label_y = [bucket_centroids[bid][1] for bid, _ in top_buckets if bid in bucket_centroids]
-            label_text = [f'  B{bid} ({sz})  ' for bid, sz in top_buckets if bid in bucket_centroids]
+            label_text = [
+                f'  {bucket_names.get(bid, f"B{bid}")}  '
+                for bid, sz in top_buckets if bid in bucket_centroids
+            ]
             self.label_source.data = self._label_data(label_x, label_y, label_text)
 
             # Hide cluster edges, show boundary points
@@ -1176,6 +1277,14 @@ class ROGBrowser:
             self.density_toggle.disabled = True
             self.density_toggle.active = False
             self.lsh_density_mode = False
+            self.summary_toggle.disabled = True
+            self.summary_toggle.active = False
+            self.lsh_summary_mode = False
+            self.bucket_summary_renderer.visible = False
+            self.bucket_summary_source.data = {
+                'x': [], 'y': [], 'size': [], 'color': [],
+                'name': [], 'count': [], 'alpha': [],
+            }
             self.recovery_toggle.disabled = True
             self.recovery_toggle.active = False
             self.lsh_recovery_mode = False
@@ -1184,8 +1293,9 @@ class ROGBrowser:
             self.lsh_persistence_mode = False
 
             self.source.data['color'] = self.stable_colors
-            # Reset point sizes to default
+            # Reset point sizes and alpha to default
             self.source.data['size'] = [4] * len(self.titles)
+            self.source.data['alpha'] = [0.7] * len(self.titles)
             self.hyperplane_renderer.visible = False
             self._update_labels_for_viewport()
             self.figure.title.text = f"ROG Browser - {len(self.titles):,} points - Level: {self.current_level} clusters"
@@ -1201,7 +1311,7 @@ class ROGBrowser:
         if not self.lsh_mode or not self.lsh_data:
             return
 
-        # Deactivate recovery, persistence, and spread if density is turned on
+        # Deactivate recovery, persistence, spread, and summary if density is turned on
         if new and self.lsh_recovery_mode:
             self.recovery_toggle.active = False
             self.lsh_recovery_mode = False
@@ -1211,6 +1321,8 @@ class ROGBrowser:
         if new and self.chunk_spread_mode:
             self.spread_toggle.active = False
             self.chunk_spread_mode = False
+        if new and self.lsh_summary_mode:
+            self.summary_toggle.active = False
 
         bucket_centroids = self.lsh_data['bucket_centroids_2d']
         bucket_sizes = self.lsh_data['bucket_sizes']
@@ -1253,6 +1365,105 @@ class ROGBrowser:
             self.label_source.data = self._label_data(label_x, label_y, label_text)
             self.figure.title.text = f"LSH Mode - {self.lsh_data['num_bits']} bits, {len(bucket_centroids)} buckets"
 
+    def _on_summary_toggle(self, attr, old, new):
+        """Toggle bucket summary view: circle glyphs at bucket centroids sized by population."""
+        self.lsh_summary_mode = new
+        if self._toggling_lsh:
+            return
+
+        if not self.lsh_mode or not self.lsh_data:
+            return
+
+        bucket_centroids = self.lsh_data['bucket_centroids_2d']
+        bucket_sizes = self.lsh_data['bucket_sizes']
+        bucket_names = self.lsh_data.get('bucket_names', {})
+
+        if new:
+            # Deactivate mutually exclusive modes
+            if self.lsh_density_mode:
+                self.density_toggle.active = False
+                self.lsh_density_mode = False
+            if self.lsh_recovery_mode:
+                self.recovery_toggle.active = False
+                self.lsh_recovery_mode = False
+            if self.lsh_persistence_mode:
+                self.persistence_toggle.active = False
+                self.lsh_persistence_mode = False
+            if self.chunk_spread_mode:
+                self.spread_toggle.active = False
+                self.chunk_spread_mode = False
+
+            # Build summary data from bucket info
+            unique_buckets = sorted(bucket_centroids.keys())
+
+            sx, sy, s_size, s_color, s_name, s_count, s_alpha = [], [], [], [], [], [], []
+            sizes_list = [bucket_sizes.get(bid, 1) for bid in unique_buckets]
+            max_sz = max(sizes_list) if sizes_list else 1
+            for bid in unique_buckets:
+                if bid not in bucket_centroids:
+                    continue
+                cx, cy = bucket_centroids[bid]
+                sz = bucket_sizes.get(bid, 1)
+                # sqrt-scale size: range ~8-40px
+                scaled = 8 + 32 * np.sqrt(sz / max_sz)
+                # Color from precomputed hierarchical bucket color map
+                color = self.lsh_bucket_color_map.get(int(bid), '#888888')
+
+                sx.append(cx)
+                sy.append(cy)
+                s_size.append(scaled)
+                s_color.append(color)
+                s_name.append(bucket_names.get(bid, f"B{bid}"))
+                s_count.append(str(sz))
+                s_alpha.append(0.8)
+
+            self.bucket_summary_source.data = {
+                'x': sx, 'y': sy, 'size': s_size, 'color': s_color,
+                'name': s_name, 'count': s_count, 'alpha': s_alpha,
+            }
+            self.bucket_summary_renderer.visible = True
+
+            # Dim scatter points for spatial context
+            self.source.data['alpha'] = [0.1] * len(self.titles)
+            self.source.data['size'] = [2] * len(self.titles)
+
+            # Update labels to show top-N bucket names at centroids
+            top_buckets = sorted(bucket_sizes.items(), key=lambda x: -x[1])[:12]
+            label_x = [bucket_centroids[bid][0] for bid, _ in top_buckets if bid in bucket_centroids]
+            label_y = [bucket_centroids[bid][1] for bid, _ in top_buckets if bid in bucket_centroids]
+            label_text = [
+                f'  {bucket_names.get(bid, f"B{bid}")}  '
+                for bid, sz in top_buckets if bid in bucket_centroids
+            ]
+            self.label_source.data = self._label_data(label_x, label_y, label_text)
+
+            n_buckets = len(unique_buckets)
+            n_points = len(self.titles)
+            self.figure.title.text = f"LSH Summary — {n_buckets} buckets, {n_points:,} points"
+        else:
+            # Hide summary overlay
+            self.bucket_summary_renderer.visible = False
+            self.bucket_summary_source.data = {
+                'x': [], 'y': [], 'size': [], 'color': [],
+                'name': [], 'count': [], 'alpha': [],
+            }
+
+            # Restore scatter alpha/size to LSH defaults
+            self.source.data['alpha'] = [0.7] * len(self.titles)
+            self.source.data['size'] = [4] * len(self.titles)
+            self.source.data['color'] = self.lsh_colors
+
+            # Restore LSH labels (top-12 bucket names)
+            top_buckets = sorted(bucket_sizes.items(), key=lambda x: -x[1])[:12]
+            label_x = [bucket_centroids[bid][0] for bid, _ in top_buckets if bid in bucket_centroids]
+            label_y = [bucket_centroids[bid][1] for bid, _ in top_buckets if bid in bucket_centroids]
+            label_text = [
+                f'  {bucket_names.get(bid, f"B{bid}")}  '
+                for bid, sz in top_buckets if bid in bucket_centroids
+            ]
+            self.label_source.data = self._label_data(label_x, label_y, label_text)
+            self.figure.title.text = f"LSH Mode - {self.lsh_data['num_bits']} bits, {len(bucket_centroids)} buckets"
+
     def _on_recovery_toggle(self, attr, old, new):
         """Toggle between bucket/density coloring and recovery depth coloring in LSH mode."""
         self.lsh_recovery_mode = new
@@ -1263,7 +1474,7 @@ class ROGBrowser:
             return
 
         if new:
-            # Switch to recovery coloring - deactivate density, persistence, and spread if on
+            # Switch to recovery coloring - deactivate density, persistence, spread, and summary if on
             if self.lsh_density_mode:
                 self.density_toggle.active = False
                 self.lsh_density_mode = False
@@ -1273,6 +1484,8 @@ class ROGBrowser:
             if self.chunk_spread_mode:
                 self.spread_toggle.active = False
                 self.chunk_spread_mode = False
+            if self.lsh_summary_mode:
+                self.summary_toggle.active = False
 
             self.source.data['color'] = self.lsh_recovery_colors
             self.source.data['size'] = self.lsh_recovery_sizes
@@ -1319,7 +1532,7 @@ class ROGBrowser:
             return
 
         if new:
-            # Switch to persistence coloring - deactivate density, recovery, and spread if on
+            # Switch to persistence coloring - deactivate density, recovery, spread, and summary if on
             if self.lsh_density_mode:
                 self.density_toggle.active = False
                 self.lsh_density_mode = False
@@ -1329,6 +1542,8 @@ class ROGBrowser:
             if self.chunk_spread_mode:
                 self.spread_toggle.active = False
                 self.chunk_spread_mode = False
+            if self.lsh_summary_mode:
+                self.summary_toggle.active = False
 
             self.source.data['color'] = self.lsh_persistence_colors
             self.source.data['size'] = self.lsh_persistence_sizes
@@ -1439,6 +1654,8 @@ class ROGBrowser:
                 self.recovery_toggle.active = False
             if self.lsh_persistence_mode:
                 self.persistence_toggle.active = False
+            if self.lsh_summary_mode:
+                self.summary_toggle.active = False
 
             # Apply spread colors and sizes
             colors = list(self.chunk_spread_colors)
@@ -2249,7 +2466,7 @@ class ROGBrowser:
             self.search_input,
             self.clear_btn,
             self.edge_toggle,
-            row(self.lsh_toggle, self.density_toggle),
+            row(self.lsh_toggle, self.density_toggle, self.summary_toggle),
             row(self.recovery_toggle, self.persistence_toggle),
             row(self.dedup_toggle, self.redundancy_toggle),
             self.spread_toggle,
