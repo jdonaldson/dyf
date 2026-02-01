@@ -38,11 +38,20 @@ COLORS_50 = cc.glasbey_light[:50]
 class ROGBrowser:
     def __init__(self, coords_2d: np.ndarray, titles: list[str], cluster_result: dict,
                  bridge_edges: dict, edge_indices: list[tuple[int, int]] | None = None,
-                 cluster_pairs: dict | None = None, lsh_data: dict | None = None):
+                 cluster_pairs: dict | None = None, lsh_data: dict | None = None,
+                 unified_edge_types: dict | None = None,
+                 unified_edge_mutual: dict | None = None):
         self.coords_2d = coords_2d
         self.titles = titles
         self.cluster_result = cluster_result
         self.edge_indices = edge_indices or []  # (source, target) pairs for edge highlighting
+
+        # Unified edge metadata (None for old caches without unified bundling)
+        self.edge_types = unified_edge_types
+        self.edge_mutual = unified_edge_mutual
+        self.has_unified_edges = unified_edge_types is not None
+        if self.has_unified_edges:
+            print("Unified edge bundling available - bridge + gradient edges in single pass", flush=True)
 
         # Check if dendrogram data is available for dynamic cutting
         self.dendrogram = cluster_result.get('dendrogram')
@@ -74,6 +83,18 @@ class ROGBrowser:
                 self.lsh_persistence_colors, self.lsh_persistence_sizes = self._build_persistence_colors(lsh_data)
                 print(f"  Persistence data available", flush=True)
 
+        # Chunk analysis modes
+        self.chunk_dedup_mode = False
+        self.chunk_redundancy_mode = False
+        self.chunk_spread_mode = False
+        if lsh_data and 'chunk_data' in lsh_data:
+            chunk_data = lsh_data['chunk_data']
+            self.chunk_dedup_mask = chunk_data['dedup_mask']
+            self.chunk_redundancy_alphas = self._build_redundancy_alphas(chunk_data)
+            self.chunk_spread_colors, self.chunk_spread_sizes = self._build_spread_colors(chunk_data)
+            kept = int(chunk_data['dedup_mask'].sum())
+            print(f"  Chunk data available - dedup keeps {kept}/{len(chunk_data['dedup_mask'])}", flush=True)
+
         # Store ordered list of cluster pairs for edge highlighting
         # Edge i corresponds to cluster_pair_list[i]
         # IMPORTANT: Must be sorted by count descending to match preprocessing order
@@ -86,6 +107,7 @@ class ROGBrowser:
 
         self.current_level = CLUSTER_LEVELS[0]
         self._programmatic_zoom = False  # Flag to skip _on_zoom during programmatic changes
+        self._toggling_lsh = False  # Guard: prevent sub-toggle cascades during LSH toggle
         self._label_update_callback = None  # Pending debounced label update
         self.last_command = None  # Track last command received
         self.connected = True  # Connection status
@@ -136,17 +158,31 @@ class ROGBrowser:
         # Create label source
         self._update_label_source()
 
-        # Bridge edges: simplify paths and cap count for rendering performance
-        self.bridge_edges = self._simplify_bridge_edges(bridge_edges)
+        # Cap edge count for rendering performance.
+        # For unified edges: cap bridge edges but always keep all gradient edges.
+        if self.has_unified_edges:
+            self.bridge_edges = self._simplify_unified_edges(
+                bridge_edges, self.edge_types, self.edge_mutual)
+        else:
+            self.bridge_edges = self._simplify_bridge_edges(bridge_edges)
 
-        # Initialize edge source with current level's bridges
+        # Initialize edge source with current level's edges (type-aware if unified)
         xs, ys = self.bridge_edges[self.current_level]
         n_edges = len(xs)
+        if self.has_unified_edges:
+            types = self.edge_types.get(self.current_level, [])
+            mutual = self.edge_mutual.get(self.current_level, [])
+            colors, alphas, widths = self._style_edges_by_type(
+                types[:n_edges], mutual[:n_edges], gradient_mode=False)
+        else:
+            colors = ['#4488cc'] * n_edges
+            alphas = [0.15] * n_edges
+            widths = [1] * n_edges
         self.edge_source = ColumnDataSource(data={
             'xs': xs, 'ys': ys,
-            'line_color': ['#4488cc'] * n_edges,
-            'line_alpha': [0.15] * n_edges,
-            'line_width': [1] * n_edges,
+            'line_color': colors,
+            'line_alpha': alphas,
+            'line_width': widths,
         })
 
         # Create figure with WebGL and explicit ranges (no auto-ranging)
@@ -159,6 +195,16 @@ class ROGBrowser:
         self.title_safe_x = int(self.plot_width * 0.10)   # 120px
         self.title_safe_y = int(self.plot_height * 0.90)   # 720px (from bottom)
 
+        # Lock ranges so hidden renderers (hyperplane lines) can't expand the view
+        max_extent = self.original_width * 2
+        x_range = Range1d(self.x_min - padding, self.x_max + padding)
+        x_range.bounds = (self.x_min - max_extent, self.x_max + max_extent)
+        x_range.reset_start = self.x_min - padding
+        x_range.reset_end = self.x_max + padding
+        y_range = Range1d(self.y_min - padding, self.y_max + padding)
+        y_range.bounds = (self.y_min - max_extent, self.y_max + max_extent)
+        y_range.reset_start = self.y_min - padding
+        y_range.reset_end = self.y_max + padding
         self.figure = figure(
             width=self.plot_width,
             height=self.plot_height,
@@ -167,8 +213,8 @@ class ROGBrowser:
             active_scroll='wheel_zoom',
             output_backend='webgl',
             title=f"ROG Browser - {len(titles):,} points - Level: {self.current_level} clusters",
-            x_range=Range1d(self.x_min - padding, self.x_max + padding),
-            y_range=Range1d(self.y_min - padding, self.y_max + padding),
+            x_range=x_range,
+            y_range=y_range,
         )
 
         # Add bundled edges (rendered first, behind points)
@@ -318,6 +364,24 @@ class ROGBrowser:
 
         # Toggle for LSH mode (if LSH data available)
         self.lsh_toggle = Toggle(label="LSH Mode", active=False, width=100)
+        # Debug: log browser zoom changes on toggle
+        zoom_debug_js = CustomJS(code="""
+            const z = Math.round(window.devicePixelRatio * 100);
+            const iw = window.innerWidth;
+            const ow = window.outerWidth;
+            console.log(`[LSH toggle] DPR=${window.devicePixelRatio} zoom~${z}% inner=${iw} outer=${ow}`);
+            // Watch for changes over next 2 seconds
+            let checks = 0;
+            const timer = setInterval(() => {
+                const z2 = Math.round(window.devicePixelRatio * 100);
+                const iw2 = window.innerWidth;
+                if (z2 !== z || iw2 !== iw) {
+                    console.warn(`[LSH toggle] ZOOM CHANGED! DPR=${window.devicePixelRatio} zoom~=${z2}% inner=${iw2}`);
+                }
+                if (++checks > 20) clearInterval(timer);
+            }, 100);
+        """)
+        self.lsh_toggle.js_on_change('active', zoom_debug_js)
         self.lsh_toggle.on_change('active', self._on_lsh_toggle)
         if not self.lsh_data:
             self.lsh_toggle.disabled = True
@@ -339,6 +403,20 @@ class ROGBrowser:
         has_persistence = lsh_data and 'bridge_persistence' in lsh_data
         self.persistence_toggle.disabled = not has_persistence
 
+        # Chunk analysis toggles
+        has_chunk_data = lsh_data and 'chunk_data' in lsh_data
+        self.dedup_toggle = Toggle(label="Dedup", active=False, width=80)
+        self.dedup_toggle.on_change('active', self._on_dedup_toggle)
+        self.dedup_toggle.disabled = not has_chunk_data
+
+        self.redundancy_toggle = Toggle(label="Redundancy", active=False, width=90)
+        self.redundancy_toggle.on_change('active', self._on_redundancy_toggle)
+        self.redundancy_toggle.disabled = not has_chunk_data
+
+        self.spread_toggle = Toggle(label="Doc Spread", active=False, width=90)
+        self.spread_toggle.on_change('active', self._on_spread_toggle)
+        self.spread_toggle.disabled = not has_chunk_data
+
         # Add hyperplane lines (hidden by default, shown in LSH mode)
         self.hyperplane_source = ColumnDataSource(data={'xs': [], 'ys': []})
         self.hyperplane_renderer = self.figure.multi_line(
@@ -350,6 +428,121 @@ class ROGBrowser:
             line_dash='dashed',
         )
         self.hyperplane_renderer.visible = False
+
+        # --- Gradient DAG overlay ---
+        self.gradient_dag_mode = False
+        self._gradient_dag_data = {}  # level -> dag source dicts
+        # Gradient detection requires embeddings (done in preprocessing)
+        if 'gradients' not in cluster_result:
+            print("Gradient data not in cache — re-run preprocessing to enable.", flush=True)
+
+        has_gradients = bool(cluster_result.get('gradients'))
+        if has_gradients:
+            self._build_gradient_dag_sources(cluster_result)
+
+        self.gradient_dag_toggle = Toggle(label="Gradients", active=False, width=90)
+        self.gradient_dag_toggle.on_change('active', self._on_gradient_dag_toggle)
+        self.gradient_dag_toggle.disabled = not has_gradients
+
+        # DAG edge lines (multi_line with per-edge color/alpha)
+        self.gradient_edge_source = ColumnDataSource(data={
+            'xs': [], 'ys': [],
+            'line_color': [], 'line_alpha': [], 'line_width': [],
+        })
+        self.gradient_edge_renderer = self.figure.multi_line(
+            'xs', 'ys',
+            source=self.gradient_edge_source,
+            line_color='line_color',
+            line_alpha='line_alpha',
+            line_width='line_width',
+            line_cap='round',
+        )
+        self.gradient_edge_renderer.visible = False
+
+        # DAG endpoint nodes (scatter with per-node color)
+        self.gradient_node_source = ColumnDataSource(data={
+            'x': [], 'y': [], 'color': [], 'size': [],
+            'line_color': [], 'label': [], 'keywords': [],
+            'marker': [],
+        })
+        self.gradient_node_renderer = self.figure.scatter(
+            'x', 'y',
+            source=self.gradient_node_source,
+            size='size',
+            color='color',
+            marker='marker',
+            line_color='line_color',
+            line_width=2,
+            alpha=0.9,
+        )
+        self.gradient_node_renderer.visible = False
+
+        # Hover tooltip for gradient nodes
+        from bokeh.models import HoverTool as HT
+        gradient_hover = HT(
+            tooltips=[("Cluster", "@label"), ("Keywords", "@keywords")],
+            renderers=[self.gradient_node_renderer],
+        )
+        self.figure.add_tools(gradient_hover)
+
+        # DAG node labels (color-coded: red=start, teal=end)
+        self.gradient_label_source = ColumnDataSource(data={
+            'x': [], 'y': [], 'label': [], 'text_color': [],
+        })
+        self.gradient_labels = LabelSet(
+            x='x', y='y', text='label',
+            source=self.gradient_label_source,
+            text_font_size='9pt',
+            text_font_style='bold',
+            text_color='text_color',
+            text_align='left',
+            x_offset=10, y_offset=-3,
+        )
+        self.figure.add_layout(self.gradient_labels)
+        self.gradient_labels.visible = False
+
+        # DAG arrowheads (small triangles at edge midpoints pointing in flow direction)
+        self.gradient_arrow_source = ColumnDataSource(data={
+            'x': [], 'y': [], 'angle': [], 'size': [], 'color': [],
+        })
+        self.gradient_arrow_renderer = self.figure.triangle(
+            'x', 'y',
+            source=self.gradient_arrow_source,
+            size='size',
+            angle='angle',
+            fill_color='color',
+            fill_alpha=0.7,
+            line_color=None,
+        )
+        self.gradient_arrow_renderer.visible = False
+
+        # Gradient ellipse overlays (replace gradient intra-cluster edges)
+        from bokeh.models.glyphs import Ellipse
+        self.gradient_ellipse_source = ColumnDataSource(data={
+            'x': [], 'y': [], 'width': [], 'height': [], 'angle': [],
+            'fill_alpha': [], 'line_alpha': [], 'cluster_name': [],
+            'gradient_info': [],
+        })
+        ellipse_glyph = Ellipse(
+            x='x', y='y', width='width', height='height', angle='angle',
+            fill_color='white', fill_alpha='fill_alpha',
+            line_color='white', line_alpha='line_alpha',
+            line_width=1, line_dash='dashed',
+        )
+        self.gradient_ellipse_renderer = self.figure.add_glyph(
+            self.gradient_ellipse_source, ellipse_glyph
+        )
+        self.gradient_ellipse_renderer.visible = False
+
+        # Hover tooltip for ellipses
+        ellipse_hover = HT(
+            tooltips=[
+                ("Cluster", "@cluster_name"),
+                ("Gradient", "@gradient_info"),
+            ],
+            renderers=[self.gradient_ellipse_renderer],
+        )
+        self.figure.add_tools(ellipse_hover)
 
         # Search box for finding articles
         self.search_input = TextInput(title="Search articles:", placeholder="Type to search...", width=180)
@@ -530,6 +723,74 @@ class ROGBrowser:
 
         return colors, sizes
 
+    def _build_redundancy_alphas(self, chunk_data: dict) -> list[float]:
+        """Build alpha values based on chunk redundancy (sibling count).
+
+        0 siblings → alpha 0.7 (unique, bright), increasing → down to 0.15 (dim).
+        """
+        redundancy = chunk_data['redundancy']
+        max_r = max(int(redundancy.max()), 1)
+        alphas = []
+        for r in redundancy:
+            # Linear mapping: 0 → 0.7, max → 0.15
+            t = int(r) / max_r
+            alphas.append(0.7 - t * 0.55)
+        return alphas
+
+    def _build_spread_colors(self, chunk_data: dict) -> tuple[list[str], list[float]]:
+        """Build colors based on document spread (concentration).
+
+        Low concentration (bridge docs spanning many buckets) → warm red/orange.
+        High concentration (focused docs in few buckets) → cool green/blue.
+        Size scales with n_buckets.
+        """
+        concentration = chunk_data['concentration']
+        n_buckets = chunk_data['n_buckets']
+
+        # Normalize concentration to [0, 1]
+        c_min = float(concentration[concentration > 0].min()) if (concentration > 0).any() else 0.0
+        c_max = float(concentration.max()) if concentration.max() > 0 else 1.0
+        c_range = c_max - c_min if c_max > c_min else 1.0
+
+        max_n_buckets = max(int(n_buckets.max()), 1)
+
+        colors = []
+        sizes = []
+        for c, nb in zip(concentration, n_buckets):
+            if c == 0 and nb == 0:
+                # Single-chunk doc or no data — grey
+                colors.append('#aaaaaa')
+                sizes.append(3)
+                continue
+
+            t = (float(c) - c_min) / c_range  # 0 = low concentration (bridge), 1 = high (focused)
+            t = max(0.0, min(1.0, t))
+
+            if t < 0.33:
+                # Warm: red/orange (bridge docs)
+                s = t / 0.33
+                r = int(220 - s * 40)
+                g = int(60 + s * 60)
+                b = int(30 + s * 20)
+            elif t < 0.66:
+                # Transition: yellow/green
+                s = (t - 0.33) / 0.33
+                r = int(180 - s * 100)
+                g = int(120 + s * 60)
+                b = int(50 + s * 40)
+            else:
+                # Cool: green/blue (focused docs)
+                s = (t - 0.66) / 0.34
+                r = int(80 - s * 40)
+                g = int(180 - s * 40)
+                b = int(90 + s * 100)
+            colors.append(f'#{r:02x}{g:02x}{b:02x}')
+
+            # Size: 3 + (n_buckets / max_n_buckets) * 7
+            sizes.append(3 + (int(nb) / max_n_buckets) * 7)
+
+        return colors, sizes
+
     def _build_hierarchical_colors(self, cluster_result: dict) -> list[str]:
         """Build stable colors with hierarchical structure.
 
@@ -698,6 +959,29 @@ class ROGBrowser:
         return result
 
     # Visual style per cluster level (coarser = more prominent)
+    @staticmethod
+    def _label_data(x, y, label, bg_color=None, border_width=1,
+                    border_color='#888888', font_size='10pt'):
+        """Build a complete label_source.data dict with all required columns.
+
+        Bokeh's LabelSet references font_size, border_color, and border_width
+        columns; omitting them causes a render crash.
+        """
+        n = len(x)
+        if bg_color is None:
+            bg_color = ['#2d2d2d'] * n
+        if isinstance(border_width, (int, float)):
+            border_width = [border_width] * n
+        if isinstance(border_color, str):
+            border_color = [border_color] * n
+        if isinstance(font_size, str):
+            font_size = [font_size] * n
+        return {
+            'x': x, 'y': y, 'label': label, 'bg_color': bg_color,
+            'border_width': border_width, 'border_color': border_color,
+            'font_size': font_size,
+        }
+
     _LEVEL_STYLE = {
         12:  {'border_width': 3, 'border_color': '#ffffff', 'font_size': '13pt'},
         25:  {'border_width': 2, 'border_color': '#bbbbbb', 'font_size': '11pt'},
@@ -839,6 +1123,8 @@ class ROGBrowser:
     def _on_lsh_toggle(self, attr, old, new):
         """Toggle between cluster view and LSH bucket view."""
         self.lsh_mode = new
+        # Guard: prevent sub-toggle callbacks from doing redundant updates
+        self._toggling_lsh = True
 
         if new and self.lsh_data:
             # Switch to LSH mode
@@ -873,7 +1159,7 @@ class ROGBrowser:
             label_x = [bucket_centroids[bid][0] for bid, _ in top_buckets if bid in bucket_centroids]
             label_y = [bucket_centroids[bid][1] for bid, _ in top_buckets if bid in bucket_centroids]
             label_text = [f'  B{bid} ({sz})  ' for bid, sz in top_buckets if bid in bucket_centroids]
-            self.label_source.data = {'x': label_x, 'y': label_y, 'label': label_text, 'bg_color': ['#2d2d2d'] * len(label_x)}
+            self.label_source.data = self._label_data(label_x, label_y, label_text)
 
             # Hide cluster edges, show boundary points
             self.edge_renderer.visible = False
@@ -882,15 +1168,13 @@ class ROGBrowser:
             self.figure.title.text = f"LSH Mode - {self.lsh_data['num_bits']} bits, {len(bucket_centroids)} buckets"
         else:
             # Switch back to cluster mode
-            # Disable and reset density toggle
+            # Disable and reset sub-toggles (guard prevents their callbacks from firing updates)
             self.density_toggle.disabled = True
             self.density_toggle.active = False
             self.lsh_density_mode = False
-            # Disable and reset recovery toggle
             self.recovery_toggle.disabled = True
             self.recovery_toggle.active = False
             self.lsh_recovery_mode = False
-            # Disable and reset persistence toggle
             self.persistence_toggle.disabled = True
             self.persistence_toggle.active = False
             self.lsh_persistence_mode = False
@@ -902,20 +1186,27 @@ class ROGBrowser:
             self._update_labels_for_viewport()
             self.figure.title.text = f"ROG Browser - {len(self.titles):,} points - Level: {self.current_level} clusters"
 
+        self._toggling_lsh = False
+
     def _on_density_toggle(self, attr, old, new):
         """Toggle between bucket coloring and density coloring in LSH mode."""
         self.lsh_density_mode = new
+        if self._toggling_lsh:
+            return
 
         if not self.lsh_mode or not self.lsh_data:
             return
 
-        # Deactivate recovery and persistence if density is turned on
+        # Deactivate recovery, persistence, and spread if density is turned on
         if new and self.lsh_recovery_mode:
             self.recovery_toggle.active = False
             self.lsh_recovery_mode = False
         if new and self.lsh_persistence_mode:
             self.persistence_toggle.active = False
             self.lsh_persistence_mode = False
+        if new and self.chunk_spread_mode:
+            self.spread_toggle.active = False
+            self.chunk_spread_mode = False
 
         bucket_centroids = self.lsh_data['bucket_centroids_2d']
         bucket_sizes = self.lsh_data['bucket_sizes']
@@ -943,7 +1234,7 @@ class ROGBrowser:
                     label_y.append(bucket_centroids[bid][1])
                     label_text.append(f'  Dense: {sz}  ')
 
-            self.label_source.data = {'x': label_x, 'y': label_y, 'label': label_text, 'bg_color': ['#2d2d2d'] * len(label_x)}
+            self.label_source.data = self._label_data(label_x, label_y, label_text)
             self.figure.title.text = f"LSH Density - Range: {min_sz} to {max_sz} (median: {median_sz})"
         else:
             # Switch back to bucket coloring
@@ -955,24 +1246,29 @@ class ROGBrowser:
             label_x = [bucket_centroids[bid][0] for bid, _ in top_buckets if bid in bucket_centroids]
             label_y = [bucket_centroids[bid][1] for bid, _ in top_buckets if bid in bucket_centroids]
             label_text = [f'  B{bid} ({sz})  ' for bid, sz in top_buckets if bid in bucket_centroids]
-            self.label_source.data = {'x': label_x, 'y': label_y, 'label': label_text, 'bg_color': ['#2d2d2d'] * len(label_x)}
+            self.label_source.data = self._label_data(label_x, label_y, label_text)
             self.figure.title.text = f"LSH Mode - {self.lsh_data['num_bits']} bits, {len(bucket_centroids)} buckets"
 
     def _on_recovery_toggle(self, attr, old, new):
         """Toggle between bucket/density coloring and recovery depth coloring in LSH mode."""
         self.lsh_recovery_mode = new
+        if self._toggling_lsh:
+            return
 
         if not self.lsh_data or 'recovery_depth' not in self.lsh_data:
             return
 
         if new:
-            # Switch to recovery coloring - deactivate density and persistence if on
+            # Switch to recovery coloring - deactivate density, persistence, and spread if on
             if self.lsh_density_mode:
                 self.density_toggle.active = False
                 self.lsh_density_mode = False
             if self.lsh_persistence_mode:
                 self.persistence_toggle.active = False
                 self.lsh_persistence_mode = False
+            if self.chunk_spread_mode:
+                self.spread_toggle.active = False
+                self.chunk_spread_mode = False
 
             self.source.data['color'] = self.lsh_recovery_colors
             self.source.data['size'] = self.lsh_recovery_sizes
@@ -984,7 +1280,7 @@ class ROGBrowser:
             recovered = sum(1 for d in recovery_depth if 0 < d <= num_bits)
             never = sum(1 for d in recovery_depth if d > num_bits)
 
-            self.label_source.data = {'x': [], 'y': [], 'label': [], 'bg_color': []}
+            self.label_source.data = self._label_data([], [], [])
             self.figure.title.text = (
                 f"Recovery View - Dense: {already_dense}, "
                 f"Recovered: {recovered}, Never: {never} "
@@ -1002,7 +1298,7 @@ class ROGBrowser:
                 label_x = [bucket_centroids[bid][0] for bid, _ in top_buckets if bid in bucket_centroids]
                 label_y = [bucket_centroids[bid][1] for bid, _ in top_buckets if bid in bucket_centroids]
                 label_text = [f'  B{bid} ({sz})  ' for bid, sz in top_buckets if bid in bucket_centroids]
-                self.label_source.data = {'x': label_x, 'y': label_y, 'label': label_text, 'bg_color': ['#2d2d2d'] * len(label_x)}
+                self.label_source.data = self._label_data(label_x, label_y, label_text)
                 self.figure.title.text = f"LSH Mode - {self.lsh_data['num_bits']} bits, {len(bucket_centroids)} buckets"
             else:
                 self.source.data['color'] = self.stable_colors
@@ -1012,18 +1308,23 @@ class ROGBrowser:
     def _on_persistence_toggle(self, attr, old, new):
         """Toggle between bucket/density coloring and bridge persistence coloring in LSH mode."""
         self.lsh_persistence_mode = new
+        if self._toggling_lsh:
+            return
 
         if not self.lsh_data or 'bridge_persistence' not in self.lsh_data:
             return
 
         if new:
-            # Switch to persistence coloring - deactivate density and recovery if on
+            # Switch to persistence coloring - deactivate density, recovery, and spread if on
             if self.lsh_density_mode:
                 self.density_toggle.active = False
                 self.lsh_density_mode = False
             if self.lsh_recovery_mode:
                 self.recovery_toggle.active = False
                 self.lsh_recovery_mode = False
+            if self.chunk_spread_mode:
+                self.spread_toggle.active = False
+                self.chunk_spread_mode = False
 
             self.source.data['color'] = self.lsh_persistence_colors
             self.source.data['size'] = self.lsh_persistence_sizes
@@ -1034,7 +1335,7 @@ class ROGBrowser:
             max_p = max(persistence) if persistence else 0
             num_bits = self.lsh_data['num_bits']
 
-            self.label_source.data = {'x': [], 'y': [], 'label': [], 'bg_color': []}
+            self.label_source.data = self._label_data([], [], [])
             self.figure.title.text = (
                 f"Persistence View - Bridges: {total_bridges}, "
                 f"Max depth span: {max_p}/{num_bits}"
@@ -1051,12 +1352,560 @@ class ROGBrowser:
                 label_x = [bucket_centroids[bid][0] for bid, _ in top_buckets if bid in bucket_centroids]
                 label_y = [bucket_centroids[bid][1] for bid, _ in top_buckets if bid in bucket_centroids]
                 label_text = [f'  B{bid} ({sz})  ' for bid, sz in top_buckets if bid in bucket_centroids]
-                self.label_source.data = {'x': label_x, 'y': label_y, 'label': label_text, 'bg_color': ['#2d2d2d'] * len(label_x)}
+                self.label_source.data = self._label_data(label_x, label_y, label_text)
                 self.figure.title.text = f"LSH Mode - {self.lsh_data['num_bits']} bits, {len(bucket_centroids)} buckets"
             else:
                 self.source.data['color'] = self.stable_colors
                 self.source.data['size'] = [4] * len(self.titles)
                 self._update_labels_for_viewport()
+
+    def _on_dedup_toggle(self, attr, old, new):
+        """Toggle chunk deduplication overlay. Hides non-representative points."""
+        self.chunk_dedup_mode = new
+
+        if not self.lsh_data or 'chunk_data' not in self.lsh_data:
+            return
+
+        n = len(self.coords_2d)
+
+        if new:
+            # Hide non-representative points (alpha=0, size=0)
+            mask = self.chunk_dedup_mask
+            kept = int(mask.sum())
+
+            alphas = list(self.source.data['alpha'])
+            sizes = list(self.source.data['size'])
+            for i in range(n):
+                if not mask[i]:
+                    alphas[i] = 0.0
+                    sizes[i] = 0
+            self.source.data['alpha'] = alphas
+            self.source.data['size'] = sizes
+
+            self.figure.title.text = (
+                f"Dedup View - {kept}/{n} kept ({100*kept/n:.1f}%)"
+            )
+        else:
+            # Restore: apply current base alphas/sizes
+            self._restore_chunk_state()
+
+    def _on_redundancy_toggle(self, attr, old, new):
+        """Toggle chunk redundancy overlay. Dims points by sibling count."""
+        self.chunk_redundancy_mode = new
+
+        if not self.lsh_data or 'chunk_data' not in self.lsh_data:
+            return
+
+        n = len(self.coords_2d)
+
+        if new:
+            # Apply redundancy alphas, respecting dedup overlay
+            alphas = list(self.chunk_redundancy_alphas)
+            if self.chunk_dedup_mode:
+                mask = self.chunk_dedup_mask
+                for i in range(n):
+                    if not mask[i]:
+                        alphas[i] = 0.0
+            self.source.data['alpha'] = alphas
+
+            redundancy = self.lsh_data['chunk_data']['redundancy']
+            max_r = int(redundancy.max())
+            unique = int((redundancy == 0).sum())
+            self.figure.title.text = (
+                f"Redundancy View - {unique} unique, max siblings={max_r}"
+            )
+        else:
+            # Restore base alphas
+            self._restore_chunk_state()
+
+    def _on_spread_toggle(self, attr, old, new):
+        """Toggle doc spread color mode. Mutually exclusive with density/recovery/persistence."""
+        self.chunk_spread_mode = new
+
+        if not self.lsh_data or 'chunk_data' not in self.lsh_data:
+            return
+
+        n = len(self.coords_2d)
+
+        if new:
+            # Deactivate mutually exclusive color modes
+            if self.lsh_density_mode:
+                self.density_toggle.active = False
+            if self.lsh_recovery_mode:
+                self.recovery_toggle.active = False
+            if self.lsh_persistence_mode:
+                self.persistence_toggle.active = False
+
+            # Apply spread colors and sizes
+            colors = list(self.chunk_spread_colors)
+            sizes = list(self.chunk_spread_sizes)
+
+            # Respect dedup overlay
+            if self.chunk_dedup_mode:
+                mask = self.chunk_dedup_mask
+                for i in range(n):
+                    if not mask[i]:
+                        sizes[i] = 0
+
+            self.source.data['color'] = colors
+            self.source.data['size'] = sizes
+
+            chunk_data = self.lsh_data['chunk_data']
+            n_unique = chunk_data['n_unique_docs']
+            self.label_source.data = self._label_data([], [], [])
+            self.figure.title.text = (
+                f"Doc Spread View - {n_unique} unique docs, "
+                f"warm=bridge, cool=focused"
+            )
+        else:
+            # Restore to current base mode
+            if self.lsh_mode:
+                self.source.data['color'] = self.lsh_colors
+                self.source.data['size'] = [4] * n
+            else:
+                self.source.data['color'] = self.stable_colors
+                self.source.data['size'] = [4] * n
+                self._update_labels_for_viewport()
+
+            # Re-apply dedup overlay if active
+            if self.chunk_dedup_mode:
+                mask = self.chunk_dedup_mask
+                sizes = list(self.source.data['size'])
+                alphas = list(self.source.data['alpha'])
+                for i in range(n):
+                    if not mask[i]:
+                        alphas[i] = 0.0
+                        sizes[i] = 0
+                self.source.data['alpha'] = alphas
+                self.source.data['size'] = sizes
+
+    def _restore_chunk_state(self):
+        """Restore alpha/size arrays based on active chunk modes."""
+        n = len(self.coords_2d)
+
+        # Determine base alphas
+        if self.chunk_redundancy_mode:
+            alphas = list(self.chunk_redundancy_alphas)
+        else:
+            alphas = [0.7] * n
+
+        # Determine base sizes
+        if self.chunk_spread_mode:
+            sizes = list(self.chunk_spread_sizes)
+        else:
+            sizes = [4] * n
+
+        # Apply dedup overlay on top
+        if self.chunk_dedup_mode:
+            mask = self.chunk_dedup_mask
+            for i in range(n):
+                if not mask[i]:
+                    alphas[i] = 0.0
+                    sizes[i] = 0
+
+        self.source.data['alpha'] = alphas
+        self.source.data['size'] = sizes
+
+    def _build_gradient_dag_sources(self, cluster_result: dict):
+        """Pre-build gradient DAG overlay data for each cluster level."""
+        from rog_preprocess import detect_cluster_gradients, build_gradient_network, label_gradient_endpoints
+        import math
+
+        gradients_dict = cluster_result.get('gradients', {})
+        network_dict = cluster_result.get('gradient_network', {})
+
+        # Ensure gradient endpoints have descriptive labels
+        for n_cl, grads in gradients_dict.items():
+            if grads and 'start_label' not in next(iter(grads.values())):
+                labs = cluster_result['labels'][n_cl]
+                label_gradient_endpoints(grads, self.coords_2d, labs, cluster_result, n_cl)
+
+        for n_clusters in CLUSTER_LEVELS:
+            gradients = gradients_dict.get(n_clusters, {})
+            if not gradients:
+                self._gradient_dag_data[n_clusters] = None
+                continue
+
+            names = cluster_result['names'][n_clusters]
+            edges = network_dict.get(n_clusters, [])
+
+            # If no precomputed network, build it now
+            if not edges and len(gradients) >= 2:
+                edges = build_gradient_network(gradients, names, k=1)
+
+            # Build endpoint data
+            endpoints = []  # (cid, pole, x, y, keywords, pole_label)
+            ep_lookup = {}
+            for cid, g in gradients.items():
+                s_label = g.get('start_label', ', '.join(g['start_keywords'][:3]))
+                e_label = g.get('end_label', ', '.join(g['end_keywords'][:3]))
+                ep_lookup[(cid, 'start')] = len(endpoints)
+                endpoints.append((cid, 'start', g['start_point'][0], g['start_point'][1],
+                                  g['start_keywords'][:3], s_label))
+                ep_lookup[(cid, 'end')] = len(endpoints)
+                endpoints.append((cid, 'end', g['end_point'][0], g['end_point'][1],
+                                  g['end_keywords'][:3], e_label))
+
+            # Orient edges as DAG using PCA global axis
+            from sklearn.decomposition import PCA
+            pts = np.array([[ep[2], ep[3]] for ep in endpoints])
+            if len(pts) >= 2:
+                pca = PCA(n_components=1)
+                pca.fit(pts)
+                global_axis = pca.components_[0]
+            else:
+                global_axis = np.array([1.0, 0.0])
+
+            projections = {i: endpoints[i][2] * global_axis[0] + endpoints[i][3] * global_axis[1]
+                           for i in range(len(endpoints))}
+
+            # Build DAG edges: intra-cluster + inter-cluster (oriented by projection)
+            dag_edges = []
+            # Intra-cluster
+            for cid, g in gradients.items():
+                s_idx = ep_lookup[(cid, 'start')]
+                e_idx = ep_lookup[(cid, 'end')]
+                if projections[s_idx] <= projections[e_idx]:
+                    dag_edges.append((s_idx, e_idx, 'intra'))
+                else:
+                    dag_edges.append((e_idx, s_idx, 'intra'))
+
+            # Inter-cluster from network edges (already computed as k=1 nearest)
+            # Orient by projection
+            for edge in edges:
+                src_cid, src_label = edge['source']
+                dst_cid, dst_label = edge['target']
+                s_key = (src_cid, src_label)
+                t_key = (dst_cid, dst_label)
+                if s_key not in ep_lookup or t_key not in ep_lookup:
+                    continue
+                s_idx = ep_lookup[s_key]
+                t_idx = ep_lookup[t_key]
+                is_mutual = edge.get('mutual', False)
+                etype = 'mutual' if is_mutual else 'directed'
+                if projections[s_idx] <= projections[t_idx]:
+                    dag_edges.append((s_idx, t_idx, etype))
+                else:
+                    dag_edges.append((t_idx, s_idx, etype))
+
+            # Build multi_line data for edges
+            edge_xs, edge_ys = [], []
+            edge_colors, edge_alphas, edge_widths = [], [], []
+
+            for s_idx, t_idx, etype in dag_edges:
+                sx, sy = endpoints[s_idx][2], endpoints[s_idx][3]
+                tx, ty = endpoints[t_idx][2], endpoints[t_idx][3]
+                edge_xs.append([sx, tx])
+                edge_ys.append([sy, ty])
+
+                if etype == 'intra':
+                    edge_colors.append('#ffffff')
+                    edge_alphas.append(0.5)
+                    edge_widths.append(2.0)
+                elif etype == 'mutual':
+                    edge_colors.append('#4ecdc4')
+                    edge_alphas.append(0.7)
+                    edge_widths.append(2.0)
+                else:
+                    edge_colors.append('#4ecdc4')
+                    edge_alphas.append(0.25)
+                    edge_widths.append(1.0)
+
+            # Build node data — two poles per cluster, distinguished by color
+            # Use cluster's own color (from COLORS_50) with brightness shift for the two poles
+            node_x, node_y, node_color, node_size = [], [], [], []
+            node_line_color, node_label, node_keywords, node_marker = [], [], [], []
+            for i, (cid, pole, x, y, kw, pole_label) in enumerate(endpoints):
+                node_x.append(x)
+                node_y.append(y)
+                base_color = COLORS_50[cid % 50]
+                # Lighten for one pole, keep saturated for other
+                if pole == 'start':
+                    node_color.append(base_color)
+                    node_marker.append('square')
+                else:
+                    # Lighten: blend toward white
+                    r, g, b = int(base_color[1:3], 16), int(base_color[3:5], 16), int(base_color[5:7], 16)
+                    r2 = min(255, r + (255 - r) // 2)
+                    g2 = min(255, g + (255 - g) // 2)
+                    b2 = min(255, b + (255 - b) // 2)
+                    node_color.append(f'#{r2:02x}{g2:02x}{b2:02x}')
+                    node_marker.append('circle')
+                node_size.append(14)
+                node_line_color.append('#ffffff')
+                name = names[cid] if cid < len(names) else f'C{cid}'
+                node_label.append(f'{name}: {pole_label}')
+                node_keywords.append(', '.join(kw))
+
+            # Build label data: use the descriptive pole label
+            label_x, label_y, label_text, label_color = [], [], [], []
+            for i, (cid, pole, x, y, kw, pole_label) in enumerate(endpoints):
+                label_x.append(x)
+                label_y.append(y)
+                label_text.append(pole_label)
+                label_color.append('#ffffff')
+
+            # Build ellipse overlay data for each elongated cluster
+            ellipse_x, ellipse_y = [], []
+            ellipse_width, ellipse_height, ellipse_angle = [], [], []
+            ellipse_fill_alpha, ellipse_line_alpha = [], []
+            ellipse_cluster_name, ellipse_gradient_info = [], []
+
+            for cid, g in gradients.items():
+                cx, cy = g['center']
+                dx, dy = g['major_axis']
+                sx, sy = g['start_point']
+                ex, ey = g['end_point']
+
+                # Semi-major: half start-to-end distance, scaled to cover ~90% of cluster
+                half_len = math.sqrt((ex - sx)**2 + (ey - sy)**2) / 2
+                semi_major = half_len * 1.3  # start/end are at 10th percentile bands
+
+                # Semi-minor: from embedding elongation ratio
+                semi_minor = semi_major / math.sqrt(max(g['elongation'], 1.0))
+
+                # Rotation angle from major axis unit vector
+                angle = math.atan2(dy, dx)
+
+                ellipse_x.append(cx)
+                ellipse_y.append(cy)
+                ellipse_width.append(semi_major * 2)
+                ellipse_height.append(semi_minor * 2)
+                ellipse_angle.append(angle)
+                ellipse_fill_alpha.append(0.04)
+                ellipse_line_alpha.append(0.25)
+
+                name = names[cid] if cid < len(names) else f'C{cid}'
+                ellipse_cluster_name.append(name)
+
+                # Build info string for tooltip
+                s_label = g.get('start_label', ', '.join(g['start_keywords'][:3]))
+                e_label = g.get('end_label', ', '.join(g['end_keywords'][:3]))
+                info_parts = [f"{s_label} → {e_label}",
+                              f"elongation={g['elongation']:.2f}"]
+                emb_ev = g.get('eigenvalues_emb', [])
+                if emb_ev:
+                    top = emb_ev[0]
+                    if len(emb_ev) >= 2 and emb_ev[1] > 0.15:
+                        info_parts.append(
+                            f"PC1={top:.0%}, PC2={emb_ev[1]:.0%}")
+                    else:
+                        info_parts.append(f"PC1={top:.0%}")
+                ellipse_gradient_info.append(' | '.join(info_parts))
+
+            ellipses_data = {
+                'x': ellipse_x, 'y': ellipse_y,
+                'width': ellipse_width, 'height': ellipse_height,
+                'angle': ellipse_angle,
+                'fill_alpha': ellipse_fill_alpha, 'line_alpha': ellipse_line_alpha,
+                'cluster_name': ellipse_cluster_name,
+                'gradient_info': ellipse_gradient_info,
+            }
+
+            dag_entry = {
+                'nodes': {
+                    'x': node_x, 'y': node_y, 'color': node_color,
+                    'size': node_size, 'line_color': node_line_color,
+                    'label': node_label, 'keywords': node_keywords,
+                    'marker': node_marker,
+                },
+                'labels': {
+                    'x': label_x, 'y': label_y, 'label': label_text,
+                    'text_color': label_color,
+                },
+                'ellipses': ellipses_data,
+                'n_elongated': len(gradients),
+                'n_edges': len(dag_edges),
+            }
+            # Only include separate edge data for legacy (non-unified) mode
+            if not self.has_unified_edges:
+                dag_entry['edges'] = {
+                    'xs': edge_xs, 'ys': edge_ys,
+                    'line_color': edge_colors, 'line_alpha': edge_alphas,
+                    'line_width': edge_widths,
+                }
+            self._gradient_dag_data[n_clusters] = dag_entry
+
+        print(f"Gradient DAG data built for levels: "
+              f"{[k for k, v in self._gradient_dag_data.items() if v]}", flush=True)
+
+    def _on_gradient_dag_toggle(self, attr, old, new):
+        """Toggle gradient DAG overlay visibility."""
+        self.gradient_dag_mode = new
+
+        if new:
+            self._show_gradient_dag()
+        else:
+            self._hide_gradient_dag()
+
+    def _show_gradient_dag(self):
+        """Show gradient DAG overlay — dispatches to unified or legacy."""
+        if self.has_unified_edges:
+            self._show_gradient_dag_unified()
+        else:
+            self._show_gradient_dag_legacy()
+
+    def _hide_gradient_dag(self):
+        """Hide gradient DAG overlay — dispatches to unified or legacy."""
+        if self.has_unified_edges:
+            self._hide_gradient_dag_unified()
+        else:
+            self._hide_gradient_dag_legacy()
+
+    def _show_gradient_dag_unified(self):
+        """Show gradient overlay with ellipses and endpoint nodes."""
+        # Find DAG data for current level (or fall back)
+        dag_data = self._gradient_dag_data.get(self.current_level)
+        if not dag_data:
+            for level in CLUSTER_LEVELS:
+                if self._gradient_dag_data.get(level):
+                    dag_data = self._gradient_dag_data[level]
+                    break
+        if not dag_data:
+            return
+
+        # Show ellipse overlays
+        if 'ellipses' in dag_data:
+            self.gradient_ellipse_source.data = dag_data['ellipses']
+            self.gradient_ellipse_renderer.visible = True
+
+        # Show endpoint nodes + labels
+        self.gradient_node_source.data = dag_data['nodes']
+        self.gradient_label_source.data = dag_data['labels']
+        self.gradient_node_renderer.visible = True
+        self.gradient_labels.visible = True
+
+        # Dim background points
+        n = len(self.coords_2d)
+        self.source.data['alpha'] = [0.15] * n
+        self.source.data['size'] = [2] * n
+
+        # Dim bridge edges
+        xs, ys = self.bridge_edges[self.current_level]
+        types = self.edge_types.get(self.current_level, [])
+        mutual = self.edge_mutual.get(self.current_level, [])
+        if types:
+            vxs, vys, vtypes, vmutual = self._cull_edges_to_viewport_typed(
+                xs, ys, types, mutual)
+            colors, alphas, widths = self._style_edges_by_type(
+                vtypes, vmutual, gradient_mode=True)
+            self.edge_source.data = {
+                'xs': vxs, 'ys': vys,
+                'line_color': colors,
+                'line_alpha': alphas,
+                'line_width': widths,
+            }
+
+        n_ellipses = len(dag_data.get('ellipses', {}).get('x', []))
+        self.figure.title.text = (
+            f"Gradient overlays - {n_ellipses} elongated clusters"
+        )
+
+    def _hide_gradient_dag_unified(self):
+        """Hide gradient overlay — ellipses, endpoint nodes, labels."""
+        # Hide ellipse overlay
+        self.gradient_ellipse_renderer.visible = False
+
+        # Hide endpoint nodes + labels
+        self.gradient_node_renderer.visible = False
+        self.gradient_labels.visible = False
+
+        # Restore point appearance
+        self._restore_chunk_state()
+
+        # Restore bridge edges
+        if not self._highlighted_indices:
+            xs, ys = self.bridge_edges[self.current_level]
+            types = self.edge_types.get(self.current_level, [])
+            mutual = self.edge_mutual.get(self.current_level, [])
+
+            if types:
+                vxs, vys, vtypes, vmutual = self._cull_edges_to_viewport_typed(
+                    xs, ys, types, mutual)
+                colors, alphas, widths = self._style_edges_by_type(
+                    vtypes, vmutual, gradient_mode=False)
+                self.edge_source.data = {
+                    'xs': vxs, 'ys': vys,
+                    'line_color': colors,
+                    'line_alpha': alphas,
+                    'line_width': widths,
+                }
+            else:
+                vxs, vys = self._cull_edges_to_viewport(xs, ys)
+                n_edges = len(vxs)
+                self.edge_source.data = {
+                    'xs': vxs, 'ys': vys,
+                    'line_color': ['#4488cc'] * n_edges,
+                    'line_alpha': [0.15] * n_edges,
+                    'line_width': [1] * n_edges,
+                }
+
+        self.figure.title.text = (
+            f"ROG Browser - {len(self.titles):,} points - "
+            f"Level: {self.current_level} clusters"
+        )
+
+    def _show_gradient_dag_legacy(self):
+        """Legacy: show gradient DAG with separate straight-line renderer."""
+        dag_data = self._gradient_dag_data.get(self.current_level)
+        if not dag_data:
+            for level in CLUSTER_LEVELS:
+                if self._gradient_dag_data.get(level):
+                    dag_data = self._gradient_dag_data[level]
+                    break
+        if not dag_data:
+            return
+
+        self.gradient_edge_source.data = dag_data['edges']
+        self.gradient_node_source.data = dag_data['nodes']
+        self.gradient_label_source.data = dag_data['labels']
+        self.gradient_edge_renderer.visible = True
+        self.gradient_node_renderer.visible = True
+        self.gradient_labels.visible = True
+
+        # Save and hide bridge edges so they don't clash with DAG edges
+        self._pre_gradient_edges_visible = self.edge_renderer.visible
+        self.edge_renderer.visible = False
+
+        # Dim background points to make DAG visible
+        n = len(self.coords_2d)
+        self.source.data['alpha'] = [0.15] * n
+        self.source.data['size'] = [2] * n
+
+        self.figure.title.text = (
+            f"Gradient DAG - {dag_data['n_elongated']} elongated clusters, "
+            f"{dag_data['n_edges']} edges"
+        )
+
+    def _hide_gradient_dag_legacy(self):
+        """Legacy: hide gradient DAG and restore normal view."""
+        self.gradient_edge_renderer.visible = False
+        self.gradient_node_renderer.visible = False
+        self.gradient_labels.visible = False
+
+        # Restore bridge edge visibility
+        was_visible = getattr(self, '_pre_gradient_edges_visible', self.edge_toggle.active)
+        self.edge_renderer.visible = was_visible
+
+        # Restore point appearance
+        self._restore_chunk_state()
+
+        # Refresh bridge edges for current viewport
+        if not self._highlighted_indices:
+            xs, ys = self.bridge_edges[self.current_level]
+            vxs, vys = self._cull_edges_to_viewport(xs, ys)
+            n_edges = len(vxs)
+            self.edge_source.data = {
+                'xs': vxs, 'ys': vys,
+                'line_color': ['#4488cc'] * n_edges,
+                'line_alpha': [0.15] * n_edges,
+                'line_width': [1] * n_edges,
+            }
+
+        self.figure.title.text = (
+            f"ROG Browser - {len(self.titles):,} points - "
+            f"Level: {self.current_level} clusters"
+        )
 
     def _on_tap_select(self, attr, old, new):
         """Handle tap selection on points."""
@@ -1150,12 +1999,34 @@ class ROGBrowser:
         self._label_update_callback = None
         self._update_labels_for_viewport()
 
+    def _schedule_view_update(self):
+        """Debounce full view updates (level change) — only process the latest."""
+        if getattr(self, '_view_update_callback', None) is not None:
+            try:
+                curdoc().remove_timeout_callback(self._view_update_callback)
+            except ValueError:
+                pass
+        self._view_update_callback = curdoc().add_timeout_callback(
+            self._do_view_update, 150
+        )
+
+    def _do_view_update(self):
+        self._view_update_callback = None
+        self._update_view()
+
     def _on_zoom(self, attr, old, new):
-        """Handle zoom changes - update labels based on viewport."""
+        """Handle zoom changes - update level, labels, and gradients."""
         if self._programmatic_zoom:
             return  # Skip during programmatic zoom changes
-        # Debounce: only update labels after zoom gestures settle
-        self._schedule_label_update()
+        # Check if zoom crossed a level threshold
+        zoom_ratio = self._get_zoom_ratio()
+        new_level = self._get_level_for_zoom(zoom_ratio)
+        if new_level != self.current_level:
+            self.current_level = new_level
+            self._schedule_view_update()
+        else:
+            # Same level — just debounce label + edge update
+            self._schedule_label_update()
 
     @staticmethod
     def _simplify_bridge_edges(bridge_edges, max_edges=500):
@@ -1167,6 +2038,49 @@ class ROGBrowser:
         simplified = {}
         for level, (xs, ys) in bridge_edges.items():
             simplified[level] = (xs[:max_edges], ys[:max_edges])
+        return simplified
+
+    @staticmethod
+    def _simplify_unified_edges(bridge_edges, edge_types, edge_mutual,
+                                max_bridge_edges=500):
+        """Cap bridge edges but always keep all gradient edges.
+
+        Reorders edges so capped bridges come first, then all gradient edges.
+        Mutates edge_types and edge_mutual dicts in place to match.
+        """
+        simplified = {}
+        for level, (xs, ys) in bridge_edges.items():
+            types = edge_types.get(level, [])
+            mutual = edge_mutual.get(level, [])
+
+            # Separate bridge and gradient edges
+            bridge_xs, bridge_ys, bridge_t, bridge_m = [], [], [], []
+            grad_xs, grad_ys, grad_t, grad_m = [], [], [], []
+            for i in range(len(xs)):
+                t = types[i] if i < len(types) else 'bridge'
+                m = mutual[i] if i < len(mutual) else False
+                if t == 'bridge':
+                    bridge_xs.append(xs[i])
+                    bridge_ys.append(ys[i])
+                    bridge_t.append(t)
+                    bridge_m.append(m)
+                else:
+                    grad_xs.append(xs[i])
+                    grad_ys.append(ys[i])
+                    grad_t.append(t)
+                    grad_m.append(m)
+
+            # Cap bridge edges, keep all gradient edges
+            capped_bx = bridge_xs[:max_bridge_edges]
+            capped_by = bridge_ys[:max_bridge_edges]
+            capped_bt = bridge_t[:max_bridge_edges]
+            capped_bm = bridge_m[:max_bridge_edges]
+
+            # Reassemble: capped bridges + all gradients
+            simplified[level] = (capped_bx + grad_xs, capped_by + grad_ys)
+            edge_types[level] = capped_bt + grad_t
+            edge_mutual[level] = capped_bm + grad_m
+
         return simplified
 
     def _cull_edges_to_viewport(self, xs, ys):
@@ -1189,6 +2103,86 @@ class ROGBrowser:
                     break
         return vxs, vys
 
+    def _cull_edges_to_viewport_typed(self, xs, ys, types, mutual):
+        """Filter edges to viewport, preserving parallel type/mutual arrays.
+
+        Gradient edges are never culled — there are few of them and their
+        visibility is controlled by _style_edges_by_type (alpha=0 when off).
+        Only bridge edges are viewport-culled for performance.
+        """
+        x0 = self.figure.x_range.start
+        x1 = self.figure.x_range.end
+        y0 = self.figure.y_range.start
+        y1 = self.figure.y_range.end
+        dx, dy = (x1 - x0) * 0.2, (y1 - y0) * 0.2
+        x0, x1, y0, y1 = x0 - dx, x1 + dx, y0 - dy, y1 + dy
+
+        vxs, vys, vtypes, vmutual = [], [], [], []
+        for ex, ey, et, em in zip(xs, ys, types, mutual):
+            if et != 'bridge':
+                # Always include gradient edges (skip viewport culling)
+                vxs.append(ex)
+                vys.append(ey)
+                vtypes.append(et)
+                vmutual.append(em)
+                continue
+            for px, py in zip(ex, ey):
+                if x0 <= px <= x1 and y0 <= py <= y1:
+                    vxs.append(ex)
+                    vys.append(ey)
+                    vtypes.append(et)
+                    vmutual.append(em)
+                    break
+        return vxs, vys, vtypes, vmutual
+
+    def _style_edges_by_type(self, types, mutual, gradient_mode=False):
+        """Map edge types + gradient_mode to per-edge color/alpha/width arrays.
+
+        Args:
+            types: list of 'bridge'|'gradient_intra'|'gradient_inter'
+            mutual: list of bool (mutual flag per edge)
+            gradient_mode: if True, show gradient edges; if False, hide them
+
+        Returns:
+            (colors, alphas, widths) — parallel lists for ColumnDataSource
+        """
+        colors, alphas, widths = [], [], []
+        for etype, is_mutual in zip(types, mutual):
+            if etype == 'bridge':
+                if gradient_mode:
+                    colors.append('#4488cc')
+                    alphas.append(0.05)
+                    widths.append(0.5)
+                else:
+                    colors.append('#4488cc')
+                    alphas.append(0.15)
+                    widths.append(1)
+            elif etype == 'gradient_intra':
+                # Hidden — replaced by ellipse overlays
+                colors.append('#ffffff')
+                alphas.append(0)
+                widths.append(0)
+            elif etype == 'gradient_inter':
+                if gradient_mode:
+                    if is_mutual:
+                        colors.append('#4ecdc4')
+                        alphas.append(0.7)
+                        widths.append(2)
+                    else:
+                        colors.append('#4ecdc4')
+                        alphas.append(0.25)
+                        widths.append(1)
+                else:
+                    colors.append('#4ecdc4')
+                    alphas.append(0.0)
+                    widths.append(0)
+            else:
+                # Unknown type — treat as bridge
+                colors.append('#4488cc')
+                alphas.append(0.15 if not gradient_mode else 0.05)
+                widths.append(1 if not gradient_mode else 0.5)
+        return colors, alphas, widths
+
     def _update_view(self):
         """Update labels and bridge edges for current level (colors stay stable)."""
         # Note: Colors are stable based on micro-clusters, so no color update needed
@@ -1200,6 +2194,31 @@ class ROGBrowser:
         # If there's an active highlight, reapply it instead of resetting to default
         if self._highlighted_indices:
             self.highlight_points(self._highlighted_indices)
+        elif self.has_unified_edges:
+            # Unified edges: use type-aware styling
+            xs, ys = self.bridge_edges[self.current_level]
+            types = self.edge_types.get(self.current_level, [])
+            mutual = self.edge_mutual.get(self.current_level, [])
+            if types:
+                vxs, vys, vtypes, vmutual = self._cull_edges_to_viewport_typed(
+                    xs, ys, types, mutual)
+                colors, alphas, widths = self._style_edges_by_type(
+                    vtypes, vmutual, gradient_mode=self.gradient_dag_mode)
+                self.edge_source.data = {
+                    'xs': vxs, 'ys': vys,
+                    'line_color': colors,
+                    'line_alpha': alphas,
+                    'line_width': widths,
+                }
+            else:
+                vxs, vys = self._cull_edges_to_viewport(xs, ys)
+                n_edges = len(vxs)
+                self.edge_source.data = {
+                    'xs': vxs, 'ys': vys,
+                    'line_color': ['#4488cc'] * n_edges,
+                    'line_alpha': [0.15] * n_edges,
+                    'line_width': [1] * n_edges,
+                }
         else:
             xs, ys = self.bridge_edges[self.current_level]
             # Viewport culling: only include edges that intersect the visible area
@@ -1212,8 +2231,12 @@ class ROGBrowser:
                 'line_width': [1] * n_edges,
             }
 
-        # Update title and status
-        self.figure.title.text = f"ROG Browser - {len(self.titles):,} points - Level: {self.current_level} clusters"
+        # Refresh gradient DAG if active
+        if self.gradient_dag_mode:
+            self._show_gradient_dag()
+        else:
+            # Update title and status
+            self.figure.title.text = f"ROG Browser - {len(self.titles):,} points - Level: {self.current_level} clusters"
         self.status.text = self._get_status_html()
 
     def layout(self):
@@ -1224,6 +2247,9 @@ class ROGBrowser:
             self.edge_toggle,
             row(self.lsh_toggle, self.density_toggle),
             row(self.recovery_toggle, self.persistence_toggle),
+            row(self.dedup_toggle, self.redundancy_toggle),
+            self.spread_toggle,
+            self.gradient_dag_toggle,
             self.status,
             width=200
         )
@@ -1387,24 +2413,53 @@ class ROGBrowser:
         orig_xs, orig_ys = self.bridge_edges[self.current_level]
         n_edges = len(orig_xs)
 
-        # When highlighting, dim non-connected edges (but keep them visible)
-        if highlighted_buckets:
-            edge_colors = ['#666666'] * n_edges  # Grey for non-connected
-            edge_alphas = [0.08] * n_edges  # Very faint
-            edge_widths = [0.5] * n_edges
-        else:
-            edge_colors = [self._default_edge_color] * n_edges
-            edge_alphas = [self._default_edge_alpha] * n_edges
-            edge_widths = [self._default_edge_width] * n_edges
+        if self.has_unified_edges:
+            # Unified edges: apply type-aware base styling, then highlight bridge edges
+            types = self.edge_types.get(self.current_level, [])
+            mutual = self.edge_mutual.get(self.current_level, [])
+            edge_colors, edge_alphas, edge_widths = self._style_edges_by_type(
+                types[:n_edges], mutual[:n_edges],
+                gradient_mode=self.gradient_dag_mode)
 
-        matched_edges = 0
-        if self.cluster_pair_list and highlighted_buckets:
-            for edge_idx, (c1, c2) in enumerate(self.cluster_pair_list):
-                if edge_idx < n_edges and (int(c1) in highlighted_buckets or int(c2) in highlighted_buckets):
-                    edge_colors[edge_idx] = '#ffaa33'  # Orange for connected edges
-                    edge_alphas[edge_idx] = 0.9
-                    edge_widths[edge_idx] = 3.0
-                    matched_edges += 1
+            # Dim all edges when highlighting points
+            if highlighted_buckets:
+                for i in range(n_edges):
+                    if types[i] == 'bridge':
+                        edge_colors[i] = '#666666'
+                        edge_alphas[i] = 0.08
+                        edge_widths[i] = 0.5
+                    # Gradient edges keep their type-based styling (already dim or hidden)
+
+            # Highlight bridge edges connected to highlighted clusters
+            matched_edges = 0
+            if self.cluster_pair_list and highlighted_buckets:
+                for edge_idx, (c1, c2) in enumerate(self.cluster_pair_list):
+                    if (edge_idx < n_edges
+                            and types[edge_idx] == 'bridge'
+                            and (int(c1) in highlighted_buckets or int(c2) in highlighted_buckets)):
+                        edge_colors[edge_idx] = '#ffaa33'
+                        edge_alphas[edge_idx] = 0.9
+                        edge_widths[edge_idx] = 3.0
+                        matched_edges += 1
+        else:
+            # Legacy: all edges are bridge edges
+            if highlighted_buckets:
+                edge_colors = ['#666666'] * n_edges
+                edge_alphas = [0.08] * n_edges
+                edge_widths = [0.5] * n_edges
+            else:
+                edge_colors = [self._default_edge_color] * n_edges
+                edge_alphas = [self._default_edge_alpha] * n_edges
+                edge_widths = [self._default_edge_width] * n_edges
+
+            matched_edges = 0
+            if self.cluster_pair_list and highlighted_buckets:
+                for edge_idx, (c1, c2) in enumerate(self.cluster_pair_list):
+                    if edge_idx < n_edges and (int(c1) in highlighted_buckets or int(c2) in highlighted_buckets):
+                        edge_colors[edge_idx] = '#ffaa33'
+                        edge_alphas[edge_idx] = 0.9
+                        edge_widths[edge_idx] = 3.0
+                        matched_edges += 1
 
         # Show all edges - highlighted ones in orange, others dimmed
         self.edge_source.data = {
@@ -1452,16 +2507,47 @@ class ROGBrowser:
 
         self._highlighted_indices = []
         n = len(self.coords_2d)
-        self.source.data['alpha'] = [0.7] * n
-        self.source.data['size'] = [4] * n
+
+        # Restore alphas based on active chunk modes
+        if self.chunk_redundancy_mode and hasattr(self, 'chunk_redundancy_alphas'):
+            alphas = list(self.chunk_redundancy_alphas)
+        else:
+            alphas = [0.7] * n
+
+        # Restore sizes based on active chunk modes
+        if self.chunk_spread_mode and hasattr(self, 'chunk_spread_sizes'):
+            sizes = list(self.chunk_spread_sizes)
+        else:
+            sizes = [4] * n
+
+        # Apply dedup overlay
+        if self.chunk_dedup_mode and hasattr(self, 'chunk_dedup_mask'):
+            mask = self.chunk_dedup_mask
+            for i in range(n):
+                if not mask[i]:
+                    alphas[i] = 0.0
+                    sizes[i] = 0
+
+        self.source.data['alpha'] = alphas
+        self.source.data['size'] = sizes
         self.source.data['line_color'] = ['rgba(0,0,0,0)'] * n
         self.source.data['line_width'] = [1] * n
 
-        # Reset edges to default
+        # Reset edges to default (type-aware for unified edges)
         n_edges = len(self.edge_source.data['xs'])
-        self.edge_source.data['line_color'] = ['#4488cc'] * n_edges
-        self.edge_source.data['line_alpha'] = [0.15] * n_edges
-        self.edge_source.data['line_width'] = [1] * n_edges
+        if self.has_unified_edges:
+            types = self.edge_types.get(self.current_level, [])
+            mutual = self.edge_mutual.get(self.current_level, [])
+            colors, alphas, widths = self._style_edges_by_type(
+                types[:n_edges], mutual[:n_edges],
+                gradient_mode=self.gradient_dag_mode)
+            self.edge_source.data['line_color'] = colors
+            self.edge_source.data['line_alpha'] = alphas
+            self.edge_source.data['line_width'] = widths
+        else:
+            self.edge_source.data['line_color'] = ['#4488cc'] * n_edges
+            self.edge_source.data['line_alpha'] = [0.15] * n_edges
+            self.edge_source.data['line_width'] = [1] * n_edges
 
     # -------------------------------------------------------------------------
     # Annotation API (ephemeral overlays)
@@ -1945,7 +3031,7 @@ class ROGBrowser:
         self.hyperplane_renderer.visible = True
 
         # Clear labels initially
-        self.label_source.data = {'x': [], 'y': [], 'label': [], 'bg_color': []}
+        self.label_source.data = self._label_data([], [], [])
 
         self.figure.title.text = "LSH Explanation - Starting with all points"
 
@@ -2179,12 +3265,33 @@ def main():
         cache.get('edge_indices'),  # May be None for old caches
         cache.get('cluster_pairs'),  # (bucket1, bucket2) -> count for edge highlighting
         cache.get('lsh_data'),  # LSH bucket visualization data
+        cache.get('unified_edge_types'),  # {level: list[str]} per-edge type
+        cache.get('unified_edge_mutual'),  # {level: list[bool]} mutual flag
     )
 
     # Store document reference for control API
     STATE.doc = curdoc()
     STATE.doc.add_root(STATE.browser.layout())
     STATE.doc.title = "ROG Browser"
+
+    # Prevent browser zoom from being hijacked by Bokeh scroll/gesture events
+    from bokeh.models import Div
+    anti_zoom = Div(text="""
+    <style>
+        html { touch-action: manipulation; }
+        body { touch-action: manipulation; overflow: hidden; }
+    </style>
+    <script>
+        // Block Ctrl+scroll and Cmd+scroll browser zoom over the page
+        document.addEventListener('wheel', function(e) {
+            if (e.ctrlKey || e.metaKey) { e.preventDefault(); }
+        }, {passive: false});
+        // Block gesturestart/gesturechange (Safari pinch-zoom)
+        document.addEventListener('gesturestart', function(e) { e.preventDefault(); });
+        document.addEventListener('gesturechange', function(e) { e.preventDefault(); });
+    </script>
+    """, visible=False)
+    STATE.doc.add_root(anti_zoom)
 
     # Periodic callback to process command queue
     def process_commands():
@@ -2217,6 +3324,12 @@ def main():
                     STATE.browser.highlight_points(params["indices"])
                 elif action == "clear_highlight":
                     STATE.browser.clear_highlight()
+                elif action == "set_dedup_mode":
+                    STATE.browser.dedup_toggle.active = params.get("active", True)
+                elif action == "set_redundancy_mode":
+                    STATE.browser.redundancy_toggle.active = params.get("active", True)
+                elif action == "set_spread_mode":
+                    STATE.browser.spread_toggle.active = params.get("active", True)
                 elif action == "annotate":
                     STATE.browser.annotate(params.get("type", "title"), params)
                     print(f"  Sketch source has {len(STATE.browser.sketch_source.data['xs'])} entries", flush=True)

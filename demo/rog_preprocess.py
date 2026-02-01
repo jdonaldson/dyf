@@ -666,6 +666,410 @@ def disambiguate_cluster_names(
     return names
 
 
+def _compute_title_scatter(
+    coords_2d: np.ndarray,
+    titles: list[str],
+    scatter_threshold: float = 0.8,
+) -> np.ndarray:
+    """Compute per-point boolean mask: True if the title's chunks are spatially stable.
+
+    Titles whose chunks scatter widely across the embedding (e.g. date articles,
+    list articles) get False. Single-chunk titles are always stable.
+
+    Args:
+        coords_2d: 2D UMAP coordinates for all points.
+        titles: List of all titles.
+        scatter_threshold: Maximum mean pairwise distance for a title to be
+            considered stable (default 0.8).
+
+    Returns:
+        Boolean array of shape (n_points,), True for stable points.
+    """
+    from collections import defaultdict
+    from scipy.spatial.distance import pdist
+
+    title_groups = defaultdict(list)
+    for i, t in enumerate(titles):
+        title_groups[t].append(i)
+
+    title_spread = {}
+    for t, idxs in title_groups.items():
+        if len(idxs) >= 2:
+            title_spread[t] = pdist(coords_2d[idxs]).mean()
+        else:
+            title_spread[t] = 0.0
+
+    stable = np.array([title_spread[titles[i]] <= scatter_threshold for i in range(len(titles))])
+    return stable
+
+
+def detect_cluster_gradients(
+    coords_2d: np.ndarray,
+    titles: list[str],
+    labels: np.ndarray,
+    n_clusters: int,
+    embeddings: np.ndarray,
+    elongation_threshold: float = 1.5,
+    n_endpoint_samples: int = 10,
+    n_endpoint_keywords: int = 8,
+    quantile: float = 0.1,
+    scatter_threshold: float = 0.8,
+) -> dict[int, dict]:
+    """Detect clusters with a dominant embedding-space axis and characterize their gradients.
+
+    For each cluster, performs PCA on the high-dimensional embeddings to measure
+    elongation (λ1/λ2 of the top two embedding eigenvalues).  Elongated clusters
+    are split at the median along embedding PC1, and contrastive TF-IDF keywords
+    are computed for each half.  2D positions are derived from the embedding-defined
+    bands so that arrows and ellipses render correctly in the scatter plot.
+
+    Points whose title has high spatial variance (e.g. date articles, list pages)
+    are excluded from endpoint sampling and contrastive keyword computation, since
+    their position reflects arbitrary content rather than a genuine topic gradient.
+
+    Args:
+        coords_2d: 2D UMAP coordinates for all points
+        titles: List of all titles
+        labels: Cluster assignment for each point
+        n_clusters: Number of clusters
+        embeddings: Full embedding vectors (required) for embedding-space PCA
+        elongation_threshold: Minimum embedding λ1/λ2 ratio to consider elongated
+            (default 1.5; embedding ratios are lower than 2D ratios)
+        n_endpoint_samples: Number of titles to sample from each quantile band
+        n_endpoint_keywords: Number of contrastive TF-IDF keywords per end
+        quantile: Fraction defining each endpoint band (default 0.1 = bottom/top 10%)
+        scatter_threshold: Max mean pairwise distance for a title's chunks to be
+            considered spatially stable (default 0.8). Higher = more permissive.
+
+    Returns:
+        Dict mapping cluster_id -> gradient info dict (only elongated clusters).
+        Each entry contains:
+        - elongation: float (embedding λ1/λ2 ratio)
+        - major_axis: (float, float) 2D unit vector from start→end
+        - center: (float, float) 2D centroid
+        - start_point: (float, float) 2D centroid of the start quantile band
+        - end_point: (float, float) 2D centroid of the end quantile band
+        - start_titles: list[str] (sampled from bottom quantile band)
+        - end_titles: list[str] (sampled from top quantile band)
+        - start_keywords: list[str] (contrastive TF-IDF keywords for start)
+        - end_keywords: list[str] (contrastive TF-IDF keywords for end)
+        - eigenvalues_emb: list[float] (embedding PCA top-N explained variance ratios)
+    """
+    from sklearn.decomposition import PCA
+
+    # Pre-compute title scatter mask: True for spatially stable chunks
+    stable = _compute_title_scatter(coords_2d, titles, scatter_threshold)
+    n_stable = stable.sum()
+    n_total = len(titles)
+    print(f"  Title scatter filter: {n_total - n_stable} / {n_total} points "
+          f"excluded ({(n_total - n_stable) / n_total * 100:.1f}%)", flush=True)
+
+    gradients = {}
+
+    for cluster_id in range(n_clusters):
+        mask = labels == cluster_id
+        cluster_indices = np.where(mask)[0]
+
+        # Skip small clusters
+        if len(cluster_indices) < 10:
+            continue
+
+        cluster_coords = coords_2d[cluster_indices]
+
+        # --- Embedding PCA (gatekeeper) ---
+        cluster_embeddings = embeddings[cluster_indices]
+        n_comp = min(10, len(cluster_indices) - 1)
+        if n_comp < 2:
+            continue
+        emb_pca = PCA(n_components=n_comp)
+        emb_pca.fit(cluster_embeddings)
+        elongation = emb_pca.explained_variance_[0] / emb_pca.explained_variance_[1]
+        if elongation < elongation_threshold:
+            continue
+
+        # Project onto EMBEDDING PC1 for ordering
+        emb_pc1 = emb_pca.components_[0]
+        emb_center = cluster_embeddings.mean(axis=0)
+        projections = (cluster_embeddings - emb_center) @ emb_pc1
+
+        # Stable points only for sampling and keyword computation
+        cluster_stable = stable[cluster_indices]
+        stable_mask_in_cluster = cluster_stable
+        stable_indices = cluster_indices[stable_mask_in_cluster]
+        stable_projections = projections[stable_mask_in_cluster]
+
+        # Need enough stable points per half for meaningful keywords
+        if len(stable_indices) < 10:
+            # Fall back to all points if too few stable
+            stable_indices = cluster_indices
+            stable_projections = projections
+
+        # Median split for contrastive TF-IDF (stable points only)
+        stable_median = np.median(stable_projections)
+        start_stable_mask = stable_projections <= stable_median
+        end_stable_mask = stable_projections > stable_median
+
+        # Quantile-band sampling from stable points only
+        lo_thresh = np.percentile(stable_projections, quantile * 100)
+        hi_thresh = np.percentile(stable_projections, (1 - quantile) * 100)
+
+        start_band = stable_indices[stable_projections <= lo_thresh]
+        end_band = stable_indices[stable_projections >= hi_thresh]
+
+        if len(start_band) == 0 or len(end_band) == 0:
+            continue
+
+        # Random sample within each band
+        rng = np.random.default_rng(42 + cluster_id)
+        if len(start_band) > n_endpoint_samples:
+            start_sample_idx = rng.choice(start_band, n_endpoint_samples, replace=False)
+        else:
+            start_sample_idx = start_band
+        if len(end_band) > n_endpoint_samples:
+            end_sample_idx = rng.choice(end_band, n_endpoint_samples, replace=False)
+        else:
+            end_sample_idx = end_band
+
+        start_titles_list = [titles[i] for i in start_sample_idx]
+        end_titles_list = [titles[i] for i in end_sample_idx]
+
+        # 2D positions from embedding-defined bands
+        start_point = coords_2d[start_band].mean(axis=0)
+        end_point = coords_2d[end_band].mean(axis=0)
+        center = cluster_coords.mean(axis=0)
+
+        # Major axis: normalized 2D vector from start→end
+        axis_2d = end_point - start_point
+        axis_len = np.linalg.norm(axis_2d)
+        if axis_len < 1e-10:
+            continue  # embedding gradient doesn't manifest in 2D
+        major_axis = axis_2d / axis_len
+
+        # Contrastive TF-IDF on stable points only
+        start_indices = stable_indices[start_stable_mask]
+        end_indices = stable_indices[end_stable_mask]
+        combined_titles = [titles[i] for i in start_indices] + [titles[i] for i in end_indices]
+        combined_labels = np.zeros(len(combined_titles), dtype=int)
+        combined_labels[len(start_indices):] = 1
+
+        kw = compute_tfidf_keywords(
+            combined_titles, combined_labels, n_clusters=2,
+            top_k=n_endpoint_keywords, min_df=1,
+        )
+        start_keywords = [w for w, _ in kw.get(0, [])][:n_endpoint_keywords]
+        end_keywords = [w for w, _ in kw.get(1, [])][:n_endpoint_keywords]
+
+        # Embedding eigenvalue ratios
+        eigenvalues_emb = emb_pca.explained_variance_ratio_.tolist()
+
+        grad_entry = {
+            'elongation': float(elongation),
+            'major_axis': (float(major_axis[0]), float(major_axis[1])),
+            'center': (float(center[0]), float(center[1])),
+            'start_point': (float(start_point[0]), float(start_point[1])),
+            'end_point': (float(end_point[0]), float(end_point[1])),
+            'start_titles': start_titles_list,
+            'end_titles': end_titles_list,
+            'start_keywords': start_keywords,
+            'end_keywords': end_keywords,
+            'eigenvalues_emb': eigenvalues_emb,
+        }
+
+        gradients[cluster_id] = grad_entry
+
+    return gradients
+
+
+def label_gradient_endpoints(
+    gradients: dict[int, dict],
+    coords_2d: np.ndarray,
+    labels: np.ndarray,
+    cluster_result: dict,
+    n_clusters: int,
+    cluster_names: list[str] | None = None,
+) -> dict[int, dict]:
+    """Add descriptive labels to gradient endpoints using finer-level subcluster names.
+
+    Iterates through all finer clustering levels (not just the immediate one)
+    until it finds a level where the two poles have different dominant
+    subclusters.  Falls back to ``"{cluster_name} ({top_keyword})"`` format
+    when no finer level differentiates the poles.
+
+    Mutates ``gradients`` in-place, adding ``'start_label'`` and
+    ``'end_label'`` to each entry.
+
+    Args:
+        gradients: Output of detect_cluster_gradients() — modified in-place.
+        coords_2d: 2D UMAP coordinates for all points.
+        labels: Cluster assignments at the current level.
+        cluster_result: Full cluster result dict containing 'labels' and
+            'names' for all levels.
+        n_clusters: Current clustering level.
+        cluster_names: Optional list of cluster names at the current level,
+            used for keyword-fallback formatting.
+
+    Returns:
+        The same ``gradients`` dict, with labels added.
+    """
+    from collections import Counter
+
+    available = sorted(cluster_result['labels'].keys())
+    finer_levels = [l for l in available if l > n_clusters]
+
+    # Current-level names for fallback formatting
+    if cluster_names is None:
+        cluster_names = cluster_result.get('names', {}).get(n_clusters, [])
+
+    for cid, g in gradients.items():
+        center = np.array(g['center'])
+        major = np.array(g['major_axis'])
+
+        mask = labels == cid
+        cluster_idx = np.where(mask)[0]
+        projections = (coords_2d[cluster_idx] - center) @ major
+        median_proj = np.median(projections)
+
+        lo_idx = cluster_idx[projections <= median_proj]
+        hi_idx = cluster_idx[projections > median_proj]
+
+        lo_label = None
+        hi_label = None
+
+        # Try each finer level until we find one that differentiates the poles
+        for fl in finer_levels:
+            fl_labels = cluster_result['labels'][fl]
+            fl_names = cluster_result['names'][fl]
+
+            lo_top = Counter(fl_labels[i] for i in lo_idx).most_common(1)[0][0]
+            hi_top = Counter(fl_labels[i] for i in hi_idx).most_common(1)[0][0]
+
+            if lo_top != hi_top:
+                lo_label = fl_names[lo_top] if lo_top < len(fl_names) else None
+                hi_label = fl_names[hi_top] if hi_top < len(fl_names) else None
+                break
+
+            # Same dominant — try #2 subcluster at this level
+            lo_counts = Counter(fl_labels[i] for i in lo_idx).most_common(2)
+            hi_counts = Counter(fl_labels[i] for i in hi_idx).most_common(2)
+            lo_pct = lo_counts[0][1] / len(lo_idx)
+            hi_pct = hi_counts[0][1] / len(hi_idx)
+
+            dominant_name = fl_names[lo_top] if lo_top < len(fl_names) else None
+
+            if lo_pct <= hi_pct and len(lo_counts) > 1:
+                alt_id = lo_counts[1][0]
+                alt_pct = lo_counts[1][1] / len(lo_idx)
+                if alt_pct >= 0.15:
+                    lo_label = fl_names[alt_id] if alt_id < len(fl_names) else None
+                    hi_label = dominant_name
+                    break
+            elif len(hi_counts) > 1:
+                alt_id = hi_counts[1][0]
+                alt_pct = hi_counts[1][1] / len(hi_idx)
+                if alt_pct >= 0.15:
+                    hi_label = fl_names[alt_id] if alt_id < len(fl_names) else None
+                    lo_label = dominant_name
+                    break
+
+        # Fallback: cluster name + top keyword (not raw comma-separated keywords)
+        if lo_label is None or hi_label is None:
+            cname = cluster_names[cid] if cid < len(cluster_names) else f"Cluster {cid}"
+            if lo_label is None:
+                top_kw = g['start_keywords'][0] if g['start_keywords'] else '?'
+                lo_label = f"{cname} ({top_kw})"
+            if hi_label is None:
+                top_kw = g['end_keywords'][0] if g['end_keywords'] else '?'
+                hi_label = f"{cname} ({top_kw})"
+
+        g['start_label'] = lo_label
+        g['end_label'] = hi_label
+
+    return gradients
+
+
+def build_gradient_network(
+    gradients: dict[int, dict],
+    cluster_names: list[str],
+    k: int = 1,
+) -> list[dict]:
+    """Find connections between gradient endpoints of different clusters.
+
+    For each endpoint (start or end of an elongated cluster), finds its k
+    nearest endpoints from *other* clusters. Mutual nearest-neighbor edges
+    form a sparse graph that reveals chains of meaning flowing across
+    cluster boundaries.
+
+    Args:
+        gradients: Output of detect_cluster_gradients()
+        cluster_names: List of cluster names (indexed by cluster_id)
+        k: Number of nearest cross-cluster neighbors per endpoint (default 1).
+
+    Returns:
+        List of edge dicts sorted by distance, each with:
+        - source: (cluster_id, 'start'|'end')
+        - target: (cluster_id, 'start'|'end')
+        - distance: float (2D distance between the two endpoints)
+        - mutual: bool (True if both endpoints chose each other)
+        - source_keywords: list[str]
+        - target_keywords: list[str]
+        - source_name: str
+        - target_name: str
+    """
+    if len(gradients) < 2:
+        return []
+
+    # Collect all endpoints: (cluster_id, end_label, 2d_point, keywords)
+    endpoints = []
+    for cid, g in gradients.items():
+        endpoints.append((cid, 'start', np.array(g['start_point']), g['start_keywords']))
+        endpoints.append((cid, 'end', np.array(g['end_point']), g['end_keywords']))
+
+    n = len(endpoints)
+
+    # For each endpoint, find its k nearest cross-cluster neighbors
+    directed_edges = set()  # (i, j) pairs
+    for i in range(n):
+        cid_i = endpoints[i][0]
+        # Compute distances to all other-cluster endpoints
+        dists = []
+        for j in range(n):
+            if endpoints[j][0] == cid_i:
+                continue
+            d = float(np.linalg.norm(endpoints[i][2] - endpoints[j][2]))
+            dists.append((d, j))
+        dists.sort()
+        for d, j in dists[:k]:
+            directed_edges.add((i, j))
+
+    # Deduplicate into undirected edges, marking mutual ones
+    seen = set()
+    edges = []
+    for i, j in directed_edges:
+        key = (min(i, j), max(i, j))
+        if key in seen:
+            continue
+        seen.add(key)
+        mutual = (j, i) in directed_edges
+        cid_i, label_i, pt_i, kw_i = endpoints[i]
+        cid_j, label_j, pt_j, kw_j = endpoints[j]
+        dist = float(np.linalg.norm(pt_i - pt_j))
+        name_i = cluster_names[cid_i] if cid_i < len(cluster_names) else f"Cluster {cid_i}"
+        name_j = cluster_names[cid_j] if cid_j < len(cluster_names) else f"Cluster {cid_j}"
+        edges.append({
+            'source': (cid_i, label_i),
+            'target': (cid_j, label_j),
+            'distance': dist,
+            'mutual': mutual,
+            'source_keywords': kw_i,
+            'target_keywords': kw_j,
+            'source_name': name_i,
+            'target_name': name_j,
+        })
+
+    edges.sort(key=lambda e: e['distance'])
+    return edges
+
+
 def find_nearest_cluster(cluster_id: int, centroids: np.ndarray) -> int:
     """Find the nearest cluster to a given cluster (by centroid distance)."""
     target = centroids[cluster_id]
@@ -1051,8 +1455,8 @@ def compute_lsh_visualization(coords_2d: np.ndarray, embeddings: np.ndarray, num
                 direction = pca_2d.components_[0]
                 center = boundary_coords.mean(axis=0)
 
-                # Extend line across the plot
-                extent = 20  # How far to extend
+                # Extend line across the plot, clipped to data range
+                extent = (coords_2d.max(axis=0) - coords_2d.min(axis=0)).max() * 0.6
                 p1 = center - direction * extent
                 p2 = center + direction * extent
                 hyperplanes_2d.append({
@@ -1079,6 +1483,142 @@ def compute_lsh_visualization(coords_2d: np.ndarray, embeddings: np.ndarray, num
         'num_bits': num_bits,
         'bucket_to_indices': dict(bucket_to_indices),
     }
+
+
+def compute_multi_resolution_recovery(
+    bucket_ids: np.ndarray,
+    num_bits: int = 12,
+    dense_threshold: int = 10,
+) -> dict:
+    """Compute multi-resolution recovery by coarsening LSH buckets via bit-masking.
+
+    At each depth d, the least-informative d hyperplane bits are masked off,
+    merging adjacent buckets.  A point is "recovered" at the first depth where
+    its coarsened bucket reaches dense_threshold members.
+
+    Returns dict with keys expected by rog_panel:
+        recovery_depth, recovery_ratio, buckets_per_depth,
+        mean_size_per_depth, dense_threshold.
+    """
+    n = len(bucket_ids)
+    ids = np.asarray(bucket_ids, dtype=np.uint64)
+
+    recovery_depth = np.full(n, num_bits + 1, dtype=np.int32)  # sentinel = never
+    recovery_ratio = np.zeros(n, dtype=np.float64)
+    buckets_per_depth = []
+    mean_size_per_depth = []
+
+    for d in range(num_bits + 1):  # d=0 full resolution … d=num_bits one bucket
+        mask = np.uint64((1 << (num_bits - d)) - 1)
+        coarse_ids = ids & mask
+
+        unique_ids, inverse, counts = np.unique(
+            coarse_ids, return_inverse=True, return_counts=True
+        )
+        buckets_per_depth.append(int(len(unique_ids)))
+        mean_size_per_depth.append(float(counts.mean()))
+
+        point_sizes = counts[inverse]
+        newly_dense = (point_sizes >= dense_threshold) & (recovery_depth > num_bits)
+        recovery_depth[newly_dense] = d
+        recovery_ratio[newly_dense] = point_sizes[newly_dense] / dense_threshold
+
+    return {
+        'recovery_depth': recovery_depth.tolist(),
+        'recovery_ratio': recovery_ratio.tolist(),
+        'buckets_per_depth': buckets_per_depth,
+        'mean_size_per_depth': mean_size_per_depth,
+        'dense_threshold': dense_threshold,
+    }
+
+
+def compute_bridge_persistence(
+    bucket_ids: np.ndarray,
+    embeddings: np.ndarray,
+    num_bits: int = 12,
+    relative_threshold: float = 0.8,
+) -> dict:
+    """Compute bridge persistence: how many coarsening depths each point acts as a connector.
+
+    A point is a "connector" at depth d when its cosine similarity to the
+    nearest *other* bucket centroid is >= relative_threshold × its similarity
+    to its own bucket centroid.  Points that bridge clusters at many depths
+    have high persistence.
+
+    Returns dict with keys expected by rog_panel:
+        bridge_persistence, bridge_ratio, bridges_per_depth.
+    """
+    n = len(bucket_ids)
+    ids = np.asarray(bucket_ids, dtype=np.uint64)
+
+    # L2-normalise embeddings once (for cosine similarity via dot product)
+    norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+    norms = np.where(norms == 0, 1.0, norms)
+    emb_normed = embeddings / norms
+
+    bridge_persistence = np.zeros(n, dtype=np.int32)
+    bridge_ratio = np.zeros(n, dtype=np.float64)
+    bridges_per_depth = []
+
+    for d in range(num_bits + 1):
+        mask = np.uint64((1 << (num_bits - d)) - 1)
+        coarse_ids = ids & mask
+
+        unique_ids, inverse, counts = np.unique(
+            coarse_ids, return_inverse=True, return_counts=True
+        )
+        n_buckets = len(unique_ids)
+        if n_buckets < 2:
+            bridges_per_depth.append(0)
+            continue
+
+        # Compute L2-normalised centroids via scatter-add
+        dim = embeddings.shape[1]
+        centroids = np.zeros((n_buckets, dim), dtype=np.float64)
+        np.add.at(centroids, inverse, emb_normed)
+        centroid_norms = np.linalg.norm(centroids, axis=1, keepdims=True)
+        centroid_norms = np.where(centroid_norms == 0, 1.0, centroid_norms)
+        centroids /= centroid_norms
+
+        # Similarity: each point vs all centroids
+        sim_matrix = emb_normed @ centroids.T  # (n, n_buckets)
+
+        own_sim = sim_matrix[np.arange(n), inverse]
+
+        # Mask own bucket to find best *other* centroid
+        sim_matrix[np.arange(n), inverse] = -np.inf
+        max_other_sim = sim_matrix.max(axis=1)
+
+        # Connector if relative similarity exceeds threshold
+        safe_own = np.where(own_sim == 0, 1.0, own_sim)
+        ratio = max_other_sim / safe_own
+        is_connector = ratio >= relative_threshold
+
+        bridge_persistence[is_connector] += 1
+        bridge_ratio = np.maximum(bridge_ratio, ratio)
+        bridges_per_depth.append(int(is_connector.sum()))
+
+    return {
+        'bridge_persistence': bridge_persistence.tolist(),
+        'bridge_ratio': bridge_ratio.tolist(),
+        'bridges_per_depth': bridges_per_depth,
+    }
+
+
+def _sklearn_to_scipy_Z(model, n_leaves):
+    """Convert sklearn AgglomerativeClustering result to scipy Z matrix."""
+    children = model.children_
+    distances = model.distances_
+    n_merges = len(children)
+    Z = np.zeros((n_merges, 4))
+    sizes = np.ones(n_leaves + n_merges)
+    for i, (left, right) in enumerate(children):
+        Z[i, 0] = left
+        Z[i, 1] = right
+        Z[i, 2] = distances[i]
+        sizes[n_leaves + i] = sizes[left] + sizes[right]
+        Z[i, 3] = sizes[n_leaves + i]
+    return Z
 
 
 def compute_lsh_hierarchy(
@@ -1109,9 +1649,25 @@ def compute_lsh_hierarchy(
 
     point_to_micro = kmeans.labels_
 
-    # Ward linkage on 2D micro-cluster centroids
-    print("  Building dendrogram (Ward linkage on 2D centroids)...")
-    Z = linkage(kmeans.cluster_centers_, method='ward')
+    # Connectivity-constrained Ward linkage on 2D micro-cluster centroids.
+    # kNN graph ensures Ward only merges spatially adjacent micro-clusters,
+    # producing contiguous regions instead of patchwork.
+    from sklearn.cluster import AgglomerativeClustering
+    from sklearn.neighbors import kneighbors_graph
+
+    print("  Building dendrogram (connectivity-constrained Ward on 2D centroids)...")
+    n_neighbors = min(10, n_micro - 1)
+    connectivity = kneighbors_graph(kmeans.cluster_centers_, n_neighbors=n_neighbors, mode='connectivity')
+    connectivity = 0.5 * (connectivity + connectivity.T)
+
+    agg = AgglomerativeClustering(
+        n_clusters=1,
+        linkage='ward',
+        connectivity=connectivity,
+        compute_distances=True,
+    )
+    agg.fit(kmeans.cluster_centers_)
+    Z = _sklearn_to_scipy_Z(agg, n_micro)
 
     # Build tree and collect node info
     tree = to_tree(Z, rd=True)
@@ -1339,6 +1895,158 @@ def _bundled_to_multiline(bundled: pd.DataFrame) -> tuple[list, list]:
     return xs, ys
 
 
+def compute_unified_edges(
+    coords_2d: np.ndarray,
+    embeddings: np.ndarray,
+    cluster_result: dict,
+    bridge_cluster_level: int = 12,
+) -> tuple[dict, list, dict, np.ndarray, dict, dict]:
+    """Compute bridge edges and bundle them with hammer_bundle.
+
+    Gradient intra-cluster edges are no longer bundled here — they are
+    replaced by ellipse overlays in the panel.
+
+    Returns:
+        bridge_edges: {level: (xs, ys)} — all bundled edge paths per level
+        edge_indices: list of (source, target) point pairs for highlighting
+        cluster_pairs: {(c1, c2): count} — bridge edge weights
+        diversity: np.ndarray — ROG diversity scores
+        unified_edge_types: {level: list[str]} — 'bridge' (only bridge edges now)
+        unified_edge_mutual: {level: list[bool]} — mutual flag per edge
+    """
+    from collections import defaultdict
+
+    cluster_labels = cluster_result['labels']
+
+    # --- Bridge detection (same logic as compute_bridge_edges) ---
+    print("Building ROG ontology for bridge detection...")
+    result = dyf.build_rog_ontology(
+        embeddings,
+        initial_threshold=0.55,
+        min_threshold=0.35,
+        target_coverage=0.95,
+        verbose=True,
+    )
+
+    labels_bridge = cluster_labels[bridge_cluster_level]
+    print(f"Using {bridge_cluster_level}-cluster level for bridge detection")
+
+    ont = result.ontology
+    cluster_pair_counts = defaultdict(int)
+    cluster_pair_points = defaultdict(list)
+    within_cluster = 0
+    cross_cluster = 0
+
+    for parent, children_list in ont.children.items():
+        for child, sim, div_gap in children_list:
+            c1, c2 = labels_bridge[parent], labels_bridge[child]
+            if c1 != c2:
+                cross_cluster += 1
+                pair = (min(c1, c2), max(c1, c2))
+                cluster_pair_counts[pair] += 1
+                if parent < child:
+                    cluster_pair_points[pair].append((parent, child))
+                else:
+                    cluster_pair_points[pair].append((child, parent))
+            else:
+                within_cluster += 1
+
+    total_edges = within_cluster + cross_cluster
+    print(f"Edge analysis: {within_cluster:,} within-cluster, {cross_cluster:,} cross-cluster")
+    print(f"Found {len(cluster_pair_counts)} unique cluster pairs with connections")
+
+    if not cluster_pair_counts:
+        print("No bridge edges found")
+        empty_edges = {level: ([], []) for level in cluster_labels.keys()}
+        empty_types = {level: [] for level in cluster_labels.keys()}
+        empty_mutual = {level: [] for level in cluster_labels.keys()}
+        return empty_edges, [], {}, result.ontology.diversity, empty_types, empty_mutual
+
+    # Compute bridge-level centroids (used as anchor nodes for bundling)
+    n_bridge_clusters = bridge_cluster_level
+    bridge_centroids = []
+    for c in range(n_bridge_clusters):
+        mask = labels_bridge == c
+        if mask.any():
+            bridge_centroids.append(coords_2d[mask].mean(axis=0))
+        else:
+            bridge_centroids.append(np.array([0.0, 0.0]))
+    bridge_centroids = np.array(bridge_centroids)
+
+    # Create sorted bridge edges (sorted by count descending, same as original)
+    bridge_edge_list = []
+    for (c1, c2), count in sorted(cluster_pair_counts.items(), key=lambda x: -x[1]):
+        bridge_edge_list.append((c1, c2))
+
+    print(f"  {len(bridge_edge_list)} bridge cluster pairs")
+
+    # --- Unified bundling per cluster level ---
+    edges_result = {}
+    unified_edge_types = {}
+    unified_edge_mutual = {}
+
+    for level in cluster_labels.keys():
+        # Bridge-only bundling — gradient intra-cluster edges are replaced
+        # by ellipse overlays in the panel, so no gradient nodes/edges here.
+        node_xs = list(bridge_centroids[:, 0])
+        node_ys = list(bridge_centroids[:, 1])
+
+        all_edges = []  # (source_node, target_node)
+        edge_types = []
+        edge_mutual = []
+
+        # Bridge edges: between bridge-level centroids
+        for c1, c2 in bridge_edge_list:
+            all_edges.append((c1, c2))
+            edge_types.append('bridge')
+            edge_mutual.append(False)
+
+        n_total = len(all_edges)
+        print(f"  Level {level}: {n_total} bridge edges")
+
+        if not all_edges:
+            edges_result[level] = ([], [])
+            unified_edge_types[level] = []
+            unified_edge_mutual[level] = []
+            continue
+
+        # Build DataFrames for hammer_bundle
+        nodes_df = pd.DataFrame({'x': node_xs, 'y': node_ys})
+        nodes_df.index.name = 'id'
+        edges_df = pd.DataFrame(all_edges, columns=['source', 'target'])
+
+        bundled = hammer_bundle(
+            nodes_df, edges_df,
+            iterations=BUNDLE_ITERATIONS,
+            batch_size=min(20000, len(all_edges)),
+        )
+
+        xs, ys = _bundled_to_multiline(bundled)
+
+        # Verify edge count matches — hammer_bundle should produce one path per edge
+        if len(xs) != n_total:
+            print(f"  WARNING: expected {n_total} paths, got {len(xs)} — "
+                  f"truncating metadata to match")
+            edge_types = edge_types[:len(xs)]
+            edge_mutual = edge_mutual[:len(xs)]
+
+        edges_result[level] = (xs, ys)
+        unified_edge_types[level] = edge_types
+        unified_edge_mutual[level] = edge_mutual
+
+    print(f"Unified bundling complete: {len(edges_result)} levels")
+
+    # Flatten point pairs for highlighting
+    edge_indices = []
+    for pair_list in cluster_pair_points.values():
+        edge_indices.extend(pair_list)
+
+    cluster_pair_info = dict(cluster_pair_counts)
+
+    return (edges_result, edge_indices, cluster_pair_info,
+            result.ontology.diversity, unified_edge_types, unified_edge_mutual)
+
+
 def cut_dendrogram(dendrogram: dict, n_clusters: int) -> tuple[np.ndarray, np.ndarray, list[str]]:
     """Cut dendrogram to get n_clusters and return labels, centroids, and names.
 
@@ -1479,6 +2187,30 @@ def main():
             names = disambiguate_cluster_names(names, titles, labels)
             cluster_result['names'][n_clusters] = names
 
+        # Detect cluster gradients (elongated clusters with directional themes)
+        print("\n=== Detecting cluster gradients ===")
+        cluster_result['gradients'] = {}
+        cluster_result['gradient_network'] = {}
+        for n_clusters in CLUSTER_LEVELS:
+            labels = cluster_result['labels'][n_clusters]
+            names = cluster_result['names'][n_clusters]
+            gradients = detect_cluster_gradients(
+                coords_2d, titles, labels, n_clusters, embeddings=embeddings)
+            label_gradient_endpoints(gradients, coords_2d, labels, cluster_result, n_clusters)
+            cluster_result['gradients'][n_clusters] = gradients
+            n_elongated = len(gradients)
+            if n_elongated > 0:
+                max_elong = max(g['elongation'] for g in gradients.values())
+                print(f"  {n_clusters} clusters: {n_elongated} elongated "
+                      f"(max elongation={max_elong:.1f})")
+                # Build gradient network
+                edges = build_gradient_network(gradients, names, k=1)
+                cluster_result['gradient_network'][n_clusters] = edges
+                print(f"    gradient network: {len(edges)} connections")
+            else:
+                print(f"  {n_clusters} clusters: none elongated")
+                cluster_result['gradient_network'][n_clusters] = []
+
         # Add dendrogram to cluster_result for dynamic cutting
         cluster_result['dendrogram'] = dendrogram
     else:
@@ -1486,9 +2218,33 @@ def main():
         cluster_result = compute_hierarchical_clusters(coords_2d, titles)
         dendrogram = None
 
-    bridge_edges, edge_indices, cluster_pairs, diversity = compute_bridge_edges(
-        coords_2d, embeddings, cluster_result['labels'],
-        bridge_cluster_level=args.bridge_level
+        # Detect cluster gradients for legacy path too
+        print("\n=== Detecting cluster gradients (legacy) ===")
+        cluster_result['gradients'] = {}
+        cluster_result['gradient_network'] = {}
+        for n_clusters in CLUSTER_LEVELS:
+            labels = cluster_result['labels'][n_clusters]
+            names = cluster_result['names'][n_clusters]
+            gradients = detect_cluster_gradients(
+                coords_2d, titles, labels, n_clusters, embeddings=embeddings)
+            label_gradient_endpoints(gradients, coords_2d, labels, cluster_result, n_clusters)
+            cluster_result['gradients'][n_clusters] = gradients
+            n_elongated = len(gradients)
+            if n_elongated > 0:
+                max_elong = max(g['elongation'] for g in gradients.values())
+                print(f"  {n_clusters} clusters: {n_elongated} elongated "
+                      f"(max elongation={max_elong:.1f})")
+                edges = build_gradient_network(gradients, names, k=1)
+                cluster_result['gradient_network'][n_clusters] = edges
+                print(f"    gradient network: {len(edges)} connections")
+            else:
+                print(f"  {n_clusters} clusters: none elongated")
+                cluster_result['gradient_network'][n_clusters] = []
+
+    (bridge_edges, edge_indices, cluster_pairs, diversity,
+     unified_edge_types, unified_edge_mutual) = compute_unified_edges(
+        coords_2d, embeddings, cluster_result,
+        bridge_cluster_level=args.bridge_level,
     )
 
     # Compute multi-resolution analysis using Rust DensityClassifier
@@ -1498,36 +2254,30 @@ def main():
     rust_clf.fit(embeddings.astype(np.float32))
     lsh_data['rust_bucket_ids'] = rust_clf.get_bucket_ids()
 
-    # Multi-resolution analysis (may not be available in all dyf_rs versions)
-    if hasattr(rust_clf, 'multi_resolution_analysis'):
-        print("Computing multi-resolution analysis...")
-        mra = rust_clf.multi_resolution_analysis(dense_threshold=10)
-        lsh_data['recovery_depth'] = mra.recovery_depth
-        lsh_data['recovery_ratio'] = mra.recovery_ratio
-        lsh_data['buckets_per_depth'] = mra.buckets_per_depth
-        lsh_data['mean_size_per_depth'] = mra.mean_size_per_depth
-        lsh_data['mra_dense_threshold'] = mra.dense_threshold
-        print(f"  Multi-resolution: {sum(1 for d in mra.recovery_depth if d == 0)} already dense, "
-              f"{sum(1 for d in mra.recovery_depth if 0 < d <= num_bits)} recovered, "
-              f"{sum(1 for d in mra.recovery_depth if d > num_bits)} never recovered")
-    else:
-        print("Skipping multi-resolution analysis (not available in this dyf_rs version)")
+    # Multi-resolution recovery (pure Python, bit-masking)
+    print("Computing multi-resolution recovery...")
+    mra = compute_multi_resolution_recovery(
+        np.asarray(lsh_data['bucket_ids']), num_bits=lsh_data['num_bits'])
+    lsh_data['recovery_depth'] = mra['recovery_depth']
+    lsh_data['recovery_ratio'] = mra['recovery_ratio']
+    lsh_data['buckets_per_depth'] = mra['buckets_per_depth']
+    lsh_data['mean_size_per_depth'] = mra['mean_size_per_depth']
+    lsh_data['mra_dense_threshold'] = mra['dense_threshold']
+    print(f"  Dense at full resolution: {sum(1 for d in mra['recovery_depth'] if d == 0)}, "
+          f"Recovered: {sum(1 for d in mra['recovery_depth'] if 0 < d <= num_bits)}, "
+          f"Never: {sum(1 for d in mra['recovery_depth'] if d > num_bits)}")
 
-    # Bridge persistence analysis (may not be available in all dyf_rs versions)
-    if hasattr(rust_clf, 'bridge_persistence'):
-        print("Computing bridge persistence analysis...")
-        bp = rust_clf.bridge_persistence(embeddings.astype(np.float32), relative_threshold=0.8)
-        lsh_data['bridge_persistence'] = bp.bridge_persistence
-        lsh_data['max_bridge_depth'] = bp.max_bridge_depth
-        lsh_data['min_bridge_depth'] = bp.min_bridge_depth
-        lsh_data['bridge_ratio'] = bp.bridge_ratio
-        lsh_data['bridges_per_depth'] = bp.bridges_per_depth
-        total_connectors = sum(1 for p in bp.bridge_persistence if p > 0)
-        max_p = max(bp.bridge_persistence) if bp.bridge_persistence else 0
-        print(f"  Connectors: {total_connectors}, max persistence={max_p}, threshold={bp.relative_threshold}")
-        print(f"  Connectors per depth: {bp.bridges_per_depth}")
-    else:
-        print("Skipping bridge persistence analysis (not available in this dyf_rs version)")
+    # Bridge persistence (pure Python, matmul)
+    print("Computing bridge persistence...")
+    bp = compute_bridge_persistence(
+        np.asarray(lsh_data['bucket_ids']), embeddings, num_bits=lsh_data['num_bits'])
+    lsh_data['bridge_persistence'] = bp['bridge_persistence']
+    lsh_data['bridge_ratio'] = bp['bridge_ratio']
+    lsh_data['bridges_per_depth'] = bp['bridges_per_depth']
+    total_connectors = sum(1 for p in bp['bridge_persistence'] if p > 0)
+    max_p = max(bp['bridge_persistence']) if bp['bridge_persistence'] else 0
+    print(f"  Connectors: {total_connectors}, max persistence={max_p}")
+    print(f"  Connectors per depth: {bp['bridges_per_depth']}")
 
     # Chunk analysis (redundancy, dedup, doc spread)
     from dyf.chunks import chunk_redundancy, deduplicate_chunks, doc_spread
@@ -1577,6 +2327,8 @@ def main():
         'cluster_pairs': cluster_pairs,  # {(c1, c2): count} for edge weights
         'diversity': diversity,  # For visualization (ROG diversity scores)
         'lsh_data': lsh_data,  # LSH bucket visualization data
+        'unified_edge_types': unified_edge_types,  # {level: list[str]} per-edge type
+        'unified_edge_mutual': unified_edge_mutual,  # {level: list[bool]} mutual flag
     }
 
     with open(output_path, 'wb') as f:
