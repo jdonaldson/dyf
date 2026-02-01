@@ -996,6 +996,10 @@ class ROGBrowser:
         Coarser levels are placed first with thicker borders and larger font.
         Finer levels fill in detail, skipping positions too close to existing labels.
         """
+        # Suppress cluster labels in LSH mode — bucket coloring replaces them
+        if self.lsh_mode:
+            return
+
         x_start = self.figure.x_range.start
         x_end = self.figure.x_range.end
         y_start = self.figure.y_range.start
