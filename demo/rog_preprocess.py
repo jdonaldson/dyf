@@ -11,7 +11,7 @@ import polars as pl
 import pandas as pd
 import pickle
 from pathlib import Path
-from sklearn.cluster import KMeans
+from sklearn.cluster import Birch
 from scipy.cluster.hierarchy import linkage, fcluster
 import umap
 from datashader.bundling import hammer_bundle
@@ -181,46 +181,39 @@ def load_data(path: str, sample: int | None = None,
     return coords_2d, titles, embeddings
 
 
-def compute_hierarchical_clusters(coords_2d: np.ndarray, titles: list[str]):
-    """Cluster using k-means then cut dendrogram at multiple levels.
+def _fit_birch(data: np.ndarray, target_k: int, max_iters: int = 10) -> 'Birch':
+    """Fit BIRCH with iterative threshold search to get ~target_k subclusters.
 
-    This is the legacy function - kept for backwards compatibility.
-    See compute_dendrogram_hierarchy for the new dynamic approach.
+    Binary searches on threshold so the subcluster count lands within
+    [target_k/2, target_k*2].  Returns the fitted Birch estimator.
     """
-    print("Computing hierarchical clusters...")
+    lo, hi = 1e-4, float(np.linalg.norm(data.max(axis=0) - data.min(axis=0)))
+    best_birch, best_diff = None, float('inf')
 
-    initial_k = min(100, len(coords_2d) // 50)
-    kmeans = KMeans(n_clusters=initial_k, random_state=42, n_init=10)
-    kmeans.fit(coords_2d)
+    for _ in range(max_iters):
+        mid = (lo + hi) / 2
+        birch = Birch(n_clusters=None, threshold=mid, branching_factor=50)
+        birch.fit(data)
+        n = len(birch.subcluster_centers_)
+        diff = abs(n - target_k)
+        if diff < best_diff:
+            best_birch, best_diff = birch, diff
+        if n > target_k:
+            lo = mid   # bigger threshold → fewer subclusters
+        else:
+            hi = mid
+        # Close enough
+        if target_k // 2 <= n <= target_k * 2:
+            break
 
-    Z = linkage(kmeans.cluster_centers_, method='ward')
+    return best_birch
 
-    result = {'labels': {}, 'names': {}, 'centroids': {}}
 
-    for n_clusters in CLUSTER_LEVELS:
-        centroid_labels = fcluster(Z, n_clusters, criterion='maxclust') - 1
-        labels = np.array([centroid_labels[l] for l in kmeans.labels_])
-        result['labels'][n_clusters] = labels
-
-        centroids = []
-        for c in range(n_clusters):
-            mask = labels == c
-            if mask.any():
-                centroids.append(coords_2d[mask].mean(axis=0))
-            else:
-                centroids.append(np.array([0.0, 0.0]))
-        result['centroids'][n_clusters] = np.array(centroids)
-
-    # LLM label all levels with contrastive labeling
-    for n_clusters in CLUSTER_LEVELS:
-        print(f"Generating contrastive labels for {n_clusters} clusters...")
-        result['names'][n_clusters] = label_clusters_with_llm(
-            titles, result['labels'][n_clusters], n_clusters,
-            centroids=result['centroids'][n_clusters],
-            contrastive=True,
-        )
-
-    return result
+def compute_hierarchical_clusters(coords_2d: np.ndarray, titles: list[str]):
+    """Legacy function — use compute_dendrogram_hierarchy or compute_lsh_hierarchy instead."""
+    raise NotImplementedError(
+        "Legacy clustering removed. Use --use-dendrogram flag for BIRCH-based hierarchy."
+    )
 
 
 def sample_representative_points(
@@ -306,22 +299,23 @@ def compute_dendrogram_hierarchy(
 
     print("Computing dendrogram hierarchy...")
 
-    # Step 1: K-means on high-dim embeddings (semantic clustering, not spatial)
-    initial_k = min(100, len(coords_2d) // 50)
-    print(f"  K-means with k={initial_k} on embeddings...")
-    kmeans = KMeans(n_clusters=initial_k, random_state=42, n_init=10)
-    kmeans.fit(embeddings)
+    # Step 1: BIRCH on high-dim embeddings (density-adaptive micro-clustering)
+    target_k = min(100, len(coords_2d) // 50)
+    print(f"  BIRCH micro-clustering (target ~{target_k} subclusters) on embeddings...")
+    birch = _fit_birch(embeddings, target_k)
+    n_sub = len(birch.subcluster_centers_)
+    print(f"    BIRCH produced {n_sub} subclusters")
 
-    # Step 2: Hierarchical clustering on micro-cluster centroids (in embedding space)
+    # Step 2: Hierarchical clustering on subcluster centroids (in embedding space)
     print("  Building dendrogram...")
-    Z = linkage(kmeans.cluster_centers_, method='ward')
+    Z = linkage(birch.subcluster_centers_, method='ward')
 
     # Step 3: Build tree structure and collect info for each node
     tree = to_tree(Z, rd=True)
     root, nodes = tree
 
-    # Map point indices to their kmeans cluster
-    point_to_micro = kmeans.labels_
+    # Map point indices to their BIRCH subcluster
+    point_to_micro = birch.labels_
 
     # For each micro-cluster, get the point indices
     micro_to_points = defaultdict(list)
@@ -329,7 +323,7 @@ def compute_dendrogram_hierarchy(
         micro_to_points[micro].append(i)
 
     # Build node info: for each node, get all point indices under it
-    n_micro = initial_k
+    n_micro = n_sub
     node_points = {}  # node_id -> list of point indices
     node_centroids = {}  # node_id -> (x, y)
 
@@ -461,16 +455,16 @@ Reply with ONLY the label, nothing else."""
     max_dist = float(Z[:, 2].max()) if len(Z) > 0 else 1.0
 
     # Compute 2D centroids for each micro-cluster (for label placement)
-    kmeans_centroids_2d = np.zeros((initial_k, 2))
-    for micro_id in range(initial_k):
+    micro_centroids_2d = np.zeros((n_micro, 2))
+    for micro_id in range(n_micro):
         pts = micro_to_points[micro_id]
         if pts:
-            kmeans_centroids_2d[micro_id] = coords_2d[pts].mean(axis=0)
+            micro_centroids_2d[micro_id] = coords_2d[pts].mean(axis=0)
 
     return {
         'Z': Z,
-        'kmeans_labels': point_to_micro,
-        'kmeans_centroids': kmeans_centroids_2d,  # 2D centroids for label placement
+        'kmeans_labels': point_to_micro,  # compat key name kept for panel
+        'kmeans_centroids': micro_centroids_2d,  # 2D centroids for label placement
         'node_labels': node_labels,
         'node_points': {k: v for k, v in node_points.items()},  # Convert to regular dict
         'node_centroids': node_centroids,
@@ -1361,12 +1355,13 @@ Reply with ONLY the label, nothing else."""
     return cluster_names
 
 
-def compute_lsh_visualization(coords_2d: np.ndarray, embeddings: np.ndarray, num_bits: int = 12):
+def compute_lsh_visualization(coords_2d: np.ndarray, embeddings: np.ndarray, titles: list[str], num_bits: int = 12):
     """Compute LSH bucket assignments and hyperplane projections for visualization.
 
     Args:
         coords_2d: UMAP 2D coordinates
         embeddings: Original high-dim embeddings
+        titles: List of titles for each point (used for bucket naming)
         num_bits: Number of LSH bits (determines number of hyperplanes)
 
     Returns:
@@ -1474,6 +1469,10 @@ def compute_lsh_visualization(coords_2d: np.ndarray, embeddings: np.ndarray, num
     boundary_points = np.where(min_margins < margin_threshold)[0]
     print(f"  Found {len(boundary_points)} boundary points")
 
+    # Step 7: Compute bucket names via LLM (falls back to TF-IDF)
+    bucket_names = compute_bucket_names_llm(bucket_to_indices, titles)
+    print(f"  Named {len(bucket_names)} buckets")
+
     return {
         'bucket_ids': bucket_ids,
         'hyperplanes_2d': hyperplanes_2d,
@@ -1482,7 +1481,173 @@ def compute_lsh_visualization(coords_2d: np.ndarray, embeddings: np.ndarray, num
         'boundary_points': boundary_points.tolist(),
         'num_bits': num_bits,
         'bucket_to_indices': dict(bucket_to_indices),
+        'bucket_names': bucket_names,
     }
+
+
+def compute_bucket_names(
+    bucket_to_indices: dict[int, list[int]],
+    titles: list[str],
+    top_k: int = 3,
+) -> dict[int, str]:
+    """Compute short descriptive names for LSH buckets using TF-IDF.
+
+    Treats each bucket as a "document" of concatenated titles. IDF is computed
+    across buckets so that words appearing in many buckets are down-weighted.
+
+    Args:
+        bucket_to_indices: Mapping of bucket_id -> list of point indices
+        titles: List of all titles
+        top_k: Number of keywords to join for the bucket name
+
+    Returns:
+        Dict mapping bucket_id -> short name string
+    """
+    import re
+    import math
+    from collections import defaultdict
+
+    try:
+        from nltk.corpus import stopwords
+        stop_words = set(stopwords.words('english'))
+    except LookupError:
+        import nltk
+        nltk.download('stopwords', quiet=True)
+        from nltk.corpus import stopwords
+        stop_words = set(stopwords.words('english'))
+
+    stop_words.update(['the', 'a', 'an', 'of', 'in', 'on', 'at', 'to', 'for',
+                       'and', 'or', 'is', 'was', 'are', 'were', 'be', 'been',
+                       'list', 'disambiguation', 'episode', 'season'])
+
+    def tokenize(text):
+        words = re.findall(r'[a-z]+', text.lower())
+        return [w for w in words if len(w) > 2 and w not in stop_words]
+
+    # Build per-bucket word counts and document frequencies
+    n_buckets = len(bucket_to_indices)
+    bucket_word_counts = {}
+    word_df = defaultdict(int)
+
+    for bid, indices in bucket_to_indices.items():
+        word_counts = defaultdict(int)
+        words_in_bucket = set()
+        for idx in indices:
+            for word in tokenize(titles[idx]):
+                word_counts[word] += 1
+                words_in_bucket.add(word)
+        bucket_word_counts[bid] = word_counts
+        for word in words_in_bucket:
+            word_df[word] += 1
+
+    # Filter: appear in >=2 buckets but not all
+    vocab = {w for w, df in word_df.items() if 2 <= df < n_buckets}
+    idf = {w: math.log((n_buckets + 1) / (word_df[w] + 1)) for w in vocab}
+
+    bucket_names = {}
+    for bid, word_counts in bucket_word_counts.items():
+        total = sum(word_counts.values())
+        if total == 0:
+            bucket_names[bid] = f"B{bid}"
+            continue
+
+        scores = []
+        for word in vocab:
+            tf = word_counts.get(word, 0) / total
+            score = tf * idf[word]
+            if score > 0:
+                scores.append((word, score))
+
+        scores.sort(key=lambda x: -x[1])
+        keywords = [w for w, _ in scores[:top_k]]
+        bucket_names[bid] = ', '.join(keywords) if keywords else f"B{bid}"
+
+    return bucket_names
+
+
+def compute_bucket_names_llm(
+    bucket_to_indices: dict[int, list[int]],
+    titles: list[str],
+    model: str = 'qwen2.5:7b',
+    ollama_url: str = 'http://localhost:11434/api/generate',
+    max_sample: int = 15,
+    concurrency: int = 8,
+) -> dict[int, str]:
+    """Compute bucket names using a local LLM via Ollama.
+
+    Sends a sample of deduplicated titles per bucket and asks for a 2-5 word
+    topic label.  Uses concurrent requests for speed.  Falls back to TF-IDF
+    ``compute_bucket_names`` if Ollama is unreachable.
+
+    Args:
+        bucket_to_indices: Mapping of bucket_id -> list of point indices
+        titles: List of all titles
+        model: Ollama model name
+        ollama_url: Ollama generate endpoint
+        max_sample: Max deduplicated titles to send per bucket
+        concurrency: Number of parallel requests
+
+    Returns:
+        Dict mapping bucket_id -> short label string
+    """
+    import json
+    import urllib.request
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    # Quick connectivity check
+    try:
+        req = urllib.request.Request(
+            ollama_url.replace('/api/generate', '/api/tags'),
+            method='GET',
+        )
+        urllib.request.urlopen(req, timeout=3)
+    except Exception:
+        print("  Ollama not reachable, falling back to TF-IDF bucket names")
+        return compute_bucket_names(bucket_to_indices, titles)
+
+    def _label_bucket(bid: int, indices: list[int]) -> tuple[int, str]:
+        sample = list(dict.fromkeys(titles[i] for i in indices))[:max_sample]
+        prompt = (
+            "Given these article titles from a thematic group, write a concise "
+            "2-5 word topic label that captures the common theme. "
+            "Reply with ONLY the label, nothing else.\n\n"
+            "Titles:\n" + "\n".join(f"- {t}" for t in sample)
+        )
+        payload = json.dumps({
+            'model': model,
+            'prompt': prompt,
+            'stream': False,
+            'options': {'temperature': 0, 'num_predict': 20},
+        }).encode()
+        try:
+            req = urllib.request.Request(
+                ollama_url, data=payload,
+                headers={'Content-Type': 'application/json'},
+            )
+            resp = json.loads(urllib.request.urlopen(req, timeout=30).read())
+            label = resp['response'].strip().strip('"').strip("'")
+            if label:
+                return bid, label
+        except Exception:
+            pass
+        return bid, f"B{bid}"
+
+    bucket_names: dict[int, str] = {}
+    total = len(bucket_to_indices)
+    done = 0
+    with ThreadPoolExecutor(max_workers=concurrency) as pool:
+        futures = {
+            pool.submit(_label_bucket, bid, idxs): bid
+            for bid, idxs in bucket_to_indices.items()
+        }
+        for future in as_completed(futures):
+            bid, label = future.result()
+            bucket_names[bid] = label
+            done += 1
+            if done % 50 == 0 or done == total:
+                print(f"  LLM labeled {done}/{total} buckets", flush=True)
+
+    return bucket_names
 
 
 def compute_multi_resolution_recovery(
@@ -1627,11 +1792,12 @@ def compute_lsh_hierarchy(
     embeddings: np.ndarray,
     n_micro_clusters: int = 1000,
 ) -> dict:
-    """Build dendrogram hierarchy using k-means micro-clusters on 2D coords.
+    """Build dendrogram hierarchy using BIRCH micro-clusters on 2D coords.
 
-    K-means on 2D UMAP coordinates produces spatially contiguous micro-clusters.
-    Ward linkage on their 2D centroids builds the hierarchy. Node labels are
-    cheap placeholders; real labels come from post-hoc label_flat_clusters().
+    BIRCH on 2D UMAP coordinates produces density-adaptive spatially contiguous
+    micro-clusters. Ward linkage on their 2D centroids builds the hierarchy.
+    Node labels are cheap placeholders; real labels come from post-hoc
+    label_flat_clusters().
 
     Returns the same dict contract as compute_dendrogram_hierarchy() for
     panel compatibility.
@@ -1641,15 +1807,16 @@ def compute_lsh_hierarchy(
 
     print("Computing spatial hierarchy...")
 
-    # K-means on 2D coords for spatially contiguous micro-clusters
-    n_micro = min(n_micro_clusters, len(coords_2d) // 10)
-    print(f"  K-means with k={n_micro} on 2D coordinates...")
-    kmeans = KMeans(n_clusters=n_micro, random_state=42, n_init=10)
-    kmeans.fit(coords_2d)
+    # BIRCH on 2D coords for density-adaptive spatially contiguous micro-clusters
+    target_k = min(n_micro_clusters, len(coords_2d) // 10)
+    print(f"  BIRCH micro-clustering (target ~{target_k} subclusters) on 2D coordinates...")
+    birch = _fit_birch(coords_2d, target_k)
+    n_micro = len(birch.subcluster_centers_)
+    print(f"    BIRCH produced {n_micro} subclusters")
 
-    point_to_micro = kmeans.labels_
+    point_to_micro = birch.labels_
 
-    # Connectivity-constrained Ward linkage on 2D micro-cluster centroids.
+    # Connectivity-constrained Ward linkage on 2D subcluster centroids.
     # kNN graph ensures Ward only merges spatially adjacent micro-clusters,
     # producing contiguous regions instead of patchwork.
     from sklearn.cluster import AgglomerativeClustering
@@ -1657,7 +1824,7 @@ def compute_lsh_hierarchy(
 
     print("  Building dendrogram (connectivity-constrained Ward on 2D centroids)...")
     n_neighbors = min(10, n_micro - 1)
-    connectivity = kneighbors_graph(kmeans.cluster_centers_, n_neighbors=n_neighbors, mode='connectivity')
+    connectivity = kneighbors_graph(birch.subcluster_centers_, n_neighbors=n_neighbors, mode='connectivity')
     connectivity = 0.5 * (connectivity + connectivity.T)
 
     agg = AgglomerativeClustering(
@@ -1666,7 +1833,7 @@ def compute_lsh_hierarchy(
         connectivity=connectivity,
         compute_distances=True,
     )
-    agg.fit(kmeans.cluster_centers_)
+    agg.fit(birch.subcluster_centers_)
     Z = _sklearn_to_scipy_Z(agg, n_micro)
 
     # Build tree and collect node info
@@ -2135,8 +2302,6 @@ def main():
     parser.add_argument("--output", type=str, default=None)
     parser.add_argument("--bridge-level", type=int, default=100,
                         help="Cluster level for bridge detection (12, 25, 50, or 100)")
-    parser.add_argument("--use-dendrogram", action="store_true",
-                        help="Use dynamic dendrogram hierarchy (labels all internal nodes)")
     parser.add_argument("--umap-neighbors", type=int, default=None,
                         help="UMAP n_neighbors (default: auto via dyf density)")
     parser.add_argument("--densmap", action="store_true",
@@ -2161,85 +2326,57 @@ def main():
         dedup=not args.no_dedup)
 
     # Compute LSH visualization data first (needed for LSH-based hierarchy)
-    lsh_data = compute_lsh_visualization(coords_2d, embeddings, num_bits=12)
+    lsh_data = compute_lsh_visualization(coords_2d, embeddings, titles, num_bits=12)
 
-    if args.use_dendrogram:
-        # LSH-based hierarchy: uses LSH buckets as micro-clusters
-        print("\n=== Using LSH-based dendrogram hierarchy ===")
-        dendrogram = compute_lsh_hierarchy(coords_2d, titles, embeddings)
+    # BIRCH-based dendrogram hierarchy
+    print("\n=== Building dendrogram hierarchy ===")
+    dendrogram = compute_lsh_hierarchy(coords_2d, titles, embeddings)
 
-        # Pre-compute cluster results for standard levels
-        cluster_result = {'labels': {}, 'names': {}, 'centroids': {}}
-        for n_clusters in CLUSTER_LEVELS:
-            print(f"Cutting dendrogram at {n_clusters} clusters...")
-            labels, centroids, names = cut_dendrogram(dendrogram, n_clusters)
-            cluster_result['labels'][n_clusters] = labels
-            cluster_result['centroids'][n_clusters] = centroids
-            cluster_result['names'][n_clusters] = names  # placeholder
+    # Pre-compute cluster results for standard levels
+    cluster_result = {'labels': {}, 'names': {}, 'centroids': {}}
+    for n_clusters in CLUSTER_LEVELS:
+        print(f"Cutting dendrogram at {n_clusters} clusters...")
+        labels, centroids, names = cut_dendrogram(dendrogram, n_clusters)
+        cluster_result['labels'][n_clusters] = labels
+        cluster_result['centroids'][n_clusters] = centroids
+        cluster_result['names'][n_clusters] = names  # placeholder
 
-        # Post-hoc labeling: label flat clusters directly from their spatial contents
-        print("\n=== Post-hoc cluster labeling ===")
-        for n_clusters in CLUSTER_LEVELS:
-            labels = cluster_result['labels'][n_clusters]
-            centroids = cluster_result['centroids'][n_clusters]
-            names = label_flat_clusters(
-                titles, coords_2d, labels, centroids, n_clusters)
-            names = disambiguate_cluster_names(names, titles, labels)
-            cluster_result['names'][n_clusters] = names
+    # Post-hoc labeling: label flat clusters directly from their spatial contents
+    print("\n=== Post-hoc cluster labeling ===")
+    for n_clusters in CLUSTER_LEVELS:
+        labels = cluster_result['labels'][n_clusters]
+        centroids = cluster_result['centroids'][n_clusters]
+        names = label_flat_clusters(
+            titles, coords_2d, labels, centroids, n_clusters)
+        names = disambiguate_cluster_names(names, titles, labels)
+        cluster_result['names'][n_clusters] = names
 
-        # Detect cluster gradients (elongated clusters with directional themes)
-        print("\n=== Detecting cluster gradients ===")
-        cluster_result['gradients'] = {}
-        cluster_result['gradient_network'] = {}
-        for n_clusters in CLUSTER_LEVELS:
-            labels = cluster_result['labels'][n_clusters]
-            names = cluster_result['names'][n_clusters]
-            gradients = detect_cluster_gradients(
-                coords_2d, titles, labels, n_clusters, embeddings=embeddings)
-            label_gradient_endpoints(gradients, coords_2d, labels, cluster_result, n_clusters)
-            cluster_result['gradients'][n_clusters] = gradients
-            n_elongated = len(gradients)
-            if n_elongated > 0:
-                max_elong = max(g['elongation'] for g in gradients.values())
-                print(f"  {n_clusters} clusters: {n_elongated} elongated "
-                      f"(max elongation={max_elong:.1f})")
-                # Build gradient network
-                edges = build_gradient_network(gradients, names, k=1)
-                cluster_result['gradient_network'][n_clusters] = edges
-                print(f"    gradient network: {len(edges)} connections")
-            else:
-                print(f"  {n_clusters} clusters: none elongated")
-                cluster_result['gradient_network'][n_clusters] = []
+    # Detect cluster gradients (elongated clusters with directional themes)
+    print("\n=== Detecting cluster gradients ===")
+    cluster_result['gradients'] = {}
+    cluster_result['gradient_network'] = {}
+    for n_clusters in CLUSTER_LEVELS:
+        labels = cluster_result['labels'][n_clusters]
+        names = cluster_result['names'][n_clusters]
+        gradients = detect_cluster_gradients(
+            coords_2d, titles, labels, n_clusters, embeddings=embeddings)
+        label_gradient_endpoints(gradients, coords_2d, labels, cluster_result, n_clusters)
+        cluster_result['gradients'][n_clusters] = gradients
+        n_elongated = len(gradients)
+        if n_elongated > 0:
+            max_elong = max(g['elongation'] for g in gradients.values())
+            print(f"  {n_clusters} clusters: {n_elongated} elongated "
+                  f"(max elongation={max_elong:.1f})")
+            # Build gradient network
+            edges = build_gradient_network(gradients, names, k=1)
+            cluster_result['gradient_network'][n_clusters] = edges
+            print(f"    gradient network: {len(edges)} connections")
+        else:
+            print(f"  {n_clusters} clusters: none elongated")
+            cluster_result['gradient_network'][n_clusters] = []
 
-        # Add dendrogram to cluster_result for dynamic cutting
-        cluster_result['dendrogram'] = dendrogram
-    else:
-        # Legacy fixed-level approach
-        cluster_result = compute_hierarchical_clusters(coords_2d, titles)
-        dendrogram = None
-
-        # Detect cluster gradients for legacy path too
-        print("\n=== Detecting cluster gradients (legacy) ===")
-        cluster_result['gradients'] = {}
-        cluster_result['gradient_network'] = {}
-        for n_clusters in CLUSTER_LEVELS:
-            labels = cluster_result['labels'][n_clusters]
-            names = cluster_result['names'][n_clusters]
-            gradients = detect_cluster_gradients(
-                coords_2d, titles, labels, n_clusters, embeddings=embeddings)
-            label_gradient_endpoints(gradients, coords_2d, labels, cluster_result, n_clusters)
-            cluster_result['gradients'][n_clusters] = gradients
-            n_elongated = len(gradients)
-            if n_elongated > 0:
-                max_elong = max(g['elongation'] for g in gradients.values())
-                print(f"  {n_clusters} clusters: {n_elongated} elongated "
-                      f"(max elongation={max_elong:.1f})")
-                edges = build_gradient_network(gradients, names, k=1)
-                cluster_result['gradient_network'][n_clusters] = edges
-                print(f"    gradient network: {len(edges)} connections")
-            else:
-                print(f"  {n_clusters} clusters: none elongated")
-                cluster_result['gradient_network'][n_clusters] = []
+    # Add dendrogram to cluster_result for dynamic cutting
+    cluster_result['dendrogram'] = dendrogram
 
     (bridge_edges, edge_indices, cluster_pairs, diversity,
      unified_edge_types, unified_edge_mutual) = compute_unified_edges(
@@ -2336,8 +2473,7 @@ def main():
 
     print(f"\nSaved cache to {output_path}")
     print(f"Run server with: bokeh serve demo/rog_panel.py --port 5007 --args {output_path}")
-    if args.use_dendrogram:
-        print("Note: Dendrogram data included - panel can dynamically cut at any level")
+    print("Note: Dendrogram data included - panel can dynamically cut at any level")
     print("Note: LSH data included - toggle LSH mode to see bucket assignments")
 
 

@@ -473,7 +473,7 @@ class ROGBrowser:
         # Hover tooltip for bucket summary circles
         from bokeh.models import HoverTool as BucketHT
         bucket_summary_hover = BucketHT(
-            tooltips=[("Bucket", "@name"), ("Points", "@count")],
+            tooltips=[("Bucket", "@name"), ("Points", "@count"), ("Cluster", "@cluster")],
             renderers=[self.bucket_summary_renderer],
         )
         self.figure.add_tools(bucket_summary_hover)
@@ -636,7 +636,8 @@ class ROGBrowser:
         for i, bid in enumerate(bucket_ids):
             bucket_members.setdefault(int(bid), []).append(i)
 
-        bucket_dominant_cluster = {}
+        self.lsh_bucket_dominant_cluster = {}
+        bucket_dominant_cluster = self.lsh_bucket_dominant_cluster
         bucket_within_idx = {}  # bucket's index within its cluster group
         cluster_bucket_counts = Counter()  # how many buckets per cluster
         for bid in unique_buckets:
@@ -921,13 +922,13 @@ class ROGBrowser:
             # Base hue from top-level cluster
             base_hue = base_hues[top_cluster % len(base_hues)]
 
-            # Small hue variation from micro-cluster (±0.05)
-            hue_variation = ((micro_cluster % 10) - 5) * 0.01
+            # Hue variation from micro-cluster (±0.08)
+            hue_variation = ((micro_cluster % 10) - 5) * 0.016
             hue = (base_hue + hue_variation) % 1.0
 
             # Saturation/lightness variation from micro-cluster
-            sat = 0.5 + (micro_cluster % 7) * 0.07  # 0.5-0.92
-            light = 0.45 + (micro_cluster % 5) * 0.08  # 0.45-0.77
+            sat = 0.4 + (micro_cluster % 7) * 0.09  # 0.4-0.94
+            light = 0.35 + (micro_cluster % 5) * 0.12  # 0.35-0.83
 
             # Convert HSL to RGB
             r, g, b = colorsys.hls_to_rgb(hue, light, sat)
@@ -1396,7 +1397,11 @@ class ROGBrowser:
             # Build summary data from bucket info
             unique_buckets = sorted(bucket_centroids.keys())
 
-            sx, sy, s_size, s_color, s_name, s_count, s_alpha = [], [], [], [], [], [], []
+            # Look up cluster names for dominant cluster per bucket
+            coarsest_level = min(self.cluster_result['labels'].keys())
+            cluster_names = self.cluster_result['names'].get(coarsest_level, {})
+
+            sx, sy, s_size, s_color, s_name, s_count, s_alpha, s_cluster = [], [], [], [], [], [], [], []
             sizes_list = [bucket_sizes.get(bid, 1) for bid in unique_buckets]
             max_sz = max(sizes_list) if sizes_list else 1
             for bid in unique_buckets:
@@ -1408,6 +1413,9 @@ class ROGBrowser:
                 scaled = 8 + 32 * np.sqrt(sz / max_sz)
                 # Color from precomputed hierarchical bucket color map
                 color = self.lsh_bucket_color_map.get(int(bid), '#888888')
+                # Dominant cluster name
+                dom_id = self.lsh_bucket_dominant_cluster.get(int(bid), 0)
+                dom_name = cluster_names.get(dom_id, f"Cluster {dom_id}")
 
                 sx.append(cx)
                 sy.append(cy)
@@ -1416,10 +1424,12 @@ class ROGBrowser:
                 s_name.append(bucket_names.get(bid, f"B{bid}"))
                 s_count.append(str(sz))
                 s_alpha.append(0.8)
+                s_cluster.append(dom_name)
 
             self.bucket_summary_source.data = {
                 'x': sx, 'y': sy, 'size': s_size, 'color': s_color,
                 'name': s_name, 'count': s_count, 'alpha': s_alpha,
+                'cluster': s_cluster,
             }
             self.bucket_summary_renderer.visible = True
 
