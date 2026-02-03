@@ -71,6 +71,14 @@ from .pca_tree import (
     cut_tree_to_labels,
 )
 
+# DYF tree (recursive k-ary LSH splits)
+from .dyf_tree import (
+    build_dyf_tree,
+    cut_dyf_tree_to_labels,
+)
+# Also available: dyf_tree.extract_boundary_persistence,
+#                 dyf_tree.boundary_persistence_scores
+
 # Re-ranking
 from .rerank import (
     rerank_standard,
@@ -157,6 +165,9 @@ __all__ = [
     "extract_boundary_persistence",
     "boundary_persistence_scores",
     "cut_tree_to_labels",
+    # DYF tree
+    "build_dyf_tree",
+    "cut_dyf_tree_to_labels",
     # Re-ranking
     "rerank_standard",
     "rerank_mmr",
