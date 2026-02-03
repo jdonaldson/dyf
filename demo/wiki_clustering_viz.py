@@ -807,47 +807,35 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
     overlay_html = f"""
 <!-- Header -->
 <div id="header" style="position:absolute;top:0;left:0;right:260px;z-index:10;
-  padding:12px 20px;background:rgba(30,30,30,0.92);
-  border-bottom:1px solid #444;color:#ddd;
-  font:14px -apple-system,'Segoe UI',sans-serif;">
+  padding:12px 20px;font:14px -apple-system,'Segoe UI',sans-serif;">
   <div style="font-size:16px;font-weight:600">{title_str}</div>
-  <div id="header-sub" style="font-size:12px;color:#999">
+  <div id="header-sub" class="sub" style="font-size:12px;">
     Scroll to zoom &middot; Drag to orbit &middot; Hover for details
   </div>
 </div>
 
 <!-- Control panel -->
 <div id="panel" style="position:absolute;top:0;right:0;bottom:0;width:260px;
-  z-index:10;background:rgba(28,28,28,0.95);border-left:1px solid #444;
-  color:#ddd;font:13px -apple-system,'Segoe UI',sans-serif;
+  z-index:10;font:13px -apple-system,'Segoe UI',sans-serif;
   overflow-y:auto;padding:16px;">
 
-  <div style="font-weight:600;font-size:14px;margin-bottom:12px;
-    color:#aaa;text-transform:uppercase;letter-spacing:1px;font-size:11px;">
+  <div style="font-weight:600;margin-bottom:12px;
+    color:var(--fg-section);text-transform:uppercase;letter-spacing:1px;font-size:11px;">
     Controls
   </div>
 
   <div style="display:flex;gap:8px;margin-bottom:16px;">
-    <button id="reset-btn" style="flex:1;background:#444;color:#ddd;
-      border:1px solid #666;padding:8px 0;border-radius:4px;cursor:pointer;
-      font-size:13px;font-family:inherit;"
-      onmouseover="this.style.background='#555'"
-      onmouseout="this.style.background='#444'">
-      Reset View
-    </button>
-    <button id="mode-btn" style="flex:1;background:#444;color:#ddd;
-      border:1px solid #666;padding:8px 0;border-radius:4px;cursor:pointer;
-      font-size:13px;font-family:inherit;"
-      onmouseover="this.style.background='#555'"
-      onmouseout="this.style.background='#444'">
-      2D Mode
-    </button>
+    <button id="reset-btn" class="panel-btn">Reset View</button>
+    <button id="mode-btn" class="panel-btn">2D Mode</button>
+  </div>
+  <div style="display:flex;gap:8px;margin-bottom:16px;">
+    <button id="theme-btn" class="panel-btn">Light Mode</button>
   </div>
 
   <div style="margin-bottom:12px;">
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
       <input type="checkbox" id="toggle-labels" checked
-        style="accent-color:#888;width:16px;height:16px;">
+        style="accent-color:var(--accent);width:16px;height:16px;">
       <span>Show labels</span>
     </label>
   </div>
@@ -855,35 +843,60 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
   <div style="margin-bottom:16px;">
     <div style="margin-bottom:6px;">Point size: <span id="ps-val">2</span></div>
     <input type="range" id="point-size" min="1" max="8" value="2" step="0.5"
-      style="width:100%;accent-color:#888;">
+      style="width:100%;accent-color:var(--accent);">
   </div>
 
   <div style="font-weight:600;font-size:11px;margin-bottom:8px;
-    color:#aaa;text-transform:uppercase;letter-spacing:1px;">
+    color:var(--fg-section);text-transform:uppercase;letter-spacing:1px;">
     Clusters
   </div>
   <div id="cluster-list" style="font-size:12px;line-height:1.8;"></div>
 </div>
 
 <style>
+:root {{
+  --bg: #1e1e1e; --bg-panel: rgba(28,28,28,0.95); --bg-header: rgba(30,30,30,0.92);
+  --bg-label: rgba(30,30,30,0.88); --bg-btn: #444; --bg-btn-hover: #555;
+  --fg: #ddd; --fg-muted: #999; --fg-section: #aaa;
+  --border: #444; --border-label: rgba(120,120,120,0.5);
+  --range-bg: #555; --range-thumb: #aaa; --accent: #888;
+  --shadow-label: rgba(0,0,0,0.6);
+}}
+body.light {{
+  --bg: #f5f5f5; --bg-panel: rgba(245,245,245,0.97); --bg-header: rgba(250,250,250,0.95);
+  --bg-label: rgba(255,255,255,0.92); --bg-btn: #ddd; --bg-btn-hover: #ccc;
+  --fg: #222; --fg-muted: #666; --fg-section: #555;
+  --border: #ccc; --border-label: rgba(100,100,100,0.3);
+  --range-bg: #ccc; --range-thumb: #666; --accent: #666;
+  --shadow-label: rgba(0,0,0,0.15);
+}}
 .cl {{
   position:absolute; pointer-events:none; z-index:5;
-  color:#fff; font:bold 14px -apple-system,"Segoe UI",sans-serif;
-  background:rgba(30,30,30,0.88);
-  border:1px solid rgba(120,120,120,0.5);
+  color:var(--fg); font:bold 14px -apple-system,"Segoe UI",sans-serif;
+  background:var(--bg-label);
+  border:1px solid var(--border-label);
   padding:2px 6px; border-radius:3px; white-space:nowrap;
   transform:translate(-50%,-50%);
-  text-shadow:0 1px 2px rgba(0,0,0,0.6);
+  text-shadow:0 1px 2px var(--shadow-label);
   transition:opacity 0.15s;
 }}
+#header {{ background:var(--bg-header); border-bottom:1px solid var(--border); color:var(--fg); }}
+#header .sub {{ color:var(--fg-muted); }}
+#panel {{ background:var(--bg-panel); border-left:1px solid var(--border); color:var(--fg); }}
 #panel input[type="range"] {{
-  -webkit-appearance:none; height:4px; background:#555; border-radius:2px;
+  -webkit-appearance:none; height:4px; background:var(--range-bg); border-radius:2px;
   outline:none;
 }}
 #panel input[type="range"]::-webkit-slider-thumb {{
   -webkit-appearance:none; width:14px; height:14px;
-  background:#aaa; border-radius:50%; cursor:pointer;
+  background:var(--range-thumb); border-radius:50%; cursor:pointer;
 }}
+.panel-btn {{
+  flex:1; background:var(--bg-btn); color:var(--fg);
+  border:1px solid var(--border); padding:8px 0; border-radius:4px;
+  cursor:pointer; font-size:13px; font-family:inherit;
+}}
+.panel-btn:hover {{ background:var(--bg-btn-hover); }}
 </style>
 
 <script>
@@ -1008,7 +1021,7 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
         'background:rgb(' + c.r + ',' + c.g + ',' + c.b + ');margin-right:6px;' +
         'vertical-align:middle;"></span>' +
         '<span style="vertical-align:middle;">' + c.text +
-        ' <span style="color:#888;">(' + c.size + ')</span></span>';
+        ' <span style="color:var(--fg-muted);">(' + c.size + ')</span></span>';
 
       // Single click: toggle hide
       row.addEventListener("click", function(e) {{
@@ -1187,6 +1200,30 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
     dk.setProps({{ layers: newLayers }});
   }});
 
+  // ── Dark/light theme toggle ──────────────────────────────────────────
+  var currentTheme = "dark";
+  function setTheme(theme) {{
+    currentTheme = theme;
+    var isLight = (theme === "light");
+    document.body.classList.toggle("light", isLight);
+    var btn = document.getElementById("theme-btn");
+    if (btn) btn.textContent = isLight ? "Dark Mode" : "Light Mode";
+    // Update deck.gl canvas background
+    var bg = isLight ? "#f5f5f5" : "#1e1e1e";
+    document.body.style.background = bg;
+    var canvases = document.querySelectorAll("canvas");
+    canvases.forEach(function(c) {{ c.style.background = bg; }});
+    // Update pydeck wrapper div
+    var deckDiv = document.getElementById("deck-container");
+    if (deckDiv) deckDiv.style.background = bg;
+    var deckWrapper = document.querySelector("#deckgl-wrapper");
+    if (deckWrapper) deckWrapper.style.background = bg;
+  }}
+
+  document.getElementById("theme-btn").addEventListener("click", function() {{
+    setTheme(currentTheme === "dark" ? "light" : "dark");
+  }});
+
   // ── 2D/3D mode toggle ────────────────────────────────────────────────
   function setViewMode(mode) {{
     viewMode = mode;
@@ -1316,6 +1353,11 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
         case "set_mode":
           if (msg.mode === "2d" || msg.mode === "3d") {{
             setViewMode(msg.mode);
+          }}
+          break;
+        case "set_theme":
+          if (msg.theme === "light" || msg.theme === "dark") {{
+            setTheme(msg.theme);
           }}
           break;
       }}
