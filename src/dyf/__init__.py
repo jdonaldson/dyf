@@ -57,8 +57,26 @@ from .io import save_index, load_index, PrecomputedIndex
 from .chunks import (
     DocSpread,
     chunk_redundancy,
+    cluster_quality,
     deduplicate_chunks,
     doc_spread,
+    neighbor_coherence,
+)
+
+# PCA tree
+from .pca_tree import (
+    build_pca_tree,
+    extract_boundary_persistence,
+    boundary_persistence_scores,
+    cut_tree_to_labels,
+)
+
+# Re-ranking
+from .rerank import (
+    rerank_standard,
+    rerank_mmr,
+    rerank_bridge_boost,
+    rerank_bridge_mmr,
 )
 
 # RAG index
@@ -130,8 +148,20 @@ __all__ = [
     # Chunk analysis
     "DocSpread",
     "chunk_redundancy",
+    "cluster_quality",
     "deduplicate_chunks",
     "doc_spread",
+    "neighbor_coherence",
+    # PCA tree
+    "build_pca_tree",
+    "extract_boundary_persistence",
+    "boundary_persistence_scores",
+    "cut_tree_to_labels",
+    # Re-ranking
+    "rerank_standard",
+    "rerank_mmr",
+    "rerank_bridge_boost",
+    "rerank_bridge_mmr",
 ]
 
 def check_rust_available():
