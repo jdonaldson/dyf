@@ -25,6 +25,8 @@ from pathlib import Path
 import numpy as np
 import polars as pl
 import umap
+from scipy.cluster.hierarchy import linkage, fcluster
+from scipy.ndimage import gaussian_filter
 from sklearn.cluster import Birch
 from sklearn.neighbors import NearestNeighbors
 
@@ -130,6 +132,157 @@ def orient_landscape(coords):
     return out
 
 
+# ── 3D HAMMER edge bundling ──────────────────────────────────────────
+
+
+def bundle_edges_3d(node_coords, edges, n_points=20, attraction=0.7):
+    """3D edge bundling via midpoint attraction with cubic spline output.
+
+    For each edge, computes a midpoint pulled toward the centroid of all
+    edge midpoints that share a node (i.e. edges from the same cluster hub
+    get bundled). The pulled midpoint becomes a spline control point,
+    producing smooth curves that converge at shared hubs.
+
+    Args:
+        node_coords: (N, 3) array of node positions
+        edges: list of (source_idx, target_idx) tuples
+        n_points: number of output points per edge path
+        attraction: how strongly midpoints pull toward shared hub (0-1)
+
+    Returns:
+        list of (n_points, 3) arrays — one smooth path per edge
+    """
+    from scipy.interpolate import CubicSpline
+
+    if not edges:
+        return []
+
+    coords = np.asarray(node_coords, dtype=np.float32)
+
+    # Compute the centroid of all edge midpoints sharing each node
+    # This creates natural "hubs" where edges from the same cluster converge
+    node_mid_sum = defaultdict(lambda: np.zeros(3, dtype=np.float64))
+    node_mid_count = defaultdict(int)
+    edge_midpoints = []
+    for src, dst in edges:
+        mid = (coords[src] + coords[dst]) / 2
+        edge_midpoints.append(mid)
+        node_mid_sum[src] += mid
+        node_mid_count[src] += 1
+        node_mid_sum[dst] += mid
+        node_mid_count[dst] += 1
+
+    # For each node, the hub point is the average midpoint of its edges
+    node_hub = {}
+    for nid in node_mid_sum:
+        node_hub[nid] = (node_mid_sum[nid] / node_mid_count[nid]).astype(np.float32)
+
+    # Build smooth spline paths
+    result = []
+    t_ctrl = np.array([0.0, 0.25, 0.5, 0.75, 1.0])
+    t_out = np.linspace(0, 1, n_points)
+
+    for i, (src, dst) in enumerate(edges):
+        p0 = coords[src]
+        p4 = coords[dst]
+        mid = edge_midpoints[i]
+
+        # Pull the midpoint toward both endpoint hubs
+        hub_src = node_hub[src]
+        hub_dst = node_hub[dst]
+        attracted_mid = mid + attraction * ((hub_src + hub_dst) / 2 - mid)
+
+        # Quarter points interpolate between endpoint and attracted midpoint
+        q1 = p0 * 0.5 + attracted_mid * 0.5
+        q3 = p4 * 0.5 + attracted_mid * 0.5
+
+        ctrl = np.array([p0, q1, attracted_mid, q3, p4], dtype=np.float32)
+        cs = CubicSpline(t_ctrl, ctrl, bc_type='clamped')
+        path = cs(t_out).astype(np.float32)
+        result.append(path)
+
+    return result
+
+
+def compute_bridge_edges_3d(coords, embeddings, labels, n_clusters):
+    """Compute cross-cluster bridge edges using ROG ontology.
+
+    Returns (bundled_3d, bundled_2d, pair_counts, centroids) where
+    bundled_3d and bundled_2d are lists of bundled edge paths for
+    3D and 2D rendering respectively.
+    """
+    from collections import defaultdict
+    import dyf
+
+    print("  Building ROG ontology for bridge detection...")
+    result = dyf.build_rog_ontology(
+        embeddings,
+        initial_threshold=0.55,
+        min_threshold=0.35,
+        target_coverage=0.95,
+        verbose=False,
+    )
+
+    ont = result.ontology
+    pair_counts = defaultdict(int)
+
+    for parent, children_list in ont.children.items():
+        for child, sim, div_gap in children_list:
+            c1, c2 = int(labels[parent]), int(labels[child])
+            if c1 != c2:
+                pair = (min(c1, c2), max(c1, c2))
+                pair_counts[pair] += 1
+
+    cross = sum(pair_counts.values())
+    print(f"  Found {len(pair_counts)} cluster pairs, {cross:,} cross-cluster edges")
+
+    # Compute cluster centroids in 3D
+    centroids = np.zeros((n_clusters, coords.shape[1]), dtype=np.float32)
+    for c in range(n_clusters):
+        mask = labels == c
+        if mask.any():
+            centroids[c] = coords[mask].mean(axis=0)
+
+    # Build edge list (deduplicated cluster pairs)
+    edge_list = sorted(pair_counts.keys(), key=lambda p: -pair_counts[p])
+
+    if not edge_list:
+        return [], {}, centroids
+
+    # 2D: datashader hammer_bundle (proven KDEEB on dense 2D grid)
+    print(f"  Bundling {len(edge_list)} bridge edges in 2D (datashader)...")
+    import pandas as pd
+    from datashader.bundling import hammer_bundle as ds_hammer_bundle
+
+    centroids_2d = centroids[:, :2]
+    nodes_df = pd.DataFrame({
+        "x": centroids_2d[:, 0].astype(float),
+        "y": centroids_2d[:, 1].astype(float),
+    })
+    edges_df = pd.DataFrame({
+        "source": [e[0] for e in edge_list],
+        "target": [e[1] for e in edge_list],
+    })
+    bundled_df = ds_hammer_bundle(nodes_df, edges_df)
+
+    # Parse datashader output: NaN-separated edge segments → list of paths
+    bundled_2d = []
+    current_path = []
+    for _, row in bundled_df.iterrows():
+        if pd.isna(row["x"]) or pd.isna(row["y"]):
+            if current_path:
+                bundled_2d.append(np.array(current_path, dtype=np.float32))
+                current_path = []
+        else:
+            current_path.append([row["x"], row["y"], 0.0])
+    if current_path:
+        bundled_2d.append(np.array(current_path, dtype=np.float32))
+
+    print(f"  Got {len(bundled_2d)} 2D bundled paths")
+
+    return bundled_2d, pair_counts, centroids
+
+
 def fit_birch(data, target_k, max_iters=10):
     """Fit BIRCH with enough subclusters, then agglomerative merge to target_k."""
     # Binary search for a threshold that produces >= target_k subclusters
@@ -164,6 +317,70 @@ def fit_birch(data, target_k, max_iters=10):
         return birch
 
     return best_birch
+
+
+CLUSTER_LEVELS = (5, 12, 25)
+
+
+def build_label_hierarchy(coords, titles_arr, birch, embeddings=None,
+                          model=None):
+    """Build multi-level label hierarchy from BIRCH subclusters via Ward linkage.
+
+    If model is provided, generates LLM labels via contrastive TF-IDF.
+    Returns dict mapping level -> list of label dicts with centroid, name, size.
+    """
+    ndim = coords.shape[1]
+    sub_centers = birch.subcluster_centers_
+    n_subs = len(sub_centers)
+    titles = list(titles_arr)
+
+    # Ward linkage on subcluster centers
+    Z = linkage(sub_centers, method='ward')
+
+    # Map each point to its subcluster
+    sub_labels = birch.predict(coords)
+
+    levels = {}
+    for k in CLUSTER_LEVELS:
+        if k >= n_subs:
+            continue
+        # Cut dendrogram at k clusters
+        micro_labels = fcluster(Z, k, criterion='maxclust') - 1
+        # Map points through subclusters to final labels
+        point_labels = np.array([micro_labels[s] for s in sub_labels])
+
+        # Get LLM labels if model provided
+        cluster_names = None
+        if model and embeddings is not None:
+            print(f"  Labeling level {k}...")
+            cluster_names = label_clusters(
+                titles, coords, point_labels, embeddings, model=model)
+
+        label_data = []
+        for cid in sorted(set(point_labels)):
+            mask = point_labels == cid
+            if not mask.any():
+                continue
+            pts = np.where(mask)[0]
+            centroid = coords[pts].mean(axis=0)
+            if cluster_names and cid in cluster_names:
+                name = cluster_names[cid]
+            else:
+                # Fallback: nearest title to centroid
+                dists = np.linalg.norm(coords[pts] - centroid, axis=1)
+                name = str(titles_arr[pts[np.argmin(dists)]])
+            rec = {
+                "x": float(centroid[0]),
+                "y": float(centroid[1]),
+                "z": float(centroid[2]) if ndim >= 3 else 0.0,
+                "text": name[:50],
+                "size": int(mask.sum()),
+            }
+            label_data.append(rec)
+        levels[k] = label_data
+        print(f"  Level {k}: {len(label_data)} labels")
+
+    return levels
 
 
 def golden_ratio_colors(labels):
@@ -366,19 +583,19 @@ def label_clusters(titles, coords, labels, embeddings, model="gemma2:9b",
                           f"{', '.join(keywords)}")
 
         prompt = (
-            f"You are labeling clusters on a Wikipedia article map. "
-            f"This cluster has {len(pts)} articles.\n"
+            f"You are labeling clusters in an embedding space. "
+            f"This cluster has {len(pts)} items.\n"
             f"{kw_str}\n"
-            f"Sample articles from across this cluster:\n"
+            f"Sample items from across this cluster:\n"
             + "\n".join(f"- {t}" for t in sample_titles)
             + "\n\n"
-            "Give a short (2-5 word) label for this cluster. "
-            "The label should name the SPECIFIC subject area, "
-            "not a vague category.\n\n"
-            "BAD labels (too vague): \"Human Knowledge\", "
-            "\"Historical Events\", \"Human Culture\"\n"
-            "GOOD labels: \"Anatomy & Medicine\", \"Cold War Politics\", "
-            "\"European Monarchs\", \"Programming Languages\"\n\n"
+            "Give a short (2-5 word) label that DISTINGUISHES this cluster "
+            "from similar ones. Use the distinguishing keywords and specific "
+            "product/item names to find what makes this group unique.\n\n"
+            "BAD labels (too vague): \"Medical Devices\", "
+            "\"Surgical Instruments\", \"General Products\"\n"
+            "GOOD labels: \"Spinal Fixation Screws\", \"Dental Crowns & Bridges\", "
+            "\"Compression Stockings\", \"Hearing Aid Components\"\n\n"
             "Reply with ONLY the label, nothing else."
         )
         tasks.append((cid, prompt))
@@ -703,7 +920,8 @@ def build_html(coords, titles_arr, labels, color_map, title_str,
 
 
 def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
-                 cluster_names=None, ws_port=8766):
+                 cluster_names=None, ws_port=8766, label_levels=None,
+                 bundled_edges=None):
     """Build a pydeck 3D point cloud with HTML overlay labels."""
     import pydeck as pdk
 
@@ -725,7 +943,7 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
         }
         point_data.append(rec)
 
-    # Centroid labels
+    # Centroid labels — single level fallback
     label_data = []
     for cid in sorted(set(labels_list)):
         mask = np.array(labels_list) == cid
@@ -747,6 +965,14 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
         }
         label_data.append(rec)
 
+    # Multi-level label hierarchy (if provided, use it; otherwise single-level)
+    if label_levels:
+        levels_data = label_levels
+    else:
+        # Wrap single-level as the only level
+        n_clusters = len(label_data)
+        levels_data = {n_clusters: label_data}
+
     # Data is median-centered by run_umap, so origin is the natural center
     target = [0, 0, 0]
 
@@ -765,6 +991,21 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
         auto_highlight=True,
     )
 
+    layers = [point_layer]
+
+    # Add empty edge layer (populated in 2D mode by JS rebuildLayer)
+    if bundled_edges:
+        edge_layer = pdk.Layer(
+            "PathLayer",
+            data=[],
+            get_path="path",
+            get_color="color",
+            width_min_pixels=1,
+            width_max_pixels=2,
+            pickable=False,
+        )
+        layers.append(edge_layer)
+
     # TextLayer + OrbitView has a known sizing bug (deck.gl #6808).
     # We inject HTML overlay labels instead — see reset_script below.
 
@@ -779,7 +1020,7 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
     view = pdk.View(type="OrbitView", controller=True)
 
     deck = pdk.Deck(
-        layers=[point_layer],
+        layers=layers,
         initial_view_state=view_state,
         views=[view],
         tooltip={"text": "{title}\nCluster {cluster}"},
@@ -795,7 +1036,15 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
         1,
     )
     label_json = json.dumps(label_data)
+    # Multi-level labels: keys are level numbers (as strings in JSON)
+    levels_json = json.dumps({str(k): v for k, v in levels_data.items()})
     point_json = json.dumps(point_data)
+    # Edge path data for JS (2D bundled edges only, shown in 2D mode)
+    edge_paths_json = "[]"
+    if bundled_edges:
+        edge_paths = [[[float(p[0]), float(p[1]), float(p[2])]
+                       for p in path] for path in bundled_edges]
+        edge_paths_json = json.dumps(edge_paths)
 
     # Expose pydeck's local deckInstance as a global
     html = html.replace(
@@ -840,6 +1089,14 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
     </label>
   </div>
 
+  <div style="margin-bottom:12px;">
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+      <input type="checkbox" id="toggle-edges" checked
+        style="accent-color:var(--accent);width:16px;height:16px;">
+      <span>Show bridge edges</span>
+    </label>
+  </div>
+
   <div style="margin-bottom:16px;">
     <div style="margin-bottom:6px;">Point size: <span id="ps-val">2</span></div>
     <input type="range" id="point-size" min="1" max="8" value="2" step="0.5"
@@ -880,6 +1137,9 @@ body.light {{
   text-shadow:0 1px 2px var(--shadow-label);
   transition:opacity 0.15s;
 }}
+.cl.level-coarse {{ font-size:15px; font-weight:800; border-width:2px; }}
+.cl.level-mid    {{ font-size:13px; font-weight:700; border-width:1px; }}
+.cl.level-fine   {{ font-size:11px; font-weight:600; border-width:1px; opacity:0.85; }}
 #header {{ background:var(--bg-header); border-bottom:1px solid var(--border); color:var(--fg); }}
 #header .sub {{ color:var(--fg-muted); }}
 #panel {{ background:var(--bg-panel); border-left:1px solid var(--border); color:var(--fg); }}
@@ -902,8 +1162,11 @@ body.light {{
 <script>
 (function() {{
   var labels = {label_json};
+  var labelLevels = {levels_json};
   var allPoints = {point_json};
+  var edgePaths = {edge_paths_json};
   var labelsVisible = true;
+  var edgesVisible = true;
 
   // Cluster visibility state: null=all visible, Set=only those visible
   var hiddenClusters = new Set();
@@ -911,55 +1174,56 @@ body.light {{
 
   // 2D/3D mode state
   var viewMode = "3d";
+  var currentTheme = "dark";
   var zBackup = allPoints.map(function(p) {{ return p.z; }});
-  var zLabelsBackup = labels.map(function(c) {{ return c.z; }});
 
-  // Build cluster ID list from labels
-  var clusterIds = labels.map(function(c, i) {{ return i; }});
-  // Map label index to cluster IDs in point data
-  var labelClusterIds = [];
-  (function() {{
-    var seen = {{}};
-    allPoints.forEach(function(p) {{
-      if (!(p.cluster in seen)) {{
-        seen[p.cluster] = true;
-        labelClusterIds.push(p.cluster);
-      }}
-    }});
-  }})();
-  // Build lookup: cluster id -> label index
-  var clusterToLabelIdx = {{}};
-  labels.forEach(function(c, i) {{
-    // Match by cluster position in sorted unique cluster IDs
-    var uniqueCids = [];
-    var cset = {{}};
-    allPoints.forEach(function(p) {{
-      if (!(p.cluster in cset)) {{ cset[p.cluster] = true; uniqueCids.push(p.cluster); }}
-    }});
-    uniqueCids.sort(function(a,b) {{ return a - b; }});
-    // labels are in sorted cluster order already
-    if (i < uniqueCids.length) clusterToLabelIdx[uniqueCids[i]] = i;
+  // ── Multi-level label system ─────────────────────────────────────────
+  // Parse levels: keys are cluster counts (as strings), values are label arrays
+  var levelKeys = Object.keys(labelLevels).map(Number).sort(function(a,b) {{ return a - b; }});
+  // Store z backups per level for 2D/3D toggle
+  var zLevelsBackup = {{}};
+  levelKeys.forEach(function(k) {{
+    zLevelsBackup[k] = labelLevels[k].map(function(c) {{ return c.z; }});
   }});
-
-  // Create label DOM elements
-  var els = labels.map(function(c) {{
+  // Level style classes: coarsest=coarse, finest=fine, middle=mid
+  function levelClass(k) {{
+    var idx = levelKeys.indexOf(k);
+    if (idx === 0) return "level-coarse";
+    if (idx === levelKeys.length - 1) return "level-fine";
+    return "level-mid";
+  }}
+  // Pre-create a pool of reusable label DOM elements
+  var MAX_VISIBLE_LABELS = 40;
+  var labelPool = [];
+  for (var _lp = 0; _lp < MAX_VISIBLE_LABELS; _lp++) {{
     var e = document.createElement("div");
     e.className = "cl";
-    e.textContent = c.text;
-    e.style.borderLeft = "3px solid rgb(" + c.r + "," + c.g + "," + c.b + ")";
+    e.style.opacity = "0";
     document.body.appendChild(e);
-    return e;
-  }});
+    labelPool.push(e);
+  }}
 
   function isClusterVisible(cid) {{
     if (isolatedCluster !== null) return cid === isolatedCluster;
     return !hiddenClusters.has(cid);
   }}
 
+  // Build edge path layer data (for toggling)
+  function edgeColor() {{
+    return (currentTheme === "light") ? [30, 80, 180, 90] : [255, 255, 255, 60];
+  }}
+  var edgePathData = edgePaths.map(function(path) {{
+    return {{ path: path, color: edgeColor() }};
+  }});
+
   function rebuildLayer() {{
     var dk = getDeck();
     if (!dk || !dk.props) return;
     var is2d = (viewMode === "2d");
+    var ec = edgeColor();
+    edgePathData = edgePaths.map(function(path) {{
+      return {{ path: path, color: ec }};
+    }});
     var visible = allPoints.filter(function(p) {{ return isClusterVisible(p.cluster); }});
     if (is2d) {{
       visible = visible.map(function(p) {{
@@ -971,7 +1235,13 @@ body.light {{
     if (!layers || !layers.length) return;
     var oldLayer = layers[0];
     var newLayer = oldLayer.clone({{ data: visible }});
-    dk.setProps({{ layers: [newLayer] }});
+    var newLayers = [newLayer];
+    // Add edge layer in 2D mode only (bundled edges are 2D)
+    if (is2d && edgesVisible && edgePaths.length > 0 && layers.length > 1) {{
+      var edgeLayer = layers[1];
+      newLayers.push(edgeLayer.clone({{ data: edgePathData }}));
+    }}
+    dk.setProps({{ layers: newLayers }});
     updateRowStyles();
     // Trigger depth alpha recalc (3D only)
     if (!is2d) {{
@@ -1062,24 +1332,13 @@ body.light {{
     return d && d.deck ? d.deck : d || null;
   }}
 
-  // Map label index to cluster ID (labels sorted by cluster ID)
-  var labelCids = (function() {{
-    var cset = {{}}, uniqs = [];
-    allPoints.forEach(function(p) {{
-      if (!(p.cluster in cset)) {{ cset[p.cluster] = true; uniqs.push(p.cluster); }}
-    }});
-    uniqs.sort(function(a,b) {{ return a - b; }});
-    return uniqs;
-  }})();
-
   // Depth-based point alpha (debounced — rebuilds layer when view settles)
   var depthTimer = null;
   var lastViewJson = "";
   function updatePointAlpha(dk, vp) {{
-    if (viewMode === "2d") return;  // no depth alpha in 2D
+    if (viewMode === "2d") return;
     var visible = allPoints.filter(function(p) {{ return isClusterVisible(p.cluster); }});
     if (!visible.length) return;
-    // Project all visible points to get depth
     var depths = [];
     for (var i = 0; i < visible.length; i++) {{
       try {{
@@ -1094,18 +1353,116 @@ body.light {{
     }}
     var rangeD = maxD - minD || 1;
     var updated = visible.map(function(p, i) {{
-      var t = (depths[i] - minD) / rangeD;  // 0=near, 1=far
-      var alpha = Math.round(255 - t * 200);  // near=255, far=55
+      var t = (depths[i] - minD) / rangeD;
+      var alpha = Math.round(255 - t * 200);
       return {{ x: p.x, y: p.y, z: p.z, r: p.r, g: p.g, b: p.b,
                 a: alpha, title: p.title, cluster: p.cluster }};
     }});
     var layers = dk.props.layers;
     if (layers && layers.length) {{
-      dk.setProps({{ layers: [layers[0].clone({{ data: updated }})] }});
+      var newLayers = [layers[0].clone({{ data: updated }})];
+      // Preserve edge layer (index 1) if present
+      for (var li = 1; li < layers.length; li++) {{
+        newLayers.push(layers[li]);
+      }}
+      dk.setProps({{ layers: newLayers }});
     }}
   }}
 
-  // Label projection loop (depth-sorted: closer labels on top)
+  // ── Multi-level zoom-aware label placement ───────────────────────────
+  // Zoom thresholds: map zoom level to which cluster levels to show
+  // deck.gl OrbitView zoom ~5.5 default; higher = more zoomed in
+  // All levels always active; spatial separation + label pool (40 max)
+  // naturally prioritize coarse labels and fill gaps with finer ones.
+  // Isolated clusters always get labeled regardless of zoom.
+  var ZOOM_THRESHOLDS = [
+    {{ zoom: 0, levels: levelKeys }}
+  ];
+
+  function getActiveLevels(zoom) {{
+    var active = ZOOM_THRESHOLDS[0].levels;
+    for (var i = 0; i < ZOOM_THRESHOLDS.length; i++) {{
+      if (zoom >= ZOOM_THRESHOLDS[i].zoom) active = ZOOM_THRESHOLDS[i].levels;
+    }}
+    return active;
+  }}
+
+  // Label placement: project, cull off-screen, spatial separation
+  function updateLabels(vp, zoom) {{
+    if (!labelsVisible) {{
+      for (var i = 0; i < MAX_VISIBLE_LABELS; i++) labelPool[i].style.opacity = "0";
+      return;
+    }}
+    var activeLevels = getActiveLevels(zoom);
+    var is2d = (viewMode === "2d");
+    var w = window.innerWidth - 260;  // account for panel
+    var h = window.innerHeight;
+
+    // Minimum screen-space separation squared (pixels)
+    var minSepSq = Math.pow(Math.min(w, h) * 0.06, 2);
+
+    var placed = [];  // {{sx, sy, text, levelKey, depth}}
+
+    // Process levels coarsest first
+    for (var li = 0; li < activeLevels.length; li++) {{
+      var lk = activeLevels[li];
+      var lvlLabels = labelLevels[lk];
+      if (!lvlLabels) continue;
+      var cls = levelClass(lk);
+
+      for (var j = 0; j < lvlLabels.length; j++) {{
+        var c = lvlLabels[j];
+        var lz = is2d ? 0 : c.z;
+        var sp;
+        try {{ sp = vp.project([c.x, c.y, lz]); }} catch(e) {{ continue; }}
+        var sx = sp[0], sy = sp[1];
+
+        // Cull off-screen
+        if (sx < -30 || sx > w + 30 || sy < -30 || sy > h + 30) continue;
+
+        // Check separation against already-placed labels
+        var tooClose = false;
+        for (var p = 0; p < placed.length; p++) {{
+          var dx = sx - placed[p].sx, dy = sy - placed[p].sy;
+          if (dx * dx + dy * dy < minSepSq) {{ tooClose = true; break; }}
+        }}
+        if (tooClose) continue;
+
+        if (placed.length >= MAX_VISIBLE_LABELS) break;
+        placed.push({{ sx: sx, sy: sy, text: c.text, cls: cls, depth: sp[2] || 0 }});
+      }}
+      if (placed.length >= MAX_VISIBLE_LABELS) break;
+    }}
+
+    // Sort by depth for z-ordering (farther = lower z-index)
+    placed.sort(function(a, b) {{ return b.depth - a.depth; }});
+    var minD = placed.length ? placed[placed.length - 1].depth : 0;
+    var maxD = placed.length ? placed[0].depth : 1;
+    var rangeD = maxD - minD || 1;
+
+    // Apply to pool elements
+    for (var i = 0; i < MAX_VISIBLE_LABELS; i++) {{
+      var el = labelPool[i];
+      if (i < placed.length) {{
+        var pl = placed[i];
+        el.textContent = pl.text;
+        el.className = "cl " + pl.cls;
+        el.style.left = pl.sx + "px";
+        el.style.top = pl.sy + "px";
+        el.style.zIndex = 10 + i;
+        if (is2d) {{
+          el.style.opacity = "1";
+        }} else {{
+          var t = (pl.depth - minD) / rangeD;
+          el.style.opacity = (1.0 - t * 0.7).toFixed(2);
+        }}
+      }} else {{
+        el.style.opacity = "0";
+      }}
+    }}
+  }}
+
+  // Main render loop
   function update() {{
     requestAnimationFrame(update);
     var dk = getDeck();
@@ -1114,7 +1471,13 @@ body.light {{
     if (!vps || !vps.length) return;
     var vp = vps[0];
 
-    // Debounced point alpha update on view change
+    // Get current zoom from view state
+    var zoom = 5.5;
+    if (dk.viewManager) {{
+      try {{ zoom = dk.viewManager.getViewState().zoom || 5.5; }} catch(e) {{}}
+    }}
+
+    // Debounced point alpha update
     var vs = dk.viewManager ? JSON.stringify(dk.viewManager.getViewState()) : "";
     if (vs !== lastViewJson) {{
       lastViewJson = vs;
@@ -1122,41 +1485,9 @@ body.light {{
       depthTimer = setTimeout(function() {{ updatePointAlpha(dk, vp); }}, 150);
     }}
 
-    // Project all labels and collect depth
-    var projected = [];
-    for (var i = 0; i < labels.length; i++) {{
-      var c = labels[i], el = els[i];
-      var cid = i < labelCids.length ? labelCids[i] : i;
-      if (!labelsVisible || !isClusterVisible(cid)) {{
-        el.style.opacity = "0"; continue;
-      }}
-      var lz = (viewMode === "2d") ? 0 : c.z;
-      try {{ var sp = vp.project([c.x, c.y, lz]); }} catch(e) {{ continue; }}
-      if (sp[0] < -50 || sp[0] > window.innerWidth - 260 + 50 ||
-          sp[1] < -50 || sp[1] > window.innerHeight + 50) {{
-        el.style.opacity = "0"; continue;
-      }}
-      el.style.left = sp[0] + "px";
-      el.style.top = sp[1] + "px";
-      projected.push({{ idx: i, depth: sp[2] || 0 }});
-    }}
-    // Sort by depth descending (farther = lower z-index, more transparent)
-    projected.sort(function(a, b) {{ return b.depth - a.depth; }});
-    var minD = projected.length ? projected[projected.length - 1].depth : 0;
-    var maxD = projected.length ? projected[0].depth : 1;
-    var rangeD = maxD - minD || 1;
-    for (var j = 0; j < projected.length; j++) {{
-      var p = projected[j];
-      els[p.idx].style.zIndex = 10 + j;
-      if (viewMode === "2d") {{
-        els[p.idx].style.opacity = "1";
-      }} else {{
-        var t = (p.depth - minD) / rangeD;
-        els[p.idx].style.opacity = (1.0 - t * 0.75).toFixed(2);
-      }}
-    }}
+    updateLabels(vp, zoom);
   }}
-  // Initial alpha pass after deck loads, then start label loop
+
   setTimeout(function() {{
     var dk = getDeck();
     if (dk && dk.getViewports) {{
@@ -1182,6 +1513,12 @@ body.light {{
     labelsVisible = e.target.checked;
   }});
 
+  // Toggle bridge edges
+  document.getElementById("toggle-edges").addEventListener("change", function(e) {{
+    edgesVisible = e.target.checked;
+    rebuildLayer();
+  }});
+
   // Point size slider
   document.getElementById("point-size").addEventListener("input", function(e) {{
     var sz = parseFloat(e.target.value);
@@ -1201,7 +1538,6 @@ body.light {{
   }});
 
   // ── Dark/light theme toggle ──────────────────────────────────────────
-  var currentTheme = "dark";
   function setTheme(theme) {{
     currentTheme = theme;
     var isLight = (theme === "light");
@@ -1218,6 +1554,8 @@ body.light {{
     if (deckDiv) deckDiv.style.background = bg;
     var deckWrapper = document.querySelector("#deckgl-wrapper");
     if (deckWrapper) deckWrapper.style.background = bg;
+    // Rebuild edge layer with theme-appropriate edge color
+    rebuildLayer();
   }}
 
   document.getElementById("theme-btn").addEventListener("click", function() {{
@@ -1238,7 +1576,10 @@ body.light {{
     if (mode === "2d") {{
       // Flatten Z (XY already landscape-oriented from Python)
       for (var i = 0; i < allPoints.length; i++) allPoints[i].z = 0;
-      for (var j = 0; j < labels.length; j++) labels[j].z = 0;
+      // Flatten Z in all label levels
+      levelKeys.forEach(function(k) {{
+        labelLevels[k].forEach(function(c) {{ c.z = 0; }});
+      }});
       // Top-down view, lock rotation, pan-only controller
       dk.setProps({{
         initialViewState: {{
@@ -1251,7 +1592,11 @@ body.light {{
     }} else {{
       // Restore Z
       for (var i = 0; i < allPoints.length; i++) allPoints[i].z = zBackup[i];
-      for (var j = 0; j < labels.length; j++) labels[j].z = zLabelsBackup[j];
+      // Restore Z in all label levels
+      levelKeys.forEach(function(k) {{
+        var backup = zLevelsBackup[k];
+        labelLevels[k].forEach(function(c, j) {{ c.z = backup[j]; }});
+      }});
       // Restore orbit controls
       dk.setProps({{
         initialViewState: {{
@@ -1344,7 +1689,9 @@ body.light {{
             }}).filter(function(p) {{ return p !== null; }});
             var dk3 = getDeck();
             if (dk3 && dk3.props && dk3.props.layers && dk3.props.layers.length) {{
-              dk3.setProps({{ layers: [dk3.props.layers[0].clone({{ data: highlighted }})] }});
+              var hlLayers = [dk3.props.layers[0].clone({{ data: highlighted }})];
+              for (var hli = 1; hli < dk3.props.layers.length; hli++) hlLayers.push(dk3.props.layers[hli]);
+              dk3.setProps({{ layers: hlLayers }});
             }}
             // Restore after 3 seconds
             setTimeout(function() {{ rebuildLayer(); }}, 3000);
@@ -1400,6 +1747,8 @@ def main():
                         help="Ollama model for cluster labeling (default: gemma2:9b)")
     parser.add_argument("--densmap", action="store_true",
                         help="Use densMAP for density-preserving projection")
+    parser.add_argument("--no-edges", action="store_true",
+                        help="Skip bridge edge bundling")
     parser.add_argument("--port", type=int, default=8766,
                         help="WebSocket port for viz_server bridge (default: 8766)")
     args = parser.parse_args()
@@ -1425,6 +1774,14 @@ def main():
     labels_birch = birch.predict(coords)
     n_birch = len(set(labels_birch))
     print(f"  BIRCH: {n_birch} clusters")
+
+    # ── Multi-level label hierarchy from BIRCH ───────────────────────────
+    print(f"\nBuilding label hierarchy from BIRCH subclusters...")
+    hierarchy_model = args.model if not args.no_label else None
+    birch_levels = build_label_hierarchy(
+        coords, titles_arr, birch, embeddings=embeddings,
+        model=hierarchy_model,
+    )
 
     # ── DYF tree clustering on high-D embeddings ─────────────────────────
     print(f"\nBuilding DYF tree (depth={args.dyf_depth}, bits={args.dyf_bits}) "
@@ -1462,6 +1819,37 @@ def main():
         names_dyf = label_clusters(
             titles, coords, labels_dyf, embeddings, model=args.model)
 
+    # Add base BIRCH labels as finest hierarchy level so all panel labels
+    # are reachable when zoomed in (Ward linkage cuts differ from BIRCH merge)
+    if names_birch:
+        ndim = coords.shape[1]
+        base_level = []
+        for cid in sorted(set(labels_birch.tolist()
+                               if hasattr(labels_birch, 'tolist')
+                               else list(labels_birch))):
+            mask = labels_birch == cid
+            pts = np.where(mask)[0]
+            centroid = coords[pts].mean(axis=0)
+            name = names_birch.get(cid, f"Cluster {cid}")
+            base_level.append({
+                "x": float(centroid[0]),
+                "y": float(centroid[1]),
+                "z": float(centroid[2]) if ndim >= 3 else 0.0,
+                "text": name[:50],
+                "size": int(mask.sum()),
+            })
+        birch_levels[n_birch] = base_level
+        print(f"  Added base BIRCH level ({n_birch}): {len(base_level)} labels")
+
+    # ── Bridge edge bundling (2D only) ──────────────────────────────────
+    bundled_birch_2d = None
+    if args.renderer == "pydeck" and not args.no_edges:
+        print("\n=== Computing bridge edges (BIRCH) ===")
+        bundled_birch_2d, pair_info, _ = compute_bridge_edges_3d(
+            coords, embeddings, labels_birch, n_birch)
+        if bundled_birch_2d:
+            print(f"  Bundled {len(bundled_birch_2d)} 2D bridge edges")
+
     if args.renderer == "pydeck":
         rgb_birch = golden_ratio_rgb_map(labels_birch)
         rgb_dyf = golden_ratio_rgb_map(labels_dyf.tolist())
@@ -1473,12 +1861,16 @@ def main():
             coords, titles_arr, labels_birch, rgb_birch,
             f"BIRCH on {dim_label} (k={dyf_k} UMAP) — {n_birch} clusters, {n:,} pts",
             path_birch, cluster_names=names_birch, ws_port=args.port,
+            label_levels=birch_levels,
+            bundled_edges=bundled_birch_2d,
         )
         build_pydeck(
             coords, titles_arr, labels_dyf, rgb_dyf,
             f"DYF Tree (depth={args.dyf_depth}, bits={args.dyf_bits}) "
             f"— {n_dyf} clusters, {n:,} pts",
             path_dyf, cluster_names=names_dyf, ws_port=args.port,
+            label_levels=birch_levels,
+            bundled_edges=bundled_birch_2d,
         )
     else:
         cmap_birch = golden_ratio_color_map(labels_birch)
