@@ -997,9 +997,10 @@ def build_html(coords, titles_arr, labels, color_map, title_str,
 
 def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
                  cluster_names=None, ws_port=8766, label_levels=None,
-                 bundled_edges=None, logo_path=None):
+                 bundled_edges=None, edge_pairs=None, logo_path=None):
     """Build a pydeck 3D point cloud with HTML overlay labels."""
     import base64
+    import pyarrow as pa
     import pydeck as pdk
 
     labels_list = labels.tolist() if hasattr(labels, 'tolist') else list(labels)
@@ -1059,7 +1060,7 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
 
     point_layer = pdk.Layer(
         "PointCloudLayer",
-        data=point_data,
+        data=[],
         get_position=["x", "y", "z"],
         get_color=["r", "g", "b", "a"],
         get_normal=[0, 0, 1],
@@ -1112,16 +1113,55 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
         '<head><meta name="viewport" content="width=device-width, initial-scale=1">',
         1,
     )
+    html = html.replace('<title>pydeck</title>', f'<title>dyfviz — {title_str}</title>', 1)
     label_json = json.dumps(label_data)
     # Multi-level labels: keys are level numbers (as strings in JSON)
     levels_json = json.dumps({str(k): v for k, v in levels_data.items()})
-    point_json = json.dumps(point_data)
-    # Edge path data for JS (2D bundled edges only, shown in 2D mode)
-    edge_paths_json = "[]"
+
+    # ── Arrow IPC for compact binary transfer ───────────────────────
+    points_batch = pa.record_batch({
+        "x": pa.array([p["x"] for p in point_data], type=pa.float32()),
+        "y": pa.array([p["y"] for p in point_data], type=pa.float32()),
+        "z": pa.array([p["z"] for p in point_data], type=pa.float32()),
+        "r": pa.array([p["r"] for p in point_data], type=pa.uint8()),
+        "g": pa.array([p["g"] for p in point_data], type=pa.uint8()),
+        "b": pa.array([p["b"] for p in point_data], type=pa.uint8()),
+        "a": pa.array([p["a"] for p in point_data], type=pa.uint8()),
+        "cluster": pa.array([p["cluster"] for p in point_data], type=pa.int32()),
+        "title": pa.array([p["title"] for p in point_data], type=pa.utf8()),
+    })
+    sink = pa.BufferOutputStream()
+    with pa.ipc.new_stream(sink, points_batch.schema) as writer:
+        writer.write_batch(points_batch)
+    import gzip as _gzip
+    points_ipc_b64 = base64.b64encode(
+        _gzip.compress(sink.getvalue().to_pybytes())
+    ).decode()
+
+    # Edge paths as Arrow IPC with list<float32> column (gzip-compressed)
+    edges_ipc_b64 = ""
+    edge_pairs_json = "[]"
     if bundled_edges:
-        edge_paths = [[[float(p[0]), float(p[1]), float(p[2])]
-                       for p in path] for path in bundled_edges]
-        edge_paths_json = json.dumps(edge_paths)
+        path_arrays = []
+        for path in bundled_edges:
+            flat = []
+            for pt in path:
+                flat.extend([float(pt[0]), float(pt[1]), float(pt[2])])
+            path_arrays.append(flat)
+        edges_batch = pa.record_batch({
+            "path": pa.array(path_arrays, type=pa.list_(pa.float32())),
+        })
+        edge_sink = pa.BufferOutputStream()
+        with pa.ipc.new_stream(edge_sink, edges_batch.schema) as writer:
+            writer.write_batch(edges_batch)
+        edges_ipc_b64 = base64.b64encode(
+            _gzip.compress(edge_sink.getvalue().to_pybytes())
+        ).decode()
+    if edge_pairs:
+        # edge_pairs maps (c1, c2) -> count, sorted by count desc
+        # Export as [[c1, c2], ...] in same order as edge_paths
+        sorted_pairs = sorted(edge_pairs.keys(), key=lambda p: -edge_pairs[p])
+        edge_pairs_json = json.dumps([[int(a), int(b)] for a, b in sorted_pairs])
 
     # Expose pydeck's local deckInstance as a global
     html = html.replace(
@@ -1130,20 +1170,20 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
     )
 
     # Build overlay: header, control panel, labels, and logic
-    # DYF logo: always-present inline SVG (Futura, flipped-y lambda)
+    # DYF logo: inline SVG with Montserrat, natural kerning via tspan
     dyf_logo_svg = (
-        '<svg class="dyf-logo" viewBox="0 0 135 105" width="54" height="42">'
+        '<svg class="dyf-logo" viewBox="0 0 340 105" width="85" height="26">'
         '<defs><linearGradient id="dyf-grad" x1="0%" y1="0%" x2="100%" y2="100%">'
         '<stop offset="0%" stop-color="#e94560"/>'
         '<stop offset="100%" stop-color="#f9a826"/>'
         '</linearGradient></defs>'
-        '<text x="4" y="82" font-family="Futura,\'Trebuchet MS\',sans-serif"'
-        ' font-size="88" font-weight="700" class="dyf-letter">d</text>'
-        '<text x="56" y="82" font-family="Futura,\'Trebuchet MS\',sans-serif"'
-        ' font-size="88" font-weight="700" fill="url(#dyf-grad)"'
-        ' transform="rotate(180,79,59)">y</text>'
-        '<text x="104" y="82" font-family="Futura,\'Trebuchet MS\',sans-serif"'
-        ' font-size="88" font-weight="700" class="dyf-letter">f</text>'
+        '<text x="4" y="82" font-family="Montserrat,sans-serif"'
+        ' font-size="88" font-weight="700">'
+        '<tspan class="dyf-letter">d</tspan>'
+        '<tspan fill="url(#dyf-grad)">\u028e</tspan>'
+        '<tspan class="dyf-letter">f</tspan>'
+        '<tspan class="dyf-muted">viz</tspan>'
+        '</text>'
         '</svg>'
     )
 
@@ -1160,6 +1200,9 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
 
     overlay_html = f"""
 <!-- DYF_OVERLAY_START -->
+<!-- Highlighter canvas overlay -->
+<canvas id="hl-canvas" style="position:absolute;top:0;left:0;width:100%;height:100%;
+  z-index:6;pointer-events:none;"></canvas>
 <!-- Header -->
 <div id="header" style="position:absolute;top:0;left:0;right:260px;z-index:10;
   padding:12px 20px;font:14px -apple-system,'Segoe UI',sans-serif;">
@@ -1187,12 +1230,12 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
     </div>
     <div class="palette-body">
       <div style="display:flex;gap:6px;margin-bottom:8px;">
-        <button id="reset-btn" class="panel-btn">Reset</button>
-        <button id="mode-btn" class="panel-btn">2D</button>
-        <button id="fullscreen-btn" class="panel-btn">Fullscreen</button>
+        <button id="reset-btn" class="panel-btn">↻ Reset</button>
+        <button id="mode-btn" class="panel-btn">□ 2D</button>
+        <button id="fullscreen-btn" class="panel-btn">⛶ Fullscreen</button>
       </div>
       <div style="display:flex;gap:6px;">
-        <button id="theme-btn" class="panel-btn">Light</button>
+        <button id="theme-btn" class="panel-btn">☼ Light</button>
       </div>
     </div>
   </div>
@@ -1232,6 +1275,7 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
   </div>
 </div>
 
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&display=swap" rel="stylesheet">
 <style>
 :root {{
   --bg: #1e1e1e; --bg-panel: rgba(28,28,28,0.95); --bg-header: rgba(30,30,30,0.92);
@@ -1268,6 +1312,8 @@ body.light {{
 #header .sub {{ color:var(--fg-muted); }}
 .dyf-logo .dyf-letter {{ fill: #dddddd; }}
 body.light .dyf-logo .dyf-letter {{ fill: #333333; }}
+.dyf-logo .dyf-muted {{ fill: #999999; }}
+body.light .dyf-logo .dyf-muted {{ fill: #666666; }}
 .header-logo {{ filter:grayscale(1) invert(1) brightness(1.8); }}
 body.light .header-logo {{ filter:grayscale(1) brightness(0.3); }}
 #panel {{ background:var(--bg-panel); border-left:1px solid var(--border); color:var(--fg); }}
@@ -1320,14 +1366,67 @@ body.light .header-logo {{ filter:grayscale(1) brightness(0.3); }}
 }}
 </style>
 
-<script>
-(function() {{
+<script type="module">
+import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+esm";
+
+(async function() {{
+  // ── Base64 → Uint8Array, then gzip decompress ─────────────────────
+  function b64toBytes(b64) {{
+    var bin = atob(b64), n = bin.length, u8 = new Uint8Array(n);
+    for (var i = 0; i < n; i++) u8[i] = bin.charCodeAt(i);
+    return u8;
+  }}
+  async function ungzip(bytes) {{
+    var ds = new DecompressionStream("gzip");
+    var writer = ds.writable.getWriter();
+    writer.write(bytes);
+    writer.close();
+    return new Uint8Array(await new Response(ds.readable).arrayBuffer());
+  }}
+
+  // ── Reconstruct point data from gzipped Arrow IPC ─────────────────
+  var _pt = tableFromIPC(await ungzip(b64toBytes("{points_ipc_b64}")));
+  var _x = _pt.getChild("x").toArray();
+  var _y = _pt.getChild("y").toArray();
+  var _z = _pt.getChild("z").toArray();
+  var _r = _pt.getChild("r").toArray();
+  var _g = _pt.getChild("g").toArray();
+  var _b = _pt.getChild("b").toArray();
+  var _a = _pt.getChild("a").toArray();
+  var _clu = _pt.getChild("cluster").toArray();
+  var _titles = _pt.getChild("title");
+  var _nPts = _pt.numRows;
+  var allPoints = new Array(_nPts);
+  for (var _i = 0; _i < _nPts; _i++) {{
+    allPoints[_i] = {{
+      x: _x[_i], y: _y[_i], z: _z[_i],
+      r: _r[_i], g: _g[_i], b: _b[_i], a: _a[_i],
+      title: _titles.get(_i), cluster: _clu[_i]
+    }};
+  }}
+
+  // ── Reconstruct edge paths from gzipped Arrow IPC ─────────────────
+  var edgePaths = [];
+  var _edgesB64 = "{edges_ipc_b64}";
+  if (_edgesB64.length > 0) {{
+    var _edgeTable = tableFromIPC(await ungzip(b64toBytes(_edgesB64)));
+    var _pathCol = _edgeTable.getChild("path");
+    for (var _j = 0; _j < _edgeTable.numRows; _j++) {{
+      var _flat = _pathCol.get(_j).toArray();
+      var _path = [];
+      for (var _k = 0; _k < _flat.length; _k += 3) {{
+        _path.push([_flat[_k], _flat[_k+1], _flat[_k+2]]);
+      }}
+      edgePaths.push(_path);
+    }}
+  }}
+
   var labels = {label_json};
   var labelLevels = {levels_json};
-  var allPoints = {point_json};
-  var edgePaths = {edge_paths_json};
+  var edgePairs = {edge_pairs_json};  // [[c1,c2], ...] matching edgePaths order
   var labelsVisible = true;
   var edgesVisible = true;
+  var highlightedEdgeClusters = new Set();  // cluster IDs whose edges to highlight
 
   // Cluster visibility state: null=all visible, Set=only those visible
   var hiddenClusters = new Set();
@@ -1337,6 +1436,83 @@ body.light .header-logo {{ filter:grayscale(1) brightness(0.3); }}
   var viewMode = "3d";
   var currentTheme = "dark";
   var zBackup = allPoints.map(function(p) {{ return p.z; }});
+
+  // ── Highlighter annotations ────────────────────────────────────────
+  var annotations = [];
+  // Each: {{ type:"circle"|"path", points:[[x,y,z],...], color:str, width:num }}
+
+  function convexHull(pts) {{
+    // Graham scan on 2D (x,y) — returns points in CCW order
+    if (pts.length < 3) return pts.slice();
+    var pivot = pts.reduce(function(a, b) {{
+      return (b[1] < a[1] || (b[1] === a[1] && b[0] < a[0])) ? b : a;
+    }});
+    function cross(O, A, B) {{
+      return (A[0]-O[0])*(B[1]-O[1]) - (A[1]-O[1])*(B[0]-O[0]);
+    }}
+    var sorted = pts.slice().sort(function(a, b) {{
+      var angA = Math.atan2(a[1]-pivot[1], a[0]-pivot[0]);
+      var angB = Math.atan2(b[1]-pivot[1], b[0]-pivot[0]);
+      if (angA !== angB) return angA - angB;
+      var dA = (a[0]-pivot[0])*(a[0]-pivot[0])+(a[1]-pivot[1])*(a[1]-pivot[1]);
+      var dB = (b[0]-pivot[0])*(b[0]-pivot[0])+(b[1]-pivot[1])*(b[1]-pivot[1]);
+      return dA - dB;
+    }});
+    var hull = [];
+    for (var i = 0; i < sorted.length; i++) {{
+      while (hull.length >= 2 && cross(hull[hull.length-2], hull[hull.length-1], sorted[i]) <= 0) {{
+        hull.pop();
+      }}
+      hull.push(sorted[i]);
+    }}
+    return hull;
+  }}
+
+  function padHull(hull, pad) {{
+    // Expand hull outward by `pad` units
+    var cx = 0, cy = 0;
+    for (var i = 0; i < hull.length; i++) {{ cx += hull[i][0]; cy += hull[i][1]; }}
+    cx /= hull.length; cy /= hull.length;
+    return hull.map(function(p) {{
+      var dx = p[0] - cx, dy = p[1] - cy;
+      var d = Math.sqrt(dx*dx + dy*dy) || 1;
+      return [p[0] + dx/d * pad, p[1] + dy/d * pad, p[2] || 0];
+    }});
+  }}
+
+  function drawAnnotations(vp) {{
+    var canvas = document.getElementById("hl-canvas");
+    if (!canvas || !vp) return;
+    canvas.width = canvas.clientWidth;
+    canvas.height = canvas.clientHeight;
+    var ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (annotations.length === 0) return;
+
+    for (var i = 0; i < annotations.length; i++) {{
+      var ann = annotations[i];
+      var screenPts = [];
+      for (var j = 0; j < ann.points.length; j++) {{
+        try {{
+          var sp = vp.project(ann.points[j]);
+          screenPts.push([sp[0], sp[1]]);
+        }} catch(e) {{}}
+      }}
+      if (screenPts.length < 2) continue;
+
+      ctx.strokeStyle = ann.color || "rgba(255,230,0,0.35)";
+      ctx.lineWidth = ann.width || 18;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+      ctx.moveTo(screenPts[0][0], screenPts[0][1]);
+      for (var k = 1; k < screenPts.length; k++) {{
+        ctx.lineTo(screenPts[k][0], screenPts[k][1]);
+      }}
+      if (ann.type === "circle") ctx.closePath();
+      ctx.stroke();
+    }}
+  }}
 
   // ── Multi-level label system ─────────────────────────────────────────
   // Parse levels: keys are cluster counts (as strings), values are label arrays
@@ -1382,7 +1558,16 @@ body.light .header-logo {{ filter:grayscale(1) brightness(0.3); }}
     if (!dk || !dk.props) return;
     var is2d = (viewMode === "2d");
     var ec = edgeColor();
-    edgePathData = edgePaths.map(function(path) {{
+    var hlEc = (currentTheme === "light") ? [220, 80, 20, 200] : [255, 160, 40, 220];
+    var hasHl = highlightedEdgeClusters.size > 0;
+    edgePathData = edgePaths.map(function(path, idx) {{
+      if (hasHl && idx < edgePairs.length) {{
+        var pair = edgePairs[idx];
+        if (highlightedEdgeClusters.has(pair[0]) || highlightedEdgeClusters.has(pair[1])) {{
+          return {{ path: path, color: hlEc }};
+        }}
+        return {{ path: path, color: [ec[0], ec[1], ec[2], 15] }};
+      }}
       return {{ path: path, color: ec }};
     }});
     var visible = allPoints.filter(function(p) {{ return isClusterVisible(p.cluster); }});
@@ -1649,9 +1834,12 @@ body.light .header-logo {{ filter:grayscale(1) brightness(0.3); }}
     }}
 
     updateLabels(vp, zoom);
+    drawAnnotations(vp);
   }}
 
   setTimeout(function() {{
+    // Populate the empty pydeck layer with decoded binary data
+    rebuildLayer();
     var dk = getDeck();
     if (dk && dk.getViewports) {{
       var vps = dk.getViewports();
@@ -1706,17 +1894,18 @@ body.light .header-logo {{ filter:grayscale(1) brightness(0.3); }}
     var isLight = (theme === "light");
     document.body.classList.toggle("light", isLight);
     var btn = document.getElementById("theme-btn");
-    if (btn) btn.textContent = isLight ? "Dark Mode" : "Light Mode";
-    // Update deck.gl canvas background
+    if (btn) btn.textContent = isLight ? "\u263D Dark" : "\u263C Light";
+    // Update background color
     var bg = isLight ? "#f5f5f5" : "#1e1e1e";
     document.body.style.background = bg;
-    var canvases = document.querySelectorAll("canvas");
-    canvases.forEach(function(c) {{ c.style.background = bg; }});
-    // Update pydeck wrapper div
+    // Update pydeck wrapper div (not the WebGL canvas directly)
     var deckDiv = document.getElementById("deck-container");
     if (deckDiv) deckDiv.style.background = bg;
     var deckWrapper = document.querySelector("#deckgl-wrapper");
     if (deckWrapper) deckWrapper.style.background = bg;
+    // Update highlighter canvas only
+    var hlCanvas = document.getElementById("hl-canvas");
+    if (hlCanvas) hlCanvas.style.background = "transparent";
     // Rebuild edge layer with theme-appropriate edge color
     rebuildLayer();
   }}
@@ -1734,19 +1923,19 @@ body.light .header-logo {{ filter:grayscale(1) brightness(0.3); }}
       }}).catch(function() {{}});
     }} else {{
       document.exitFullscreen();
-      btn.textContent = "Fullscreen";
+      btn.textContent = "\u26F6 Fullscreen";
     }}
   }});
   document.addEventListener("fullscreenchange", function() {{
     var btn = document.getElementById("fullscreen-btn");
-    if (btn) btn.textContent = document.fullscreenElement ? "Exit Fullscreen" : "Fullscreen";
+    if (btn) btn.textContent = document.fullscreenElement ? "\u26F6 Exit" : "\u26F6 Fullscreen";
   }});
 
   // ── 2D/3D mode toggle ────────────────────────────────────────────────
   function setViewMode(mode) {{
     viewMode = mode;
     var btn = document.getElementById("mode-btn");
-    if (btn) btn.textContent = (mode === "2d") ? "3D Mode" : "2D Mode";
+    if (btn) btn.textContent = (mode === "2d") ? "\u29C8 3D" : "\u25A1 2D";
     var sub = document.getElementById("header-sub");
     if (sub) sub.textContent = (mode === "2d")
       ? "Scroll to zoom \u00b7 Drag to pan \u00b7 Hover for details"
@@ -1887,6 +2076,103 @@ body.light .header-logo {{ filter:grayscale(1) brightness(0.3); }}
             setTheme(msg.theme);
           }}
           break;
+        case "zoom_to":
+          var dkZ = getDeck();
+          if (dkZ && dkZ.setProps) {{
+            // Start from current view state to preserve rotation
+            var curVS = {{}};
+            if (dkZ.viewManager) {{
+              try {{ curVS = JSON.parse(JSON.stringify(dkZ.viewManager.getViewState())); }} catch(e) {{}}
+            }}
+            curVS.transitionDuration = msg.transitionDuration || 500;
+            if (msg.target) curVS.target = msg.target;
+            if (typeof msg.zoom === "number") curVS.zoom = msg.zoom;
+            dkZ.setProps({{ initialViewState: curVS }});
+          }}
+          break;
+        case "clear_highlight":
+          highlightedEdgeClusters.clear();
+          rebuildLayer();
+          break;
+        case "highlight_edges":
+          if (msg.clusters && msg.clusters.length) {{
+            highlightedEdgeClusters.clear();
+            for (var hei = 0; hei < msg.clusters.length; hei++) {{
+              highlightedEdgeClusters.add(msg.clusters[hei]);
+            }}
+            // Auto-enable edges and switch to 2D if needed
+            if (!edgesVisible) {{
+              edgesVisible = true;
+              var ecbH = document.getElementById("toggle-edges");
+              if (ecbH) ecbH.checked = true;
+            }}
+            if (viewMode !== "2d") setViewMode("2d");
+            else rebuildLayer();
+          }}
+          break;
+        case "clear_edge_highlight":
+          highlightedEdgeClusters.clear();
+          rebuildLayer();
+          break;
+        case "toggle_edges":
+          if (typeof msg.visible === "boolean") {{
+            edgesVisible = msg.visible;
+            var ecbW = document.getElementById("toggle-edges");
+            if (ecbW) ecbW.checked = edgesVisible;
+            rebuildLayer();
+          }}
+          break;
+        case "toggle_labels":
+          if (typeof msg.visible === "boolean") {{
+            labelsVisible = msg.visible;
+            var lcbW = document.getElementById("toggle-labels");
+            if (lcbW) lcbW.checked = labelsVisible;
+          }}
+          break;
+        case "draw_circle":
+          // Compute convex hull of cluster's points, add as closed annotation
+          var cid = msg.cluster;
+          if (typeof cid === "number") {{
+            var cPts = [];
+            for (var ci = 0; ci < allPoints.length; ci++) {{
+              if (allPoints[ci].cluster === cid) {{
+                cPts.push([allPoints[ci].x, allPoints[ci].y, allPoints[ci].z]);
+              }}
+            }}
+            if (cPts.length >= 3) {{
+              var hull = convexHull(cPts);
+              // Pad outward by ~2% of data extent
+              var xMin=1e9,xMax=-1e9,yMin=1e9,yMax=-1e9;
+              for (var ci2=0;ci2<allPoints.length;ci2++) {{
+                if (allPoints[ci2].x<xMin) xMin=allPoints[ci2].x;
+                if (allPoints[ci2].x>xMax) xMax=allPoints[ci2].x;
+                if (allPoints[ci2].y<yMin) yMin=allPoints[ci2].y;
+                if (allPoints[ci2].y>yMax) yMax=allPoints[ci2].y;
+              }}
+              var extent = Math.max(xMax-xMin, yMax-yMin) || 1;
+              hull = padHull(hull, extent * 0.02);
+              annotations.push({{
+                type: "circle",
+                points: hull,
+                color: msg.color || "rgba(255,230,0,0.35)",
+                width: msg.width || 18
+              }});
+            }}
+          }}
+          break;
+        case "draw_path":
+          if (msg.points && msg.points.length >= 2) {{
+            annotations.push({{
+              type: "path",
+              points: msg.points,
+              color: msg.color || "rgba(255,230,0,0.35)",
+              width: msg.width || 18
+            }});
+          }}
+          break;
+        case "draw_clear":
+          annotations.length = 0;
+          break;
         case "reload":
           // Save state before reload
           var dkR = getDeck();
@@ -1907,6 +2193,8 @@ body.light .header-logo {{ filter:grayscale(1) brightness(0.3); }}
           // Save point size from slider
           var psSlider = document.getElementById("point-size");
           if (psSlider) savedState.pointSize = parseFloat(psSlider.value);
+          // Save annotations
+          if (annotations.length > 0) savedState.annotations = annotations;
           sessionStorage.setItem("dyf_viz_state", JSON.stringify(savedState));
           setTimeout(function() {{ location.reload(); }}, 100);
           break;
@@ -1956,6 +2244,11 @@ body.light .header-logo {{ filter:grayscale(1) brightness(0.3); }}
         psEl.dispatchEvent(new Event("input"));
       }}
       if (pvEl) pvEl.textContent = s.pointSize;
+    }}
+
+    // Restore annotations
+    if (s.annotations && s.annotations.length) {{
+      annotations = s.annotations;
     }}
 
     // Restore camera viewState after deck.gl finishes initializing
@@ -2102,9 +2395,10 @@ def main():
 
     # ── Bridge edge bundling (2D only) ──────────────────────────────────
     bundled_birch_2d = None
+    birch_pair_info = None
     if args.renderer == "pydeck" and not args.no_edges:
         print("\n=== Computing bridge edges (BIRCH) ===")
-        bundled_birch_2d, pair_info, _ = compute_bridge_edges_3d(
+        bundled_birch_2d, birch_pair_info, _ = compute_bridge_edges_3d(
             coords, embeddings, labels_birch, n_birch)
         if bundled_birch_2d:
             print(f"  Bundled {len(bundled_birch_2d)} 2D bridge edges")
@@ -2122,6 +2416,7 @@ def main():
             path_birch, cluster_names=names_birch, ws_port=args.port,
             label_levels=birch_levels,
             bundled_edges=bundled_birch_2d,
+            edge_pairs=birch_pair_info,
             logo_path=args.logo,
         )
         build_pydeck(
@@ -2131,6 +2426,7 @@ def main():
             path_dyf, cluster_names=names_dyf, ws_port=args.port,
             label_levels=birch_levels,
             bundled_edges=bundled_birch_2d,
+            edge_pairs=birch_pair_info,
             logo_path=args.logo,
         )
     else:
