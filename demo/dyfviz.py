@@ -1279,13 +1279,51 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
   <div style="font-size:14px;font-weight:600">{title_str}</div>
   <div id="header-sub" class="sub" style="font-size:11px;">
     Scroll to zoom &middot; Drag to orbit &middot; Hover for details
+    <span id="session-id" style="margin-left:12px;opacity:0.7;font-family:monospace;"></span>
   </div>
+</div>
+<!-- Tour cluster label overlay (positioned at centroid) -->
+<div id="tour-label" style="display:none;position:absolute;z-index:15;padding:8px 16px;
+  background:rgba(0,0,0,0.85);border-radius:6px;
+  font:600 16px -apple-system,'Segoe UI',sans-serif;color:#fff;
+  text-align:center;pointer-events:none;white-space:nowrap;
+  box-shadow:0 2px 12px rgba(0,0,0,0.5);
+  transform:translate(-50%,-100%) translateY(-12px);"></div>
+<!-- Container for edge centroid labels during tour -->
+<div id="tour-edge-labels" style="display:none;"></div>
+<!-- Camera state debug overlay -->
+<div id="camera-debug" style="display:none;position:absolute;bottom:10px;left:10px;z-index:20;
+  padding:8px 12px;background:rgba(0,0,0,0.8);border-radius:4px;
+  font:11px monospace;color:#0f0;pointer-events:none;white-space:pre;"></div>
+<style>
+.tour-edge-label {{
+  position:absolute;z-index:14;padding:4px 10px;
+  background:rgba(60,80,160,0.9);border-radius:4px;
+  font:500 12px -apple-system,'Segoe UI',sans-serif;color:#fff;
+  text-align:center;pointer-events:none;white-space:nowrap;
+  box-shadow:0 1px 6px rgba(0,0,0,0.4);
+  transform:translate(-50%,-50%);
+  border:1px solid rgba(100,140,255,0.5);
+}}
+body.light .tour-edge-label {{
+  background:rgba(70,100,180,0.95);
+  border-color:rgba(50,80,150,0.6);
+}}
+</style>
+
+<!-- Panel toggle tab -->
+<div id="panel-toggle" onclick="togglePanel()" style="position:absolute;top:50%;right:260px;
+  transform:translateY(-50%);z-index:11;width:20px;height:60px;
+  background:var(--bg-panel);border:1px solid var(--border);border-right:none;
+  border-radius:6px 0 0 6px;cursor:pointer;display:flex;align-items:center;
+  justify-content:center;font-size:14px;color:var(--fg);transition:right 0.3s ease;">
+  <span id="panel-toggle-arrow">▶</span>
 </div>
 
 <!-- Palette panel -->
 <div id="panel" style="position:absolute;top:0;right:0;bottom:0;width:260px;
   z-index:10;font:13px -apple-system,'Segoe UI',sans-serif;
-  overflow-y:auto;">
+  overflow-y:auto;transition:right 0.3s ease;">
 
   <!-- DYF logo -->
   <div style="padding:10px 12px 6px;text-align:center;">
@@ -1327,6 +1365,20 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
         <input type="checkbox" id="toggle-arc-dir" checked>
         <span>Arcs up (3D)</span>
       </label>
+      <label class="palette-check">
+        <input type="checkbox" id="toggle-sheen">
+        <span>Specular sweep</span>
+      </label>
+      <label class="palette-check">
+        <input type="checkbox" id="toggle-orbit">
+        <span>Auto-orbit</span>
+      </label>
+      <button id="tour-btn" class="panel-btn" style="margin-top:6px;width:100%;">
+        ▶ Tour
+      </button>
+      <button id="daydream-btn" class="panel-btn" style="margin-top:4px;width:100%;">
+        ✦ Daydream
+      </button>
       <div style="margin-top:8px;">
         <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
           <span>Point size</span><span id="ps-val">2</span>
@@ -1439,6 +1491,28 @@ body.light .header-logo {{ filter:grayscale(1) brightness(0.3); }}
 }}
 </style>
 
+<script>
+// Panel toggle (global scope for onclick)
+var panelHidden = false;
+function togglePanel() {{
+  panelHidden = !panelHidden;
+  var panel = document.getElementById("panel");
+  var toggle = document.getElementById("panel-toggle");
+  var arrow = document.getElementById("panel-toggle-arrow");
+  var header = document.getElementById("header");
+  if (panelHidden) {{
+    panel.style.right = "-260px";
+    toggle.style.right = "0";
+    arrow.textContent = "◀";
+    if (header) header.style.right = "0";
+  }} else {{
+    panel.style.right = "0";
+    toggle.style.right = "260px";
+    arrow.textContent = "▶";
+    if (header) header.style.right = "260px";
+  }}
+}}
+</script>
 <script type="module">
 import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+esm";
 
@@ -1456,6 +1530,11 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
     writer.close();
     return new Uint8Array(await new Response(ds.readable).arrayBuffer());
   }}
+
+  // ── Generate and display session ID ───────────────────────────────
+  var sessionId = Math.random().toString(36).substring(2, 8).toUpperCase();
+  var sessionEl = document.getElementById("session-id");
+  if (sessionEl) sessionEl.textContent = "Session: " + sessionId;
 
   // ── Reconstruct point data from gzipped Arrow IPC ─────────────────
   var _pt = tableFromIPC(await ungzip(b64toBytes("{points_ipc_b64}")));
@@ -1506,9 +1585,39 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
   var labels = {label_json};
   var labelLevels = {levels_json};
   var edgePairs = {edge_pairs_json};  // [[c1,c2], ...] matching edgePaths order
+
+  // Build cluster centroid map from edge endpoints (these match the bundled edge positions)
+  var edgeCentroids = {{}};
+  edgePairs.forEach(function(pair, idx) {{
+    var path = edgePaths3d[idx];
+    if (path && path.length >= 2) {{
+      var c1 = pair[0], c2 = pair[1];
+      // First point is source centroid, last point is target centroid
+      if (!(c1 in edgeCentroids)) edgeCentroids[c1] = path[0];
+      if (!(c2 in edgeCentroids)) edgeCentroids[c2] = path[path.length - 1];
+    }}
+  }});
+
   var labelsVisible = true;
   var edgesVisible = true;
+  var originalEdgeLayer = null;  // saved reference to edge layer
   var highlightedEdgeClusters = new Set();  // cluster IDs whose edges to highlight
+  var edgeFadeAlpha = 0;      // current fade state (0 = normal, 1 = fully highlighted)
+  var edgeFadeTarget = 0;     // target fade state
+  var edgeFadeSpeed = 0.05;   // fade speed per frame (~60fps = ~0.3s fade)
+  var lastHighlightedKey = "";  // track which clusters are highlighted to detect changes
+
+  function setEdgeHighlight(clusterIds) {{
+    // Build a key to detect changes
+    var newKey = Array.from(clusterIds).sort().join(",");
+    if (newKey !== lastHighlightedKey) {{
+      // Cluster set changed - reset fade to animate in
+      edgeFadeAlpha = 0;
+      lastHighlightedKey = newKey;
+    }}
+    highlightedEdgeClusters = new Set(clusterIds);
+    edgeFadeTarget = highlightedEdgeClusters.size > 0 ? 1 : 0;
+  }}
 
   // Cluster visibility state: null=all visible, Set=only those visible
   var hiddenClusters = new Set();
@@ -1519,6 +1628,583 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
   var currentTheme = "dark";
   var arcsUp = true;  // true = arcs go up, false = arcs go down
   var zBackup = allPoints.map(function(p) {{ return p.z; }});
+
+  // ── Compute data extent and optimal zoom ────────────────────────────
+  var xVals = allPoints.map(function(p) {{ return p.x; }});
+  var yVals = allPoints.map(function(p) {{ return p.y; }});
+  var zVals = allPoints.map(function(p) {{ return p.z; }});
+  var xMin = Math.min.apply(null, xVals);
+  var xMax = Math.max.apply(null, xVals);
+  var yMin = Math.min.apply(null, yVals);
+  var yMax = Math.max.apply(null, yVals);
+  var zMin = Math.min.apply(null, zVals);
+  var zMax = Math.max.apply(null, zVals);
+  var xRange = xMax - xMin || 1;
+  var yRange = yMax - yMin || 1;
+  var zRange = zMax - zMin || 1;
+  var maxExtent = Math.max(xRange, yRange, zRange);
+  // Compute zoom to fill viewport: use container size for accurate fit
+  // OrbitView at zoom Z shows roughly (baseSize / 2^Z) world units
+  // We want maxExtent to fill ~85% of the smaller viewport dimension
+  var container = document.getElementById("deckgl-wrapper");
+  var vpSize = container ? Math.min(container.clientWidth, container.clientHeight) : 800;
+  // Empirical base: at zoom 0, ~50 world units visible per 100px viewport
+  var defaultZoom = Math.log2(vpSize * 0.85 / maxExtent);
+  defaultZoom = Math.max(4, Math.min(12, defaultZoom));
+  console.log("[dyfviz] extent:", maxExtent.toFixed(2), "vpSize:", vpSize, "zoom:", defaultZoom.toFixed(2));
+
+  // ── Specular sweep animation (traveling highlight for orientation) ──
+  var sheenEnabled = false;
+  var sheenPhase = 0;
+  var sheenLastTime = 0;
+  // Normalized X position for each point (0 to 1)
+  var sheenXNorm = allPoints.map(function(p) {{ return (p.x - xMin) / xRange; }});
+
+  function updateSheen(timestamp) {{
+    if (!sheenEnabled) return;
+
+    // Time-based animation (not frame-based)
+    if (!sheenLastTime) sheenLastTime = timestamp;
+    var dt = (timestamp - sheenLastTime) / 1000;  // seconds
+    sheenLastTime = timestamp;
+
+    var dk = getDeck();
+    if (!dk || !dk.props) return;
+    var layers = dk.props.layers;
+    if (!layers || !layers.length) return;
+
+    sheenPhase += dt * 0.35;  // ~5 sec per full sweep
+    if (sheenPhase > 1.3) sheenPhase = -0.3;
+    var is2d = (viewMode === "2d");
+    var animated = allPoints.map(function(p, i) {{
+      if (!isClusterVisible(p.cluster)) return null;
+      // Alpha wave sweeping across
+      var dist = Math.abs(sheenXNorm[i] - sheenPhase);
+      // Gaussian falloff for wave
+      var wave = Math.exp(-dist * dist / 0.04);
+      // Alpha: base 40% + up to 60% in wave
+      var alpha = Math.round(255 * (0.4 + 0.6 * wave));
+      if (is2d) {{
+        return {{ x: p.x, y: p.y, z: 0, r: p.r, g: p.g, b: p.b,
+                  a: alpha, title: p.title, cluster: p.cluster }};
+      }}
+      return {{ x: p.x, y: p.y, z: p.z, r: p.r, g: p.g, b: p.b,
+                a: alpha, title: p.title, cluster: p.cluster }};
+    }}).filter(function(p) {{ return p !== null; }});
+
+    var newLayers = [];
+    var basePointLayer = layers[0];
+
+    // Main points layer with animation
+    var newLayer = basePointLayer.clone({{ data: animated }});
+    newLayers.push(newLayer);
+
+    // Add remaining layers (edges)
+    for (var li = 1; li < layers.length; li++) {{
+      newLayers.push(layers[li]);
+    }}
+    dk.setProps({{ layers: newLayers }});
+
+    // Continue animation loop
+    if (sheenEnabled) {{
+      requestAnimationFrame(updateSheen);
+    }}
+  }}
+
+  function startSheen() {{
+    if (sheenEnabled) return;
+    sheenEnabled = true;
+    sheenPhase = -0.4;
+    sheenLastTime = 0;
+    requestAnimationFrame(updateSheen);
+  }}
+
+  function stopSheen() {{
+    sheenEnabled = false;
+    sheenLastTime = 0;
+    // Restore original colors
+    rebuildLayer();
+  }}
+
+  // ── Auto-orbit animation ───────────────────────────────────────────
+  var orbitEnabled = false;
+  var orbitTimer = null;
+  var orbitAngle = 30;  // starting angle (matches initial view)
+
+  function updateOrbit() {{
+    if (!orbitEnabled) return;
+    var dk = getDeck();
+    if (!dk || !dk.setProps) return;
+    orbitAngle += 0.3;  // degrees per frame
+    if (orbitAngle >= 360) orbitAngle -= 360;
+    dk.setProps({{ initialViewState: {{
+      target: [0, 0, 0],
+      rotationX: 15,
+      rotationOrbit: orbitAngle,
+      zoom: defaultZoom,
+      transitionDuration: 0
+    }} }});
+  }}
+
+  function startOrbit() {{
+    if (orbitTimer) return;
+    orbitEnabled = true;
+    orbitTimer = setInterval(updateOrbit, 50);  // 20 FPS
+  }}
+
+  function stopOrbit() {{
+    orbitEnabled = false;
+    if (orbitTimer) {{
+      clearInterval(orbitTimer);
+      orbitTimer = null;
+    }}
+  }}
+
+  // ── Cluster tour ───────────────────────────────────────────────────
+  var tourRunning = false;
+  var tourIndex = 0;
+  var tourCentroid = null;  // current centroid for label positioning
+  var tourConnected = [];   // [{name, centroid}, ...] for connected clusters
+
+  // Build label-to-clusterID mapping (same logic as rowClusterIds)
+  var labelClusterIds = (function() {{
+    var uniqueCids = [];
+    var cset = {{}};
+    allPoints.forEach(function(p) {{
+      if (!(p.cluster in cset)) {{ cset[p.cluster] = true; uniqueCids.push(p.cluster); }}
+    }});
+    uniqueCids.sort(function(a,b) {{ return a - b; }});
+    return labels.map(function(c, i) {{
+      return i < uniqueCids.length ? uniqueCids[i] : i;
+    }});
+  }})();
+
+  // Debug overlay for camera state during tour
+  var debugEl = document.getElementById("camera-debug");
+  function updateCameraDebug(centroid, targetOrbit, targetPitch, curOrbit, curPitch, curZoom, phase) {{
+    if (!debugEl) return;
+    // Compute centroid angle (from +X axis, standard math convention)
+    var centroidAngle = Math.atan2(centroid[1], centroid[0]) * 180 / Math.PI;
+    // Compute alignment error: how far off is the camera from pointing at centroid?
+    // If orbit=0 means camera at +Y, then camera direction at orbit θ might be:
+    // Option A: camera at angle (90 - θ) from +X  => alignment = centroidAngle - (90 - curOrbit)
+    // Option B: camera at angle θ from +Y => θ - 90 from +X => alignment = centroidAngle - (curOrbit - 90)
+    // Option C: camera at angle -θ from +Y
+    // Let's compute several and show which is closest to 0 or 180
+    var errA = centroidAngle - (90 - curOrbit);
+    var errB = centroidAngle - (curOrbit - 90);
+    var errC = centroidAngle - (-curOrbit + 90);
+    var errD = centroidAngle - curOrbit;
+    // Normalize to -180..180
+    function norm(a) {{ while(a>180) a-=360; while(a<-180) a+=360; return a; }}
+    errA = norm(errA); errB = norm(errB); errC = norm(errC); errD = norm(errD);
+    var lines = [
+      "Centroid: [" + centroid[0].toFixed(2) + ", " + centroid[1].toFixed(2) + "] angle=" + centroidAngle.toFixed(1) + "°",
+      "Orbit:    target=" + targetOrbit.toFixed(1) + "° cur=" + curOrbit.toFixed(1) + "°",
+      "ErrA(90-θ):" + errA.toFixed(1) + "° ErrB(θ-90):" + errB.toFixed(1) + "°",
+      "ErrC(-θ+90):" + errC.toFixed(1) + "° ErrD(θ):" + errD.toFixed(1) + "°",
+      "Phase: " + phase
+    ];
+    debugEl.textContent = lines.join("\\n");
+  }}
+
+  function runTour() {{
+    if (tourRunning) {{
+      // Stop tour
+      tourRunning = false;
+      tourCentroid = null;
+      tourConnected = [];
+      setEdgeHighlight([]);
+      rebuildLayer();
+      document.getElementById("tour-btn").textContent = "▶ Tour";
+      document.getElementById("tour-label").style.display = "none";
+      document.getElementById("tour-edge-labels").style.display = "none";
+      document.getElementById("camera-debug").style.display = "none";
+      return;
+    }}
+    if (labels.length === 0) return;
+
+    tourRunning = true;
+    tourIndex = 0;
+    document.getElementById("tour-btn").textContent = "◼ Stop Tour";
+    // Debug panel disabled: document.getElementById("camera-debug").style.display = "block";
+
+    // Sort labels by size (largest first), keeping track of cluster IDs
+    var sortedWithIds = labels.map(function(c, i) {{
+      return {{ label: c, cid: labelClusterIds[i] }};
+    }}).sort(function(a, b) {{
+      return (b.label.size || 0) - (a.label.size || 0);
+    }});
+
+    var tourLabelEl = document.getElementById("tour-label");
+
+    function visitNext() {{
+      if (!tourRunning || tourIndex >= sortedWithIds.length) {{
+        // Tour complete
+        tourRunning = false;
+        tourCentroid = null;
+        tourConnected = [];
+        setEdgeHighlight([]);
+        rebuildLayer();
+        document.getElementById("tour-btn").textContent = "▶ Tour";
+        tourLabelEl.style.display = "none";
+        document.getElementById("tour-edge-labels").style.display = "none";
+        document.getElementById("camera-debug").style.display = "none";
+        document.getElementById("tour-edge-labels").innerHTML = "";
+        // Return to default view
+        var dk = getDeck();
+        if (dk && dk.setProps) {{
+          dk.setProps({{ initialViewState: {{
+            target: [0, 0, 0],
+            rotationX: 15,
+            rotationOrbit: 30,
+            zoom: defaultZoom,
+            transitionDuration: 1000,
+            transitionInterpolator: new deck.LinearInterpolator(['target', 'zoom', 'rotationOrbit'])
+          }} }});
+        }}
+        return;
+      }}
+
+      var item = sortedWithIds[tourIndex];
+      var cluster = item.label;
+      var cid = item.cid;
+
+      // Show cluster label
+      tourLabelEl.textContent = cluster.text;
+      tourLabelEl.style.display = "block";
+
+      // Highlight this cluster's edges (with fade-in animation)
+      setEdgeHighlight([cid]);
+      rebuildLayer();
+
+      var dk = getDeck();
+      if (dk && dk.setProps) {{
+        // Use edge centroid if available (matches where edges connect)
+        // Fall back to computing from points if cluster has no edges
+        var centroid = edgeCentroids[cid];
+        if (!centroid) {{
+          var clusterPts = allPoints.filter(function(p) {{ return p.cluster === cid; }});
+          centroid = [0, 0, 0];
+          if (clusterPts.length > 0) {{
+            clusterPts.forEach(function(p) {{
+              centroid[0] += p.x; centroid[1] += p.y; centroid[2] += p.z;
+            }});
+            centroid[0] /= clusterPts.length;
+            centroid[1] /= clusterPts.length;
+            centroid[2] /= clusterPts.length;
+          }}
+        }}
+
+        // Compute bounding box for zoom calculation
+        var clusterPts = allPoints.filter(function(p) {{ return p.cluster === cid; }});
+        var minX = Infinity, maxX = -Infinity;
+        var minY = Infinity, maxY = -Infinity;
+        var minZ = Infinity, maxZ = -Infinity;
+        clusterPts.forEach(function(p) {{
+          if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+          if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+          if (p.z < minZ) minZ = p.z; if (p.z > maxZ) maxZ = p.z;
+        }});
+
+        // Store centroid for label positioning (now matches edge endpoints)
+        tourCentroid = centroid;
+
+        // Build list of connected cluster names and centroids for edge labels
+        tourConnected = [];
+        edgePairs.forEach(function(pair) {{
+          var connCid = null;
+          if (pair[0] === cid) connCid = pair[1];
+          else if (pair[1] === cid) connCid = pair[0];
+          if (connCid !== null && edgeCentroids[connCid]) {{
+            // Find the label for this cluster
+            var connLabel = null;
+            for (var li = 0; li < labelClusterIds.length; li++) {{
+              if (labelClusterIds[li] === connCid) {{
+                connLabel = labels[li];
+                break;
+              }}
+            }}
+            if (connLabel) {{
+              tourConnected.push({{
+                name: connLabel.text,
+                centroid: edgeCentroids[connCid]
+              }});
+            }}
+          }}
+        }});
+        document.getElementById("tour-edge-labels").style.display = "block";
+
+        // Compute zoom levels for the cluster
+        var dx = maxX - minX, dy = maxY - minY, dz = maxZ - minZ;
+        var clusterExtent = Math.max(dx, dy, dz) || 0.5;
+        var container = document.getElementById("deckgl-wrapper");
+        var vpSize = container ? Math.min(container.clientWidth, container.clientHeight) : 800;
+
+        // Distance from origin to centroid (how far out this cluster is)
+        var centroidDist = Math.sqrt(centroid[0]*centroid[0] + centroid[1]*centroid[1] + centroid[2]*centroid[2]);
+
+        // Zoom to see cluster detail (accounting for its distance from center)
+        var closeZoom = Math.log2(vpSize * 0.6 / clusterExtent);
+        closeZoom = Math.max(defaultZoom + 0.5, Math.min(14, closeZoom));
+
+        // Zoom to see edges (need to see from center out to farthest connected centroid)
+        var maxEdgeDist = centroidDist;
+        tourConnected.forEach(function(conn) {{
+          var d = Math.sqrt(conn.centroid[0]*conn.centroid[0] + conn.centroid[1]*conn.centroid[1] + conn.centroid[2]*conn.centroid[2]);
+          if (d > maxEdgeDist) maxEdgeDist = d;
+        }});
+        var wideZoom = Math.log2(vpSize * 0.4 / maxEdgeDist);
+        wideZoom = Math.max(defaultZoom - 1, Math.min(defaultZoom + 0.5, wideZoom));
+
+        // === SPINNING GLOBE APPROACH ===
+        // Target always at origin. Camera orbits around it.
+        // Rotate to put cluster on NEAR side (between camera and origin).
+
+        // OrbitView geometry (verified empirically):
+        // - orbit=0° → camera at -Y, orbit=90° → -X, orbit=180° → +Y, orbit=270° → +X
+        // - Camera angle from +X axis = -(orbit + 90°)
+        // - For centroid at angle A to be NEAR: -(orbit + 90) = A → orbit = -A - 90
+        var centroidAngle = Math.atan2(centroid[1], centroid[0]) * 180 / Math.PI;
+        var targetOrbit = -centroidAngle - 90;
+
+        // Vertical (pitch): camera should be on same Z side as centroid
+        // Positive pitch = camera at positive Z, negative pitch = camera at negative Z
+        var xyDist = Math.sqrt(centroid[0]*centroid[0] + centroid[1]*centroid[1]);
+        var targetPitch = Math.atan2(centroid[2], xyDist) * 180 / Math.PI;
+        // Clamp pitch to reasonable range
+        targetPitch = Math.max(-60, Math.min(60, targetPitch));
+
+        // Get current state
+        var curState = dk.viewManager ? dk.viewManager.getViewState() : {{}};
+        var startOrbit = curState.rotationOrbit || 0;
+        var startPitch = curState.rotationX || 20;
+        var startZoom = curState.zoom || defaultZoom;
+
+        // Handle orbit wraparound (take shortest rotation path)
+        var orbitDiff = targetOrbit - startOrbit;
+        while (orbitDiff > 180) orbitDiff -= 360;
+        while (orbitDiff < -180) orbitDiff += 360;
+        var pitchDiff = targetPitch - startPitch;
+
+        // === PHASE 1: Rotate to face cluster (both orbit and pitch) ===
+        var phase1Duration = 1500;
+        var startScale1 = Math.pow(2, startZoom);
+        var survey = Math.min(startZoom, wideZoom);  // pull back if needed
+        var endScale1 = Math.pow(2, survey);
+        var startTime1 = performance.now();
+
+        function animatePhase1() {{
+          if (!tourRunning) return;
+          var elapsed = performance.now() - startTime1;
+          var t = Math.min(1, elapsed / phase1Duration);
+          var ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
+          var curScale = startScale1 + (endScale1 - startScale1) * ease;
+          var curOrbit = startOrbit + orbitDiff * ease;
+          var curPitch = startPitch + pitchDiff * ease;
+
+          var curZoom = Math.log2(curScale);
+          dk.setProps({{ initialViewState: {{
+            target: [0, 0, 0],
+            rotationOrbit: curOrbit,
+            rotationX: curPitch,
+            zoom: curZoom,
+            transitionDuration: 0
+          }} }});
+          updateCameraDebug(centroid, targetOrbit, targetPitch, curOrbit, curPitch, curZoom, "1: Rotate");
+          if (t < 1) requestAnimationFrame(animatePhase1);
+        }}
+        animatePhase1();
+
+        // === PHASE 2: Zoom to show edge connections ===
+        setTimeout(function() {{
+          if (!tourRunning) return;
+          var phase2Duration = 1200;
+          var startScale2 = Math.pow(2, survey);
+          var endScale2 = Math.pow(2, wideZoom);
+          var startTime2 = performance.now();
+
+          function animatePhase2() {{
+            if (!tourRunning) return;
+            var elapsed = performance.now() - startTime2;
+            var t = Math.min(1, elapsed / phase2Duration);
+            var ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
+            var curScale = startScale2 + (endScale2 - startScale2) * ease;
+            var curZoom = Math.log2(curScale);
+            dk.setProps({{ initialViewState: {{
+              target: [0, 0, 0],
+              rotationOrbit: targetOrbit,
+              rotationX: targetPitch,
+              zoom: curZoom,
+              transitionDuration: 0
+            }} }});
+            updateCameraDebug(centroid, targetOrbit, targetPitch, targetOrbit, targetPitch, curZoom, "2: Wide zoom");
+            if (t < 1) requestAnimationFrame(animatePhase2);
+          }}
+          animatePhase2();
+        }}, phase1Duration);
+
+        // === PHASE 3: Zoom in to cluster detail ===
+        setTimeout(function() {{
+          if (!tourRunning) return;
+          var phase3Duration = 1500;
+          var startScale3 = Math.pow(2, wideZoom);
+          var endScale3 = Math.pow(2, closeZoom);
+          var startTime3 = performance.now();
+
+          function animatePhase3() {{
+            if (!tourRunning) return;
+            var elapsed = performance.now() - startTime3;
+            var t = Math.min(1, elapsed / phase3Duration);
+            var ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
+            var curScale = startScale3 + (endScale3 - startScale3) * ease;
+            var curZoom = Math.log2(curScale);
+            dk.setProps({{ initialViewState: {{
+              target: [0, 0, 0],
+              rotationOrbit: targetOrbit,
+              rotationX: targetPitch,
+              zoom: curZoom,
+              transitionDuration: 0
+            }} }});
+            updateCameraDebug(centroid, targetOrbit, targetPitch, targetOrbit, targetPitch, curZoom, "3: Close zoom");
+            if (t < 1) requestAnimationFrame(animatePhase3);
+          }}
+          animatePhase3();
+        }}, phase1Duration + 1200 + 2000);  // after rotate + edge-zoom + pause
+
+        // === PHASE 4: Pull back to survey for next cluster ===
+        setTimeout(function() {{
+          if (!tourRunning) return;
+          var phase4Duration = 1200;
+          var startScale4 = Math.pow(2, closeZoom);
+          var endScale4 = Math.pow(2, defaultZoom);
+          var startTime4 = performance.now();
+
+          function animatePhase4() {{
+            if (!tourRunning) return;
+            var elapsed = performance.now() - startTime4;
+            var t = Math.min(1, elapsed / phase4Duration);
+            var ease = 1 - Math.pow(1 - t, 2);  // ease-out
+
+            var curScale = startScale4 + (endScale4 - startScale4) * ease;
+            var curZoom = Math.log2(curScale);
+            dk.setProps({{ initialViewState: {{
+              target: [0, 0, 0],
+              rotationOrbit: targetOrbit,
+              rotationX: targetPitch,
+              zoom: curZoom,
+              transitionDuration: 0
+            }} }});
+            updateCameraDebug(centroid, targetOrbit, targetPitch, targetOrbit, targetPitch, curZoom, "4: Pull back");
+            if (t < 1) requestAnimationFrame(animatePhase4);
+          }}
+          animatePhase4();
+        }}, phase1Duration + 1200 + 2000 + 1500 + 2000);  // after all + hold
+      }}
+
+      tourIndex++;
+      // Total: 1.5s rotate + 1.2s edge-zoom + 2s pause + 1.5s close-zoom + 2s hold + 1.2s pull-back
+      setTimeout(visitNext, 9400);
+    }}
+
+    visitNext();
+  }}
+
+  // ── Ambient orbit mode with flickering ─────────────────────────────
+  var ambientRunning = false;
+  var ambientOrbit = 0;
+  var flickerData = null;  // Stores per-point flicker phase
+
+  function runAmbient() {{
+    if (ambientRunning) {{
+      ambientRunning = false;
+      setEdgeHighlight([]);
+      rebuildLayer();
+      document.getElementById("daydream-btn").textContent = "✦ Daydream";
+      return;
+    }}
+
+    ambientRunning = true;
+    document.getElementById("daydream-btn").textContent = "◼ Stop";
+
+    // Initialize candlelight flicker: multiple frequencies + occasional flares
+    flickerData = allPoints.map(function() {{
+      return {{
+        phase1: Math.random() * Math.PI * 2,
+        phase2: Math.random() * Math.PI * 2,
+        phase3: Math.random() * Math.PI * 2,
+        speed1: 1.5 + Math.random() * 2.0,   // slow base
+        speed2: 4.0 + Math.random() * 3.0,   // medium wobble
+        speed3: 8.0 + Math.random() * 6.0,   // fast flutter
+        flareTimer: Math.random() * 3.0,     // seconds until next flare
+        flareBrightness: 0
+      }};
+    }});
+
+    var dk = getDeck();
+    if (!dk) return;
+
+    var lastTime = performance.now();
+    var orbitSpeed = 2;  // degrees per second (3 min per rotation, planetary)
+
+    function animateAmbient() {{
+      if (!ambientRunning) return;
+
+      var now = performance.now();
+      var dt = (now - lastTime) / 1000;
+      lastTime = now;
+
+      // Update orbit angle
+      ambientOrbit = (ambientOrbit + orbitSpeed * dt) % 360;
+
+      // Simple flicker - no depth effects
+      var flickerTime = now / 1000;
+      var flickered = allPoints.map(function(p, i) {{
+        var f = flickerData[i];
+
+        // Gentle flicker
+        var base = 0.75 + 0.15 * Math.sin(flickerTime * f.speed1 * 0.5 + f.phase1);
+        var shimmer = 0.1 * Math.sin(flickerTime * f.speed2 * 0.3 + f.phase2);
+        var flicker = Math.min(1.0, base + shimmer);
+
+        var alpha = Math.round(p.a * flicker);
+        return {{
+          x: p.x, y: p.y, z: p.z,
+          r: p.r, g: p.g, b: p.b, a: alpha,
+          title: p.title, cluster: p.cluster
+        }};
+      }}).filter(function(p) {{ return isClusterVisible(p.cluster); }});
+
+      // Update deck view
+      dk.setProps({{
+        initialViewState: {{
+          target: [0, 0, 0],
+          rotationOrbit: ambientOrbit,
+          rotationX: 15,
+          zoom: defaultZoom,  // Show all points
+          transitionDuration: 0
+        }}
+      }});
+
+      // Update point layer with flickered data
+      var layers = dk.props.layers;
+      if (layers && layers.length > 0) {{
+        var newLayer = layers[0].clone({{ data: flickered }});
+        var newLayers = [newLayer];
+        if (layers.length > 1) {{
+          newLayers.push(layers[layers.length - 1]);
+        }}
+        dk.setProps({{ layers: newLayers }});
+      }}
+
+      requestAnimationFrame(animateAmbient);
+    }}
+
+    animateAmbient();
+  }}
 
   // ── Highlighter annotations ────────────────────────────────────────
   var annotations = [];
@@ -1642,6 +2328,9 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
     var hlEc = (currentTheme === "light") ? [220, 80, 20, 200] : [255, 160, 40, 220];
     var hasHl = highlightedEdgeClusters.size > 0;
 
+    // Update fade target based on highlight state
+    edgeFadeTarget = hasHl ? 1 : 0;
+
     // Use 2D bundled paths in 2D mode, 3D catenary curves in 3D mode
     var edgePaths = is2d ? edgePaths2d : edgePaths3d;
     edgePathData = edgePaths.map(function(path, idx) {{
@@ -1659,12 +2348,23 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
           return [pt[0], pt[1], baseZ - offset];  // flip the offset
         }});
       }}
+      // Compute faded colors based on edgeFadeAlpha
+      var fadeAlpha = edgeFadeAlpha;
       if (hasHl && idx < edgePairs.length) {{
         var pair = edgePairs[idx];
-        if (highlightedEdgeClusters.has(pair[0]) || highlightedEdgeClusters.has(pair[1])) {{
-          return {{ path: finalPath, color: hlEc, width: width * 1.5 }};
+        var isHighlighted = highlightedEdgeClusters.has(pair[0]) || highlightedEdgeClusters.has(pair[1]);
+        if (isHighlighted) {{
+          // Highlighted edge: fade from normal to bright
+          var a = Math.round(ec[3] + (hlEc[3] - ec[3]) * fadeAlpha);
+          var r = Math.round(ec[0] + (hlEc[0] - ec[0]) * fadeAlpha);
+          var g = Math.round(ec[1] + (hlEc[1] - ec[1]) * fadeAlpha);
+          var b = Math.round(ec[2] + (hlEc[2] - ec[2]) * fadeAlpha);
+          var wid = width * (1 + 0.5 * fadeAlpha);
+          return {{ path: finalPath, color: [r, g, b, a], width: wid }};
         }}
-        return {{ path: finalPath, color: [ec[0], ec[1], ec[2], 15], width: width }};
+        // Non-highlighted edge: fade from normal to dim
+        var dimAlpha = Math.round(ec[3] - (ec[3] - 15) * fadeAlpha);
+        return {{ path: finalPath, color: [ec[0], ec[1], ec[2], dimAlpha], width: width }};
       }}
       return {{ path: finalPath, color: ec, width: width }};
     }});
@@ -1682,10 +2382,13 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
     var oldLayer = layers[0];
     var newLayer = oldLayer.clone({{ data: visible }});
     var newLayers = [newLayer];
+    // Save original edge layer reference on first call
+    if (!originalEdgeLayer && layers.length > 1) {{
+      originalEdgeLayer = layers[1];
+    }}
     // Add edge layer in both 2D and 3D modes
-    if (edgesVisible && edgePaths.length > 0 && layers.length > 1) {{
-      var edgeLayer = layers[1];
-      newLayers.push(edgeLayer.clone({{ data: edgeData }}));
+    if (edgesVisible && edgePaths.length > 0 && originalEdgeLayer) {{
+      newLayers.push(originalEdgeLayer.clone({{ data: edgeData }}));
     }}
     dk.setProps({{ layers: newLayers }});
     updateRowStyles();
@@ -1834,7 +2537,8 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
 
   // Label placement: project, cull off-screen, spatial separation
   function updateLabels(vp, zoom) {{
-    if (!labelsVisible) {{
+    // Hide main labels when tour is running (tour has its own focused label)
+    if (!labelsVisible || tourRunning) {{
       for (var i = 0; i < MAX_VISIBLE_LABELS; i++) labelPool[i].style.opacity = "0";
       return;
     }}
@@ -1846,7 +2550,7 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
     // Minimum screen-space separation squared (pixels)
     // Scale separation inversely with zoom: tighter labels when zoomed in
     var baseSep = Math.min(w, h) * 0.06;
-    var sepScale = Math.max(0.5, 5.5 / zoom);
+    var sepScale = Math.max(0.5, defaultZoom / zoom);
     var minSepSq = Math.pow(baseSep * sepScale, 2);
 
     var placed = [];  // {{sx, sy, text, levelKey, depth}}
@@ -1920,9 +2624,19 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
     var vp = vps[0];
 
     // Get current zoom from view state
-    var zoom = 5.5;
+    var zoom = defaultZoom;
     if (dk.viewManager) {{
-      try {{ zoom = dk.viewManager.getViewState().zoom || 5.5; }} catch(e) {{}}
+      try {{ zoom = dk.viewManager.getViewState().zoom || defaultZoom; }} catch(e) {{}}
+    }}
+
+    // Animate edge fade
+    if (edgeFadeAlpha !== edgeFadeTarget) {{
+      if (edgeFadeAlpha < edgeFadeTarget) {{
+        edgeFadeAlpha = Math.min(edgeFadeTarget, edgeFadeAlpha + edgeFadeSpeed);
+      }} else {{
+        edgeFadeAlpha = Math.max(edgeFadeTarget, edgeFadeAlpha - edgeFadeSpeed);
+      }}
+      rebuildLayer();  // Update edge colors during fade
     }}
 
     // Debounced point alpha update
@@ -1935,12 +2649,43 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
 
     updateLabels(vp, zoom);
     drawAnnotations(vp);
+
+    // Position tour label at centroid
+    if (tourRunning && tourCentroid) {{
+      var tourLabelEl = document.getElementById("tour-label");
+      try {{
+        var sp = vp.project(tourCentroid);
+        tourLabelEl.style.left = sp[0] + "px";
+        tourLabelEl.style.top = sp[1] + "px";
+      }} catch(e) {{}}
+
+      // Render edge centroid labels
+      var edgeLabelsContainer = document.getElementById("tour-edge-labels");
+      var html = "";
+      tourConnected.forEach(function(conn) {{
+        try {{
+          var esp = vp.project(conn.centroid);
+          html += '<div class="tour-edge-label" style="left:' + esp[0] + 'px;top:' + esp[1] + 'px;">' + conn.name + '</div>';
+        }} catch(e) {{}}
+      }});
+      edgeLabelsContainer.innerHTML = html;
+    }}
   }}
 
   setTimeout(function() {{
     // Populate the empty pydeck layer with decoded binary data
     rebuildLayer();
     var dk = getDeck();
+    // Apply computed zoom to fill screen
+    if (dk && dk.setProps) {{
+      dk.setProps({{ initialViewState: {{
+        target: [0, 0, 0],
+        rotationX: 15,
+        rotationOrbit: 30,
+        zoom: defaultZoom,
+        transitionDuration: 0
+      }} }});
+    }}
     if (dk && dk.getViewports) {{
       var vps = dk.getViewports();
       if (vps && vps.length) updatePointAlpha(dk, vps[0]);
@@ -1953,7 +2698,7 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
     var dk = getDeck();
     if (dk && dk.setProps) {{
       dk.setProps({{ initialViewState: {{
-        target: [0,0,0], rotationX: 15, rotationOrbit: 30, zoom: 5.5,
+        target: [0,0,0], rotationX: 15, rotationOrbit: 30, zoom: defaultZoom,
         transitionDuration: 300
       }} }});
     }}
@@ -1975,6 +2720,28 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
     arcsUp = e.target.checked;
     rebuildLayer();
   }});
+
+  // Toggle specular sweep animation (orientation cue)
+  document.getElementById("toggle-sheen").addEventListener("change", function(e) {{
+    if (e.target.checked) {{
+      startSheen();
+    }} else {{
+      stopSheen();
+    }}
+  }});
+
+  // Toggle auto-orbit
+  document.getElementById("toggle-orbit").addEventListener("change", function(e) {{
+    if (e.target.checked) {{
+      startOrbit();
+    }} else {{
+      stopOrbit();
+    }}
+  }});
+
+  // Cluster tour button
+  document.getElementById("tour-btn").addEventListener("click", runTour);
+  document.getElementById("daydream-btn").addEventListener("click", runAmbient);
 
   // Point size slider
   document.getElementById("point-size").addEventListener("input", function(e) {{
@@ -2058,7 +2825,7 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
       // Top-down view, lock rotation, pan-only controller
       dk.setProps({{
         initialViewState: {{
-          target: [0, 0, 0], rotationX: 90, rotationOrbit: 0, zoom: 5.5,
+          target: [0, 0, 0], rotationX: 90, rotationOrbit: 0, zoom: defaultZoom,
           minRotationX: 90, maxRotationX: 90,
           transitionDuration: 400
         }},
@@ -2075,7 +2842,7 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
       // Restore orbit controls
       dk.setProps({{
         initialViewState: {{
-          target: [0, 0, 0], rotationX: 15, rotationOrbit: 30, zoom: 5.5,
+          target: [0, 0, 0], rotationX: 15, rotationOrbit: 30, zoom: defaultZoom,
           minRotationX: -90, maxRotationX: 90,
           transitionDuration: 400
         }},
@@ -2122,7 +2889,7 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
           var dk = getDeck();
           if (dk && dk.setProps) {{
             dk.setProps({{ initialViewState: {{
-              target: [0,0,0], rotationX: 15, rotationOrbit: 30, zoom: 5.5,
+              target: [0,0,0], rotationX: 15, rotationOrbit: 30, zoom: defaultZoom,
               transitionDuration: 300
             }} }});
           }}
@@ -2196,16 +2963,27 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
             dkZ.setProps({{ initialViewState: curVS }});
           }}
           break;
+        case "set_view":
+          // Set view state directly (orbit, pitch, zoom)
+          var dkV = getDeck();
+          if (dkV && dkV.setProps) {{
+            var newVS = {{
+              target: msg.target || [0, 0, 0],
+              rotationOrbit: typeof msg.orbit === "number" ? msg.orbit : 0,
+              rotationX: typeof msg.pitch === "number" ? msg.pitch : 15,
+              zoom: typeof msg.zoom === "number" ? msg.zoom : defaultZoom,
+              transitionDuration: msg.transitionDuration || 0
+            }};
+            dkV.setProps({{ initialViewState: newVS }});
+          }}
+          break;
         case "clear_highlight":
-          highlightedEdgeClusters.clear();
+          setEdgeHighlight([]);
           rebuildLayer();
           break;
         case "highlight_edges":
           if (msg.clusters && msg.clusters.length) {{
-            highlightedEdgeClusters.clear();
-            for (var hei = 0; hei < msg.clusters.length; hei++) {{
-              highlightedEdgeClusters.add(msg.clusters[hei]);
-            }}
+            setEdgeHighlight(msg.clusters);
             // Auto-enable edges and switch to 2D if needed
             if (!edgesVisible) {{
               edgesVisible = true;
@@ -2217,7 +2995,7 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
           }}
           break;
         case "clear_edge_highlight":
-          highlightedEdgeClusters.clear();
+          setEdgeHighlight([]);
           rebuildLayer();
           break;
         case "toggle_edges":
@@ -2278,6 +3056,59 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
           break;
         case "draw_clear":
           annotations.length = 0;
+          break;
+        case "tour":
+          runTour();
+          break;
+        case "get_state":
+          // Return current view state via WebSocket
+          var dkState = getDeck();
+          var state = {{ session: sessionId }};
+          if (dkState && dkState.viewManager) {{
+            try {{
+              var vs = dkState.viewManager.getViewState();
+              state.zoom = vs.zoom;
+              state.rotationOrbit = vs.rotationOrbit;
+              state.rotationX = vs.rotationX;
+              state.target = vs.target;
+              // Try to get camera position from viewport
+              var vp = dkState.viewManager.getViewports()[0];
+              if (vp && vp.cameraPosition) {{
+                state.cameraPosition = vp.cameraPosition;
+              }}
+              // Also compute estimated camera direction from orbit angles
+              var orbitRad = (vs.rotationOrbit || 0) * Math.PI / 180;
+              var pitchRad = (vs.rotationX || 0) * Math.PI / 180;
+              // Estimate camera direction (unit vector from target toward camera)
+              state.camDirEstimate = [
+                Math.sin(orbitRad) * Math.cos(pitchRad),
+                Math.cos(orbitRad) * Math.cos(pitchRad),
+                Math.sin(pitchRad)
+              ];
+            }} catch(e) {{ state.error = e.message; }}
+          }}
+          state.viewMode = viewMode;
+          state.tourRunning = tourRunning;
+          if (tourCentroid) {{
+            state.tourCentroid = tourCentroid;
+            // Compute alignment errors to help debug the orbit formula
+            var cx = tourCentroid[0], cy = tourCentroid[1];
+            var centroidAngle = Math.atan2(cy, cx) * 180 / Math.PI;
+            var orbit = state.rotationOrbit || 0;
+            function normAngle(a) {{ while(a>180) a-=360; while(a<-180) a+=360; return a; }}
+            state.debug = {{
+              centroidAngle: centroidAngle,
+              orbitAngle: orbit,
+              // Different interpretations of how orbit maps to camera direction
+              errA: normAngle(centroidAngle - (90 - orbit)),  // camera at 90-orbit from +X
+              errB: normAngle(centroidAngle - (orbit - 90)),  // camera at orbit-90 from +X
+              errC: normAngle(centroidAngle - (-orbit)),      // camera at -orbit from +X
+              errD: normAngle(centroidAngle - orbit),         // camera at orbit from +X
+              errE: normAngle(centroidAngle - (orbit + 90)),  // camera at orbit+90 from +X
+              errF: normAngle(centroidAngle - (-orbit + 180)) // camera at -orbit+180 from +X
+            }};
+          }}
+          ws.send(JSON.stringify({{ cmd: "state_response", state: state }}));
           break;
         case "reload":
           // Save state before reload
