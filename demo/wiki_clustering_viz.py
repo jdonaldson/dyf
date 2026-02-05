@@ -323,10 +323,11 @@ CLUSTER_LEVELS = (5, 12, 25)
 
 
 def build_label_hierarchy(coords, titles_arr, birch, embeddings=None,
-                          model=None):
+                          model=None, cluster_data=None):
     """Build multi-level label hierarchy from BIRCH subclusters via Ward linkage.
 
     If model is provided, generates LLM labels via contrastive TF-IDF.
+    cluster_data: the data BIRCH was fit on (for predict); defaults to coords.
     Returns dict mapping level -> list of label dicts with centroid, name, size.
     """
     ndim = coords.shape[1]
@@ -337,8 +338,9 @@ def build_label_hierarchy(coords, titles_arr, birch, embeddings=None,
     # Ward linkage on subcluster centers
     Z = linkage(sub_centers, method='ward')
 
-    # Map each point to its subcluster
-    sub_labels = birch.predict(coords)
+    # Map each point to its subcluster (predict on same space BIRCH was fit on)
+    predict_data = cluster_data if cluster_data is not None else coords
+    sub_labels = birch.predict(predict_data)
 
     levels = {}
     for k in CLUSTER_LEVELS:
@@ -628,6 +630,79 @@ def label_clusters(titles, coords, labels, embeddings, model="gemma2:9b",
                 print(f"    Labeled {completed}/{len(tasks)} clusters...",
                       flush=True)
 
+    # ── Second pass: re-label duplicates with sibling context ───────────
+    # Find clusters that share the same label
+    from collections import Counter
+    label_counts = Counter(cluster_names.values())
+    duplicates = {lbl for lbl, cnt in label_counts.items() if cnt > 1}
+
+    if duplicates:
+        dup_cids = [cid for cid in unique_labels
+                    if cluster_names[cid] in duplicates]
+        taken = sorted(set(cluster_names.values()))
+        print(f"    Re-labeling {len(dup_cids)} clusters with duplicate names...")
+
+        dup_tasks = []
+        for cid in dup_cids:
+            pts = cluster_points[cid]
+            if not pts:
+                continue
+            sample_indices = _sample_spatial(pts, coords, n_samples * 3)
+            seen = set()
+            sample_titles = []
+            for idx in sample_indices:
+                t = titles[idx]
+                if t not in seen:
+                    seen.add(t)
+                    sample_titles.append(t)
+                    if len(sample_titles) >= n_samples:
+                        break
+
+            # Contrastive TF-IDF against nearest high-D neighbor
+            nearest_idx = _find_nearest_cluster(cid_to_idx[cid], hd_centroids)
+            nearest_cid = unique_labels[nearest_idx]
+            neighbor_pts = cluster_points[nearest_cid]
+            kw_str = ""
+            if neighbor_pts:
+                combined_titles = ([titles[p] for p in pts]
+                                   + [titles[p] for p in neighbor_pts])
+                combined_labels_arr = np.zeros(
+                    len(pts) + len(neighbor_pts), dtype=int)
+                combined_labels_arr[len(pts):] = 1
+                kw = _compute_tfidf_keywords(
+                    combined_titles, combined_labels_arr, 2, top_k=8, min_df=1)
+                keywords = [w for w, _ in kw.get(0, [])][:8]
+                if keywords:
+                    kw_str = (f"\nDistinguishing keywords (vs neighbor): "
+                              f"{', '.join(keywords)}")
+
+            # List sibling labels so the LLM avoids them
+            siblings = [l for l in taken if l != cluster_names[cid]]
+            sibling_str = ", ".join(f'"{s}"' for s in siblings[:15])
+
+            prompt = (
+                f"You are labeling clusters in an embedding space. "
+                f"This cluster has {len(pts)} items.\n"
+                f"{kw_str}\n"
+                f"Sample items from across this cluster:\n"
+                + "\n".join(f"- {t}" for t in sample_titles)
+                + "\n\n"
+                f"These labels are ALREADY TAKEN by other clusters: "
+                f"{sibling_str}\n\n"
+                "Give a short (2-5 word) label that is DIFFERENT from all "
+                "taken labels. Focus on what makes THIS cluster UNIQUE — "
+                "specific device types, body parts, or use cases.\n\n"
+                "Reply with ONLY the label, nothing else."
+            )
+            dup_tasks.append((cid, prompt))
+
+        n_workers = min(4, len(dup_tasks))
+        with ThreadPoolExecutor(max_workers=n_workers) as executor:
+            futures = {executor.submit(_call_ollama, t): t for t in dup_tasks}
+            for future in as_completed(futures):
+                cid, label = future.result()
+                cluster_names[cid] = label
+
     for cid in unique_labels:
         n_pts = len(cluster_points[cid])
         print(f"    [{cid:2d}] {cluster_names[cid]:<35s} ({n_pts} pts)")
@@ -691,6 +766,7 @@ html, body { width: 100%%; height: 100%%; overflow: hidden; background: #1e1e1e;
   transition: opacity 0.12s;
   text-shadow: 0 1px 2px rgba(0,0,0,0.6);
 }
+
 </style>
 </head>
 <body>
@@ -921,8 +997,9 @@ def build_html(coords, titles_arr, labels, color_map, title_str,
 
 def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
                  cluster_names=None, ws_port=8766, label_levels=None,
-                 bundled_edges=None):
+                 bundled_edges=None, logo_path=None):
     """Build a pydeck 3D point cloud with HTML overlay labels."""
+    import base64
     import pydeck as pdk
 
     labels_list = labels.tolist() if hasattr(labels, 'tolist') else list(labels)
@@ -1053,67 +1130,113 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
     )
 
     # Build overlay: header, control panel, labels, and logic
+    # DYF logo: always-present inline SVG (Futura, flipped-y lambda)
+    dyf_logo_svg = (
+        '<svg class="dyf-logo" viewBox="0 0 135 105" width="54" height="42">'
+        '<defs><linearGradient id="dyf-grad" x1="0%" y1="0%" x2="100%" y2="100%">'
+        '<stop offset="0%" stop-color="#e94560"/>'
+        '<stop offset="100%" stop-color="#f9a826"/>'
+        '</linearGradient></defs>'
+        '<text x="4" y="82" font-family="Futura,\'Trebuchet MS\',sans-serif"'
+        ' font-size="88" font-weight="700" class="dyf-letter">d</text>'
+        '<text x="56" y="82" font-family="Futura,\'Trebuchet MS\',sans-serif"'
+        ' font-size="88" font-weight="700" fill="url(#dyf-grad)"'
+        ' transform="rotate(180,79,59)">y</text>'
+        '<text x="104" y="82" font-family="Futura,\'Trebuchet MS\',sans-serif"'
+        ' font-size="88" font-weight="700" class="dyf-letter">f</text>'
+        '</svg>'
+    )
+
+    # Optional client logo (e.g. --logo curvo.png)
+    client_logo_html = ""
+    if logo_path and Path(logo_path).exists():
+        logo_data = Path(logo_path).read_bytes()
+        logo_b64 = base64.b64encode(logo_data).decode()
+        client_logo_html = (
+            f'<img src="data:image/png;base64,{logo_b64}" '
+            f'class="header-logo" '
+            f'style="height:28px;margin-left:12px;vertical-align:middle;">'
+        )
+
     overlay_html = f"""
+<!-- DYF_OVERLAY_START -->
 <!-- Header -->
 <div id="header" style="position:absolute;top:0;left:0;right:260px;z-index:10;
   padding:12px 20px;font:14px -apple-system,'Segoe UI',sans-serif;">
-  <div style="font-size:16px;font-weight:600">{title_str}</div>
-  <div id="header-sub" class="sub" style="font-size:12px;">
+  <div style="margin-bottom:6px;">{client_logo_html}</div>
+  <div style="font-size:14px;font-weight:600">{title_str}</div>
+  <div id="header-sub" class="sub" style="font-size:11px;">
     Scroll to zoom &middot; Drag to orbit &middot; Hover for details
   </div>
 </div>
 
-<!-- Control panel -->
+<!-- Palette panel -->
 <div id="panel" style="position:absolute;top:0;right:0;bottom:0;width:260px;
   z-index:10;font:13px -apple-system,'Segoe UI',sans-serif;
-  overflow-y:auto;padding:16px;">
+  overflow-y:auto;">
 
-  <div style="font-weight:600;margin-bottom:12px;
-    color:var(--fg-section);text-transform:uppercase;letter-spacing:1px;font-size:11px;">
-    Controls
-  </div>
-
-  <div style="display:flex;gap:8px;margin-bottom:16px;">
-    <button id="reset-btn" class="panel-btn">Reset View</button>
-    <button id="mode-btn" class="panel-btn">2D Mode</button>
-  </div>
-  <div style="display:flex;gap:8px;margin-bottom:16px;">
-    <button id="theme-btn" class="panel-btn">Light Mode</button>
+  <!-- DYF logo -->
+  <div style="padding:10px 12px 6px;text-align:center;">
+    {dyf_logo_svg}
   </div>
 
-  <div style="margin-bottom:12px;">
-    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-      <input type="checkbox" id="toggle-labels" checked
-        style="accent-color:var(--accent);width:16px;height:16px;">
-      <span>Show labels</span>
-    </label>
+  <!-- View palette -->
+  <div class="palette">
+    <div class="palette-header" onclick="this.parentElement.classList.toggle('collapsed')">
+      <span class="palette-arrow"></span>View
+    </div>
+    <div class="palette-body">
+      <div style="display:flex;gap:6px;margin-bottom:8px;">
+        <button id="reset-btn" class="panel-btn">Reset</button>
+        <button id="mode-btn" class="panel-btn">2D</button>
+        <button id="fullscreen-btn" class="panel-btn">Fullscreen</button>
+      </div>
+      <div style="display:flex;gap:6px;">
+        <button id="theme-btn" class="panel-btn">Light</button>
+      </div>
+    </div>
   </div>
 
-  <div style="margin-bottom:12px;">
-    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-      <input type="checkbox" id="toggle-edges" checked
-        style="accent-color:var(--accent);width:16px;height:16px;">
-      <span>Show bridge edges</span>
-    </label>
+  <!-- Display palette -->
+  <div class="palette">
+    <div class="palette-header" onclick="this.parentElement.classList.toggle('collapsed')">
+      <span class="palette-arrow"></span>Display
+    </div>
+    <div class="palette-body">
+      <label class="palette-check">
+        <input type="checkbox" id="toggle-labels" checked>
+        <span>Labels</span>
+      </label>
+      <label class="palette-check">
+        <input type="checkbox" id="toggle-edges" checked>
+        <span>Bridge edges</span>
+      </label>
+      <div style="margin-top:8px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+          <span>Point size</span><span id="ps-val">2</span>
+        </div>
+        <input type="range" id="point-size" min="1" max="8" value="2" step="0.5"
+          style="width:100%;">
+      </div>
+    </div>
   </div>
 
-  <div style="margin-bottom:16px;">
-    <div style="margin-bottom:6px;">Point size: <span id="ps-val">2</span></div>
-    <input type="range" id="point-size" min="1" max="8" value="2" step="0.5"
-      style="width:100%;accent-color:var(--accent);">
+  <!-- Clusters palette -->
+  <div class="palette">
+    <div class="palette-header" onclick="this.parentElement.classList.toggle('collapsed')">
+      <span class="palette-arrow"></span>Clusters
+    </div>
+    <div class="palette-body">
+      <div id="cluster-list" style="font-size:12px;line-height:1.8;"></div>
+    </div>
   </div>
-
-  <div style="font-weight:600;font-size:11px;margin-bottom:8px;
-    color:var(--fg-section);text-transform:uppercase;letter-spacing:1px;">
-    Clusters
-  </div>
-  <div id="cluster-list" style="font-size:12px;line-height:1.8;"></div>
 </div>
 
 <style>
 :root {{
   --bg: #1e1e1e; --bg-panel: rgba(28,28,28,0.95); --bg-header: rgba(30,30,30,0.92);
   --bg-label: rgba(30,30,30,0.88); --bg-btn: #444; --bg-btn-hover: #555;
+  --bg-palette-header: rgba(40,40,40,0.95);
   --fg: #ddd; --fg-muted: #999; --fg-section: #aaa;
   --border: #444; --border-label: rgba(120,120,120,0.5);
   --range-bg: #555; --range-thumb: #aaa; --accent: #888;
@@ -1122,6 +1245,7 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
 body.light {{
   --bg: #f5f5f5; --bg-panel: rgba(245,245,245,0.97); --bg-header: rgba(250,250,250,0.95);
   --bg-label: rgba(255,255,255,0.92); --bg-btn: #ddd; --bg-btn-hover: #ccc;
+  --bg-palette-header: rgba(230,230,230,0.95);
   --fg: #222; --fg-muted: #666; --fg-section: #555;
   --border: #ccc; --border-label: rgba(100,100,100,0.3);
   --range-bg: #ccc; --range-thumb: #666; --accent: #666;
@@ -1142,10 +1266,14 @@ body.light {{
 .cl.level-fine   {{ font-size:11px; font-weight:600; border-width:1px; opacity:0.85; }}
 #header {{ background:var(--bg-header); border-bottom:1px solid var(--border); color:var(--fg); }}
 #header .sub {{ color:var(--fg-muted); }}
+.dyf-logo .dyf-letter {{ fill: #dddddd; }}
+body.light .dyf-logo .dyf-letter {{ fill: #333333; }}
+.header-logo {{ filter:grayscale(1) invert(1) brightness(1.8); }}
+body.light .header-logo {{ filter:grayscale(1) brightness(0.3); }}
 #panel {{ background:var(--bg-panel); border-left:1px solid var(--border); color:var(--fg); }}
 #panel input[type="range"] {{
   -webkit-appearance:none; height:4px; background:var(--range-bg); border-radius:2px;
-  outline:none;
+  outline:none; accent-color:var(--accent);
 }}
 #panel input[type="range"]::-webkit-slider-thumb {{
   -webkit-appearance:none; width:14px; height:14px;
@@ -1153,10 +1281,43 @@ body.light {{
 }}
 .panel-btn {{
   flex:1; background:var(--bg-btn); color:var(--fg);
-  border:1px solid var(--border); padding:8px 0; border-radius:4px;
-  cursor:pointer; font-size:13px; font-family:inherit;
+  border:1px solid var(--border); padding:6px 0; border-radius:3px;
+  cursor:pointer; font-size:11px; font-family:inherit;
 }}
 .panel-btn:hover {{ background:var(--bg-btn-hover); }}
+.palette {{
+  border-bottom:1px solid var(--border);
+}}
+.palette-header {{
+  display:flex; align-items:center; gap:6px;
+  padding:8px 12px; cursor:pointer; user-select:none;
+  font-size:11px; font-weight:600; text-transform:uppercase;
+  letter-spacing:0.5px; color:var(--fg-section);
+  background:var(--bg-palette-header);
+}}
+.palette-header:hover {{ background:var(--bg-btn); }}
+.palette-arrow {{
+  display:inline-block; width:0; height:0;
+  border-left:4px solid transparent; border-right:4px solid transparent;
+  border-top:5px solid var(--fg-muted);
+  transition:transform 0.15s;
+}}
+.palette.collapsed .palette-arrow {{
+  transform:rotate(-90deg);
+}}
+.palette-body {{
+  padding:10px 12px;
+}}
+.palette.collapsed .palette-body {{
+  display:none;
+}}
+.palette-check {{
+  display:flex; align-items:center; gap:8px; cursor:pointer;
+  padding:3px 0;
+}}
+.palette-check input {{
+  accent-color:var(--accent); width:14px; height:14px;
+}}
 </style>
 
 <script>
@@ -1372,9 +1533,8 @@ body.light {{
   // ── Multi-level zoom-aware label placement ───────────────────────────
   // Zoom thresholds: map zoom level to which cluster levels to show
   // deck.gl OrbitView zoom ~5.5 default; higher = more zoomed in
-  // All levels always active; spatial separation + label pool (40 max)
-  // naturally prioritize coarse labels and fill gaps with finer ones.
-  // Isolated clusters always get labeled regardless of zoom.
+  // Show one level at a time: coarse at default zoom, finer when zoomed in.
+  // Separation scales inversely with zoom so more labels fit when zoomed in.
   var ZOOM_THRESHOLDS = [
     {{ zoom: 0, levels: levelKeys }}
   ];
@@ -1399,7 +1559,10 @@ body.light {{
     var h = window.innerHeight;
 
     // Minimum screen-space separation squared (pixels)
-    var minSepSq = Math.pow(Math.min(w, h) * 0.06, 2);
+    // Scale separation inversely with zoom: tighter labels when zoomed in
+    var baseSep = Math.min(w, h) * 0.06;
+    var sepScale = Math.max(0.5, 5.5 / zoom);
+    var minSepSq = Math.pow(baseSep * sepScale, 2);
 
     var placed = [];  // {{sx, sy, text, levelKey, depth}}
 
@@ -1562,6 +1725,23 @@ body.light {{
     setTheme(currentTheme === "dark" ? "light" : "dark");
   }});
 
+  // ── Fullscreen toggle ──────────────────────────────────────────────
+  document.getElementById("fullscreen-btn").addEventListener("click", function() {{
+    var btn = document.getElementById("fullscreen-btn");
+    if (!document.fullscreenElement) {{
+      document.documentElement.requestFullscreen().then(function() {{
+        btn.textContent = "Exit Fullscreen";
+      }}).catch(function() {{}});
+    }} else {{
+      document.exitFullscreen();
+      btn.textContent = "Fullscreen";
+    }}
+  }});
+  document.addEventListener("fullscreenchange", function() {{
+    var btn = document.getElementById("fullscreen-btn");
+    if (btn) btn.textContent = document.fullscreenElement ? "Exit Fullscreen" : "Fullscreen";
+  }});
+
   // ── 2D/3D mode toggle ────────────────────────────────────────────────
   function setViewMode(mode) {{
     viewMode = mode;
@@ -1707,13 +1887,90 @@ body.light {{
             setTheme(msg.theme);
           }}
           break;
+        case "reload":
+          // Save state before reload
+          var dkR = getDeck();
+          var savedState = {{
+            theme: currentTheme,
+            viewMode: viewMode,
+            labelsVisible: labelsVisible,
+            edgesVisible: edgesVisible
+          }};
+          // Save camera viewState
+          if (dkR && dkR.viewManager) {{
+            try {{
+              savedState.viewState = JSON.parse(JSON.stringify(
+                dkR.viewManager.getViewState()
+              ));
+            }} catch(e) {{}}
+          }}
+          // Save point size from slider
+          var psSlider = document.getElementById("point-size");
+          if (psSlider) savedState.pointSize = parseFloat(psSlider.value);
+          sessionStorage.setItem("dyf_viz_state", JSON.stringify(savedState));
+          setTimeout(function() {{ location.reload(); }}, 100);
+          break;
       }}
     }};
     ws.onclose = function() {{ setTimeout(connectWS, 2000); }};
     ws.onerror = function() {{}};  // suppress console errors when server not running
   }})();
+
+  // ── Restore state after hot-reload ──────────────────────────────────
+  (function restoreState() {{
+    var raw = sessionStorage.getItem("dyf_viz_state");
+    if (!raw) return;
+    sessionStorage.removeItem("dyf_viz_state");
+    var s;
+    try {{ s = JSON.parse(raw); }} catch(e) {{ return; }}
+
+    // Restore theme immediately
+    if (s.theme && s.theme !== currentTheme) {{
+      setTheme(s.theme);
+    }}
+
+    // Restore view mode immediately
+    if (s.viewMode && s.viewMode !== viewMode) {{
+      setViewMode(s.viewMode);
+    }}
+
+    // Restore label/edge visibility
+    if (typeof s.labelsVisible === "boolean") {{
+      labelsVisible = s.labelsVisible;
+      var lcb = document.getElementById("toggle-labels");
+      if (lcb) lcb.checked = labelsVisible;
+    }}
+    if (typeof s.edgesVisible === "boolean") {{
+      edgesVisible = s.edgesVisible;
+      var ecb = document.getElementById("toggle-edges");
+      if (ecb) ecb.checked = edgesVisible;
+      rebuildLayer();
+    }}
+
+    // Restore point size
+    if (typeof s.pointSize === "number") {{
+      var psEl = document.getElementById("point-size");
+      var pvEl = document.getElementById("ps-val");
+      if (psEl) {{
+        psEl.value = s.pointSize;
+        psEl.dispatchEvent(new Event("input"));
+      }}
+      if (pvEl) pvEl.textContent = s.pointSize;
+    }}
+
+    // Restore camera viewState after deck.gl finishes initializing
+    if (s.viewState) {{
+      setTimeout(function() {{
+        var dk = getDeck();
+        if (dk && dk.setProps) {{
+          dk.setProps({{ initialViewState: s.viewState }});
+        }}
+      }}, 1500);
+    }}
+  }})();
 }})();
 </script>
+<!-- DYF_OVERLAY_END -->
 """
 
     html = html.replace("</html>", overlay_html + "\n</html>", 1)
@@ -1751,6 +2008,8 @@ def main():
                         help="Skip bridge edge bundling")
     parser.add_argument("--port", type=int, default=8766,
                         help="WebSocket port for viz_server bridge (default: 8766)")
+    parser.add_argument("--logo", default=None,
+                        help="Path to logo image (PNG) to embed in header")
     args = parser.parse_args()
 
     outdir = Path(args.parquet_path).parent
@@ -1863,6 +2122,7 @@ def main():
             path_birch, cluster_names=names_birch, ws_port=args.port,
             label_levels=birch_levels,
             bundled_edges=bundled_birch_2d,
+            logo_path=args.logo,
         )
         build_pydeck(
             coords, titles_arr, labels_dyf, rgb_dyf,
@@ -1871,6 +2131,7 @@ def main():
             path_dyf, cluster_names=names_dyf, ws_port=args.port,
             label_levels=birch_levels,
             bundled_edges=bundled_birch_2d,
+            logo_path=args.logo,
         )
     else:
         cmap_birch = golden_ratio_color_map(labels_birch)

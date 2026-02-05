@@ -2,10 +2,11 @@
 Combined HTTP + WebSocket server for controlling pydeck visualizations.
 
 Server mode (default):
-    python demo/viz_server.py [--port 8766] [--dir demo]
+    python demo/viz_server.py [--port 8766] [--dir demo] [--watch]
 
     Serves static HTML files via HTTP and runs a WebSocket endpoint at /ws.
     Browser clients connect on page load and receive commands as JSON.
+    With --watch, polls HTML files for changes and auto-reloads browsers.
 
 Command mode:
     python demo/viz_server.py --cmd '{"cmd": "isolate", "cluster": 5}'
@@ -25,6 +26,7 @@ Commands:
 """
 
 import argparse
+import glob
 import json
 import os
 import webbrowser
@@ -76,6 +78,39 @@ class InjectHandler(tornado.web.StaticFileHandler):
         return super().get_content_type()
 
 
+class FileWatcher:
+    """Polls HTML files for mtime changes and broadcasts reload commands."""
+
+    def __init__(self, directory, interval_ms=500):
+        self._dir = os.path.abspath(directory)
+        self._mtimes = self._scan()  # snapshot current state
+        self._cb = tornado.ioloop.PeriodicCallback(self._check, interval_ms)
+
+    def start(self):
+        self._cb.start()
+        print(f"[viz_server] Watching {self._dir} for HTML changes")
+
+    def _scan(self):
+        """Return dict of html_path -> mtime."""
+        result = {}
+        for path in glob.glob(os.path.join(self._dir, "*.html")):
+            try:
+                result[path] = os.stat(path).st_mtime
+            except OSError:
+                pass
+        return result
+
+    def _check(self):
+        current = self._scan()
+        for path, mtime in current.items():
+            old_mtime = self._mtimes.get(path)
+            if old_mtime is not None and mtime != old_mtime:
+                fname = os.path.basename(path)
+                print(f"[watch] Changed: {fname}")
+                broadcast({"cmd": "reload", "file": fname})
+        self._mtimes = current
+
+
 def broadcast(message):
     """Send a JSON message to all connected browser clients."""
     text = message if isinstance(message, str) else json.dumps(message)
@@ -86,7 +121,7 @@ def broadcast(message):
             _clients.discard(c)
 
 
-def start_server(port=8766, static_dir="demo", open_browser=True):
+def start_server(port=8766, static_dir="demo", open_browser=True, watch=False):
     """Start the HTTP + WebSocket server."""
     static_dir = os.path.abspath(static_dir)
 
@@ -98,6 +133,10 @@ def start_server(port=8766, static_dir="demo", open_browser=True):
     print(f"[viz_server] Serving {static_dir} on http://localhost:{port}")
     print(f"[viz_server] WebSocket at ws://localhost:{port}/ws")
     print("[viz_server] Press Ctrl+C to stop")
+
+    if watch:
+        watcher = FileWatcher(static_dir)
+        watcher.start()
 
     if open_browser:
         # Try to open a default HTML file
@@ -131,6 +170,8 @@ def main():
                         help="Send a JSON command to a running server and exit")
     parser.add_argument("--no-browser", action="store_true",
                         help="Don't open browser on start")
+    parser.add_argument("--watch", action="store_true",
+                        help="Watch HTML files for changes and auto-reload browsers")
     args = parser.parse_args()
 
     if args.cmd:
@@ -145,7 +186,7 @@ def main():
     else:
         # Server mode
         start_server(port=args.port, static_dir=args.dir,
-                     open_browser=not args.no_browser)
+                     open_browser=not args.no_browser, watch=args.watch)
 
 
 if __name__ == "__main__":
