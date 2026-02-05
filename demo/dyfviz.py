@@ -247,7 +247,7 @@ def compute_bridge_edges_3d(coords, embeddings, labels, n_clusters):
     edge_list = sorted(pair_counts.keys(), key=lambda p: -pair_counts[p])
 
     if not edge_list:
-        return [], {}, centroids
+        return [], [], {}, centroids
 
     # 2D: datashader hammer_bundle (proven KDEEB on dense 2D grid)
     print(f"  Bundling {len(edge_list)} bridge edges in 2D (datashader)...")
@@ -266,21 +266,60 @@ def compute_bridge_edges_3d(coords, embeddings, labels, n_clusters):
     bundled_df = ds_hammer_bundle(nodes_df, edges_df)
 
     # Parse datashader output: NaN-separated edge segments → list of paths
+    # Each path corresponds to edge_list[i] = (c1, c2)
     bundled_2d = []
     current_path = []
     for _, row in bundled_df.iterrows():
         if pd.isna(row["x"]) or pd.isna(row["y"]):
             if current_path:
-                bundled_2d.append(np.array(current_path, dtype=np.float32))
+                bundled_2d.append(current_path)
                 current_path = []
         else:
-            current_path.append([row["x"], row["y"], 0.0])
+            current_path.append([row["x"], row["y"]])
     if current_path:
-        bundled_2d.append(np.array(current_path, dtype=np.float32))
+        bundled_2d.append(current_path)
 
-    print(f"  Got {len(bundled_2d)} 2D bundled paths")
+    # Add z=0 to 2D bundled paths for flat rendering
+    bundled_2d_flat = []
+    for path in bundled_2d:
+        bundled_2d_flat.append(np.array([[x, y, 0.0] for x, y in path], dtype=np.float32))
 
-    return bundled_2d, pair_counts, centroids
+    # Generate catenary curves between centroids for 3D
+    # Sag increases with distance, stronger edges arc higher
+    n_segments = 20  # points per curve
+    max_count = max(pair_counts.values()) if pair_counts else 1
+
+    bundled_3d = []
+    for c1, c2 in edge_list:
+        p1 = centroids[c1]
+        p2 = centroids[c2]
+        count = pair_counts.get((c1, c2), 1)
+
+        # Distance between centroids
+        dist = np.linalg.norm(p2 - p1)
+
+        # Sag: proportional to distance, stronger edges sag less (arc higher)
+        strength = count / max_count  # 0-1
+        base_sag = 0.15 * dist  # sag proportional to distance
+        sag = base_sag * (1.0 - 0.5 * strength)  # stronger = less sag (higher arc)
+
+        # Generate catenary-like curve (parabolic approximation)
+        path = []
+        for j in range(n_segments + 1):
+            t = j / n_segments
+            # Linear interpolation for x, y, z
+            pt = p1 + t * (p2 - p1)
+            # Parabolic arc in z (maximum at t=0.5)
+            sag_amount = 4 * sag * t * (1 - t)  # positive = upward arc
+            pt = pt.copy()
+            pt[2] += sag_amount
+            path.append(pt.tolist())
+
+        bundled_3d.append(np.array(path, dtype=np.float32))
+
+    print(f"  Got {len(bundled_2d_flat)} 2D bundled + {len(bundled_3d)} 3D catenary paths")
+
+    return bundled_2d_flat, bundled_3d, pair_counts, centroids
 
 
 def fit_birch(data, target_k, max_iters=10):
@@ -997,7 +1036,8 @@ def build_html(coords, titles_arr, labels, color_map, title_str,
 
 def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
                  cluster_names=None, ws_port=8766, label_levels=None,
-                 bundled_edges=None, edge_pairs=None, logo_path=None):
+                 bundled_edges_2d=None, bundled_edges_3d=None, edge_pairs=None,
+                 logo_path=None):
     """Build a pydeck 3D point cloud with HTML overlay labels."""
     import base64
     import pyarrow as pa
@@ -1071,15 +1111,17 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
 
     layers = [point_layer]
 
-    # Add empty edge layer (populated in 2D mode by JS rebuildLayer)
-    if bundled_edges:
+    # Add empty edge layer (populated by JS rebuildLayer)
+    if bundled_edges_2d or bundled_edges_3d:
         edge_layer = pdk.Layer(
             "PathLayer",
             data=[],
             get_path="path",
             get_color="color",
+            get_width="width",
+            width_scale=1,
             width_min_pixels=1,
-            width_max_pixels=2,
+            width_max_pixels=6,
             pickable=False,
         )
         layers.append(edge_layer)
@@ -1138,29 +1180,56 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
         _gzip.compress(sink.getvalue().to_pybytes())
     ).decode()
 
-    # Edge paths as Arrow IPC with list<float32> column (gzip-compressed)
-    edges_ipc_b64 = ""
+    # Edge paths as Arrow IPC: 2D bundled + 3D catenary + weights (gzip-compressed)
+    edges_2d_ipc_b64 = ""
+    edges_3d_ipc_b64 = ""
     edge_pairs_json = "[]"
-    if bundled_edges:
-        path_arrays = []
-        for path in bundled_edges:
-            flat = []
-            for pt in path:
-                flat.extend([float(pt[0]), float(pt[1]), float(pt[2])])
-            path_arrays.append(flat)
-        edges_batch = pa.record_batch({
-            "path": pa.array(path_arrays, type=pa.list_(pa.float32())),
-        })
-        edge_sink = pa.BufferOutputStream()
-        with pa.ipc.new_stream(edge_sink, edges_batch.schema) as writer:
-            writer.write_batch(edges_batch)
-        edges_ipc_b64 = base64.b64encode(
-            _gzip.compress(edge_sink.getvalue().to_pybytes())
-        ).decode()
-    if edge_pairs:
-        # edge_pairs maps (c1, c2) -> count, sorted by count desc
-        # Export as [[c1, c2], ...] in same order as edge_paths
+    if edge_pairs and (bundled_edges_2d or bundled_edges_3d):
         sorted_pairs = sorted(edge_pairs.keys(), key=lambda p: -edge_pairs[p])
+        max_weight = max(edge_pairs.values()) if edge_pairs else 1
+        weights = []
+        for i in range(len(sorted_pairs)):
+            pair = sorted_pairs[i]
+            weights.append(edge_pairs[pair] / max_weight)
+
+        # Serialize 2D bundled paths
+        if bundled_edges_2d:
+            path_arrays_2d = []
+            for path in bundled_edges_2d:
+                flat = []
+                for pt in path:
+                    flat.extend([float(pt[0]), float(pt[1]), float(pt[2])])
+                path_arrays_2d.append(flat)
+            edges_2d_batch = pa.record_batch({
+                "path": pa.array(path_arrays_2d, type=pa.list_(pa.float32())),
+                "weight": pa.array(weights[:len(path_arrays_2d)], type=pa.float32()),
+            })
+            sink_2d = pa.BufferOutputStream()
+            with pa.ipc.new_stream(sink_2d, edges_2d_batch.schema) as writer:
+                writer.write_batch(edges_2d_batch)
+            edges_2d_ipc_b64 = base64.b64encode(
+                _gzip.compress(sink_2d.getvalue().to_pybytes())
+            ).decode()
+
+        # Serialize 3D catenary paths
+        if bundled_edges_3d:
+            path_arrays_3d = []
+            for path in bundled_edges_3d:
+                flat = []
+                for pt in path:
+                    flat.extend([float(pt[0]), float(pt[1]), float(pt[2])])
+                path_arrays_3d.append(flat)
+            edges_3d_batch = pa.record_batch({
+                "path": pa.array(path_arrays_3d, type=pa.list_(pa.float32())),
+                "weight": pa.array(weights[:len(path_arrays_3d)], type=pa.float32()),
+            })
+            sink_3d = pa.BufferOutputStream()
+            with pa.ipc.new_stream(sink_3d, edges_3d_batch.schema) as writer:
+                writer.write_batch(edges_3d_batch)
+            edges_3d_ipc_b64 = base64.b64encode(
+                _gzip.compress(sink_3d.getvalue().to_pybytes())
+            ).decode()
+
         edge_pairs_json = json.dumps([[int(a), int(b)] for a, b in sorted_pairs])
 
     # Expose pydeck's local deckInstance as a global
@@ -1253,6 +1322,10 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
       <label class="palette-check">
         <input type="checkbox" id="toggle-edges" checked>
         <span>Bridge edges</span>
+      </label>
+      <label class="palette-check">
+        <input type="checkbox" id="toggle-arc-dir" checked>
+        <span>Arcs up (3D)</span>
       </label>
       <div style="margin-top:8px;">
         <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
@@ -1405,21 +1478,30 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
     }};
   }}
 
-  // ── Reconstruct edge paths from gzipped Arrow IPC ─────────────────
-  var edgePaths = [];
-  var _edgesB64 = "{edges_ipc_b64}";
-  if (_edgesB64.length > 0) {{
-    var _edgeTable = tableFromIPC(await ungzip(b64toBytes(_edgesB64)));
-    var _pathCol = _edgeTable.getChild("path");
-    for (var _j = 0; _j < _edgeTable.numRows; _j++) {{
-      var _flat = _pathCol.get(_j).toArray();
-      var _path = [];
-      for (var _k = 0; _k < _flat.length; _k += 3) {{
-        _path.push([_flat[_k], _flat[_k+1], _flat[_k+2]]);
+  // ── Reconstruct edge paths (2D bundled + 3D catenary) from Arrow IPC ──
+  async function loadEdges(b64) {{
+    var paths = [], weights = [];
+    if (b64 && b64.length > 0) {{
+      var tbl = tableFromIPC(await ungzip(b64toBytes(b64)));
+      var pathCol = tbl.getChild("path");
+      var weightCol = tbl.getChild("weight");
+      for (var j = 0; j < tbl.numRows; j++) {{
+        var flat = pathCol.get(j).toArray();
+        var path = [];
+        for (var k = 0; k < flat.length; k += 3) {{
+          path.push([flat[k], flat[k+1], flat[k+2]]);
+        }}
+        paths.push(path);
+        weights.push(weightCol ? weightCol.get(j) : 0.5);
       }}
-      edgePaths.push(_path);
     }}
+    return {{ paths: paths, weights: weights }};
   }}
+  var _edges2d = await loadEdges("{edges_2d_ipc_b64}");
+  var _edges3d = await loadEdges("{edges_3d_ipc_b64}");
+  var edgePaths2d = _edges2d.paths;
+  var edgePaths3d = _edges3d.paths;
+  var edgeWeights = _edges2d.weights.length ? _edges2d.weights : _edges3d.weights;
 
   var labels = {label_json};
   var labelLevels = {levels_json};
@@ -1435,6 +1517,7 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
   // 2D/3D mode state
   var viewMode = "3d";
   var currentTheme = "dark";
+  var arcsUp = true;  // true = arcs go up, false = arcs go down
   var zBackup = allPoints.map(function(p) {{ return p.z; }});
 
   // ── Highlighter annotations ────────────────────────────────────────
@@ -1549,9 +1632,7 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
   function edgeColor() {{
     return (currentTheme === "light") ? [30, 80, 180, 90] : [255, 255, 255, 60];
   }}
-  var edgePathData = edgePaths.map(function(path) {{
-    return {{ path: path, color: edgeColor() }};
-  }});
+  var edgePathData = [];
 
   function rebuildLayer() {{
     var dk = getDeck();
@@ -1560,16 +1641,34 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
     var ec = edgeColor();
     var hlEc = (currentTheme === "light") ? [220, 80, 20, 200] : [255, 160, 40, 220];
     var hasHl = highlightedEdgeClusters.size > 0;
+
+    // Use 2D bundled paths in 2D mode, 3D catenary curves in 3D mode
+    var edgePaths = is2d ? edgePaths2d : edgePaths3d;
     edgePathData = edgePaths.map(function(path, idx) {{
+      var w = edgeWeights[idx] || 0.5;
+      var width = 0.005 + w * 0.015;  // thicker for stronger connections
+      // Flip arc direction in 3D if arcsUp is false
+      var finalPath = path;
+      if (!is2d && !arcsUp && path.length > 2) {{
+        // Compute baseline z (linear interp) and flip offset
+        var z0 = path[0][2], zn = path[path.length-1][2];
+        finalPath = path.map(function(pt, i) {{
+          var t = i / (path.length - 1);
+          var baseZ = z0 + t * (zn - z0);
+          var offset = pt[2] - baseZ;
+          return [pt[0], pt[1], baseZ - offset];  // flip the offset
+        }});
+      }}
       if (hasHl && idx < edgePairs.length) {{
         var pair = edgePairs[idx];
         if (highlightedEdgeClusters.has(pair[0]) || highlightedEdgeClusters.has(pair[1])) {{
-          return {{ path: path, color: hlEc }};
+          return {{ path: finalPath, color: hlEc, width: width * 1.5 }};
         }}
-        return {{ path: path, color: [ec[0], ec[1], ec[2], 15] }};
+        return {{ path: finalPath, color: [ec[0], ec[1], ec[2], 15], width: width }};
       }}
-      return {{ path: path, color: ec }};
+      return {{ path: finalPath, color: ec, width: width }};
     }});
+
     var visible = allPoints.filter(function(p) {{ return isClusterVisible(p.cluster); }});
     if (is2d) {{
       visible = visible.map(function(p) {{
@@ -1577,15 +1676,16 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
                   a: 255, title: p.title, cluster: p.cluster }};
       }});
     }}
+    var edgeData = edgePathData;
     var layers = dk.props.layers;
     if (!layers || !layers.length) return;
     var oldLayer = layers[0];
     var newLayer = oldLayer.clone({{ data: visible }});
     var newLayers = [newLayer];
-    // Add edge layer in 2D mode only (bundled edges are 2D)
-    if (is2d && edgesVisible && edgePaths.length > 0 && layers.length > 1) {{
+    // Add edge layer in both 2D and 3D modes
+    if (edgesVisible && edgePaths.length > 0 && layers.length > 1) {{
       var edgeLayer = layers[1];
-      newLayers.push(edgeLayer.clone({{ data: edgePathData }}));
+      newLayers.push(edgeLayer.clone({{ data: edgeData }}));
     }}
     dk.setProps({{ layers: newLayers }});
     updateRowStyles();
@@ -1867,6 +1967,12 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
   // Toggle bridge edges
   document.getElementById("toggle-edges").addEventListener("change", function(e) {{
     edgesVisible = e.target.checked;
+    rebuildLayer();
+  }});
+
+  // Toggle arc direction (3D only)
+  document.getElementById("toggle-arc-dir").addEventListener("change", function(e) {{
+    arcsUp = e.target.checked;
     rebuildLayer();
   }});
 
@@ -2393,15 +2499,16 @@ def main():
         birch_levels[n_birch] = base_level
         print(f"  Added base BIRCH level ({n_birch}): {len(base_level)} labels")
 
-    # ── Bridge edge bundling (2D only) ──────────────────────────────────
+    # ── Bridge edge bundling (2D bundled + 3D catenary) ─────────────────
     bundled_birch_2d = None
+    bundled_birch_3d = None
     birch_pair_info = None
     if args.renderer == "pydeck" and not args.no_edges:
         print("\n=== Computing bridge edges (BIRCH) ===")
-        bundled_birch_2d, birch_pair_info, _ = compute_bridge_edges_3d(
+        bundled_birch_2d, bundled_birch_3d, birch_pair_info, _ = compute_bridge_edges_3d(
             coords, embeddings, labels_birch, n_birch)
         if bundled_birch_2d:
-            print(f"  Bundled {len(bundled_birch_2d)} 2D bridge edges")
+            print(f"  Bundled {len(bundled_birch_2d)} 2D + {len(bundled_birch_3d)} 3D bridge edges")
 
     if args.renderer == "pydeck":
         rgb_birch = golden_ratio_rgb_map(labels_birch)
@@ -2415,7 +2522,8 @@ def main():
             f"BIRCH on {dim_label} (k={dyf_k} UMAP) — {n_birch} clusters, {n:,} pts",
             path_birch, cluster_names=names_birch, ws_port=args.port,
             label_levels=birch_levels,
-            bundled_edges=bundled_birch_2d,
+            bundled_edges_2d=bundled_birch_2d,
+            bundled_edges_3d=bundled_birch_3d,
             edge_pairs=birch_pair_info,
             logo_path=args.logo,
         )
@@ -2425,7 +2533,8 @@ def main():
             f"— {n_dyf} clusters, {n:,} pts",
             path_dyf, cluster_names=names_dyf, ws_port=args.port,
             label_levels=birch_levels,
-            bundled_edges=bundled_birch_2d,
+            bundled_edges_2d=bundled_birch_2d,
+            bundled_edges_3d=bundled_birch_3d,
             edge_pairs=birch_pair_info,
             logo_path=args.logo,
         )
