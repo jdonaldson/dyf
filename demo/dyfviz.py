@@ -1362,10 +1362,6 @@ body.light .tour-edge-label {{
         <span>Bridge edges</span>
       </label>
       <label class="palette-check">
-        <input type="checkbox" id="toggle-arc-dir">
-        <span>Arcs up (3D)</span>
-      </label>
-      <label class="palette-check">
         <input type="checkbox" id="toggle-sheen">
         <span>Specular sweep</span>
       </label>
@@ -1623,7 +1619,6 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
   // 2D/3D mode state
   var viewMode = "3d";
   var currentTheme = "dark";
-  var arcsUp = false;  // true = arcs go up, false = arcs hang down
   var zBackup = allPoints.map(function(p) {{ return p.z; }});
 
   // Global flag: pause all animations while user is dragging
@@ -2375,9 +2370,9 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
     edgePaths.forEach(function(path, idx) {{
       var w = edgeWeights[idx] || 0.5;
       var width = 0.005 + w * 0.015;  // thicker for stronger connections
-      // Flip arc direction in 3D if arcsUp is false
+      // Flip arcs to hang down in 3D
       var finalPath = path;
-      if (!is2d && !arcsUp && path.length > 2) {{
+      if (!is2d && path.length > 2) {{
         // Compute baseline z (linear interp) and flip offset
         var z0 = path[0][2], zn = path[path.length-1][2];
         finalPath = path.map(function(pt, i) {{
@@ -2752,12 +2747,6 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
   // Toggle bridge edges
   document.getElementById("toggle-edges").addEventListener("change", function(e) {{
     edgesVisible = e.target.checked;
-    rebuildLayer();
-  }});
-
-  // Toggle arc direction (3D only)
-  document.getElementById("toggle-arc-dir").addEventListener("change", function(e) {{
-    arcsUp = e.target.checked;
     rebuildLayer();
   }});
 
