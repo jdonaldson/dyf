@@ -1362,7 +1362,7 @@ body.light .tour-edge-label {{
         <span>Bridge edges</span>
       </label>
       <label class="palette-check">
-        <input type="checkbox" id="toggle-arc-dir" checked>
+        <input type="checkbox" id="toggle-arc-dir">
         <span>Arcs up (3D)</span>
       </label>
       <label class="palette-check">
@@ -1375,9 +1375,6 @@ body.light .tour-edge-label {{
       </label>
       <button id="tour-btn" class="panel-btn" style="margin-top:6px;width:100%;">
         ▶ Tour
-      </button>
-      <button id="daydream-btn" class="panel-btn" style="margin-top:4px;width:100%;">
-        ✦ Daydream
       </button>
       <div style="margin-top:8px;">
         <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
@@ -1626,8 +1623,14 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
   // 2D/3D mode state
   var viewMode = "3d";
   var currentTheme = "dark";
-  var arcsUp = true;  // true = arcs go up, false = arcs go down
+  var arcsUp = false;  // true = arcs go up, false = arcs hang down
   var zBackup = allPoints.map(function(p) {{ return p.z; }});
+
+  // Global flag: pause all animations while user is dragging
+  var userDragging = false;
+  document.addEventListener("pointerdown", function() {{ userDragging = true; }});
+  document.addEventListener("pointerup", function() {{ userDragging = false; }});
+  document.addEventListener("pointercancel", function() {{ userDragging = false; }});
 
   // ── Compute data extent and optimal zoom ────────────────────────────
   var xVals = allPoints.map(function(p) {{ return p.x; }});
@@ -1662,6 +1665,7 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
 
   function updateSheen(timestamp) {{
     if (!sheenEnabled) return;
+    if (userDragging) {{ requestAnimationFrame(updateSheen); return; }}
 
     // Time-based animation (not frame-based)
     if (!sheenLastTime) sheenLastTime = timestamp;
@@ -2157,12 +2161,10 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
       ambientRunning = false;
       setEdgeHighlight([]);
       rebuildLayer();
-      document.getElementById("daydream-btn").textContent = "✦ Daydream";
       return;
     }}
 
     ambientRunning = true;
-    document.getElementById("daydream-btn").textContent = "◼ Stop";
 
     // Initialize candlelight flicker: multiple frequencies + occasional flares
     flickerData = allPoints.map(function() {{
@@ -2186,6 +2188,7 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
 
     function animateAmbient() {{
       if (!ambientRunning) return;
+      if (userDragging) {{ requestAnimationFrame(animateAmbient); return; }}
 
       var now = performance.now();
       var dt = (now - lastTime) / 1000;
@@ -2350,7 +2353,8 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
 
   // Build edge path layer data (for toggling)
   function edgeColor() {{
-    return (currentTheme === "light") ? [30, 80, 180, 90] : [255, 255, 255, 60];
+    // More transparent edges
+    return (currentTheme === "light") ? [30, 80, 180, 25] : [255, 255, 255, 20];
   }}
   var edgePathData = [];
 
@@ -2367,7 +2371,8 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
 
     // Use 2D bundled paths in 2D mode, 3D catenary curves in 3D mode
     var edgePaths = is2d ? edgePaths2d : edgePaths3d;
-    edgePathData = edgePaths.map(function(path, idx) {{
+    edgePathData = [];
+    edgePaths.forEach(function(path, idx) {{
       var w = edgeWeights[idx] || 0.5;
       var width = 0.005 + w * 0.015;  // thicker for stronger connections
       // Flip arc direction in 3D if arcsUp is false
@@ -2382,25 +2387,26 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
           return [pt[0], pt[1], baseZ - offset];  // flip the offset
         }});
       }}
-      // Compute faded colors based on edgeFadeAlpha
+      // Determine base color
+      var baseColor = ec;
+      var baseWidth = width;
       var fadeAlpha = edgeFadeAlpha;
       if (hasHl && idx < edgePairs.length) {{
         var pair = edgePairs[idx];
         var isHighlighted = highlightedEdgeClusters.has(pair[0]) || highlightedEdgeClusters.has(pair[1]);
         if (isHighlighted) {{
-          // Highlighted edge: fade from normal to bright
           var a = Math.round(ec[3] + (hlEc[3] - ec[3]) * fadeAlpha);
           var r = Math.round(ec[0] + (hlEc[0] - ec[0]) * fadeAlpha);
           var g = Math.round(ec[1] + (hlEc[1] - ec[1]) * fadeAlpha);
           var b = Math.round(ec[2] + (hlEc[2] - ec[2]) * fadeAlpha);
-          var wid = width * (1 + 0.5 * fadeAlpha);
-          return {{ path: finalPath, color: [r, g, b, a], width: wid }};
+          baseColor = [r, g, b, a];
+          baseWidth = width * (1 + 0.5 * fadeAlpha);
+        }} else {{
+          var dimAlpha = Math.round(ec[3] - (ec[3] - 15) * fadeAlpha);
+          baseColor = [ec[0], ec[1], ec[2], dimAlpha];
         }}
-        // Non-highlighted edge: fade from normal to dim
-        var dimAlpha = Math.round(ec[3] - (ec[3] - 15) * fadeAlpha);
-        return {{ path: finalPath, color: [ec[0], ec[1], ec[2], dimAlpha], width: width }};
       }}
-      return {{ path: finalPath, color: ec, width: width }};
+      edgePathData.push({{ path: finalPath, color: baseColor, width: baseWidth }});
     }});
 
     var visible = allPoints.filter(function(p) {{ return isClusterVisible(p.cluster); }});
@@ -2775,7 +2781,6 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
 
   // Cluster tour button
   document.getElementById("tour-btn").addEventListener("click", runTour);
-  document.getElementById("daydream-btn").addEventListener("click", runAmbient);
 
   // Point size slider
   document.getElementById("point-size").addEventListener("input", function(e) {{
