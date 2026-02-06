@@ -1645,11 +1645,11 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
   var maxExtent = Math.max(xRange, yRange, zRange);
   // Compute zoom to fill viewport: use container size for accurate fit
   // OrbitView at zoom Z shows roughly (baseSize / 2^Z) world units
-  // We want maxExtent to fill ~85% of the smaller viewport dimension
+  // We want maxExtent to fill viewport more tightly
   var container = document.getElementById("deckgl-wrapper");
   var vpSize = container ? Math.min(container.clientWidth, container.clientHeight) : 800;
   // Empirical base: at zoom 0, ~50 world units visible per 100px viewport
-  var defaultZoom = Math.log2(vpSize * 0.85 / maxExtent);
+  var defaultZoom = Math.log2(vpSize * 1.3 / maxExtent);  // 1.3 = tighter fit
   defaultZoom = Math.max(4, Math.min(12, defaultZoom));
   console.log("[dyfviz] extent:", maxExtent.toFixed(2), "vpSize:", vpSize, "zoom:", defaultZoom.toFixed(2));
 
@@ -1730,9 +1730,43 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
   var orbitEnabled = false;
   var orbitTimer = null;
   var orbitAngle = 30;  // starting angle (matches initial view)
+  var orbitZoom = defaultZoom;  // track zoom separately
+  var orbitPaused = false;  // true when user is interacting
+  var orbitResumeTimer = null;
+
+  function pauseOrbitAndResume(delayMs) {{
+    if (!orbitEnabled) return;
+    orbitPaused = true;
+    if (orbitResumeTimer) clearTimeout(orbitResumeTimer);
+    orbitResumeTimer = setTimeout(function() {{
+      // Sync angle and zoom to current view before resuming
+      try {{
+        var dk = getDeck();
+        var vs = dk.viewManager.getViewState();
+        if (vs) {{
+          if (typeof vs.rotationOrbit === "number") orbitAngle = vs.rotationOrbit;
+          if (typeof vs.zoom === "number") orbitZoom = vs.zoom;
+        }}
+      }} catch(e) {{}}
+      orbitPaused = false;
+    }}, delayMs);
+  }}
+
+  // Pause orbit while user drags
+  document.addEventListener("pointerdown", function(e) {{
+    pauseOrbitAndResume(800);
+  }});
+  document.addEventListener("pointerup", function(e) {{
+    pauseOrbitAndResume(500);
+  }});
+
+  // Pause orbit while user zooms with wheel
+  document.addEventListener("wheel", function(e) {{
+    pauseOrbitAndResume(600);
+  }}, {{ passive: true }});
 
   function updateOrbit() {{
-    if (!orbitEnabled) return;
+    if (!orbitEnabled || orbitPaused) return;
     var dk = getDeck();
     if (!dk || !dk.setProps) return;
     orbitAngle += 0.3;  // degrees per frame
@@ -1741,7 +1775,7 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
       target: [0, 0, 0],
       rotationX: 15,
       rotationOrbit: orbitAngle,
-      zoom: defaultZoom,
+      zoom: orbitZoom,
       transitionDuration: 0
     }} }});
   }}
