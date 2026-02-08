@@ -149,6 +149,91 @@ def _numpy_dtype_to_arrow(quantization):
     raise ValueError(f"Unknown quantization: {quantization}")
 
 
+def _train_pq(embeddings, n_subquantizers):
+    """Train a FAISS ProductQuantizer on (possibly subsampled) embeddings.
+
+    Args:
+        embeddings: (n, d) float32 array (will be L2-normalized).
+        n_subquantizers: Number of sub-quantizers M (dim must be divisible by M).
+
+    Returns:
+        (pq, codebook) — faiss.ProductQuantizer and (M, 256, dsub) float32 codebook.
+    """
+    import faiss
+
+    n, d = embeddings.shape
+    dsub = d // n_subquantizers
+
+    # L2-normalize
+    emb = embeddings.astype(np.float32).copy()
+    faiss.normalize_L2(emb)
+
+    # Subsample to 1M for training if dataset is larger
+    max_train = 1_000_000
+    if n > max_train:
+        rng = np.random.default_rng(42)
+        idx = rng.choice(n, max_train, replace=False)
+        train_data = emb[idx]
+    else:
+        train_data = emb
+
+    pq = faiss.ProductQuantizer(d, n_subquantizers, 8)  # 8 bits = 256 centroids
+    pq.train(train_data)
+
+    # Extract codebook as (M, 256, dsub)
+    centroids_flat = faiss.vector_to_array(pq.centroids)
+    codebook = centroids_flat.reshape(n_subquantizers, 256, dsub).copy()
+
+    return pq, codebook
+
+
+def _encode_pq(embeddings, pq):
+    """Encode embeddings to PQ codes.
+
+    Args:
+        embeddings: (n, d) float32 array (will be L2-normalized).
+        pq: Trained faiss.ProductQuantizer.
+
+    Returns:
+        (n, M) uint8 codes.
+    """
+    import faiss
+
+    emb = embeddings.astype(np.float32).copy()
+    faiss.normalize_L2(emb)
+    codes = pq.compute_codes(emb)  # (n, M) uint8
+    return codes
+
+
+def _serialize_codebook(codebook):
+    """Serialize codebook to base64 string for metadata storage.
+
+    Args:
+        codebook: (M, 256, dsub) float32 array.
+
+    Returns:
+        Base64 encoded string.
+    """
+    import base64
+    return base64.b64encode(codebook.astype(np.float32).tobytes()).decode('ascii')
+
+
+def _deserialize_codebook(b64_str, n_subquantizers, dsub):
+    """Deserialize codebook from base64 string.
+
+    Args:
+        b64_str: Base64 encoded string.
+        n_subquantizers: Number of sub-quantizers M.
+        dsub: Sub-vector dimension.
+
+    Returns:
+        (M, 256, dsub) float32 codebook.
+    """
+    import base64
+    raw = base64.b64decode(b64_str)
+    return np.frombuffer(raw, dtype=np.float32).reshape(n_subquantizers, 256, dsub).copy()
+
+
 def write_lazy_index(tree, embeddings, path, compression='zstd',
                      quantization='float16', metadata=None,
                      build_params=None):
@@ -160,7 +245,9 @@ def write_lazy_index(tree, embeddings, path, compression='zstd',
         embeddings: (n, d) array of embedding vectors.
         path: Output file path (e.g. "index.dyf").
         compression: "none", "zstd", or "lz4" (default: "zstd").
-        quantization: "float32", "float16", or "int8" (default: "float16").
+        quantization: "float32", "float16", "int8", or "pq-M" where M is the
+            number of sub-quantizers (default: "float16"). For PQ, dim must
+            be divisible by M. Example: "pq-8" for 8 sub-quantizers.
         metadata: Optional dict of string key-value pairs.
         build_params: Optional dict with keys: max_depth, num_bits,
             min_leaf_size, seed. Auto-detected from tree if not provided.
@@ -182,9 +269,50 @@ def write_lazy_index(tree, embeddings, path, compression='zstd',
     flat_nodes, leaf_batch_map = _flatten_tree_bfs(tree, embeddings)
     n_leaves = sum(1 for n in flat_nodes if n['is_leaf'])
 
-    # Quantize embeddings
-    q_embeddings = _quantize_embeddings(embeddings, quantization)
-    arrow_value_type = _numpy_dtype_to_arrow(quantization)
+    # Detect PQ quantization
+    is_pq = quantization.startswith('pq')
+
+    if is_pq:
+        if quantization == 'pq':
+            # Auto-select M = dim // 4 (dsub=4, canonical PQ default)
+            n_subquantizers = embedding_dim // 4
+            if n_subquantizers < 1:
+                raise ValueError(
+                    f"embedding_dim={embedding_dim} too small for PQ "
+                    f"(need at least 4)")
+        else:
+            # Parse M from e.g. "pq-8" -> M=8
+            n_subquantizers = int(quantization.split('-')[1])
+        if embedding_dim % n_subquantizers != 0:
+            raise ValueError(
+                f"embedding_dim={embedding_dim} must be divisible by "
+                f"n_subquantizers={n_subquantizers} for PQ quantization")
+        dsub = embedding_dim // n_subquantizers
+
+        # Train PQ on full dataset, encode all embeddings
+        pq, codebook = _train_pq(embeddings, n_subquantizers)
+        all_codes = _encode_pq(embeddings, pq)  # (n_items, M) uint8
+
+        # Store PQ params in metadata
+        if metadata is None:
+            metadata = {}
+        metadata['pq_codebook'] = _serialize_codebook(codebook)
+        metadata['pq_n_subquantizers'] = str(n_subquantizers)
+        metadata['pq_dsub'] = str(dsub)
+
+        # Arrow schema for PQ: codes stored as FixedSizeList(uint8, M)
+        arrow_schema = pa.schema([
+            ('item_index', pa.uint32()),
+            ('embedding', pa.list_(pa.uint8(), n_subquantizers)),
+        ])
+    else:
+        # Standard quantization path
+        q_embeddings = _quantize_embeddings(embeddings, quantization)
+        arrow_value_type = _numpy_dtype_to_arrow(quantization)
+        arrow_schema = pa.schema([
+            ('item_index', pa.uint32()),
+            ('embedding', pa.list_(arrow_value_type, embedding_dim)),
+        ])
 
     # Build Arrow IPC batches per leaf
     ipc_options = None
@@ -195,33 +323,36 @@ def write_lazy_index(tree, embeddings, path, compression='zstd',
         ipc_options = pa.ipc.IpcWriteOptions(
             compression=pa.Codec('lz4'))
 
-    # Schema for leaf batches
-    arrow_schema = pa.schema([
-        ('item_index', pa.uint32()),
-        ('embedding', pa.list_(arrow_value_type, embedding_dim)),
-    ])
-
     # Write each leaf batch to bytes, record offsets
     batch_buffers = []
     for node in flat_nodes:
         if not node['is_leaf']:
             continue
         indices = node['indices']
-        leaf_emb = q_embeddings[indices]
 
         # Build Arrow RecordBatch
         item_idx_arr = pa.array(indices.astype(np.uint32), type=pa.uint32())
 
-        # Build fixed-size list array for embeddings
-        flat_values = leaf_emb.flatten()
-        if quantization == 'int8':
-            values_arr = pa.array(flat_values, type=pa.int8())
-        elif quantization == 'float16':
-            values_arr = pa.array(flat_values, type=pa.float16())
+        if is_pq:
+            # PQ path: slice pre-encoded codes for this leaf
+            leaf_codes = all_codes[indices]  # (n_leaf, M) uint8
+            flat_codes = leaf_codes.flatten()
+            values_arr = pa.array(flat_codes, type=pa.uint8())
+            emb_arr = pa.FixedSizeListArray.from_arrays(
+                values_arr, n_subquantizers)
         else:
-            values_arr = pa.array(flat_values, type=pa.float32())
+            # Standard path: quantized embeddings
+            leaf_emb = q_embeddings[indices]
+            flat_values = leaf_emb.flatten()
+            if quantization == 'int8':
+                values_arr = pa.array(flat_values, type=pa.int8())
+            elif quantization == 'float16':
+                values_arr = pa.array(flat_values, type=pa.float16())
+            else:
+                values_arr = pa.array(flat_values, type=pa.float32())
+            emb_arr = pa.FixedSizeListArray.from_arrays(
+                values_arr, embedding_dim)
 
-        emb_arr = pa.FixedSizeListArray.from_arrays(values_arr, embedding_dim)
         batch = pa.record_batch([item_idx_arr, emb_arr], schema=arrow_schema)
 
         # Write to IPC stream bytes
@@ -478,7 +609,7 @@ class LazyIndex:
     def tree_summary(self):
         """Return tree stats without touching Arrow data."""
         bp = self._index.BuildParams()
-        return {
+        summary = {
             'version': self._index.Version().decode() if self._index.Version() else None,
             'embedding_dim': self.embedding_dim,
             'total_items': self.total_items,
@@ -493,6 +624,140 @@ class LazyIndex:
                 'compression': bp.Compression().decode() if bp and bp.Compression() else None,
             } if bp else None,
         }
+        # Add PQ section if applicable
+        if self.is_pq:
+            meta = self._get_metadata()
+            m = int(meta.get('pq_n_subquantizers', '0'))
+            dsub = int(meta.get('pq_dsub', '0'))
+            summary['pq'] = {
+                'n_subquantizers': m,
+                'dsub': dsub,
+                'bytes_per_vector': m,
+                'codebook_size_kb': round(m * 256 * dsub * 4 / 1024, 1),
+            }
+        return summary
+
+    def _get_metadata(self):
+        """Parse FlatBuffers KeyValue pairs into dict (cached)."""
+        if hasattr(self, '_metadata_cache'):
+            return self._metadata_cache
+        meta = {}
+        n = self._index.MetadataLength()
+        for i in range(n):
+            kv = self._index.Metadata(i)
+            if kv is not None:
+                key = kv.Key()
+                value = kv.Value()
+                if key is not None and value is not None:
+                    meta[key.decode()] = value.decode()
+        self._metadata_cache = meta
+        return meta
+
+    @property
+    def quantization(self):
+        """Read quantization string from BuildParams."""
+        bp = self._index.BuildParams()
+        if bp and bp.Quantization():
+            return bp.Quantization().decode()
+        return 'float16'
+
+    @property
+    def is_pq(self):
+        """True if this index uses Product Quantization."""
+        return self.quantization.startswith('pq')
+
+    def _load_pq_codebook(self):
+        """Deserialize PQ codebook from metadata (cached)."""
+        if hasattr(self, '_pq_codebook'):
+            return self._pq_codebook
+        meta = self._get_metadata()
+        m = int(meta['pq_n_subquantizers'])
+        dsub = int(meta['pq_dsub'])
+        self._pq_codebook = _deserialize_codebook(meta['pq_codebook'], m, dsub)
+        return self._pq_codebook
+
+    def _pq_precompute_tables(self, query_normed):
+        """Precompute ADC distance tables for a query.
+
+        Args:
+            query_normed: (dim,) L2-normalized query vector.
+
+        Returns:
+            (M, 256) float32 inner product lookup tables.
+        """
+        codebook = self._load_pq_codebook()  # (M, 256, dsub)
+        m = codebook.shape[0]
+        dsub = codebook.shape[2]
+        query_subs = query_normed.reshape(m, dsub)  # (M, dsub)
+        # tables[j, c] = dot(query_sub_j, codebook[j, c])
+        tables = np.einsum('md,mcd->mc', query_subs, codebook)  # (M, 256)
+        return tables
+
+    def _pq_adc_scores(self, tables, codes):
+        """Compute approximate inner products via ADC table lookups.
+
+        Args:
+            tables: (M, 256) precomputed distance tables.
+            codes: (n, M) uint8 PQ codes.
+
+        Returns:
+            (n,) float32 approximate cosine similarity scores.
+        """
+        m = tables.shape[0]
+        n = codes.shape[0]
+        scores = np.zeros(n, dtype=np.float32)
+        for j in range(m):
+            scores += tables[j, codes[:, j]]
+        return scores
+
+    def _score_leaf(self, batch, query_normed, adc_tables=None):
+        """Score all items in a leaf batch against a query.
+
+        Dispatches between PQ ADC scoring and standard matmul scoring.
+
+        Args:
+            batch: Arrow RecordBatch with columns: item_index, embedding.
+            query_normed: (dim,) L2-normalized query vector.
+            adc_tables: (M, 256) precomputed ADC tables (required if is_pq).
+
+        Returns:
+            (item_indices, scores) — numpy arrays.
+        """
+        item_indices = batch.column('item_index').to_numpy()
+        emb_col = batch.column('embedding')
+        n_rows = len(emb_col)
+        flat_values = emb_col.values.to_numpy()
+
+        if self.is_pq:
+            meta = self._get_metadata()
+            m = int(meta['pq_n_subquantizers'])
+            codes = flat_values.reshape(n_rows, m)
+            scores = self._pq_adc_scores(adc_tables, codes)
+        else:
+            dim = self.embedding_dim
+            leaf_emb = flat_values.reshape(n_rows, dim).astype(np.float32)
+            norms = np.linalg.norm(leaf_emb, axis=1, keepdims=True)
+            leaf_emb_n = leaf_emb / np.maximum(norms, 1e-10)
+            scores = leaf_emb_n @ query_normed
+
+        return item_indices, scores
+
+    def _pq_reconstruct(self, codes):
+        """Reconstruct approximate vectors from PQ codes.
+
+        Args:
+            codes: (n, M) uint8 PQ codes.
+
+        Returns:
+            (n, dim) float32 approximate vectors (NOT normalized).
+        """
+        codebook = self._load_pq_codebook()  # (M, 256, dsub)
+        m, _, dsub = codebook.shape
+        n = codes.shape[0]
+        reconstructed = np.zeros((n, m * dsub), dtype=np.float32)
+        for j in range(m):
+            reconstructed[:, j * dsub:(j + 1) * dsub] = codebook[j, codes[:, j]]
+        return reconstructed
 
     def get_leaf(self, batch_index):
         """Decompress and return a leaf's Arrow RecordBatch.
@@ -608,31 +873,19 @@ class LazyIndex:
         # Find candidate leaves by tree traversal
         candidate_leaves = self._find_candidate_leaves(query, nprobe)
 
+        # Precompute ADC tables once per query if PQ
+        adc_tables = None
+        if self.is_pq:
+            adc_tables = self._pq_precompute_tables(query_normed)
+
         # Collect results from all candidate leaves
         all_indices = []
         all_scores = []
 
         for batch_index in candidate_leaves:
             batch = self.get_leaf(batch_index)
-            item_indices = batch.column('item_index').to_numpy()
-
-            # Extract embeddings from fixed-size list
-            emb_col = batch.column('embedding')
-            # Convert to numpy: flatten then reshape
-            n_rows = len(emb_col)
-            dim = self.embedding_dim
-
-            # Get raw values from the fixed-size list array
-            flat_values = emb_col.values.to_numpy()
-            leaf_emb = flat_values.reshape(n_rows, dim).astype(np.float32)
-
-            # Normalize for cosine similarity
-            norms = np.linalg.norm(leaf_emb, axis=1, keepdims=True)
-            leaf_emb_n = leaf_emb / np.maximum(norms, 1e-10)
-
-            # Cosine similarities
-            scores = leaf_emb_n @ query_normed
-
+            item_indices, scores = self._score_leaf(
+                batch, query_normed, adc_tables)
             all_indices.append(item_indices)
             all_scores.append(scores)
 
@@ -733,26 +986,19 @@ class LazyIndex:
 
         candidate_batches = batch_indices[top_leaf_pos]
 
+        # Precompute ADC tables once per query if PQ
+        adc_tables = None
+        if self.is_pq:
+            adc_tables = self._pq_precompute_tables(query_normed)
+
         # Score candidates from selected leaves
         all_indices = []
         all_scores = []
 
         for batch_index in candidate_batches:
             batch = self.get_leaf(int(batch_index))
-            item_indices = batch.column('item_index').to_numpy()
-
-            emb_col = batch.column('embedding')
-            n_rows = len(emb_col)
-            dim = self.embedding_dim
-
-            flat_values = emb_col.values.to_numpy()
-            leaf_emb = flat_values.reshape(n_rows, dim).astype(np.float32)
-
-            norms = np.linalg.norm(leaf_emb, axis=1, keepdims=True)
-            leaf_emb_n = leaf_emb / np.maximum(norms, 1e-10)
-
-            scores = leaf_emb_n @ query_normed
-
+            item_indices, scores = self._score_leaf(
+                batch, query_normed, adc_tables)
             all_indices.append(item_indices)
             all_scores.append(scores)
 
@@ -930,14 +1176,32 @@ class LazyIndex:
         all_embeddings = []
         all_ids = []
 
-        for batch_idx in batch_indices:
-            batch = self.get_leaf(int(batch_idx))
-            item_indices = batch.column('item_index').to_numpy().astype(np.int64)
-            emb_col = batch.column('embedding')
-            flat_values = emb_col.values.to_numpy()
-            leaf_emb = flat_values.reshape(len(item_indices), dim).astype(np.float32)
-            all_embeddings.append(leaf_emb)
-            all_ids.append(item_indices)
+        if self.is_pq:
+            import warnings
+            warnings.warn(
+                "Exporting PQ-quantized index to FAISS uses lossy "
+                "reconstructed vectors. Search quality may be reduced.",
+                stacklevel=2)
+            meta = self._get_metadata()
+            m = int(meta['pq_n_subquantizers'])
+            for batch_idx in batch_indices:
+                batch = self.get_leaf(int(batch_idx))
+                item_indices = batch.column('item_index').to_numpy().astype(np.int64)
+                emb_col = batch.column('embedding')
+                flat_values = emb_col.values.to_numpy()
+                codes = flat_values.reshape(len(item_indices), m)
+                leaf_emb = self._pq_reconstruct(codes)
+                all_embeddings.append(leaf_emb)
+                all_ids.append(item_indices)
+        else:
+            for batch_idx in batch_indices:
+                batch = self.get_leaf(int(batch_idx))
+                item_indices = batch.column('item_index').to_numpy().astype(np.int64)
+                emb_col = batch.column('embedding')
+                flat_values = emb_col.values.to_numpy()
+                leaf_emb = flat_values.reshape(len(item_indices), dim).astype(np.float32)
+                all_embeddings.append(leaf_emb)
+                all_ids.append(item_indices)
 
         all_embeddings = np.vstack(all_embeddings)
         all_ids = np.concatenate(all_ids)
