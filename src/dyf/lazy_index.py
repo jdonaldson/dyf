@@ -556,23 +556,29 @@ class LazyIndex:
             hyperplanes: (num_bits, dim) float32 array.
 
         Returns:
-            bucket_id (uint64).
+            (bucket_id, projections) — bucket_id as int, projections as
+            (num_bits,) float32 array of signed distances to each hyperplane.
         """
         projections = hyperplanes @ query
         bits = (projections > 0).astype(np.uint64)
         bucket_id = np.uint64(0)
         for i, b in enumerate(bits):
             bucket_id |= (b << np.uint64(i))
-        return int(bucket_id)
+        return int(bucket_id), projections
 
-    def _hamming_distance(self, a, b, num_bits):
-        """Hamming distance between two bucket IDs."""
+    def _margin_distance(self, a, b, projections, num_bits):
+        """Margin-weighted distance between two bucket IDs.
+
+        Cost of flipping bit i = |projection[i]| (distance from hyperplane).
+        Bits where the query is close to the boundary are cheap to flip;
+        bits where the query is far from the boundary are expensive.
+        """
         xor = a ^ b
-        dist = 0
-        for _ in range(num_bits):
-            dist += xor & 1
-            xor >>= 1
-        return dist
+        cost = 0.0
+        for i in range(num_bits):
+            if xor & (1 << i):
+                cost += abs(float(projections[i]))
+        return cost
 
     def search(self, query, k=10, nprobe=3):
         """Search the index for nearest neighbors.
@@ -658,6 +664,125 @@ class LazyIndex:
 
         return all_indices[order], all_scores[order]
 
+    def _build_centroid_index(self):
+        """Build a flat centroid matrix from all leaf nodes.
+
+        Scans FlatBuffers nodes once, extracts centroids from leaves,
+        returns (centroid_matrix, batch_indices) for IVF-style search.
+        Cached after first call.
+        """
+        if hasattr(self, '_centroid_matrix'):
+            return self._centroid_matrix, self._centroid_batch_indices
+
+        dim = self.embedding_dim
+        centroids = []
+        batch_indices = []
+
+        for node_id in range(self._index.NodesLength()):
+            node = self._index.Nodes(node_id)
+            if node is None:
+                continue
+            # Leaf = no children, has a valid batch index
+            if node.ChildrenLength() == 0 and node.BatchIndex() >= 0:
+                cent = self._get_node_centroid(node)
+                if cent is not None:
+                    centroids.append(cent)
+                    batch_indices.append(node.BatchIndex())
+
+        self._centroid_matrix = np.array(centroids, dtype=np.float32)  # (n_leaves, dim)
+        self._centroid_batch_indices = np.array(batch_indices, dtype=np.int32)
+        return self._centroid_matrix, self._centroid_batch_indices
+
+    def search_ivf(self, query, k=10, nprobe=3):
+        """IVF-style search: rank leaves by centroid similarity, then score.
+
+        Instead of LSH tree traversal, computes query similarity to all leaf
+        centroids and probes the top-nprobe leaves. Combines DYF's lazy
+        loading with FAISS IVF-quality routing.
+
+        Args:
+            query: (dim,) query vector.
+            k: Number of results to return.
+            nprobe: Number of leaves to probe.
+
+        Returns:
+            (indices, scores) — arrays of shape (min(k, total_found),).
+        """
+        query = np.asarray(query, dtype=np.float32)
+        if query.ndim != 1 or len(query) != self.embedding_dim:
+            raise ValueError(
+                f"Query must be 1D with dim={self.embedding_dim}, "
+                f"got shape {query.shape}")
+
+        # Normalize query
+        qnorm = np.linalg.norm(query)
+        if qnorm > 1e-10:
+            query_normed = query / qnorm
+        else:
+            query_normed = query
+
+        # Get centroid index (built once, cached)
+        centroids, batch_indices = self._build_centroid_index()
+
+        # Rank all leaves by centroid similarity
+        sims = centroids @ query_normed  # (n_leaves,)
+        if len(sims) <= nprobe:
+            top_leaf_pos = np.arange(len(sims))
+        else:
+            top_leaf_pos = np.argpartition(-sims, nprobe)[:nprobe]
+
+        candidate_batches = batch_indices[top_leaf_pos]
+
+        # Score candidates from selected leaves
+        all_indices = []
+        all_scores = []
+
+        for batch_index in candidate_batches:
+            batch = self.get_leaf(int(batch_index))
+            item_indices = batch.column('item_index').to_numpy()
+
+            emb_col = batch.column('embedding')
+            n_rows = len(emb_col)
+            dim = self.embedding_dim
+
+            flat_values = emb_col.values.to_numpy()
+            leaf_emb = flat_values.reshape(n_rows, dim).astype(np.float32)
+
+            norms = np.linalg.norm(leaf_emb, axis=1, keepdims=True)
+            leaf_emb_n = leaf_emb / np.maximum(norms, 1e-10)
+
+            scores = leaf_emb_n @ query_normed
+
+            all_indices.append(item_indices)
+            all_scores.append(scores)
+
+        if not all_indices:
+            return np.array([], dtype=np.uint32), np.array([], dtype=np.float32)
+
+        all_indices = np.concatenate(all_indices)
+        all_scores = np.concatenate(all_scores)
+
+        # Deduplicate
+        unique_mask = np.ones(len(all_indices), dtype=bool)
+        seen = set()
+        for i, idx in enumerate(all_indices):
+            idx_int = int(idx)
+            if idx_int in seen:
+                unique_mask[i] = False
+            else:
+                seen.add(idx_int)
+        all_indices = all_indices[unique_mask]
+        all_scores = all_scores[unique_mask]
+
+        # Top-k
+        if len(all_scores) <= k:
+            order = np.argsort(-all_scores)
+        else:
+            part_idx = np.argpartition(-all_scores, k)[:k]
+            order = part_idx[np.argsort(-all_scores[part_idx])]
+
+        return all_indices[order], all_scores[order]
+
     def _find_candidate_leaves(self, query, nprobe):
         """Traverse tree to find candidate leaf batch indices.
 
@@ -694,7 +819,7 @@ class LazyIndex:
             n_children = node.ChildrenLength()
 
             if hyperplanes is not None:
-                bucket_id = self._hash_query(query, hyperplanes)
+                bucket_id, projections = self._hash_query(query, hyperplanes)
                 num_bits = node.NumBits()
 
                 # Find primary child via bucket_id_to_child mapping
@@ -713,10 +838,10 @@ class LazyIndex:
                     primary_child = bid_to_child[bucket_id]
                     primary_bid = bucket_id
                 else:
-                    # Fallback: find nearest bucket by Hamming distance
-                    best_dist = num_bits + 1
+                    # Fallback: find nearest bucket by margin distance
+                    best_dist = float('inf')
                     for bid, child_nid in bid_to_child.items():
-                        dist = self._hamming_distance(bucket_id, bid, num_bits)
+                        dist = self._margin_distance(bucket_id, bid, projections, num_bits)
                         if dist < best_dist:
                             best_dist = dist
                             primary_child = child_nid
@@ -725,13 +850,13 @@ class LazyIndex:
                 if primary_child is not None:
                     probe_queue.append((priority, primary_child))
 
-                # For nprobe > 1: add alternative children sorted by Hamming distance
+                # For nprobe > 1: add alternative children by margin distance
                 if nprobe > 1:
                     alternatives = []
                     for bid, child_nid in bid_to_child.items():
                         if bid == primary_bid:
                             continue
-                        dist = self._hamming_distance(bucket_id, bid, num_bits)
+                        dist = self._margin_distance(bucket_id, bid, projections, num_bits)
                         alternatives.append((dist, child_nid))
                     alternatives.sort(key=lambda x: x[0])
                     for dist, child_nid in alternatives:
@@ -761,3 +886,189 @@ class LazyIndex:
                             probe_queue.append((priority + 1, child_nid))
 
         return list(candidates)
+
+    def to_faiss(self, pq_subquantizers=None, pq_bits=8):
+        """Export dyf index as a FAISS IVF index.
+
+        Uses dyf's leaf centroids as the coarse quantizer and populates
+        FAISS inverted lists from dyf's leaf embeddings. This gives dyf's
+        PCA-LSH partitioning with FAISS's optimized search.
+
+        Args:
+            pq_subquantizers: If set, use IndexIVFPQ with this many
+                subquantizers for compression (e.g., 8 or 16). If None,
+                use IndexIVFFlat (no compression).
+            pq_bits: Bits per subquantizer for PQ (default: 8).
+
+        Returns:
+            faiss.IndexIVFFlat or faiss.IndexIVFPQ, ready to search.
+        """
+        import faiss
+
+        dim = self.embedding_dim
+        centroids, batch_indices = self._build_centroid_index()
+        n_leaves = len(centroids)
+
+        # Normalize centroids for inner product (cosine) search
+        centroids_norm = centroids.copy()
+        faiss.normalize_L2(centroids_norm)
+
+        # Build coarse quantizer from dyf leaf centroids
+        quantizer = faiss.IndexFlatIP(dim)
+        quantizer.add(centroids_norm)
+
+        # Create IVF index
+        if pq_subquantizers is not None:
+            index = faiss.IndexIVFPQ(
+                quantizer, dim, n_leaves, pq_subquantizers, pq_bits,
+                faiss.METRIC_INNER_PRODUCT)
+        else:
+            index = faiss.IndexIVFFlat(
+                quantizer, dim, n_leaves, faiss.METRIC_INNER_PRODUCT)
+
+        # Collect all embeddings and IDs from leaves
+        all_embeddings = []
+        all_ids = []
+
+        for batch_idx in batch_indices:
+            batch = self.get_leaf(int(batch_idx))
+            item_indices = batch.column('item_index').to_numpy().astype(np.int64)
+            emb_col = batch.column('embedding')
+            flat_values = emb_col.values.to_numpy()
+            leaf_emb = flat_values.reshape(len(item_indices), dim).astype(np.float32)
+            all_embeddings.append(leaf_emb)
+            all_ids.append(item_indices)
+
+        all_embeddings = np.vstack(all_embeddings)
+        all_ids = np.concatenate(all_ids)
+
+        # Normalize for cosine similarity
+        faiss.normalize_L2(all_embeddings)
+
+        # Train PQ codebook if needed (IVFFlat doesn't need training)
+        if pq_subquantizers is not None:
+            index.train(all_embeddings)
+        else:
+            index.is_trained = True
+
+        # Add vectors — FAISS assigns to nearest centroid
+        index.add_with_ids(all_embeddings, all_ids)
+
+        return index
+
+
+def from_faiss(faiss_index, path, compression='zstd', quantization='float16',
+               metadata=None):
+    """Build a dyf lazy index file from a FAISS IVF index.
+
+    Extracts FAISS's inverted lists and centroids, builds a single-level
+    dyf tree (one node per IVF cell), and writes to the dyf file format.
+
+    Args:
+        faiss_index: A trained faiss.IndexIVFFlat or faiss.IndexIVFPQ.
+        path: Output file path (e.g., "index.dyf").
+        compression: "none", "zstd", or "lz4" (default: "zstd").
+        quantization: "float32", "float16", or "int8" (default: "float16").
+        metadata: Optional dict of string key-value pairs.
+
+    Returns:
+        LazyIndex opened on the written file.
+    """
+    import faiss
+
+    # Extract index parameters
+    dim = faiss_index.d
+    n_cells = faiss_index.nlist
+    invlists = faiss_index.invlists
+
+    # Extract coarse centroids
+    quantizer = faiss.downcast_index(faiss_index.quantizer)
+    centroids = faiss.rev_swig_ptr(quantizer.get_xb(), n_cells * dim)
+    centroids = np.array(centroids).reshape(n_cells, dim).copy()
+
+    # Collect all embeddings, IDs, and cell assignments
+    # Enable direct map for reconstruction (needed for PQ indexes)
+    faiss_index.make_direct_map()
+
+    all_embeddings = []
+    all_ids = []
+    cell_sizes = []
+
+    for cell_id in range(n_cells):
+        list_size = invlists.list_size(cell_id)
+        if list_size == 0:
+            cell_sizes.append(0)
+            continue
+
+        ids = faiss.rev_swig_ptr(invlists.get_ids(cell_id), list_size)
+        ids = np.array(ids).copy().astype(np.int64)
+
+        # Reconstruct vectors (works for both Flat and PQ inverted lists)
+        codes = np.zeros((list_size, dim), dtype=np.float32)
+        for j in range(list_size):
+            faiss_index.reconstruct(int(ids[j]), codes[j])
+
+        all_embeddings.append(codes)
+        all_ids.append(ids)
+        cell_sizes.append(list_size)
+
+    if not all_embeddings:
+        raise ValueError("FAISS index is empty (no vectors)")
+    all_embeddings = np.vstack(all_embeddings)
+    all_ids = np.concatenate(all_ids)
+
+    # Reorder embeddings so position i holds FAISS ID i.
+    # This way write_lazy_index stores original FAISS IDs as item_index.
+    max_id = int(all_ids.max())
+    n_total = max_id + 1
+    ordered_embeddings = np.zeros((n_total, dim), dtype=np.float32)
+    ordered_embeddings[all_ids] = all_embeddings
+
+    # Build a flat dyf tree: root with one child per non-empty cell
+    non_empty_cells = [i for i in range(n_cells) if cell_sizes[i] > 0]
+
+    # Rebuild cell membership using original FAISS IDs
+    children = []
+    cell_id_offset = 0
+    for cell_id in non_empty_cells:
+        list_size = cell_sizes[cell_id]
+        # all_ids was built in cell order, so slice to get this cell's IDs
+        cell_faiss_ids = all_ids[cell_id_offset:cell_id_offset + list_size]
+        cell_id_offset += list_size
+        children.append({
+            'children': [],
+            'indices': cell_faiss_ids.astype(np.intp),
+            'depth': 0,
+            'point_margin_map': None,
+            'hyperplanes': None,
+            'bucket_id_to_child': None,
+        })
+
+    tree = {
+        'children': children,
+        'indices': np.arange(n_total),
+        'depth': 1,
+        'point_margin_map': None,
+        'hyperplanes': None,
+        'bucket_id_to_child': None,
+    }
+
+    build_params = {
+        'max_depth': 1,
+        'num_bits': 0,
+        'min_leaf_size': 1,
+        'seed': 0,
+    }
+
+    if metadata is None:
+        metadata = {}
+    metadata['source'] = 'faiss'
+    metadata['faiss_nlist'] = str(n_cells)
+
+    write_lazy_index(tree, ordered_embeddings, path,
+                     compression=compression,
+                     quantization=quantization,
+                     metadata=metadata,
+                     build_params=build_params)
+
+    return LazyIndex(path)
