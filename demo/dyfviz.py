@@ -777,6 +777,213 @@ def scatter_gl_normalize(coords):
     return norm
 
 
+def generate_tour_narration(cluster_names, titles, labels, edge_pairs=None, model="gemma2:9b"):
+    """Generate short narration text for each cluster for TTS during tour.
+
+    Returns:
+        dict mapping cluster_id -> narration string
+    """
+    import subprocess
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    label_arr = np.asarray(labels)
+    cluster_points = defaultdict(list)
+    for i, cid in enumerate(label_arr):
+        cluster_points[int(cid)].append(i)
+
+    # Build connection map from edge_pairs
+    connections = defaultdict(list)
+    if edge_pairs:
+        for (c1, c2), weight in edge_pairs.items():
+            if c1 in cluster_names and c2 in cluster_names:
+                connections[c1].append((c2, cluster_names[c2], weight))
+                connections[c2].append((c1, cluster_names[c1], weight))
+        # Sort by weight (strongest connections first)
+        for cid in connections:
+            connections[cid].sort(key=lambda x: -x[2])
+
+    print(f"\n=== Generating tour narration ===")
+    print(f"  Generating narration for {len(cluster_names)} clusters...")
+
+    tasks = []
+    for cid, name in cluster_names.items():
+        pts = cluster_points.get(cid, [])
+        n_pts = len(pts)
+
+        # Sample a few titles for context
+        sample_titles = []
+        if pts:
+            sample_indices = pts[:min(10, len(pts))]
+            sample_titles = [titles[i] for i in sample_indices]
+
+        # Get top 3 connections
+        conn_str = ""
+        top_connections = connections.get(cid, [])[:3]
+        if top_connections:
+            conn_names = [f'"{c[1]}"' for c in top_connections]
+            conn_str = f"\nThis cluster connects to: {', '.join(conn_names)}"
+
+        prompt = (
+            f"You are narrating a tour of a data visualization showing clusters and their connections. "
+            f"Generate 2-3 sentences introducing this cluster and its connections.\n\n"
+            f"Cluster name: {name}\n"
+            f"Number of items: {n_pts}\n"
+            f"Sample items: {', '.join(sample_titles[:5])}"
+            f"{conn_str}\n\n"
+            f"IMPORTANT: Vary your opening! Do NOT start with 'Welcome to'. "
+            f"Use diverse phrases like: 'Here we see...', 'This cluster contains...', "
+            f"'Moving to...', 'Next up is...', 'Now exploring...', '{name} brings together...', "
+            f"or just start with the cluster name directly.\n\n"
+            f"The narration should:\n"
+            f"1. First introduce the cluster and what it contains\n"
+            f"2. Then mention the connected clusters and why they might be related\n"
+            f"Sound natural when spoken aloud, like a museum audio guide.\n\n"
+            f"CRITICAL: Keep your response under 200 characters. Be concise.\n"
+            f"Reply with ONLY the narration, nothing else."
+        )
+        tasks.append((cid, name, prompt))
+
+    def call_ollama(task):
+        cid, name, prompt = task
+        try:
+            result = subprocess.run(
+                ["ollama", "run", model, prompt],
+                capture_output=True, text=True, timeout=60,
+            )
+            text = result.stdout.strip().split('\n')[0][:400]  # Allow 2x the requested limit
+            text = text.strip('"\'').strip()
+            return cid, text if text else name
+        except Exception:
+            return cid, name
+
+    narration = {}
+    n_workers = min(4, len(tasks))
+
+    with ThreadPoolExecutor(max_workers=n_workers) as executor:
+        futures = {executor.submit(call_ollama, t): t for t in tasks}
+        done = 0
+        for future in as_completed(futures):
+            cid, text = future.result()
+            narration[cid] = text
+            done += 1
+            if done % 5 == 0 or done == len(tasks):
+                print(f"    Generated {done}/{len(tasks)} narrations...")
+
+    # Print a few examples
+    for cid in list(narration.keys())[:3]:
+        if isinstance(cid, int):
+            print(f"    [{cid:2d}] {narration[cid][:60]}...")
+
+    # Generate intro and outro
+    n_clusters = len(cluster_names)
+    top_clusters = sorted(cluster_names.items(),
+                          key=lambda x: len(cluster_points.get(x[0], [])),
+                          reverse=True)[:5]
+    top_names = [name for _, name in top_clusters]
+
+    intro_prompt = (
+        f"You are introducing a guided tour of a data visualization with {n_clusters} clusters. "
+        f"Generate a brief intro (2-3 sentences) that:\n"
+        f"1. Sets the scene - we're exploring a map of knowledge/concepts\n"
+        f"2. Mentions we'll visit {n_clusters} different topic areas\n"
+        f"3. Previews some highlights: {', '.join(top_names[:3])}\n\n"
+        f"Sound welcoming and intriguing, like starting a museum audio tour.\n"
+        f"CRITICAL: Keep your response under 250 characters. Be concise.\n"
+        f"Reply with ONLY the intro narration, nothing else."
+    )
+
+    outro_prompt = (
+        f"You are concluding a guided tour of a data visualization. "
+        f"Generate a brief outro (2-3 sentences) that:\n"
+        f"1. Thanks the listener for joining the tour\n"
+        f"2. Encourages them to explore further on their own\n"
+        f"3. Mentions they can click on clusters or use the controls\n\n"
+        f"Sound warm and inviting.\n"
+        f"CRITICAL: Keep your response under 200 characters. Be concise.\n"
+        f"Reply with ONLY the outro narration, nothing else."
+    )
+
+    # Generate intro
+    try:
+        result = subprocess.run(
+            ["ollama", "run", model, intro_prompt],
+            capture_output=True, text=True, timeout=60,
+        )
+        intro_text = result.stdout.strip().split('\n')[0][:500].strip('"\'').strip()  # Allow 2x requested
+        narration["intro"] = intro_text if intro_text else "Welcome to this visualization tour."
+        print(f"    [intro] {narration['intro'][:60]}...")
+    except Exception:
+        narration["intro"] = "Welcome to this visualization tour."
+
+    # Generate outro
+    try:
+        result = subprocess.run(
+            ["ollama", "run", model, outro_prompt],
+            capture_output=True, text=True, timeout=60,
+        )
+        outro_text = result.stdout.strip().split('\n')[0][:400].strip('"\'').strip()  # Allow 2x requested
+        narration["outro"] = outro_text if outro_text else "Thank you for joining this tour."
+        print(f"    [outro] {narration['outro'][:60]}...")
+    except Exception:
+        narration["outro"] = "Thank you for joining this tour."
+
+    return narration
+
+
+def generate_tour_audio(narration, voice="bm_george"):
+    """Generate audio for tour narration using Kokoro TTS.
+
+    Args:
+        narration: dict mapping cluster_id -> narration text
+        voice: Kokoro voice ID (default: bm_george for British male)
+
+    Returns:
+        dict mapping cluster_id -> {"data": base64 WAV, "duration": ms}
+    """
+    import base64
+    import io
+    try:
+        import soundfile as sf
+        from kokoro import KPipeline
+    except ImportError:
+        print("  [TTS] Kokoro not available, skipping audio generation")
+        return {}
+
+    print(f"\n=== Generating tour audio ===")
+    print(f"  Rendering {len(narration)} audio clips with voice '{voice}'...")
+
+    # Initialize Kokoro pipeline (British English)
+    lang_code = 'b' if voice.startswith('b') else 'a'
+    pipeline = KPipeline(lang_code=lang_code)
+
+    audio_data = {}
+    done = 0
+    for cid, text in narration.items():
+        try:
+            # Generate audio
+            for _, _, audio in pipeline(text, voice=voice):
+                # Calculate duration in ms (24000 Hz sample rate)
+                duration_ms = int(len(audio) / 24000 * 1000)
+                # Convert to WAV bytes
+                buf = io.BytesIO()
+                sf.write(buf, audio, 24000, format='WAV')
+                buf.seek(0)
+                # Store both data and duration
+                audio_data[cid] = {
+                    "data": base64.b64encode(buf.read()).decode('ascii'),
+                    "duration": duration_ms
+                }
+                break  # Only need first chunk
+        except Exception as e:
+            print(f"    [TTS] Failed for cluster {cid}: {e}")
+
+        done += 1
+        if done % 5 == 0 or done == len(narration):
+            print(f"    Rendered {done}/{len(narration)} clips...")
+
+    return audio_data
+
+
 # ── HTML template ────────────────────────────────────────────────────────
 
 HTML_TEMPLATE = r"""<!DOCTYPE html>
@@ -1037,7 +1244,7 @@ def build_html(coords, titles_arr, labels, color_map, title_str,
 def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
                  cluster_names=None, ws_port=8766, label_levels=None,
                  bundled_edges_2d=None, bundled_edges_3d=None, edge_pairs=None,
-                 logo_path=None):
+                 logo_path=None, tour_narration=None, tour_audio=None):
     """Build a pydeck 3D point cloud with HTML overlay labels."""
     import base64
     import pyarrow as pa
@@ -1104,7 +1311,7 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
         get_position=["x", "y", "z"],
         get_color=["r", "g", "b", "a"],
         get_normal=[0, 0, 1],
-        point_size=2,
+        point_size=3,
         pickable=True,
         auto_highlight=True,
     )
@@ -1159,6 +1366,10 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
     label_json = json.dumps(label_data)
     # Multi-level labels: keys are level numbers (as strings in JSON)
     levels_json = json.dumps({str(k): v for k, v in levels_data.items()})
+    # Tour narration: cluster_id -> narration text
+    narration_json = json.dumps({str(k): v for k, v in (tour_narration or {}).items()})
+    # Tour audio: cluster_id -> base64 WAV
+    audio_json = json.dumps({str(k): v for k, v in (tour_audio or {}).items()})
 
     # ── Arrow IPC for compact binary transfer ───────────────────────
     points_batch = pa.record_batch({
@@ -1369,9 +1580,6 @@ body.light .tour-edge-label {{
         <input type="checkbox" id="toggle-orbit">
         <span>Auto-orbit</span>
       </label>
-      <button id="tour-btn" class="panel-btn" style="margin-top:6px;width:100%;">
-        ▶ Tour
-      </button>
       <div style="margin-top:8px;">
         <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
           <span>Point size</span><span id="ps-val">2</span>
@@ -1389,6 +1597,29 @@ body.light .tour-edge-label {{
     </div>
     <div class="palette-body">
       <div id="cluster-list" style="font-size:12px;line-height:1.8;"></div>
+    </div>
+  </div>
+
+  <!-- Tour palette -->
+  <div class="palette collapsed">
+    <div class="palette-header" onclick="this.parentElement.classList.toggle('collapsed')">
+      <span class="palette-arrow"></span>Tour
+    </div>
+    <div class="palette-body">
+      <button id="tour-btn" class="panel-btn" style="width:100%;margin-bottom:8px;">
+        ▶ Start Tour
+      </button>
+      <div id="tour-list" style="font-size:11px;line-height:1.6;max-height:200px;overflow-y:auto;"></div>
+    </div>
+  </div>
+
+  <!-- MCP Debug palette -->
+  <div class="palette collapsed">
+    <div class="palette-header" onclick="this.parentElement.classList.toggle('collapsed')">
+      <span class="palette-arrow"></span>MCP Debug
+    </div>
+    <div class="palette-body">
+      <div id="mcp-log" style="font-size:10px;font-family:monospace;max-height:200px;overflow-y:auto;overflow-x:hidden;word-break:break-all;"></div>
     </div>
   </div>
 </div>
@@ -1481,6 +1712,22 @@ body.light .header-logo {{ filter:grayscale(1) brightness(0.3); }}
 }}
 .palette-check input {{
   accent-color:var(--accent); width:14px; height:14px;
+}}
+.tour-item {{
+  opacity: 0.6;
+  transition: opacity 0.2s;
+  position: relative;
+  overflow: hidden;
+}}
+.tour-item:hover {{
+  opacity: 0.9;
+  background: rgba(255,255,255,0.1);
+}}
+.tour-item.active {{
+  opacity: 1;
+  color: #fff;
+  font-weight: 600;
+  background: linear-gradient(to right, var(--accent) var(--progress, 0%), rgba(255,255,255,0.15) var(--progress, 0%));
 }}
 </style>
 
@@ -1578,6 +1825,7 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
   var labels = {label_json};
   var labelLevels = {levels_json};
   var edgePairs = {edge_pairs_json};  // [[c1,c2], ...] matching edgePaths order
+  var tourNarration = {narration_json};  // cluster_id -> narration text for TTS
 
   // Build cluster centroid map from edge endpoints (these match the bundled edge positions)
   var edgeCentroids = {{}};
@@ -1593,7 +1841,6 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
 
   var labelsVisible = true;
   var edgesVisible = true;
-  var originalEdgeLayer = null;  // saved reference to edge layer
   var highlightedEdgeClusters = new Set();  // cluster IDs whose edges to highlight
   var edgeFadeAlpha = 0;      // current fade state (0 = normal, 1 = fully highlighted)
   var edgeFadeTarget = 0;     // target fade state
@@ -1626,6 +1873,122 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
   document.addEventListener("pointerdown", function() {{ userDragging = true; }});
   document.addEventListener("pointerup", function() {{ userDragging = false; }});
   document.addEventListener("pointercancel", function() {{ userDragging = false; }});
+
+  // ── Edge sway physics (3D gravity-based sag) ────────────────────────
+  var currentSag = [0, 0, -1];   // Current sag direction [x, y, z]
+  var sagVelocity = [0, 0, 0];   // Velocity for smooth transitions
+  var lastSwayTime = 0;
+  var swayDamping = 12;          // Damping (lower = more bounce)
+  var swayStiffness = 80;        // Stiffness (higher = faster snap to target)
+  var swayMass = 1.5;            // Mass (lower = snappier response)
+  var swayActive = false;
+  var swayThreshold = 0.002;
+  var swayTime = 0;              // For per-edge oscillation phase
+
+  // Pre-compute random offsets per edge for organic variation
+  var edgeRandom = [];
+  (function() {{
+    for (var _e = 0; _e < edgePaths3d.length; _e++) {{
+      edgeRandom.push({{
+        phase1: Math.random() * Math.PI * 2,
+        phase2: Math.random() * Math.PI * 2,
+        phase3: Math.random() * Math.PI * 2,
+        amp: 0.4 + Math.random() * 1.2,
+        freq1: 0.5 + Math.random() * 1.0,
+        freq2: 0.3 + Math.random() * 0.8,
+        freq3: 1.0 + Math.random() * 2.0,
+        wobbleAmp: 0.1 + Math.random() * 0.4,
+        delay: Math.random() * 2.0
+      }});
+    }}
+  }})();
+
+  // Get target sag direction using viewport unproject
+  function getTargetSag() {{
+    var dk = getDeck();
+    if (!dk) return [0, 0, -1];
+
+    var viewports = dk.getViewports ? dk.getViewports() : null;
+    if (!viewports || !viewports.length) return [0, 0, -1];
+    var vp = viewports[0];
+
+    var w = vp.width || 800;
+    var h = vp.height || 600;
+    var centerX = w / 2;
+    var centerY = h / 2;
+
+    try {{
+      var p1 = vp.unproject([centerX, centerY]);
+      var p2 = vp.unproject([centerX, centerY + 100]);
+      if (!p1 || !p2) return [0, 0, -1];
+
+      var dx = p2[0] - p1[0];
+      var dy = p2[1] - p1[1];
+      var dz = (p2[2] || 0) - (p1[2] || 0);
+      var len = Math.sqrt(dx*dx + dy*dy + dz*dz) || 1;
+      return [dx/len, dy/len, dz/len];
+    }} catch(e) {{
+      return [0, 0, -1];
+    }}
+  }}
+
+  function updateSway(timestamp) {{
+    if (!swayActive) return;
+    if (viewMode === "2d") {{ swayActive = false; return; }}
+
+    var dk = getDeck();
+    if (!dk) {{ requestAnimationFrame(updateSway); return; }}
+
+    // Delta time
+    if (!lastSwayTime) lastSwayTime = timestamp;
+    var dt = Math.min(0.05, (timestamp - lastSwayTime) / 1000);
+    lastSwayTime = timestamp;
+    swayTime += dt;
+
+    // Get target sag from viewport
+    var target = getTargetSag();
+
+    // 3D spring-damper physics toward target sag direction
+    var k = swayStiffness * 0.5;
+    var c = swayDamping * 0.3;
+    var m = swayMass;
+
+    for (var axis = 0; axis < 3; axis++) {{
+      var x = currentSag[axis];
+      var v = sagVelocity[axis];
+      var springF = k * (target[axis] - x);
+      var dampF = -c * v;
+      var a = (springF + dampF) / m;
+      v += a * dt;
+      x += v * dt;
+      sagVelocity[axis] = v;
+      currentSag[axis] = x;
+    }}
+
+    // Check energy to stop
+    var velMag = Math.sqrt(sagVelocity[0]*sagVelocity[0] + sagVelocity[1]*sagVelocity[1] + sagVelocity[2]*sagVelocity[2]);
+    if (velMag < swayThreshold && !userDragging) {{
+      currentSag = target.slice();
+      sagVelocity = [0, 0, 0];
+      swayActive = false;
+      rebuildLayer();
+      return;
+    }}
+
+    rebuildLayer();
+    requestAnimationFrame(updateSway);
+  }}
+
+  function startSway() {{
+    if (swayActive || viewMode === "2d") return;
+    swayActive = true;
+    lastSwayTime = 0;
+    requestAnimationFrame(updateSway);
+  }}
+
+  // Start sway when user interacts
+  document.addEventListener("pointerdown", function() {{ startSway(); }});
+  document.addEventListener("wheel", function() {{ startSway(); }}, {{ passive: true }});
 
   // ── Compute data extent and optimal zoom ────────────────────────────
   var xVals = allPoints.map(function(p) {{ return p.x; }});
@@ -1759,9 +2122,13 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
     pauseOrbitAndResume(500);
   }});
 
-  // Pause orbit while user zooms with wheel
+  // Update zoom while orbiting (don't pause, just adjust zoom level)
   document.addEventListener("wheel", function(e) {{
-    pauseOrbitAndResume(600);
+    if (orbitEnabled) {{
+      // Adjust zoom based on wheel delta (negative = zoom in, positive = zoom out)
+      var delta = e.deltaY > 0 ? -0.15 : 0.15;
+      orbitZoom = Math.max(1, Math.min(12, orbitZoom + delta));
+    }}
   }}, {{ passive: true }});
 
   function updateOrbit() {{
@@ -1779,23 +2146,112 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
     }} }});
   }}
 
-  function startOrbit() {{
-    if (orbitTimer) return;
-    orbitEnabled = true;
-    orbitTimer = setInterval(updateOrbit, 50);  // 20 FPS
-  }}
-
   function stopOrbit() {{
     orbitEnabled = false;
     if (orbitTimer) {{
       clearInterval(orbitTimer);
       orbitTimer = null;
     }}
+    var toggle = document.getElementById("toggle-orbit");
+    if (toggle) toggle.checked = false;
+  }}
+
+  function stopTourMode() {{
+    if (!tourRunning) return;
+    tourRunning = false;
+    if (tourTimerId) {{ clearTimeout(tourTimerId); tourTimerId = null; }}
+    stopTourProgress();
+    stopNarration();
+    tourCentroid = null;
+    tourConnected = [];
+    setEdgeHighlight([]);
+    document.getElementById("tour-btn").textContent = "▶ Start Tour";
+    document.getElementById("tour-label").style.display = "none";
+    document.getElementById("tour-edge-labels").style.display = "none";
+    document.getElementById("camera-debug").style.display = "none";
+    var tourListEl = document.getElementById("tour-list");
+    if (tourListEl) {{
+      var items = tourListEl.querySelectorAll(".tour-item");
+      items.forEach(function(el) {{ el.classList.remove("active"); }});
+    }}
+  }}
+
+  function stopAmbientMode() {{
+    if (!ambientRunning) return;
+    ambientRunning = false;
+    setEdgeHighlight([]);
+  }}
+
+  function stopAllAnimations() {{
+    stopOrbit();
+    stopTourMode();
+    stopAmbientMode();
+    rebuildLayer();
+  }}
+
+  function startOrbit() {{
+    if (orbitTimer) return;
+    // Cancel other animations first
+    stopTourMode();
+    stopAmbientMode();
+    rebuildLayer();
+    orbitEnabled = true;
+    orbitTimer = setInterval(updateOrbit, 50);  // 20 FPS
+  }}
+
+  // ── Pre-rendered audio for tour narration ─────────────────────────
+  var tourAudio = {audio_json};  // cluster_id -> {{data: base64, duration: ms}}
+  var audioContext = null;
+  var currentAudioSource = null;
+  var currentAudioDuration = 10000;  // duration of current clip in ms
+
+  function playClusterAudio(cid) {{
+    var entry = tourAudio[String(cid)];
+    if (!entry || !entry.data) return 0;
+    // Stop any currently playing audio
+    if (currentAudioSource) {{
+      try {{ currentAudioSource.stop(); }} catch(e) {{}}
+      currentAudioSource = null;
+    }}
+    // Decode base64 to ArrayBuffer
+    var binary = atob(entry.data);
+    var len = binary.length;
+    var bytes = new Uint8Array(len);
+    for (var i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
+    // Play audio
+    if (!audioContext) audioContext = new AudioContext();
+    if (audioContext.state === "suspended") audioContext.resume();
+    audioContext.decodeAudioData(bytes.buffer).then(function(buffer) {{
+      var source = audioContext.createBufferSource();
+      source.buffer = buffer;
+      source.connect(audioContext.destination);
+      source.start(0);
+      currentAudioSource = source;
+    }}).catch(function(e) {{
+      console.error("[Audio] Playback failed:", e);
+    }});
+    return entry.duration || 10000;
+  }}
+
+  function getAudioDuration(cid) {{
+    var entry = tourAudio[String(cid)];
+    return (entry && entry.duration) ? entry.duration : 10000;
+  }}
+
+  function stopNarration() {{
+    if (currentAudioSource) {{
+      try {{ currentAudioSource.stop(); }} catch(e) {{}}
+      currentAudioSource = null;
+    }}
   }}
 
   // ── Cluster tour ───────────────────────────────────────────────────
   var tourRunning = false;
   var tourIndex = 0;
+  var tourTimerId = null;   // setTimeout ID for next visit
+  var tourProgressStart = 0; // timestamp when current stop started
+  var tourProgressRAF = null; // requestAnimationFrame ID for progress bar
+  var tourStopDuration = 10000; // duration of current stop in ms (from audio)
   var tourCentroid = null;  // current centroid for label positioning
   var tourConnected = [];   // [{name, centroid}, ...] for connected clusters
 
@@ -1841,24 +2297,64 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
     debugEl.textContent = lines.join("\\n");
   }}
 
+  function startTourProgress() {{
+    var tourListEl = document.getElementById("tour-list");
+    if (!tourListEl) return;
+    var activeItem = tourListEl.querySelector(".tour-item.active");
+    if (!activeItem) return;
+    activeItem.style.setProperty("--progress", "0%");
+    tourProgressStart = performance.now();
+    if (tourProgressRAF) cancelAnimationFrame(tourProgressRAF);
+    function animateProgress() {{
+      if (!tourRunning) return;
+      var item = document.querySelector(".tour-item.active");
+      if (!item) return;
+      var elapsed = performance.now() - tourProgressStart;
+      var pct = Math.min(100, (elapsed / tourStopDuration) * 100);
+      item.style.setProperty("--progress", pct + "%");
+      if (pct < 100) {{
+        tourProgressRAF = requestAnimationFrame(animateProgress);
+      }}
+    }}
+    tourProgressRAF = requestAnimationFrame(animateProgress);
+  }}
+
+  function stopTourProgress() {{
+    if (tourProgressRAF) {{ cancelAnimationFrame(tourProgressRAF); tourProgressRAF = null; }}
+    var items = document.querySelectorAll(".tour-item");
+    items.forEach(function(el) {{ el.style.setProperty("--progress", "0%"); }});
+  }}
+
   function runTour() {{
+    var tourListEl = document.getElementById("tour-list");
     if (tourRunning) {{
       // Stop tour
       tourRunning = false;
+      if (tourTimerId) {{ clearTimeout(tourTimerId); tourTimerId = null; }}
+      stopTourProgress();
+      stopNarration();
       tourCentroid = null;
       tourConnected = [];
       setEdgeHighlight([]);
       rebuildLayer();
-      document.getElementById("tour-btn").textContent = "▶ Tour";
+      document.getElementById("tour-btn").textContent = "▶ Start Tour";
       document.getElementById("tour-label").style.display = "none";
       document.getElementById("tour-edge-labels").style.display = "none";
       document.getElementById("camera-debug").style.display = "none";
+      // Clear tour list highlights
+      if (tourListEl) {{
+        var items = tourListEl.querySelectorAll(".tour-item");
+        items.forEach(function(el) {{ el.classList.remove("active"); }});
+      }}
       return;
     }}
     if (labels.length === 0) return;
 
+    // Cancel other animations first
+    stopOrbit();
+    stopAmbientMode();
+
     tourRunning = true;
-    tourIndex = 0;
     document.getElementById("tour-btn").textContent = "◼ Stop Tour";
     // Debug panel disabled: document.getElementById("camera-debug").style.display = "block";
 
@@ -1869,21 +2365,174 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
       return (b.label.size || 0) - (a.label.size || 0);
     }});
 
+    // Check if intro/outro audio exists
+    var hasIntro = tourAudio["intro"] && tourAudio["intro"].data;
+    var hasOutro = tourAudio["outro"] && tourAudio["outro"].data;
+
+    // Start at -1 for intro if available, otherwise start at 0
+    tourIndex = hasIntro ? -1 : 0;
+
+    // Populate tour list with intro, clusters, and outro
+    if (tourListEl) {{
+      tourListEl.innerHTML = "";
+      // Add intro item
+      if (hasIntro) {{
+        var introDiv = document.createElement("div");
+        introDiv.className = "tour-item";
+        introDiv.setAttribute("data-idx", "-1");
+        introDiv.textContent = "▶ Introduction";
+        introDiv.style.padding = "2px 4px";
+        introDiv.style.borderRadius = "3px";
+        introDiv.style.cursor = "pointer";
+        introDiv.style.fontStyle = "italic";
+        introDiv.onclick = function() {{
+          if (tourTimerId) {{ clearTimeout(tourTimerId); tourTimerId = null; }}
+          tourIndex = -1;
+          visitNext();
+        }};
+        tourListEl.appendChild(introDiv);
+      }}
+      // Add cluster items
+      sortedWithIds.forEach(function(item, idx) {{
+        var div = document.createElement("div");
+        div.className = "tour-item";
+        div.setAttribute("data-idx", idx);
+        div.textContent = (idx + 1) + ". " + (item.label.text || "Cluster " + item.cid);
+        div.style.padding = "2px 4px";
+        div.style.borderRadius = "3px";
+        div.style.cursor = "pointer";
+        div.onclick = function() {{
+          if (tourTimerId) {{ clearTimeout(tourTimerId); tourTimerId = null; }}
+          tourIndex = idx;
+          visitNext();
+        }};
+        tourListEl.appendChild(div);
+      }});
+      // Add outro item
+      if (hasOutro) {{
+        var outroDiv = document.createElement("div");
+        outroDiv.className = "tour-item";
+        outroDiv.setAttribute("data-idx", "outro");
+        outroDiv.textContent = "◀ Conclusion";
+        outroDiv.style.padding = "2px 4px";
+        outroDiv.style.borderRadius = "3px";
+        outroDiv.style.cursor = "pointer";
+        outroDiv.style.fontStyle = "italic";
+        outroDiv.onclick = function() {{
+          if (tourTimerId) {{ clearTimeout(tourTimerId); tourTimerId = null; }}
+          tourIndex = sortedWithIds.length;  // outro index
+          visitNext();
+        }};
+        tourListEl.appendChild(outroDiv);
+      }}
+    }}
+
     var tourLabelEl = document.getElementById("tour-label");
 
     function visitNext() {{
-      if (!tourRunning || tourIndex >= sortedWithIds.length) {{
-        // Tour complete
+      // Highlight current item in tour list based on data-idx attribute
+      if (tourListEl) {{
+        var items = tourListEl.querySelectorAll(".tour-item");
+        var targetIdx = (tourIndex === sortedWithIds.length) ? "outro" : String(tourIndex);
+        items.forEach(function(el) {{
+          if (el.getAttribute("data-idx") === targetIdx) {{
+            el.classList.add("active");
+            el.scrollIntoView({{ block: "nearest" }});
+          }} else {{
+            el.classList.remove("active");
+          }}
+        }});
+      }}
+
+      // Handle intro (tourIndex == -1)
+      if (tourIndex === -1) {{
+        if (!tourRunning) return;
+        tourLabelEl.textContent = "Welcome";
+        tourLabelEl.style.display = "block";
+        document.getElementById("tour-edge-labels").style.display = "none";
+
+        // Play intro audio
+        var introDuration = 5000;
+        if (tourAudio["intro"] && tourAudio["intro"].data) {{
+          introDuration = playClusterAudio("intro") + 2000;
+        }}
+        tourStopDuration = introDuration;
+        startTourProgress();
+
+        // Animate to overview position
+        var dk = getDeck();
+        if (dk && dk.setProps) {{
+          dk.setProps({{ initialViewState: {{
+            target: [0, 0, 0],
+            rotationX: 25,
+            rotationOrbit: 0,
+            zoom: defaultZoom - 0.5,
+            transitionDuration: 2000,
+            transitionInterpolator: new deck.LinearInterpolator(['target', 'zoom', 'rotationOrbit', 'rotationX'])
+          }} }});
+        }}
+
+        tourIndex++;
+        tourTimerId = setTimeout(visitNext, tourStopDuration);
+        return;
+      }}
+
+      // Handle outro (tourIndex == sortedWithIds.length, exactly once)
+      if (tourIndex === sortedWithIds.length && hasOutro) {{
+        if (!tourRunning) return;
+
+        tourLabelEl.textContent = "Thank You";
+        tourLabelEl.style.display = "block";
+        setEdgeHighlight([]);
+        rebuildLayer();
+        document.getElementById("tour-edge-labels").style.display = "none";
+
+        // Play outro audio
+        var outroDuration = playClusterAudio("outro") + 2000;
+        tourStopDuration = outroDuration;
+        startTourProgress();
+
+        // Animate to wide view
+        var dk = getDeck();
+        if (dk && dk.setProps) {{
+          dk.setProps({{ initialViewState: {{
+            target: [0, 0, 0],
+            rotationX: 15,
+            rotationOrbit: 180,
+            zoom: defaultZoom - 1,
+            transitionDuration: 2000,
+            transitionInterpolator: new deck.LinearInterpolator(['target', 'zoom', 'rotationOrbit', 'rotationX'])
+          }} }});
+        }}
+
+        // Schedule tour end after outro
+        tourTimerId = setTimeout(function() {{
+          tourIndex++;  // Move past outro (to sortedWithIds.length + 1)
+          visitNext();  // This will hit the tour complete logic
+        }}, outroDuration);
+        return;
+      }}
+
+      // Tour complete (no outro, or after outro played)
+      if (tourIndex >= sortedWithIds.length) {{
         tourRunning = false;
+        if (tourTimerId) {{ clearTimeout(tourTimerId); tourTimerId = null; }}
+        stopTourProgress();
+        stopNarration();
         tourCentroid = null;
         tourConnected = [];
         setEdgeHighlight([]);
         rebuildLayer();
-        document.getElementById("tour-btn").textContent = "▶ Tour";
+        document.getElementById("tour-btn").textContent = "▶ Start Tour";
         tourLabelEl.style.display = "none";
         document.getElementById("tour-edge-labels").style.display = "none";
         document.getElementById("camera-debug").style.display = "none";
         document.getElementById("tour-edge-labels").innerHTML = "";
+        // Clear tour list highlights
+        if (tourListEl) {{
+          var items = tourListEl.querySelectorAll(".tour-item");
+          items.forEach(function(el) {{ el.classList.remove("active"); }});
+        }}
         // Return to default view
         var dk = getDeck();
         if (dk && dk.setProps) {{
@@ -1907,9 +2556,15 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
       tourLabelEl.textContent = cluster.text;
       tourLabelEl.style.display = "block";
 
+      // Play pre-rendered audio and set stop duration based on clip length
+      tourStopDuration = playClusterAudio(cid) + 2000;  // audio + 2s buffer
+
       // Highlight this cluster's edges (with fade-in animation)
       setEdgeHighlight([cid]);
       rebuildLayer();
+
+      // Start progress bar for this stop
+      startTourProgress();
 
       var dk = getDeck();
       if (dk && dk.setProps) {{
@@ -2140,7 +2795,7 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
 
       tourIndex++;
       // Total: 1.5s rotate + 1.2s edge-zoom + 2s pause + 1.5s close-zoom + 2s hold + 1.2s pull-back
-      setTimeout(visitNext, 9400);
+      tourTimerId = setTimeout(visitNext, tourStopDuration);
     }}
 
     visitNext();
@@ -2158,6 +2813,10 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
       rebuildLayer();
       return;
     }}
+
+    // Cancel other animations first
+    stopOrbit();
+    stopTourMode();
 
     ambientRunning = true;
 
@@ -2348,8 +3007,8 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
 
   // Build edge path layer data (for toggling)
   function edgeColor() {{
-    // More transparent edges
-    return (currentTheme === "light") ? [30, 80, 180, 25] : [255, 255, 255, 20];
+    // Semi-transparent edges (increased alpha for visibility)
+    return (currentTheme === "light") ? [30, 80, 180, 80] : [255, 255, 255, 60];
   }}
   var edgePathData = [];
 
@@ -2367,19 +3026,52 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
     // Use 2D bundled paths in 2D mode, 3D catenary curves in 3D mode
     var edgePaths = is2d ? edgePaths2d : edgePaths3d;
     edgePathData = [];
+
+    // Motion intensity based on velocity magnitude (for organic wobble)
+    var velMag = Math.sqrt(sagVelocity[0]*sagVelocity[0] + sagVelocity[1]*sagVelocity[1] + sagVelocity[2]*sagVelocity[2]);
+    var motionIntensity = Math.min(1, velMag * velMag * 0.3);
+
     edgePaths.forEach(function(path, idx) {{
       var w = edgeWeights[idx] || 0.5;
       var width = 0.005 + w * 0.015;  // thicker for stronger connections
-      // Flip arcs to hang down in 3D
       var finalPath = path;
+
       if (!is2d && path.length > 2) {{
-        // Compute baseline z (linear interp) and flip offset
-        var z0 = path[0][2], zn = path[path.length-1][2];
+        var p0 = path[0], pn = path[path.length-1];
+        var edgeLen = Math.sqrt(
+          Math.pow(pn[0]-p0[0], 2) + Math.pow(pn[1]-p0[1], 2) + Math.pow(pn[2]-p0[2], 2)
+        ) || 1;
+
+        // Per-edge random variation
+        var r = edgeRandom[idx] || {{ phase1: 0, phase2: 0, phase3: 0, amp: 1, freq1: 1, freq2: 0.5, freq3: 1.5, wobbleAmp: 0.2, delay: 0 }};
+        var t_delayed = Math.max(0, swayTime - r.delay);
+
+        // Wobbles scaled by motion intensity
+        var wobble1 = Math.sin(t_delayed * r.freq1 + r.phase1) * r.wobbleAmp * motionIntensity;
+        var wobble2 = Math.sin(t_delayed * r.freq2 + r.phase2) * r.wobbleAmp * 0.7 * motionIntensity;
+        var wobble3 = Math.sin(t_delayed * r.freq3 + r.phase3) * r.wobbleAmp * 0.3 * motionIntensity;
+        var totalWobble = wobble1 + wobble2 + wobble3;
+
+        // Sag direction from physics
+        var sagX = currentSag[0], sagY = currentSag[1], sagZ = currentSag[2];
+
+        // Perpendicular to sag for wobble
+        var perpX = -sagY, perpY = sagX;
+
         finalPath = path.map(function(pt, i) {{
           var t = i / (path.length - 1);
-          var baseZ = z0 + t * (zn - z0);
-          var offset = pt[2] - baseZ;
-          return [pt[0], pt[1], baseZ - offset];  // flip the offset
+          var envelope = Math.sin(t * Math.PI);
+          var curveNoise = Math.sin(t * 3.14159 * 2 + r.phase3) * 0.2 * motionIntensity;
+
+          var sagAmount = envelope * edgeLen * 0.25 * r.amp;
+          var wobbleAmount = envelope * totalWobble * edgeLen * 0.15;
+          var wobble2Amount = envelope * curveNoise * wobble2 * edgeLen * 0.1;
+
+          return [
+            pt[0] + sagX * sagAmount + perpX * wobbleAmount,
+            pt[1] + sagY * sagAmount + perpY * wobbleAmount,
+            pt[2] + sagZ * sagAmount
+          ];
         }});
       }}
       // Determine base color
@@ -2412,18 +3104,19 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
       }});
     }}
     var edgeData = edgePathData;
-    var layers = dk.props.layers;
-    if (!layers || !layers.length) return;
-    var oldLayer = layers[0];
-    var newLayer = oldLayer.clone({{ data: visible }});
-    var newLayers = [newLayer];
-    // Save original edge layer reference on first call
-    if (!originalEdgeLayer && layers.length > 1) {{
-      originalEdgeLayer = layers[1];
-    }}
-    // Add edge layer in both 2D and 3D modes
-    if (edgesVisible && edgePaths.length > 0 && originalEdgeLayer) {{
-      newLayers.push(originalEdgeLayer.clone({{ data: edgeData }}));
+    // Use cached original layers (not current dk.props.layers which changes after setProps)
+    if (!_origPointLayer) return;
+    var newPointLayer = _origPointLayer.clone({{ data: visible }});
+    var newLayers = [newPointLayer];
+    // Clone pydeck's edge layer (if present) with updated data
+    if (edgesVisible && _origEdgeLayer && edgeData.length > 0) {{
+      var newEdgeLayer = _origEdgeLayer.clone({{
+        data: edgeData,
+        getPath: function(d) {{ return d.path; }},
+        getColor: function(d) {{ return d.color; }},
+        getWidth: function(d) {{ return d.width; }}
+      }});
+      newLayers.push(newEdgeLayer);
     }}
     dk.setProps({{ layers: newLayers }});
     updateRowStyles();
@@ -2511,9 +3204,20 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
   }})();
 
   // Deck access
+  var _origPointLayer = null;
+  var _origEdgeLayer = null;
   function getDeck() {{
     var d = window.deckInstance;
-    return d && d.deck ? d.deck : d || null;
+    var dk = d && d.deck ? d.deck : d || null;
+    // Cache original layers on first access
+    if (dk && dk.props && dk.props.layers && !_origPointLayer) {{
+      _origPointLayer = dk.props.layers[0];
+      if (dk.props.layers.length > 1) {{
+        _origEdgeLayer = dk.props.layers[1];
+      }}
+      console.log("[init] Cached original layers: point=", !!_origPointLayer, "edge=", !!_origEdgeLayer);
+    }}
+    return dk;
   }}
 
   // Depth-based point alpha (debounced — rebuilds layer when view settles)
@@ -2542,15 +3246,19 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
       return {{ x: p.x, y: p.y, z: p.z, r: p.r, g: p.g, b: p.b,
                 a: alpha, title: p.title, cluster: p.cluster }};
     }});
-    var layers = dk.props.layers;
-    if (layers && layers.length) {{
-      var newLayers = [layers[0].clone({{ data: updated }})];
-      // Preserve edge layer (index 1) if present
-      for (var li = 1; li < layers.length; li++) {{
-        newLayers.push(layers[li]);
-      }}
-      dk.setProps({{ layers: newLayers }});
+    if (!_origPointLayer) return;
+    var newLayers = [_origPointLayer.clone({{ data: updated }})];
+    // Recreate edge layer from cached original with current edge data
+    if (edgesVisible && _origEdgeLayer && edgePathData.length > 0) {{
+      var newEdgeLayer = _origEdgeLayer.clone({{
+        data: edgePathData,
+        getPath: function(d) {{ return d.path; }},
+        getColor: function(d) {{ return d.color; }},
+        getWidth: function(d) {{ return d.width; }}
+      }});
+      newLayers.push(newEdgeLayer);
     }}
+    dk.setProps({{ layers: newLayers }});
   }}
 
   // ── Multi-level zoom-aware label placement ───────────────────────────
@@ -2807,6 +3515,16 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
     // Update highlighter canvas only
     var hlCanvas = document.getElementById("hl-canvas");
     if (hlCanvas) hlCanvas.style.background = "transparent";
+    // Update the deck.gl canvas CSS background (pydeck sets this)
+    var deckCanvas = document.querySelector("#deck-container canvas");
+    if (deckCanvas) deckCanvas.style.background = bg;
+    // Update deck.gl WebGL clear color (background)
+    var dk = getDeck();
+    if (dk && dk.setProps) {{
+      // clearColor uses normalized 0-1 values: #1e1e1e = 0.118, #f5f5f5 = 0.961
+      var clearColor = isLight ? [0.961, 0.961, 0.961, 1] : [0.118, 0.118, 0.118, 1];
+      dk.setProps({{ parameters: {{ clearColor: clearColor }} }});
+    }}
     // Rebuild edge layer with theme-appropriate edge color
     rebuildLayer();
   }}
@@ -2885,6 +3603,19 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
   }});
 
   // ── WebSocket bridge ──────────────────────────────────────────────────
+  var mcpLogMax = 10;
+  function logMCP(msg) {{
+    var logEl = document.getElementById("mcp-log");
+    if (!logEl) return;
+    var ts = new Date().toLocaleTimeString();
+    var line = document.createElement("div");
+    line.textContent = ts + " " + (msg.cmd || "?") + ": " + JSON.stringify(msg).slice(0, 80);
+    logEl.insertBefore(line, logEl.firstChild);
+    while (logEl.children.length > mcpLogMax) {{
+      logEl.removeChild(logEl.lastChild);
+    }}
+  }}
+
   (function connectWS() {{
     var wsUrl = "ws://" + location.host + "/ws";
     var ws;
@@ -2892,6 +3623,7 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
     ws.onmessage = function(e) {{
       var msg;
       try {{ msg = JSON.parse(e.data); }} catch(err) {{ return; }}
+      logMCP(msg);
       switch (msg.cmd) {{
         case "hide":
           hiddenClusters.add(msg.cluster);
@@ -3256,8 +3988,6 @@ def main():
     parser.add_argument("--refine", action=argparse.BooleanOptionalAction,
                         default=True,
                         help="Refine incoherent clusters (default: on)")
-    parser.add_argument("--no-label", action="store_true",
-                        help="Skip LLM cluster labeling")
     parser.add_argument("--model", default="gemma2:9b",
                         help="Ollama model for cluster labeling (default: gemma2:9b)")
     parser.add_argument("--densmap", action="store_true",
@@ -3294,7 +4024,7 @@ def main():
 
     # ── Multi-level label hierarchy from BIRCH ───────────────────────────
     print(f"\nBuilding label hierarchy from BIRCH subclusters...")
-    hierarchy_model = args.model if not args.no_label else None
+    hierarchy_model = args.model
     birch_levels = build_label_hierarchy(
         coords, titles_arr, birch, embeddings=embeddings,
         model=hierarchy_model,
@@ -3327,14 +4057,12 @@ def main():
     dim_label = "3D" if use_3d else "2D"
 
     # ── Contrastive cluster labeling via LLM ─────────────────────────────
-    names_birch = names_dyf = None
-    if not args.no_label:
-        print("\n=== Labeling BIRCH clusters ===")
-        names_birch = label_clusters(
-            titles, coords, labels_birch, embeddings, model=args.model)
-        print("\n=== Labeling DYF tree clusters ===")
-        names_dyf = label_clusters(
-            titles, coords, labels_dyf, embeddings, model=args.model)
+    print("\n=== Labeling BIRCH clusters ===")
+    names_birch = label_clusters(
+        titles, coords, labels_birch, embeddings, model=args.model)
+    print("\n=== Labeling DYF tree clusters ===")
+    names_dyf = label_clusters(
+        titles, coords, labels_dyf, embeddings, model=args.model)
 
     # Add base BIRCH labels as finest hierarchy level so all panel labels
     # are reachable when zoomed in (Ward linkage cuts differ from BIRCH merge)
@@ -3373,6 +4101,18 @@ def main():
         rgb_birch = golden_ratio_rgb_map(labels_birch)
         rgb_dyf = golden_ratio_rgb_map(labels_dyf.tolist())
 
+        # Generate tour narration for TTS (with connection info)
+        narration_birch = generate_tour_narration(
+            names_birch, titles, labels_birch,
+            edge_pairs=birch_pair_info, model=args.model)
+        narration_dyf = generate_tour_narration(
+            names_dyf, titles, labels_dyf,
+            edge_pairs=birch_pair_info, model=args.model)
+
+        # Generate audio for tour narration
+        audio_birch = generate_tour_audio(narration_birch)
+        audio_dyf = generate_tour_audio(narration_dyf)
+
         path_birch = str(outdir / "rog_3d_birch_clusters.html")
         path_dyf = str(outdir / "rog_3d_dyf_tree_clusters.html")
 
@@ -3385,6 +4125,8 @@ def main():
             bundled_edges_3d=bundled_birch_3d,
             edge_pairs=birch_pair_info,
             logo_path=args.logo,
+            tour_narration=narration_birch,
+            tour_audio=audio_birch,
         )
         build_pydeck(
             coords, titles_arr, labels_dyf, rgb_dyf,
@@ -3396,6 +4138,8 @@ def main():
             bundled_edges_3d=bundled_birch_3d,
             edge_pairs=birch_pair_info,
             logo_path=args.logo,
+            tour_narration=narration_dyf,
+            tour_audio=audio_dyf,
         )
     else:
         cmap_birch = golden_ratio_color_map(labels_birch)
