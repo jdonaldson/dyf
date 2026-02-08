@@ -74,10 +74,21 @@ from .pca_tree import (
 # DYF tree (recursive k-ary LSH splits)
 from .dyf_tree import (
     build_dyf_tree,
+    refine_dyf_tree,
     cut_dyf_tree_to_labels,
+    refine_clusters,
 )
 # Also available: dyf_tree.extract_boundary_persistence,
 #                 dyf_tree.boundary_persistence_scores
+
+# Lazy index (FlatBuffers + Arrow IPC)
+try:
+    from .lazy_index import LazyIndex, write_lazy_index
+    _HAS_LAZY = True
+except ImportError:
+    _HAS_LAZY = False
+    LazyIndex = None
+    write_lazy_index = None
 
 # Re-ranking
 from .rerank import (
@@ -167,7 +178,12 @@ __all__ = [
     "cut_tree_to_labels",
     # DYF tree
     "build_dyf_tree",
+    "refine_dyf_tree",
     "cut_dyf_tree_to_labels",
+    "refine_clusters",
+    # Lazy index
+    "LazyIndex",
+    "write_lazy_index",
     # Re-ranking
     "rerank_standard",
     "rerank_mmr",

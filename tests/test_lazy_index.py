@@ -1,0 +1,392 @@
+"""Tests for DYF lazy index (FlatBuffers + Arrow IPC)."""
+
+import os
+import tempfile
+import time
+
+import numpy as np
+import pytest
+
+from dyf import check_rust_available
+
+# Skip entire module if Rust extension not available
+pytestmark = pytest.mark.skipif(
+    not check_rust_available(), reason="Rust extension not available"
+)
+
+try:
+    import pyarrow  # noqa: F401
+    import flatbuffers  # noqa: F401
+    _HAS_LAZY_DEPS = True
+except ImportError:
+    _HAS_LAZY_DEPS = False
+
+lazy_deps = pytest.mark.skipif(
+    not _HAS_LAZY_DEPS, reason="pyarrow and flatbuffers required"
+)
+
+
+def _make_clustered_embeddings(n_clusters=5, points_per_cluster=40, dim=32,
+                               seed=42):
+    """Create synthetic clustered embeddings on the unit sphere.
+
+    Returns:
+        embeddings: (n, dim) float32 array, L2-normalized.
+    """
+    rng = np.random.default_rng(seed)
+    centers = rng.standard_normal((n_clusters, dim)).astype(np.float32)
+    centers /= np.linalg.norm(centers, axis=1, keepdims=True)
+
+    points = []
+    for i in range(n_clusters):
+        noise = rng.standard_normal((points_per_cluster, dim)).astype(np.float32) * 0.1
+        cluster_pts = centers[i] + noise
+        cluster_pts /= np.linalg.norm(cluster_pts, axis=1, keepdims=True)
+        points.append(cluster_pts)
+
+    return np.concatenate(points, axis=0)
+
+
+@lazy_deps
+class TestWriteAndLoad:
+    """Round-trip: build tree -> write index -> load LazyIndex -> search."""
+
+    @pytest.fixture
+    def index_data(self):
+        """Build a DYF tree and write a lazy index file."""
+        from dyf import build_dyf_tree
+        from dyf.lazy_index import write_lazy_index, LazyIndex
+
+        embeddings = _make_clustered_embeddings(
+            n_clusters=5, points_per_cluster=40, dim=32, seed=42)
+        tree = build_dyf_tree(embeddings, max_depth=3, num_bits=3,
+                              min_leaf_size=4, seed=42)
+
+        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+            path = f.name
+
+        try:
+            write_lazy_index(tree, embeddings, path, compression='zstd',
+                             quantization='float16',
+                             metadata={'test': 'true'})
+            yield {
+                'path': path,
+                'embeddings': embeddings,
+                'tree': tree,
+            }
+        finally:
+            if os.path.exists(path):
+                os.unlink(path)
+
+    def test_file_created(self, index_data):
+        """Index file is created and has non-zero size."""
+        path = index_data['path']
+        assert os.path.exists(path)
+        assert os.path.getsize(path) > 0
+
+    def test_magic_header(self, index_data):
+        """File starts with DYF1 magic bytes."""
+        with open(index_data['path'], 'rb') as f:
+            magic = f.read(4)
+        assert magic == b'DYF1'
+
+    def test_tree_summary(self, index_data):
+        """LazyIndex.tree_summary returns correct metadata."""
+        from dyf.lazy_index import LazyIndex
+
+        with LazyIndex(index_data['path']) as idx:
+            summary = idx.tree_summary
+            assert summary['embedding_dim'] == 32
+            assert summary['total_items'] == 200
+            assert summary['num_leaves'] > 0
+            assert summary['version'] == '1.0'
+            assert summary['build_params']['quantization'] == 'float16'
+            assert summary['build_params']['compression'] == 'zstd'
+
+    def test_search_returns_results(self, index_data):
+        """Search returns indices and scores."""
+        from dyf.lazy_index import LazyIndex
+
+        embeddings = index_data['embeddings']
+        query = embeddings[0]
+
+        with LazyIndex(index_data['path']) as idx:
+            indices, scores = idx.search(query, k=10, nprobe=3)
+            assert len(indices) > 0
+            assert len(indices) == len(scores)
+            assert len(indices) <= 10
+            # Scores should be sorted descending
+            for i in range(len(scores) - 1):
+                assert scores[i] >= scores[i + 1]
+
+    def test_search_finds_query_itself(self, index_data):
+        """Searching with an existing embedding should find itself."""
+        from dyf.lazy_index import LazyIndex
+
+        embeddings = index_data['embeddings']
+        query = embeddings[42]
+
+        with LazyIndex(index_data['path']) as idx:
+            indices, scores = idx.search(query, k=10, nprobe=5)
+            # The query itself should be in results with high similarity
+            assert 42 in indices
+            # The score for the query should be very high
+            query_pos = np.where(indices == 42)[0][0]
+            assert scores[query_pos] > 0.9
+
+    def test_search_matches_brute_force(self, index_data):
+        """LazyIndex search should find most of the true top-k."""
+        from dyf.lazy_index import LazyIndex
+
+        embeddings = index_data['embeddings']
+        query = embeddings[0]
+
+        # Brute force top-10
+        norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+        emb_n = embeddings / np.maximum(norms, 1e-10)
+        qnorm = np.linalg.norm(query)
+        q_n = query / max(qnorm, 1e-10)
+        bf_scores = emb_n @ q_n
+        bf_top = np.argsort(-bf_scores)[:10]
+
+        with LazyIndex(index_data['path']) as idx:
+            li_indices, li_scores = idx.search(query, k=10, nprobe=5)
+
+        # At least 30% overlap with brute force (approximate + quantized)
+        overlap = len(set(bf_top.tolist()) & set(li_indices.tolist()))
+        assert overlap >= 3, f"Only {overlap}/10 overlap with brute force"
+
+    def test_get_leaf(self, index_data):
+        """get_leaf returns a valid Arrow RecordBatch."""
+        from dyf.lazy_index import LazyIndex
+
+        with LazyIndex(index_data['path']) as idx:
+            batch = idx.get_leaf(0)
+            assert batch is not None
+            assert 'item_index' in batch.schema.names
+            assert 'embedding' in batch.schema.names
+            assert batch.num_rows > 0
+
+
+@lazy_deps
+class TestQuantization:
+    """Test different quantization modes."""
+
+    @pytest.fixture(params=['float32', 'float16'])
+    def quant_index(self, request):
+        """Build index with different quantization."""
+        from dyf import build_dyf_tree
+        from dyf.lazy_index import write_lazy_index
+
+        quantization = request.param
+        embeddings = _make_clustered_embeddings(
+            n_clusters=3, points_per_cluster=30, dim=16, seed=42)
+        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2,
+                              min_leaf_size=4, seed=42)
+
+        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+            path = f.name
+
+        try:
+            write_lazy_index(tree, embeddings, path, compression='zstd',
+                             quantization=quantization)
+            yield {
+                'path': path,
+                'embeddings': embeddings,
+                'quantization': quantization,
+            }
+        finally:
+            if os.path.exists(path):
+                os.unlink(path)
+
+    def test_quantization_preserves_ranking(self, quant_index):
+        """Quantized index should preserve similarity ranking."""
+        from dyf.lazy_index import LazyIndex
+
+        embeddings = quant_index['embeddings']
+        query = embeddings[0]
+
+        with LazyIndex(quant_index['path']) as idx:
+            indices, scores = idx.search(query, k=5, nprobe=3)
+            assert len(indices) > 0
+            # Self should still be found
+            assert 0 in indices
+
+
+@lazy_deps
+class TestCaching:
+    """Test LRU cache behavior."""
+
+    def test_second_search_uses_cache(self):
+        """Second search on same leaves should hit cache."""
+        from dyf import build_dyf_tree
+        from dyf.lazy_index import write_lazy_index, LazyIndex
+
+        embeddings = _make_clustered_embeddings(
+            n_clusters=3, points_per_cluster=20, dim=16, seed=42)
+        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2,
+                              min_leaf_size=4, seed=42)
+
+        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+            path = f.name
+
+        try:
+            write_lazy_index(tree, embeddings, path)
+
+            with LazyIndex(path) as idx:
+                query = embeddings[0]
+                # First search: cold cache
+                t0 = time.perf_counter()
+                idx.search(query, k=5, nprobe=1)
+                t1 = time.perf_counter()
+                cold_time = t1 - t0
+
+                # Second search: warm cache
+                t2 = time.perf_counter()
+                idx.search(query, k=5, nprobe=1)
+                t3 = time.perf_counter()
+                warm_time = t3 - t2
+
+                # Cache should be populated
+                assert len(idx._batch_cache) > 0
+        finally:
+            if os.path.exists(path):
+                os.unlink(path)
+
+
+@lazy_deps
+class TestEdgeCases:
+    """Edge cases: single leaf, nprobe > num_leaves."""
+
+    def test_single_leaf_tree(self):
+        """Tree with a single leaf (no splits)."""
+        from dyf import build_dyf_tree
+        from dyf.lazy_index import write_lazy_index, LazyIndex
+
+        # Small dataset that won't split
+        rng = np.random.default_rng(42)
+        embeddings = rng.standard_normal((10, 8)).astype(np.float32)
+        norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+        embeddings = embeddings / norms
+
+        tree = build_dyf_tree(embeddings, max_depth=1, num_bits=2,
+                              min_leaf_size=20, seed=42)
+
+        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+            path = f.name
+
+        try:
+            write_lazy_index(tree, embeddings, path)
+
+            with LazyIndex(path) as idx:
+                assert idx.num_leaves >= 1
+                indices, scores = idx.search(embeddings[0], k=5, nprobe=1)
+                assert len(indices) > 0
+        finally:
+            if os.path.exists(path):
+                os.unlink(path)
+
+    def test_nprobe_greater_than_leaves(self):
+        """nprobe > num_leaves should still work."""
+        from dyf import build_dyf_tree
+        from dyf.lazy_index import write_lazy_index, LazyIndex
+
+        embeddings = _make_clustered_embeddings(
+            n_clusters=2, points_per_cluster=20, dim=8, seed=42)
+        tree = build_dyf_tree(embeddings, max_depth=1, num_bits=2,
+                              min_leaf_size=4, seed=42)
+
+        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+            path = f.name
+
+        try:
+            write_lazy_index(tree, embeddings, path)
+
+            with LazyIndex(path) as idx:
+                # nprobe=100 but likely far fewer leaves
+                indices, scores = idx.search(embeddings[0], k=5, nprobe=100)
+                assert len(indices) > 0
+        finally:
+            if os.path.exists(path):
+                os.unlink(path)
+
+    def test_no_compression(self):
+        """Write and read with no compression."""
+        from dyf import build_dyf_tree
+        from dyf.lazy_index import write_lazy_index, LazyIndex
+
+        embeddings = _make_clustered_embeddings(
+            n_clusters=2, points_per_cluster=20, dim=8, seed=42)
+        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2,
+                              min_leaf_size=4, seed=42)
+
+        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+            path = f.name
+
+        try:
+            write_lazy_index(tree, embeddings, path, compression='none')
+
+            with LazyIndex(path) as idx:
+                indices, scores = idx.search(embeddings[0], k=5, nprobe=2)
+                assert len(indices) > 0
+        finally:
+            if os.path.exists(path):
+                os.unlink(path)
+
+    def test_query_dimension_mismatch(self):
+        """Search with wrong-dimension query should raise."""
+        from dyf import build_dyf_tree
+        from dyf.lazy_index import write_lazy_index, LazyIndex
+
+        embeddings = _make_clustered_embeddings(
+            n_clusters=2, points_per_cluster=20, dim=8, seed=42)
+        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2,
+                              min_leaf_size=4, seed=42)
+
+        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+            path = f.name
+
+        try:
+            write_lazy_index(tree, embeddings, path)
+
+            with LazyIndex(path) as idx:
+                bad_query = np.ones(16, dtype=np.float32)
+                with pytest.raises(ValueError, match="dim=8"):
+                    idx.search(bad_query, k=5)
+        finally:
+            if os.path.exists(path):
+                os.unlink(path)
+
+
+@lazy_deps
+class TestMmap:
+    """Verify the file is memory-mapped, not fully read."""
+
+    def test_mmap_used(self):
+        """LazyIndex should use mmap, not read full file."""
+        from dyf import build_dyf_tree
+        from dyf.lazy_index import write_lazy_index, LazyIndex
+
+        embeddings = _make_clustered_embeddings(
+            n_clusters=5, points_per_cluster=100, dim=64, seed=42)
+        tree = build_dyf_tree(embeddings, max_depth=3, num_bits=3,
+                              min_leaf_size=4, seed=42)
+
+        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+            path = f.name
+
+        try:
+            write_lazy_index(tree, embeddings, path)
+            file_size = os.path.getsize(path)
+            assert file_size > 1000  # Sanity check: file is non-trivial
+
+            with LazyIndex(path) as idx:
+                # mmap object should exist
+                assert idx._mm is not None
+                assert len(idx._mm) == file_size
+                # Tree metadata should be accessible without decompressing leaves
+                summary = idx.tree_summary
+                assert summary['total_items'] == 500
+        finally:
+            if os.path.exists(path):
+                os.unlink(path)

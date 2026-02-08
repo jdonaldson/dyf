@@ -1,0 +1,46 @@
+namespace dyf.schema;
+
+table Node {
+  children: [uint32];              // child node IDs (empty = leaf)
+  hyperplanes: [float32];          // flattened (num_bits * embedding_dim)
+  num_bits: uint8;                 // to reshape hyperplanes
+  bucket_ids_to_children: [uint64]; // parallel with children: bucket_id for each child
+  centroid: [float32];             // node centroid (embedding_dim)
+  num_items: uint32;               // items in subtree
+  batch_index: int32 = -1;         // Arrow batch index (leaves only, -1 for internal)
+  depth: uint8;
+}
+
+table BatchDescriptor {
+  offset: uint64;                  // byte offset from arrow section start
+  length: uint64;                  // byte length of compressed Arrow IPC batch
+  num_rows: uint32;
+}
+
+table Index {
+  version: string;
+  embedding_dim: uint16;
+  total_items: uint64;
+  num_leaves: uint32;
+  root: uint32;                    // root node index in nodes[]
+  nodes: [Node];
+  batches: [BatchDescriptor];
+  build_params: BuildParams;
+  metadata: [KeyValue];
+}
+
+table BuildParams {
+  max_depth: uint8;
+  num_bits: uint8;
+  min_leaf_size: uint32;
+  seed: uint64;
+  quantization: string;           // "float32", "float16", "int8"
+  compression: string;            // "none", "zstd", "lz4"
+}
+
+table KeyValue {
+  key: string;
+  value: string;
+}
+
+root_type Index;
