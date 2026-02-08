@@ -15,15 +15,38 @@ Reader:
     LazyIndex(path) — mmap, zero startup cost, LRU-cached leaf access
 """
 
+import json
 import mmap
 import struct
 from collections import deque
+from dataclasses import dataclass, field
 
 import numpy as np
 
 MAGIC = b"DYF1"
 HEADER_SIZE = 16  # 4 magic + 8 fb_size + 4 reserved
 PAGE_SIZE = 4096
+
+
+@dataclass
+class SearchResult:
+    """Search result with indices, scores, and optional stored fields."""
+    indices: np.ndarray      # (k,) uint32
+    scores: np.ndarray       # (k,) float32
+    fields: dict = field(default_factory=dict)  # field_name -> (k,) values
+
+    def __iter__(self):
+        """Backward-compatible unpacking: indices, scores = idx.search(...)"""
+        yield self.indices
+        yield self.scores
+
+    def __getitem__(self, key):
+        if isinstance(key, str):
+            return self.fields[key]
+        return (self.indices, self.scores)[key]
+
+    def __len__(self):
+        return 2
 
 
 def _flatten_tree_bfs(tree, embeddings):
@@ -234,9 +257,45 @@ def _deserialize_codebook(b64_str, n_subquantizers, dsub):
     return np.frombuffer(raw, dtype=np.float32).reshape(n_subquantizers, 256, dsub).copy()
 
 
+def _infer_arrow_type(values):
+    """Infer Arrow type from a Python/numpy array of values.
+
+    Args:
+        values: array-like of field values.
+
+    Returns:
+        (pa_type, type_name) — pyarrow type and string identifier for metadata.
+    """
+    import pyarrow as pa
+
+    values = np.asarray(values) if not isinstance(values, np.ndarray) else values
+
+    # numpy arrays: match dtype
+    if values.dtype == np.float32:
+        return pa.float32(), 'float32'
+    elif values.dtype == np.float64:
+        return pa.float64(), 'float64'
+    elif values.dtype == np.int32:
+        return pa.int32(), 'int32'
+    elif values.dtype == np.int64:
+        return pa.int64(), 'int64'
+    elif values.dtype.kind in ('U', 'O'):
+        # String or object array — check first non-None value
+        for v in values:
+            if v is not None:
+                if isinstance(v, bytes):
+                    return pa.binary(), 'binary'
+                return pa.utf8(), 'utf8'
+        return pa.utf8(), 'utf8'
+    elif values.dtype.kind == 'S':
+        return pa.binary(), 'binary'
+    else:
+        raise ValueError(f"Unsupported stored field dtype: {values.dtype}")
+
+
 def write_lazy_index(tree, embeddings, path, compression='zstd',
                      quantization='float16', metadata=None,
-                     build_params=None):
+                     build_params=None, stored_fields=None):
     """Write a DYF lazy index file (FlatBuffers tree + Arrow IPC leaf data).
 
     Args:
@@ -251,6 +310,9 @@ def write_lazy_index(tree, embeddings, path, compression='zstd',
         metadata: Optional dict of string key-value pairs.
         build_params: Optional dict with keys: max_depth, num_bits,
             min_leaf_size, seed. Auto-detected from tree if not provided.
+        stored_fields: Optional dict mapping field name to array-like of
+            length n_items. Supported types: str/list[str] (Arrow utf8),
+            np.int32/int64/float32/float64 arrays, list[bytes] (Arrow binary).
     """
     import flatbuffers
     import pyarrow as pa
@@ -314,6 +376,19 @@ def write_lazy_index(tree, embeddings, path, compression='zstd',
             ('embedding', pa.list_(arrow_value_type, embedding_dim)),
         ])
 
+    # Process stored fields: detect types, extend schema, store metadata
+    sf_types = {}  # field_name -> (pa_type, type_name)
+    if stored_fields:
+        for fname, fvalues in stored_fields.items():
+            pa_type, type_name = _infer_arrow_type(fvalues)
+            sf_types[fname] = (pa_type, type_name)
+            arrow_schema = arrow_schema.append(pa.field(fname, pa_type))
+        # Store field schema in metadata
+        if metadata is None:
+            metadata = {}
+        metadata['stored_fields'] = json.dumps(
+            {fname: tname for fname, (_, tname) in sf_types.items()})
+
     # Build Arrow IPC batches per leaf
     ipc_options = None
     if compression == 'zstd':
@@ -353,7 +428,21 @@ def write_lazy_index(tree, embeddings, path, compression='zstd',
             emb_arr = pa.FixedSizeListArray.from_arrays(
                 values_arr, embedding_dim)
 
-        batch = pa.record_batch([item_idx_arr, emb_arr], schema=arrow_schema)
+        # Build column list: item_index, embedding, then stored fields
+        columns = [item_idx_arr, emb_arr]
+        if stored_fields:
+            for fname in sf_types:
+                fvalues = stored_fields[fname]
+                # Slice to this leaf's indices
+                if isinstance(fvalues, np.ndarray):
+                    leaf_vals = fvalues[indices]
+                else:
+                    # list-like: index manually
+                    leaf_vals = [fvalues[i] for i in indices]
+                pa_type = sf_types[fname][0]
+                columns.append(pa.array(leaf_vals, type=pa_type))
+
+        batch = pa.record_batch(columns, schema=arrow_schema)
 
         # Write to IPC stream bytes
         sink = pa.BufferOutputStream()
@@ -606,6 +695,20 @@ class LazyIndex:
         return self._index.NodesLength()
 
     @property
+    def stored_field_names(self):
+        """List of stored field names (empty if no stored fields)."""
+        meta = self._get_metadata()
+        sf_json = meta.get('stored_fields')
+        if not sf_json:
+            return []
+        return list(json.loads(sf_json).keys())
+
+    @property
+    def has_stored_fields(self):
+        """True if this index has stored fields."""
+        return len(self.stored_field_names) > 0
+
+    @property
     def tree_summary(self):
         """Return tree stats without touching Arrow data."""
         bp = self._index.BuildParams()
@@ -635,6 +738,14 @@ class LazyIndex:
                 'bytes_per_vector': m,
                 'codebook_size_kb': round(m * 256 * dsub * 4 / 1024, 1),
             }
+        # Add stored fields info
+        sf_names = self.stored_field_names
+        if sf_names:
+            meta = self._get_metadata()
+            sf_schema = json.loads(meta['stored_fields'])
+            summary['stored_fields'] = [
+                {'name': name, 'type': sf_schema[name]} for name in sf_names
+            ]
         return summary
 
     def _get_metadata(self):
@@ -652,6 +763,23 @@ class LazyIndex:
                     meta[key.decode()] = value.decode()
         self._metadata_cache = meta
         return meta
+
+    def _get_stored_field_types(self):
+        """Parse stored field schema from metadata (cached).
+
+        Returns:
+            dict mapping field name to type string (e.g. 'utf8', 'float32').
+            Empty dict if no stored fields.
+        """
+        if hasattr(self, '_sf_types_cache'):
+            return self._sf_types_cache
+        meta = self._get_metadata()
+        sf_json = meta.get('stored_fields')
+        if not sf_json:
+            self._sf_types_cache = {}
+        else:
+            self._sf_types_cache = json.loads(sf_json)
+        return self._sf_types_cache
 
     @property
     def quantization(self):
@@ -716,12 +844,14 @@ class LazyIndex:
         Dispatches between PQ ADC scoring and standard matmul scoring.
 
         Args:
-            batch: Arrow RecordBatch with columns: item_index, embedding.
+            batch: Arrow RecordBatch with columns: item_index, embedding,
+                plus any stored field columns.
             query_normed: (dim,) L2-normalized query vector.
             adc_tables: (M, 256) precomputed ADC tables (required if is_pq).
 
         Returns:
-            (item_indices, scores) — numpy arrays.
+            (item_indices, scores, field_data) — numpy arrays and dict of
+            stored field arrays. field_data is {} if no stored fields.
         """
         item_indices = batch.column('item_index').to_numpy()
         emb_col = batch.column('embedding')
@@ -740,7 +870,17 @@ class LazyIndex:
             leaf_emb_n = leaf_emb / np.maximum(norms, 1e-10)
             scores = leaf_emb_n @ query_normed
 
-        return item_indices, scores
+        # Extract stored fields
+        field_data = {}
+        sf_types = self._get_stored_field_types()
+        for fname in sf_types:
+            col = batch.column(fname)
+            if sf_types[fname] in ('utf8', 'binary'):
+                field_data[fname] = col.to_pylist()
+            else:
+                field_data[fname] = col.to_numpy()
+
+        return item_indices, scores, field_data
 
     def _pq_reconstruct(self, codes):
         """Reconstruct approximate vectors from PQ codes.
@@ -854,8 +994,8 @@ class LazyIndex:
             nprobe: Number of leaf probes (1 = single path, >1 = multi-probe).
 
         Returns:
-            (indices, scores) — arrays of shape (min(k, total_found),).
-            indices: item indices. scores: cosine similarities.
+            SearchResult with indices, scores, and fields. Supports
+            backward-compatible unpacking: indices, scores = idx.search(...)
         """
         query = np.asarray(query, dtype=np.float32)
         if query.ndim != 1 or len(query) != self.embedding_dim:
@@ -881,19 +1021,34 @@ class LazyIndex:
         # Collect results from all candidate leaves
         all_indices = []
         all_scores = []
+        all_fields = {}  # field_name -> list of arrays
+        sf_names = self.stored_field_names
 
         for batch_index in candidate_leaves:
             batch = self.get_leaf(batch_index)
-            item_indices, scores = self._score_leaf(
+            item_indices, scores, field_data = self._score_leaf(
                 batch, query_normed, adc_tables)
             all_indices.append(item_indices)
             all_scores.append(scores)
+            for fname in sf_names:
+                all_fields.setdefault(fname, []).append(field_data[fname])
 
         if not all_indices:
-            return np.array([], dtype=np.uint32), np.array([], dtype=np.float32)
+            return SearchResult(
+                np.array([], dtype=np.uint32),
+                np.array([], dtype=np.float32),
+                {fname: [] for fname in sf_names})
 
         all_indices = np.concatenate(all_indices)
         all_scores = np.concatenate(all_scores)
+        # Concatenate stored fields
+        merged_fields = {}
+        for fname in sf_names:
+            parts = all_fields[fname]
+            if isinstance(parts[0], list):
+                merged_fields[fname] = sum(parts, [])
+            else:
+                merged_fields[fname] = np.concatenate(parts)
 
         # Deduplicate (same item may appear in overlapping leaves)
         unique_mask = np.ones(len(all_indices), dtype=bool)
@@ -906,6 +1061,12 @@ class LazyIndex:
                 seen.add(idx_int)
         all_indices = all_indices[unique_mask]
         all_scores = all_scores[unique_mask]
+        for fname in sf_names:
+            vals = merged_fields[fname]
+            if isinstance(vals, np.ndarray):
+                merged_fields[fname] = vals[unique_mask]
+            else:
+                merged_fields[fname] = [v for v, m in zip(vals, unique_mask) if m]
 
         # Top-k
         if len(all_scores) <= k:
@@ -915,7 +1076,15 @@ class LazyIndex:
             part_idx = np.argpartition(-all_scores, k)[:k]
             order = part_idx[np.argsort(-all_scores[part_idx])]
 
-        return all_indices[order], all_scores[order]
+        result_fields = {}
+        for fname in sf_names:
+            vals = merged_fields[fname]
+            if isinstance(vals, np.ndarray):
+                result_fields[fname] = vals[order]
+            else:
+                result_fields[fname] = [vals[i] for i in order]
+
+        return SearchResult(all_indices[order], all_scores[order], result_fields)
 
     def _build_centroid_index(self):
         """Build a flat centroid matrix from all leaf nodes.
@@ -959,7 +1128,8 @@ class LazyIndex:
             nprobe: Number of leaves to probe.
 
         Returns:
-            (indices, scores) — arrays of shape (min(k, total_found),).
+            SearchResult with indices, scores, and fields. Supports
+            backward-compatible unpacking: indices, scores = idx.search_ivf(...)
         """
         query = np.asarray(query, dtype=np.float32)
         if query.ndim != 1 or len(query) != self.embedding_dim:
@@ -994,19 +1164,33 @@ class LazyIndex:
         # Score candidates from selected leaves
         all_indices = []
         all_scores = []
+        all_fields = {}
+        sf_names = self.stored_field_names
 
         for batch_index in candidate_batches:
             batch = self.get_leaf(int(batch_index))
-            item_indices, scores = self._score_leaf(
+            item_indices, scores, field_data = self._score_leaf(
                 batch, query_normed, adc_tables)
             all_indices.append(item_indices)
             all_scores.append(scores)
+            for fname in sf_names:
+                all_fields.setdefault(fname, []).append(field_data[fname])
 
         if not all_indices:
-            return np.array([], dtype=np.uint32), np.array([], dtype=np.float32)
+            return SearchResult(
+                np.array([], dtype=np.uint32),
+                np.array([], dtype=np.float32),
+                {fname: [] for fname in sf_names})
 
         all_indices = np.concatenate(all_indices)
         all_scores = np.concatenate(all_scores)
+        merged_fields = {}
+        for fname in sf_names:
+            parts = all_fields[fname]
+            if isinstance(parts[0], list):
+                merged_fields[fname] = sum(parts, [])
+            else:
+                merged_fields[fname] = np.concatenate(parts)
 
         # Deduplicate
         unique_mask = np.ones(len(all_indices), dtype=bool)
@@ -1019,6 +1203,12 @@ class LazyIndex:
                 seen.add(idx_int)
         all_indices = all_indices[unique_mask]
         all_scores = all_scores[unique_mask]
+        for fname in sf_names:
+            vals = merged_fields[fname]
+            if isinstance(vals, np.ndarray):
+                merged_fields[fname] = vals[unique_mask]
+            else:
+                merged_fields[fname] = [v for v, m in zip(vals, unique_mask) if m]
 
         # Top-k
         if len(all_scores) <= k:
@@ -1027,7 +1217,55 @@ class LazyIndex:
             part_idx = np.argpartition(-all_scores, k)[:k]
             order = part_idx[np.argsort(-all_scores[part_idx])]
 
-        return all_indices[order], all_scores[order]
+        result_fields = {}
+        for fname in sf_names:
+            vals = merged_fields[fname]
+            if isinstance(vals, np.ndarray):
+                result_fields[fname] = vals[order]
+            else:
+                result_fields[fname] = [vals[i] for i in order]
+
+        return SearchResult(all_indices[order], all_scores[order], result_fields)
+
+    def get_stored_fields(self, item_indices):
+        """Look up stored fields for given item indices without re-searching.
+
+        Scans all leaves to find matching items. Less efficient than getting
+        fields from search results, but useful for post-hoc exploration.
+
+        Args:
+            item_indices: array-like of item indices to look up.
+
+        Returns:
+            dict mapping field name to list of values (in same order as
+            item_indices). Missing items get None.
+        """
+        item_indices = np.asarray(item_indices, dtype=np.uint32)
+        sf_names = self.stored_field_names
+        if not sf_names:
+            return {}
+
+        # Build lookup: item_index -> position in output
+        target_set = {int(idx): pos for pos, idx in enumerate(item_indices)}
+        n_out = len(item_indices)
+        result = {fname: [None] * n_out for fname in sf_names}
+
+        # Scan all leaves
+        n_batches = self._index.BatchesLength()
+        for bi in range(n_batches):
+            batch = self.get_leaf(bi)
+            batch_item_ids = batch.column('item_index').to_numpy()
+
+            # Check which target items are in this batch
+            for row_idx, item_id in enumerate(batch_item_ids):
+                item_id_int = int(item_id)
+                if item_id_int in target_set:
+                    out_pos = target_set[item_id_int]
+                    for fname in sf_names:
+                        col = batch.column(fname)
+                        result[fname][out_pos] = col[row_idx].as_py()
+
+        return result
 
     def _find_candidate_leaves(self, query, nprobe):
         """Traverse tree to find candidate leaf batch indices.
@@ -1222,7 +1460,7 @@ class LazyIndex:
 
 
 def from_faiss(faiss_index, path, compression='zstd', quantization='float16',
-               metadata=None):
+               metadata=None, stored_fields=None):
     """Build a dyf lazy index file from a FAISS IVF index.
 
     Extracts FAISS's inverted lists and centroids, builds a single-level
@@ -1234,6 +1472,8 @@ def from_faiss(faiss_index, path, compression='zstd', quantization='float16',
         compression: "none", "zstd", or "lz4" (default: "zstd").
         quantization: "float32", "float16", or "int8" (default: "float16").
         metadata: Optional dict of string key-value pairs.
+        stored_fields: Optional dict mapping field name to array-like of
+            length n_items (indexed by FAISS ID).
 
     Returns:
         LazyIndex opened on the written file.
@@ -1333,6 +1573,7 @@ def from_faiss(faiss_index, path, compression='zstd', quantization='float16',
                      compression=compression,
                      quantization=quantization,
                      metadata=metadata,
-                     build_params=build_params)
+                     build_params=build_params,
+                     stored_fields=stored_fields)
 
     return LazyIndex(path)
