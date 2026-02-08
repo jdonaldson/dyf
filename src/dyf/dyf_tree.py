@@ -22,7 +22,6 @@ from collections import defaultdict
 
 import numpy as np
 from sklearn.cluster import AgglomerativeClustering
-from sklearn.decomposition import PCA
 
 
 # ---------------------------------------------------------------------------
@@ -56,10 +55,7 @@ def _build_dyf_tree(embeddings, point_indices, depth, num_bits, min_leaf_size,
         if fit_method == 'itq':
             clf.fit_itq(subset)
         elif fit_method == 'raw_pca':
-            pca = PCA(n_components=num_bits)
-            pca.fit(subset)
-            hp = pca.components_.astype(np.float32)
-            clf.fit_with_hyperplanes(subset, hp)
+            clf.fit_raw_pca(subset)
         else:
             clf.fit(subset)
         bucket_ids = np.array(clf.get_bucket_ids())
