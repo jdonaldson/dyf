@@ -22,6 +22,7 @@ from collections import defaultdict
 
 import numpy as np
 from sklearn.cluster import AgglomerativeClustering
+from sklearn.decomposition import PCA
 
 
 # ---------------------------------------------------------------------------
@@ -29,7 +30,7 @@ from sklearn.cluster import AgglomerativeClustering
 # ---------------------------------------------------------------------------
 
 def _build_dyf_tree(embeddings, point_indices, depth, num_bits, min_leaf_size,
-                    seed):
+                    seed, fit_method='raw_pca'):
     """Recursively split points using DYF LSH, storing per-point margins.
 
     Returns nested dict tree with keys:
@@ -51,8 +52,16 @@ def _build_dyf_tree(embeddings, point_indices, depth, num_bits, min_leaf_size,
     dim = subset.shape[1]
 
     try:
-        clf = DensityClassifier(embedding_dim=dim, num_bits=num_bits, seed=seed)
-        clf.fit(subset)
+        clf = DensityClassifier(embedding_dim=dim, num_bits=num_bits, seed=seed, skip_isolation=True)
+        if fit_method == 'itq':
+            clf.fit_itq(subset)
+        elif fit_method == 'raw_pca':
+            pca = PCA(n_components=num_bits)
+            pca.fit(subset)
+            hp = pca.components_.astype(np.float32)
+            clf.fit_with_hyperplanes(subset, hp)
+        else:
+            clf.fit(subset)
         bucket_ids = np.array(clf.get_bucket_ids())
         centroid_sims = np.array(clf.get_centroid_similarities())
     except Exception:
@@ -110,7 +119,7 @@ def _build_dyf_tree(embeddings, point_indices, depth, num_bits, min_leaf_size,
         else:
             child = _build_dyf_tree(
                 embeddings, child_indices, depth - 1, num_bits,
-                min_leaf_size, seed)
+                min_leaf_size, seed, fit_method)
             children.append(child)
 
     return {
@@ -124,7 +133,7 @@ def _build_dyf_tree(embeddings, point_indices, depth, num_bits, min_leaf_size,
 
 
 def build_dyf_tree(embeddings, max_depth, num_bits=3, min_leaf_size=4,
-                   seed=42):
+                   seed=42, fit_method='raw_pca'):
     """Build a DYF recursive tree over embeddings.
 
     At each level, fits a DensityClassifier with ``num_bits`` bits, producing
@@ -138,6 +147,9 @@ def build_dyf_tree(embeddings, max_depth, num_bits=3, min_leaf_size=4,
         min_leaf_size: Stop splitting when a node has fewer than
                        2 * min_leaf_size points.
         seed: Random seed for DensityClassifier.
+        fit_method: Fitting method — 'raw_pca' (default, PCA on full data),
+                    'pca' (PCA on centroid subset), or 'itq'
+                    (iterative quantization for tighter partitions).
 
     Returns:
         Tree dict with keys: children, indices, depth, point_margin_map.
@@ -145,7 +157,8 @@ def build_dyf_tree(embeddings, max_depth, num_bits=3, min_leaf_size=4,
     embeddings = np.asarray(embeddings)
     all_indices = np.arange(len(embeddings))
     return _build_dyf_tree(
-        embeddings, all_indices, max_depth, num_bits, min_leaf_size, seed)
+        embeddings, all_indices, max_depth, num_bits, min_leaf_size, seed,
+        fit_method)
 
 
 # ---------------------------------------------------------------------------
@@ -328,7 +341,7 @@ def _try_resplit(indices, embeddings, num_bits, seed):
     subset = embeddings[indices]
     dim = subset.shape[1]
     try:
-        clf = DensityClassifier(embedding_dim=dim, num_bits=num_bits, seed=seed)
+        clf = DensityClassifier(embedding_dim=dim, num_bits=num_bits, seed=seed, skip_isolation=True)
         clf.fit(subset)
         bucket_ids = np.array(clf.get_bucket_ids())
         centroid_sims = np.array(clf.get_centroid_similarities())
@@ -586,7 +599,7 @@ def refine_clusters(labels, embeddings, min_coherence=None,
 
     try:
         clf = DensityClassifier(embedding_dim=dim, num_bits=num_bits,
-                                seed=seed_offset)
+                                seed=seed_offset, skip_isolation=True)
         clf.fit(ejected_emb)
         bucket_ids = np.array(clf.get_bucket_ids())
     except Exception:
