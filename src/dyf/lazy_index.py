@@ -1227,6 +1227,61 @@ class LazyIndex:
 
         return SearchResult(all_indices[order], all_scores[order], result_fields)
 
+    def _build_item_map(self):
+        """Build mapping from item_index to (batch_index, row_index).
+
+        Scans all leaf batches once, caches the mapping for O(1) subsequent
+        lookups. Called lazily on first get_item_vector() or similar call.
+        """
+        if hasattr(self, '_item_map'):
+            return self._item_map
+        item_map = {}
+        n_batches = self._index.BatchesLength()
+        for bi in range(n_batches):
+            batch = self.get_leaf(bi)
+            batch_item_ids = batch.column('item_index').to_numpy()
+            for row_idx, item_id in enumerate(batch_item_ids):
+                item_map[int(item_id)] = (bi, row_idx)
+        self._item_map = item_map
+        return item_map
+
+    def get_item_vector(self, item_index):
+        """Extract a single item's embedding vector from the index.
+
+        Scans leaf batches to find the item (building a cached mapping on
+        first call), then returns the reconstructed float32 vector.
+
+        Args:
+            item_index: The item index (as stored in the item_index column).
+
+        Returns:
+            (dim,) float32 numpy array of the item's embedding.
+
+        Raises:
+            KeyError: If item_index is not found in the index.
+        """
+        item_map = self._build_item_map()
+        if item_index not in item_map:
+            raise KeyError(f"Item index {item_index} not found in index")
+
+        batch_index, row_idx = item_map[item_index]
+        batch = self.get_leaf(batch_index)
+        emb_col = batch.column('embedding')
+        flat_values = emb_col.values.to_numpy()
+
+        if self.is_pq:
+            meta = self._get_metadata()
+            m = int(meta['pq_n_subquantizers'])
+            n_rows = len(emb_col)
+            codes = flat_values.reshape(n_rows, m)
+            row_codes = codes[row_idx:row_idx + 1]  # (1, M)
+            return self._pq_reconstruct(row_codes)[0]  # (dim,) float32
+        else:
+            dim = self.embedding_dim
+            n_rows = len(emb_col)
+            leaf_emb = flat_values.reshape(n_rows, dim)
+            return leaf_emb[row_idx].astype(np.float32)
+
     def get_stored_fields(self, item_indices):
         """Look up stored fields for given item indices without re-searching.
 
