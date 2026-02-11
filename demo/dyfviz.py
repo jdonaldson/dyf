@@ -2901,43 +2901,60 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
   var annotations = [];
   // Each: {{ type:"circle"|"path", points:[[x,y,z],...], color:str, width:num }}
 
-  function convexHull(pts) {{
-    // Graham scan on 2D (x,y) — returns points in CCW order
-    if (pts.length < 3) return pts.slice();
-    var pivot = pts.reduce(function(a, b) {{
-      return (b[1] < a[1] || (b[1] === a[1] && b[0] < a[0])) ? b : a;
-    }});
-    function cross(O, A, B) {{
-      return (A[0]-O[0])*(B[1]-O[1]) - (A[1]-O[1])*(B[0]-O[0]);
+  function fitEllipse(pts, pad) {{
+    // Fit a bounding ellipse around 3D points (using x,y) and return
+    // smooth sample points in 3D. Pad expands the radii.
+    var cx = 0, cy = 0, cz = 0;
+    for (var i = 0; i < pts.length; i++) {{
+      cx += pts[i][0]; cy += pts[i][1]; cz += (pts[i][2] || 0);
     }}
-    var sorted = pts.slice().sort(function(a, b) {{
-      var angA = Math.atan2(a[1]-pivot[1], a[0]-pivot[0]);
-      var angB = Math.atan2(b[1]-pivot[1], b[0]-pivot[0]);
-      if (angA !== angB) return angA - angB;
-      var dA = (a[0]-pivot[0])*(a[0]-pivot[0])+(a[1]-pivot[1])*(a[1]-pivot[1]);
-      var dB = (b[0]-pivot[0])*(b[0]-pivot[0])+(b[1]-pivot[1])*(b[1]-pivot[1]);
-      return dA - dB;
-    }});
-    var hull = [];
-    for (var i = 0; i < sorted.length; i++) {{
-      while (hull.length >= 2 && cross(hull[hull.length-2], hull[hull.length-1], sorted[i]) <= 0) {{
-        hull.pop();
-      }}
-      hull.push(sorted[i]);
-    }}
-    return hull;
-  }}
+    cx /= pts.length; cy /= pts.length; cz /= pts.length;
 
-  function padHull(hull, pad) {{
-    // Expand hull outward by `pad` units
-    var cx = 0, cy = 0;
-    for (var i = 0; i < hull.length; i++) {{ cx += hull[i][0]; cy += hull[i][1]; }}
-    cx /= hull.length; cy /= hull.length;
-    return hull.map(function(p) {{
-      var dx = p[0] - cx, dy = p[1] - cy;
-      var d = Math.sqrt(dx*dx + dy*dy) || 1;
-      return [p[0] + dx/d * pad, p[1] + dy/d * pad, p[2] || 0];
-    }});
+    // Covariance matrix for PCA-aligned ellipse
+    var cxx = 0, cyy = 0, cxy = 0;
+    for (var i = 0; i < pts.length; i++) {{
+      var dx = pts[i][0] - cx, dy = pts[i][1] - cy;
+      cxx += dx * dx; cyy += dy * dy; cxy += dx * dy;
+    }}
+    cxx /= pts.length; cyy /= pts.length; cxy /= pts.length;
+
+    // Eigenvectors of 2x2 covariance → principal axes
+    var trace = cxx + cyy;
+    var det = cxx * cyy - cxy * cxy;
+    var disc = Math.sqrt(Math.max(0, trace * trace / 4 - det));
+    var lam1 = trace / 2 + disc;
+    var lam2 = trace / 2 - disc;
+    var angle = Math.atan2(cxy, lam1 - cyy);
+
+    // Project points onto principal axes to find max radii
+    var cosA = Math.cos(angle), sinA = Math.sin(angle);
+    var maxR1 = 0, maxR2 = 0;
+    for (var i = 0; i < pts.length; i++) {{
+      var dx = pts[i][0] - cx, dy = pts[i][1] - cy;
+      var r1 = Math.abs(dx * cosA + dy * sinA);
+      var r2 = Math.abs(-dx * sinA + dy * cosA);
+      if (r1 > maxR1) maxR1 = r1;
+      if (r2 > maxR2) maxR2 = r2;
+    }}
+    maxR1 += pad; maxR2 += pad;
+    // Ensure minimum circularity
+    var minR = Math.max(maxR1, maxR2) * 0.4;
+    if (maxR1 < minR) maxR1 = minR;
+    if (maxR2 < minR) maxR2 = minR;
+
+    // Sample points around the ellipse
+    var nSamples = 48;
+    var result = [];
+    for (var i = 0; i < nSamples; i++) {{
+      var t = (i / nSamples) * Math.PI * 2;
+      var ex = maxR1 * Math.cos(t);
+      var ey = maxR2 * Math.sin(t);
+      // Rotate back to data space
+      var px = cx + ex * cosA - ey * sinA;
+      var py = cy + ex * sinA + ey * cosA;
+      result.push([px, py, cz]);
+    }}
+    return result;
   }}
 
   function drawAnnotations(vp) {{
@@ -2960,17 +2977,89 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
       }}
       if (screenPts.length < 2) continue;
 
-      ctx.strokeStyle = ann.color || "rgba(255,230,0,0.35)";
-      ctx.lineWidth = ann.width || 18;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.beginPath();
-      ctx.moveTo(screenPts[0][0], screenPts[0][1]);
-      for (var k = 1; k < screenPts.length; k++) {{
-        ctx.lineTo(screenPts[k][0], screenPts[k][1]);
+      var w = ann.width || 18;
+      var color = ann.color || "rgba(255,230,0,0.35)";
+
+      if (ann.type === "circle" && screenPts.length >= 4) {{
+        // Highlighter-style smooth closed curve using Catmull-Rom splines
+        // with subtle hand-drawn wobble
+        var seed = ann._seed || 42;
+        function wobbleRng() {{
+          seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+          return (seed / 0x7fffffff) * 2 - 1;  // -1 to 1
+        }}
+        var n = screenPts.length;
+
+        // Catmull-Rom helper: interpolate between p1 and p2
+        function catmullRom(p0, p1, p2, p3, t) {{
+          var t2 = t * t, t3 = t2 * t;
+          return [
+            0.5 * ((2*p1[0]) + (-p0[0]+p2[0])*t + (2*p0[0]-5*p1[0]+4*p2[0]-p3[0])*t2 + (-p0[0]+3*p1[0]-3*p2[0]+p3[0])*t3),
+            0.5 * ((2*p1[1]) + (-p0[1]+p2[1])*t + (2*p0[1]-5*p1[1]+4*p2[1]-p3[1])*t2 + (-p0[1]+3*p1[1]-3*p2[1]+p3[1])*t3)
+          ];
+        }}
+
+        // Add subtle wobble to screen points
+        var wobbled = screenPts.map(function(p) {{
+          return [p[0] + wobbleRng() * w * 0.15, p[1] + wobbleRng() * w * 0.15];
+        }});
+
+        ctx.strokeStyle = color;
+        ctx.lineWidth = w;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.beginPath();
+
+        // Draw smooth closed curve through wobbled points
+        var stepsPerSeg = 8;
+        var first = true;
+        for (var si = 0; si < n; si++) {{
+          var p0 = wobbled[(si - 1 + n) % n];
+          var p1 = wobbled[si];
+          var p2 = wobbled[(si + 1) % n];
+          var p3 = wobbled[(si + 2) % n];
+          for (var st = 0; st < stepsPerSeg; st++) {{
+            var pt = catmullRom(p0, p1, p2, p3, st / stepsPerSeg);
+            if (first) {{ ctx.moveTo(pt[0], pt[1]); first = false; }}
+            else ctx.lineTo(pt[0], pt[1]);
+          }}
+        }}
+        ctx.closePath();
+        ctx.stroke();
+
+        // Second pass: slightly offset for highlighter double-stroke effect
+        ctx.globalAlpha = 0.3;
+        ctx.lineWidth = w * 0.6;
+        ctx.beginPath();
+        first = true;
+        for (var si = 0; si < n; si++) {{
+          var p0 = wobbled[(si - 1 + n) % n];
+          var p1 = wobbled[si];
+          var p2 = wobbled[(si + 1) % n];
+          var p3 = wobbled[(si + 2) % n];
+          for (var st = 0; st < stepsPerSeg; st++) {{
+            var pt = catmullRom(p0, p1, p2, p3, st / stepsPerSeg);
+            // Offset slightly inward
+            if (first) {{ ctx.moveTo(pt[0] + 2, pt[1] + 1); first = false; }}
+            else ctx.lineTo(pt[0] + 2, pt[1] + 1);
+          }}
+        }}
+        ctx.closePath();
+        ctx.stroke();
+        ctx.globalAlpha = 1.0;
+      }} else {{
+        // Simple path (non-circle annotations)
+        ctx.strokeStyle = color;
+        ctx.lineWidth = w;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.beginPath();
+        ctx.moveTo(screenPts[0][0], screenPts[0][1]);
+        for (var k = 1; k < screenPts.length; k++) {{
+          ctx.lineTo(screenPts[k][0], screenPts[k][1]);
+        }}
+        ctx.stroke();
       }}
-      if (ann.type === "circle") ctx.closePath();
-      ctx.stroke();
     }}
   }}
 
@@ -3774,7 +3863,7 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
           }}
           break;
         case "draw_circle":
-          // Compute convex hull of cluster's points, add as closed annotation
+          // Fit smooth ellipse around cluster's points
           var cid = msg.cluster;
           if (typeof cid === "number") {{
             var cPts = [];
@@ -3784,8 +3873,7 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
               }}
             }}
             if (cPts.length >= 3) {{
-              var hull = convexHull(cPts);
-              // Pad outward by ~2% of data extent
+              // Pad outward by ~5% of data extent
               var xMin=1e9,xMax=-1e9,yMin=1e9,yMax=-1e9;
               for (var ci2=0;ci2<allPoints.length;ci2++) {{
                 if (allPoints[ci2].x<xMin) xMin=allPoints[ci2].x;
@@ -3794,10 +3882,11 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
                 if (allPoints[ci2].y>yMax) yMax=allPoints[ci2].y;
               }}
               var extent = Math.max(xMax-xMin, yMax-yMin) || 1;
-              hull = padHull(hull, extent * 0.02);
+              var ellipsePts = fitEllipse(cPts, extent * 0.03);
               annotations.push({{
                 type: "circle",
-                points: hull,
+                points: ellipsePts,
+                _seed: Math.floor(Math.random() * 99999),
                 color: msg.color || "rgba(255,230,0,0.35)",
                 width: msg.width || 18
               }});
