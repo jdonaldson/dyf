@@ -362,7 +362,7 @@ CLUSTER_LEVELS = (5, 12, 25)
 
 
 def build_label_hierarchy(coords, titles_arr, birch, embeddings=None,
-                          model=None, cluster_data=None):
+                          model=None, cluster_data=None, base_labels=None):
     """Build multi-level label hierarchy from BIRCH subclusters via Ward linkage.
 
     If model is provided, generates LLM labels via contrastive TF-IDF.
@@ -416,7 +416,10 @@ def build_label_hierarchy(coords, titles_arr, birch, embeddings=None,
                 "z": float(centroid[2]) if ndim >= 3 else 0.0,
                 "text": name[:50],
                 "size": int(mask.sum()),
+                "cid": int(cid),
             }
+            if base_labels is not None:
+                rec["leaf_cids"] = sorted(set(int(c) for c in base_labels[mask]))
             label_data.append(rec)
         levels[k] = label_data
         print(f"  Level {k}: {len(label_data)} labels")
@@ -777,15 +780,182 @@ def scatter_gl_normalize(coords):
     return norm
 
 
-def generate_tour_narration(cluster_names, titles, labels, edge_pairs=None, model="gemma2:9b"):
-    """Generate short narration text for each cluster for TTS during tour.
+def compute_cluster_shapes(coords, titles, labels):
+    """Compute shape descriptors for each cluster for narration context.
+
+    For each cluster, computes:
+    - Aspect ratio via PCA eigenvalues → "compact", "elongated", "very elongated"
+    - Tendril detection (points >2σ from centroid forming directional chains)
+    - Outlier titles (farthest from centroid) and core titles (nearest to centroid)
+
+    Returns:
+        dict mapping cluster_id -> {
+            shape: str, aspect_ratio: float, n_tendrils: int,
+            outlier_titles: list[str], core_titles: list[str],
+            outlier_indices: list[int], core_indices: list[int]
+        }
+    """
+    from sklearn.decomposition import PCA
+
+    label_arr = np.asarray(labels)
+    coords_arr = np.asarray(coords)
+    unique_cids = sorted(set(int(c) for c in label_arr))
+
+    shapes = {}
+    for cid in unique_cids:
+        mask = label_arr == cid
+        pts_idx = np.where(mask)[0]
+        if len(pts_idx) < 3:
+            shapes[cid] = {
+                "shape": "compact", "aspect_ratio": 1.0, "n_tendrils": 0,
+                "outlier_titles": [], "core_titles": [],
+                "outlier_indices": [], "core_indices": [],
+            }
+            continue
+
+        pts = coords_arr[pts_idx]
+        centroid = pts.mean(axis=0)
+        dists = np.linalg.norm(pts - centroid, axis=1)
+
+        # Aspect ratio via PCA
+        n_comp = min(3, pts.shape[1], len(pts))
+        pca = PCA(n_components=n_comp)
+        pca.fit(pts)
+        eigenvalues = pca.explained_variance_
+        if eigenvalues[-1] > 0:
+            aspect_ratio = float(eigenvalues[0] / eigenvalues[-1])
+        else:
+            aspect_ratio = float(eigenvalues[0] / (eigenvalues[-1] + 1e-10))
+
+        if aspect_ratio > 8:
+            shape = "very elongated"
+        elif aspect_ratio > 3:
+            shape = "elongated"
+        else:
+            shape = "compact"
+
+        # Tendril detection: points beyond 2σ from centroid
+        mean_dist = dists.mean()
+        std_dist = dists.std()
+        threshold = mean_dist + 2 * std_dist
+        far_mask = dists > threshold
+        far_idx = pts_idx[far_mask]
+
+        n_tendrils = 0
+        if len(far_idx) >= 2:
+            # Cluster far points by direction from centroid using simple angular binning
+            far_pts = coords_arr[far_idx]
+            directions = far_pts - centroid
+            norms = np.linalg.norm(directions, axis=1, keepdims=True)
+            norms[norms == 0] = 1
+            unit_dirs = directions / norms
+            # Use first PCA component to project directions
+            if n_comp >= 1:
+                proj = unit_dirs @ pca.components_[0]
+                # Count sign groups as rough tendril estimate
+                n_pos = (proj > 0.3).sum()
+                n_neg = (proj < -0.3).sum()
+                if n_pos >= 2:
+                    n_tendrils += 1
+                if n_neg >= 2:
+                    n_tendrils += 1
+
+        # Core titles (nearest to centroid)
+        n_core = min(5, len(pts_idx))
+        core_order = np.argsort(dists)[:n_core]
+        core_indices = pts_idx[core_order].tolist()
+        core_titles = [str(titles[i]) for i in core_indices]
+
+        # Outlier titles (farthest from centroid)
+        n_outlier = min(5, len(pts_idx))
+        outlier_order = np.argsort(dists)[-n_outlier:][::-1]
+        outlier_indices = pts_idx[outlier_order].tolist()
+        outlier_titles = [str(titles[i]) for i in outlier_indices]
+
+        shapes[cid] = {
+            "shape": shape,
+            "aspect_ratio": round(aspect_ratio, 1),
+            "n_tendrils": n_tendrils,
+            "outlier_titles": outlier_titles,
+            "core_titles": core_titles,
+            "outlier_indices": outlier_indices,
+            "core_indices": core_indices,
+        }
+
+    return shapes
+
+
+def _number_to_words(n):
+    """Convert an integer to English words for TTS-friendly output."""
+    if n < 0:
+        return "negative " + _number_to_words(-n)
+    if n == 0:
+        return "zero"
+
+    ones = ["", "one", "two", "three", "four", "five", "six", "seven",
+            "eight", "nine", "ten", "eleven", "twelve", "thirteen",
+            "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"]
+    tens = ["", "", "twenty", "thirty", "forty", "fifty",
+            "sixty", "seventy", "eighty", "ninety"]
+
+    if n < 20:
+        return ones[n]
+    if n < 100:
+        return tens[n // 10] + ("" if n % 10 == 0 else " " + ones[n % 10])
+    if n < 1000:
+        remainder = n % 100
+        if remainder == 0:
+            return ones[n // 100] + " hundred"
+        return ones[n // 100] + " hundred and " + _number_to_words(remainder)
+    if n < 1_000_000:
+        thousands = _number_to_words(n // 1000)
+        rest = n % 1000
+        if rest == 0:
+            return thousands + " thousand"
+        elif rest < 100:
+            return thousands + " thousand and " + _number_to_words(rest)
+        else:
+            return thousands + " thousand, " + _number_to_words(rest)
+    # Millions (unlikely but safe)
+    millions = _number_to_words(n // 1_000_000)
+    rest = n % 1_000_000
+    if rest == 0:
+        return millions + " million"
+    return millions + " million, " + _number_to_words(rest)
+
+
+def _approx_number_words(n):
+    """Convert a number to approximate TTS-friendly English, e.g. 'about four thousand seven hundred'."""
+    if n < 20:
+        return _number_to_words(n)
+    if n < 100:
+        # Round to nearest 10
+        rounded = round(n / 10) * 10
+        if rounded == n:
+            return _number_to_words(n)
+        return "about " + _number_to_words(rounded)
+    if n < 1000:
+        # Round to nearest 50
+        rounded = round(n / 50) * 50
+        return "about " + _number_to_words(rounded)
+    if n < 10000:
+        # Round to nearest 100
+        rounded = round(n / 100) * 100
+        return "about " + _number_to_words(rounded)
+    # Round to nearest 1000
+    rounded = round(n / 1000) * 1000
+    return "about " + _number_to_words(rounded)
+
+
+def generate_tour_narration(cluster_names, titles, labels, edge_pairs=None, model=None, cluster_shapes=None, label_centroids=None):
+    """Generate narration text for each cluster using templates.
+
+    Produces natural, museum-audio-guide-style narration with numbers
+    written out in long form for TTS compatibility.
 
     Returns:
         dict mapping cluster_id -> narration string
     """
-    import subprocess
-    from concurrent.futures import ThreadPoolExecutor, as_completed
-
     label_arr = np.asarray(labels)
     cluster_points = defaultdict(list)
     for i, cid in enumerate(label_arr):
@@ -798,134 +968,209 @@ def generate_tour_narration(cluster_names, titles, labels, edge_pairs=None, mode
             if c1 in cluster_names and c2 in cluster_names:
                 connections[c1].append((c2, cluster_names[c2], weight))
                 connections[c2].append((c1, cluster_names[c1], weight))
-        # Sort by weight (strongest connections first)
         for cid in connections:
             connections[cid].sort(key=lambda x: -x[2])
 
     print(f"\n=== Generating tour narration ===")
     print(f"  Generating narration for {len(cluster_names)} clusters...")
 
-    tasks = []
-    for cid, name in cluster_names.items():
+    total_pts = sum(len(v) for v in cluster_points.values())
+
+    # --- Size buckets for natural language (rotate to avoid repetition) ---
+    _size_large = [
+        "one of the largest territories on our map",
+        "a dominant region in this landscape",
+    ]
+    _size_major = [
+        "a major region",
+        "one of the bigger clusters here",
+        "a prominent region",
+    ]
+    _size_mid_upper = [
+        "a sizeable cluster",
+        "a well-populated region",
+        "a notable cluster",
+        "a significant grouping",
+    ]
+    _size_mid = [
+        "a mid-sized grouping",
+        "a moderate-sized cluster",
+        "a respectable pocket of activity",
+    ]
+    _size_small = [
+        "a smaller but distinct pocket",
+        "a focused niche",
+    ]
+    _size_tiny = [
+        "a compact niche",
+        "a small, specialized corner",
+    ]
+    _size_counter = [0]
+    def _size_phrase(n, total):
+        frac = n / total if total else 0
+        i = _size_counter[0]
+        _size_counter[0] += 1
+        if frac > 0.15:
+            return _size_large[i % len(_size_large)]
+        elif frac > 0.08:
+            return _size_major[i % len(_size_major)]
+        elif frac > 0.03:
+            return _size_mid_upper[i % len(_size_mid_upper)]
+        elif frac > 0.01:
+            return _size_mid[i % len(_size_mid)]
+        elif n > 200:
+            return _size_small[i % len(_size_small)]
+        else:
+            return _size_tiny[i % len(_size_tiny)]
+
+    # --- Shape + analogy phrases (rotate by index) ---
+    _compact = [
+        " Like a tightly wound ball of yarn, everything here clusters close together.",
+        " Think of it as a dense neighbourhood — all the residents know each other.",
+        " It's packed tightly, like a well-organized toolbox.",
+    ]
+    _elongated = [
+        " It stretches across the landscape like a river valley.",
+        " You can trace a gradient here, like a spectrum from one speciality to another.",
+        " It forms a long corridor through the data.",
+    ]
+    _elongated_tendril = [
+        " Like a tree with distinct branches, you can see offshoots reaching into neighbouring territory.",
+        " It sprawls outward — think of it like a delta, branching as it spreads.",
+        " Notice the tendrils — each one represents a subspecialty finding its own space.",
+    ]
+    _very_elongated = [
+        " It's spread remarkably thin, like a mountain range stretching across the horizon.",
+        " This one sprawls — a long caravan of related products crossing the landscape.",
+        " It traces a wide arc through the space, almost like a comet's tail.",
+    ]
+    _very_elongated_tendril = [
+        " Long arms reach outward in different directions, like a starburst.",
+        " It radiates outward from its core, each branch representing a distinct subfamily.",
+        " Think of a root system — a central trunk with offshoots reaching into different territories.",
+        " It fans out broadly, like a river delta splitting into separate channels.",
+    ]
+
+    def _shape_sentence(cs, idx):
+        if not cs:
+            return ""
+        shape = cs["shape"]
+        tendrils = cs["n_tendrils"]
+        if shape == "compact":
+            return _compact[idx % len(_compact)]
+        elif shape == "elongated" and tendrils > 0:
+            return _elongated_tendril[idx % len(_elongated_tendril)]
+        elif shape == "elongated":
+            return _elongated[idx % len(_elongated)]
+        elif shape == "very elongated" and tendrils > 0:
+            return _very_elongated_tendril[idx % len(_very_elongated_tendril)]
+        elif shape == "very elongated":
+            return _very_elongated[idx % len(_very_elongated)]
+        return ""
+
+    # --- Connection phrases ---
+    _conn_templates = [
+        lambda a, b: f" Bridges connect it to {a} and {b} — you'll find products here that serve both areas.",
+        lambda a, b: f" You'll notice strong links to {a} and {b}. The same devices often appear in all three contexts.",
+        lambda a, b: f" It sits at a crossroads between {a} and {b}.",
+        lambda a, b: f" Look at the bridges to {a} and {b} — these clusters trade items back and forth.",
+        lambda a, b: f" It borders {a} and {b}, with products that could belong to any of these regions.",
+    ]
+    _conn_single = [
+        lambda a: f" Its strongest connection runs to {a} — the two share overlapping products.",
+        lambda a: f" A bridge links it to {a}, where you'll find closely related devices.",
+        lambda a: f" Notice the connection to {a}. In practice, these often appear together.",
+    ]
+
+    narration = {}
+    sorted_cids = sorted(cluster_names.keys(),
+                         key=lambda c: len(cluster_points.get(c, [])),
+                         reverse=True)
+
+    for idx, cid in enumerate(sorted_cids):
+        name = cluster_names[cid]
         pts = cluster_points.get(cid, [])
         n_pts = len(pts)
 
-        # Sample a few titles for context
-        sample_titles = []
-        if pts:
-            sample_indices = pts[:min(10, len(pts))]
-            sample_titles = [titles[i] for i in sample_indices]
+        # Opener — documentary style, varied
+        size_desc = _size_phrase(n_pts, total_pts)
+        openers = [
+            f"{name} — {size_desc}.",
+            f"Here we find {name}, {size_desc}.",
+            f"Now we come to {name}, {size_desc}.",
+            f"Let's turn our attention to {name}. This is {size_desc}.",
+            f"And here, {name} — {size_desc}.",
+            f"Next, {name}. {size_desc.capitalize()}.",
+            f"We arrive at {name}, {size_desc}.",
+            f"Ahead of us, {name} — {size_desc}.",
+        ]
+        opener = openers[idx % len(openers)]
 
-        # Get top 3 connections
-        conn_str = ""
-        top_connections = connections.get(cid, [])[:3]
-        if top_connections:
-            conn_names = [f'"{c[1]}"' for c in top_connections]
-            conn_str = f"\nThis cluster connects to: {', '.join(conn_names)}"
+        # Shape
+        cs = cluster_shapes.get(cid) if cluster_shapes else None
+        shape_sentence = _shape_sentence(cs, idx)
 
-        prompt = (
-            f"You are narrating a tour of a data visualization showing clusters and their connections. "
-            f"Generate 2-3 sentences introducing this cluster and its connections.\n\n"
-            f"Cluster name: {name}\n"
-            f"Number of items: {n_pts}\n"
-            f"Sample items: {', '.join(sample_titles[:5])}"
-            f"{conn_str}\n\n"
-            f"IMPORTANT: Vary your opening! Do NOT start with 'Welcome to'. "
-            f"Use diverse phrases like: 'Here we see...', 'This cluster contains...', "
-            f"'Moving to...', 'Next up is...', 'Now exploring...', '{name} brings together...', "
-            f"or just start with the cluster name directly.\n\n"
-            f"The narration should:\n"
-            f"1. First introduce the cluster and what it contains\n"
-            f"2. Then mention the connected clusters and why they might be related\n"
-            f"Sound natural when spoken aloud, like a museum audio guide.\n\n"
-            f"CRITICAL: Keep your response under 200 characters. Be concise.\n"
-            f"Reply with ONLY the narration, nothing else."
-        )
-        tasks.append((cid, name, prompt))
+        # Connection
+        conn_sentence = ""
+        top_conns = connections.get(cid, [])[:2]
+        if len(top_conns) >= 2:
+            template = _conn_templates[idx % len(_conn_templates)]
+            conn_sentence = template(top_conns[0][1], top_conns[1][1])
+        elif len(top_conns) == 1:
+            template = _conn_single[idx % len(_conn_single)]
+            conn_sentence = template(top_conns[0][1])
 
-    def call_ollama(task):
-        cid, name, prompt = task
-        try:
-            result = subprocess.run(
-                ["ollama", "run", model, prompt],
-                capture_output=True, text=True, timeout=60,
-            )
-            text = result.stdout.strip().split('\n')[0][:400]  # Allow 2x the requested limit
-            text = text.strip('"\'').strip()
-            return cid, text if text else name
-        except Exception:
-            return cid, name
+        text = opener + shape_sentence + conn_sentence
+        narration[cid] = text
 
-    narration = {}
-    n_workers = min(4, len(tasks))
+    done = len(narration)
+    print(f"    Generated {done}/{len(cluster_names)} narrations...")
 
-    with ThreadPoolExecutor(max_workers=n_workers) as executor:
-        futures = {executor.submit(call_ollama, t): t for t in tasks}
-        done = 0
-        for future in as_completed(futures):
-            cid, text = future.result()
-            narration[cid] = text
-            done += 1
-            if done % 5 == 0 or done == len(tasks):
-                print(f"    Generated {done}/{len(tasks)} narrations...")
+    for cid in sorted_cids[:3]:
+        print(f"    [{cid:2d}] {narration[cid][:70]}...")
 
-    # Print a few examples
-    for cid in list(narration.keys())[:3]:
-        if isinstance(cid, int):
-            print(f"    [{cid:2d}] {narration[cid][:60]}...")
-
-    # Generate intro and outro
+    # --- Intro ---
     n_clusters = len(cluster_names)
-    top_clusters = sorted(cluster_names.items(),
-                          key=lambda x: len(cluster_points.get(x[0], [])),
-                          reverse=True)[:5]
-    top_names = [name for _, name in top_clusters]
+    n_words = _number_to_words(n_clusters)
+    top_names = [cluster_names[c] for c in sorted_cids[:3]]
 
-    intro_prompt = (
-        f"You are introducing a guided tour of a data visualization with {n_clusters} clusters. "
-        f"Generate a brief intro (2-3 sentences) that:\n"
-        f"1. Sets the scene - we're exploring a map of knowledge/concepts\n"
-        f"2. Mentions we'll visit {n_clusters} different topic areas\n"
-        f"3. Previews some highlights: {', '.join(top_names[:3])}\n\n"
-        f"Sound welcoming and intriguing, like starting a museum audio tour.\n"
-        f"CRITICAL: Keep your response under 250 characters. Be concise.\n"
-        f"Reply with ONLY the intro narration, nothing else."
+    narration["intro"] = (
+        f"Welcome. What you see before you is a landscape of knowledge — "
+        f"{n_words} distinct clusters, each one a community of related products. "
+        f"We'll sweep across the landscape, visiting each region in turn. "
+        f"The largest regions include {top_names[0]}"
+        + (f", {top_names[1]}" if len(top_names) > 1 else "")
+        + (f", and {top_names[2]}" if len(top_names) > 2 else "")
+        + ". Let's explore."
     )
+    print(f"    [intro] {narration['intro'][:70]}...")
 
-    outro_prompt = (
-        f"You are concluding a guided tour of a data visualization. "
-        f"Generate a brief outro (2-3 sentences) that:\n"
-        f"1. Thanks the listener for joining the tour\n"
-        f"2. Encourages them to explore further on their own\n"
-        f"3. Mentions they can click on clusters or use the controls\n\n"
-        f"Sound warm and inviting.\n"
-        f"CRITICAL: Keep your response under 200 characters. Be concise.\n"
-        f"Reply with ONLY the outro narration, nothing else."
+    # --- Outro ---
+    extremes_sentence = ""
+    if label_centroids:
+        # Compute spatial extremes from 2D centroids
+        by_x = sorted(label_centroids.items(), key=lambda kv: kv[1]["x"])
+        by_y = sorted(label_centroids.items(), key=lambda kv: kv[1]["y"])
+        leftmost_name = cluster_names.get(by_x[0][0], "unknown")
+        rightmost_name = cluster_names.get(by_x[-1][0], "unknown")
+        bottommost_name = cluster_names.get(by_y[0][0], "unknown")
+        topmost_name = cluster_names.get(by_y[-1][0], "unknown")
+        extremes_sentence = (
+            f" Looking at the big picture — on the far left we found {leftmost_name}, "
+            f"while {rightmost_name} anchors the right side. "
+            f"From top to bottom, {topmost_name} sits high and {bottommost_name} sits low. "
+            f"These extremes hint at how the algorithm organized this space."
+        )
+
+    narration["outro"] = (
+        "And that brings our tour to a close. "
+        "What we've seen is just the surface — "
+        "click any cluster to isolate it, toggle the bridges to see how domains connect, "
+        "or switch between two D and three D views to change your perspective."
+        + extremes_sentence
+        + " The landscape is yours to explore."
     )
-
-    # Generate intro
-    try:
-        result = subprocess.run(
-            ["ollama", "run", model, intro_prompt],
-            capture_output=True, text=True, timeout=60,
-        )
-        intro_text = result.stdout.strip().split('\n')[0][:500].strip('"\'').strip()  # Allow 2x requested
-        narration["intro"] = intro_text if intro_text else "Welcome to this visualization tour."
-        print(f"    [intro] {narration['intro'][:60]}...")
-    except Exception:
-        narration["intro"] = "Welcome to this visualization tour."
-
-    # Generate outro
-    try:
-        result = subprocess.run(
-            ["ollama", "run", model, outro_prompt],
-            capture_output=True, text=True, timeout=60,
-        )
-        outro_text = result.stdout.strip().split('\n')[0][:400].strip('"\'').strip()  # Allow 2x requested
-        narration["outro"] = outro_text if outro_text else "Thank you for joining this tour."
-        print(f"    [outro] {narration['outro'][:60]}...")
-    except Exception:
-        narration["outro"] = "Thank you for joining this tour."
+    print(f"    [outro] {narration['outro'][:70]}...")
 
     return narration
 
@@ -945,8 +1190,8 @@ def generate_tour_audio(narration, voice="bm_george"):
     try:
         import soundfile as sf
         from kokoro import KPipeline
-    except ImportError:
-        print("  [TTS] Kokoro not available, skipping audio generation")
+    except (ImportError, Exception) as e:
+        print(f"  [TTS] Kokoro not available ({type(e).__name__}: {e}), skipping audio generation")
         return {}
 
     print(f"\n=== Generating tour audio ===")
@@ -1244,7 +1489,8 @@ def build_html(coords, titles_arr, labels, color_map, title_str,
 def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
                  cluster_names=None, ws_port=8766, label_levels=None,
                  bundled_edges_2d=None, bundled_edges_3d=None, edge_pairs=None,
-                 logo_path=None, tour_narration=None, tour_audio=None):
+                 logo_path=None, tour_narration=None, tour_audio=None,
+                 tour_callouts=None):
     """Build a pydeck 3D point cloud with HTML overlay labels."""
     import base64
     import pyarrow as pa
@@ -1287,6 +1533,7 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
             "text": name[:45],
             "size": int(mask.sum()),
             "r": rgb[0], "g": rgb[1], "b": rgb[2],
+            "cid": int(cid),
         }
         label_data.append(rec)
 
@@ -1370,6 +1617,8 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
     narration_json = json.dumps({str(k): v for k, v in (tour_narration or {}).items()})
     # Tour audio: cluster_id -> base64 WAV
     audio_json = json.dumps({str(k): v for k, v in (tour_audio or {}).items()})
+    # Tour callouts: cluster_id -> {indices: [...], labels: [...]}
+    callouts_json = json.dumps({str(k): v for k, v in (tour_callouts or {}).items()})
 
     # ── Arrow IPC for compact binary transfer ───────────────────────
     points_batch = pa.record_batch({
@@ -1491,6 +1740,7 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
   <div id="header-sub" class="sub" style="font-size:11px;">
     Scroll to zoom &middot; Drag to orbit &middot; Hover for details
     <span id="session-id" style="margin-left:12px;opacity:0.7;font-family:monospace;"></span>
+    <span id="build-stamp" style="margin-left:12px;opacity:0.5;font-family:monospace;font-size:9px;">v9-dedup</span>
   </div>
 </div>
 <!-- Tour cluster label overlay (positioned at centroid) -->
@@ -1502,6 +1752,8 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
   transform:translate(-50%,-100%) translateY(-12px);"></div>
 <!-- Container for edge centroid labels during tour -->
 <div id="tour-edge-labels" style="display:none;"></div>
+<!-- Container for point callout labels during tour -->
+<div id="tour-callout-labels" style="display:none;"></div>
 <!-- Camera state debug overlay -->
 <div id="camera-debug" style="display:none;position:absolute;bottom:10px;left:10px;z-index:20;
   padding:8px 12px;background:rgba(0,0,0,0.8);border-radius:4px;
@@ -1519,6 +1771,39 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
 body.light .tour-edge-label {{
   background:rgba(70,100,180,0.95);
   border-color:rgba(50,80,150,0.6);
+}}
+.tour-callout-label {{
+  position:absolute;z-index:16;padding:3px 8px;
+  background:rgba(255,255,255,0.92);border-radius:3px;
+  font:500 11px -apple-system,'Segoe UI',sans-serif;color:#1a1a1a;
+  text-align:left;pointer-events:none;white-space:nowrap;
+  box-shadow:0 1px 8px rgba(0,0,0,0.5);
+  transform:translateY(-50%);
+  border:1px solid rgba(255,220,80,0.8);
+  opacity:0;transition:opacity 0.3s ease-in;
+  max-width:200px;overflow:hidden;text-overflow:ellipsis;
+}}
+.tour-callout-label.visible {{
+  opacity:1;
+}}
+.tour-callout-label.core {{
+  border-color:rgba(100,200,255,0.8);
+}}
+.tour-callout-label.outlier {{
+  border-color:rgba(255,180,60,0.8);
+}}
+body.light .tour-callout-label {{
+  background:rgba(255,255,255,0.95);
+  color:#111;
+}}
+#tour-label.hero {{
+  font-size:clamp(36px, 6vw, 72px);
+  padding:24px 48px;
+  border-radius:12px;
+  background:rgba(0,0,0,0.7);
+  box-shadow:0 4px 40px rgba(0,0,0,0.6);
+  transform:translate(-50%,-50%);
+  letter-spacing:0.02em;
 }}
 </style>
 
@@ -1579,6 +1864,10 @@ body.light .tour-edge-label {{
       <label class="palette-check">
         <input type="checkbox" id="toggle-orbit">
         <span>Auto-orbit</span>
+      </label>
+      <label class="palette-check">
+        <input type="checkbox" id="toggle-outliers">
+        <span>Show outliers</span>
       </label>
       <div style="margin-top:8px;">
         <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
@@ -1826,18 +2115,27 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
   var labelLevels = {levels_json};
   var edgePairs = {edge_pairs_json};  // [[c1,c2], ...] matching edgePaths order
   var tourNarration = {narration_json};  // cluster_id -> narration text for TTS
+  var tourCallouts = {callouts_json};  // cluster_id -> {{indices: [...], labels: [...]}}
 
-  // Build cluster centroid map from edge endpoints (these match the bundled edge positions)
-  var edgeCentroids = {{}};
+  // Build cluster centroid map from 3D catenary endpoints (exact cluster centroids).
+  // For 2D mode we flatten z to 0 — x,y are the same in both modes since 2D just
+  // zeroes z on the shared 3D UMAP layout.  We do NOT use hammer_bundle (2D edge)
+  // endpoints because the bundling algorithm can shift them from the true centroids.
+  var edgeCentroids3d = {{}};
   edgePairs.forEach(function(pair, idx) {{
-    var path = edgePaths3d[idx];
-    if (path && path.length >= 2) {{
+    var path3 = edgePaths3d[idx];
+    if (path3 && path3.length >= 2) {{
       var c1 = pair[0], c2 = pair[1];
-      // First point is source centroid, last point is target centroid
-      if (!(c1 in edgeCentroids)) edgeCentroids[c1] = path[0];
-      if (!(c2 in edgeCentroids)) edgeCentroids[c2] = path[path.length - 1];
+      if (!(c1 in edgeCentroids3d)) edgeCentroids3d[c1] = path3[0];
+      if (!(c2 in edgeCentroids3d)) edgeCentroids3d[c2] = path3[path3.length - 1];
     }}
   }});
+
+  function getEdgeCentroid(cid) {{
+    var c = edgeCentroids3d[cid];
+    if (!c) return null;
+    return (viewMode === "2d") ? [c[0], c[1], 0] : c;
+  }}
 
   var labelsVisible = true;
   var edgesVisible = true;
@@ -1862,6 +2160,7 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
   // Cluster visibility state: null=all visible, Set=only those visible
   var hiddenClusters = new Set();
   var isolatedCluster = null;  // null=normal mode, number=isolated cluster
+  var outlierClusterIds = new Set();  // populated after labelClusterIds
 
   // 2D/3D mode state
   var viewMode = "3d";
@@ -2156,6 +2455,56 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
     if (toggle) toggle.checked = false;
   }}
 
+  function clearTourCallouts() {{
+    tourActiveCallouts = [];
+    tourCalloutHighlightSet = new Set();
+    var container = document.getElementById("tour-callout-labels");
+    container.innerHTML = "";
+    container.style.display = "none";
+  }}
+
+  function fadeTourCallouts() {{
+    // Fade out labels (CSS transition handles animation), keep DOM for positioning
+    var container = document.getElementById("tour-callout-labels");
+    var divs = container.querySelectorAll(".tour-callout-label");
+    divs.forEach(function(d) {{ d.classList.remove("visible"); }});
+  }}
+
+  function showTourCallouts(cid) {{
+    clearTourCallouts();
+    var callout = tourCallouts[String(cid)];
+    if (!callout || !callout.indices || !callout.indices.length) return;
+
+    var container = document.getElementById("tour-callout-labels");
+    container.style.display = "block";
+
+    // Build callout data from point positions
+    callout.indices.forEach(function(ptIdx, i) {{
+      if (ptIdx >= 0 && ptIdx < allPoints.length) {{
+        var p = allPoints[ptIdx];
+        tourActiveCallouts.push({{
+          index: ptIdx,
+          label: callout.labels[i] || p.title,
+          pos: [p.x, p.y, p.z]
+        }});
+        tourCalloutHighlightSet.add(ptIdx);
+      }}
+    }});
+
+    // Create label divs with staggered reveal
+    tourActiveCallouts.forEach(function(co, i) {{
+      var div = document.createElement("div");
+      div.className = "tour-callout-label" + (i < 3 ? " core" : " outlier");
+      div.textContent = co.label;
+      container.appendChild(div);
+      // Stagger appearance (phase runner calls showTourCallouts at the right time)
+      setTimeout(function() {{ div.classList.add("visible"); }}, 300 * (i + 1));
+    }});
+
+    // Rebuild layer to apply callout highlighting
+    rebuildLayer();
+  }}
+
   function stopTourMode() {{
     if (!tourRunning) return;
     tourRunning = false;
@@ -2164,6 +2513,8 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
     stopNarration();
     tourCentroid = null;
     tourConnected = [];
+    tourPhase = "";
+    clearTourCallouts();
     setEdgeHighlight([]);
     document.getElementById("tour-btn").textContent = "▶ Start Tour";
     document.getElementById("tour-label").style.display = "none";
@@ -2245,15 +2596,86 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
     }}
   }}
 
+  // ── Tour animation utilities ───────────────────────────────────────
+  function easeInOutQuad(t) {{ return t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2)/2; }}
+  function easeOutQuad(t) {{ return 1 - Math.pow(1 - t, 2); }}
+  function lerpZoom(a, b, t) {{ return Math.log2(Math.pow(2, a) + (Math.pow(2, b) - Math.pow(2, a)) * t); }}
+  function lerpScalar(a, b, t) {{ return a + (b - a) * t; }}
+  function lerpArray(a, b, t) {{ return a.map(function(v, i) {{ return v + (b[i] - v) * t; }}); }}
+  function makeCamState(target, orbit, pitch, zoom) {{
+    return {{ target: target, orbit: orbit, pitch: pitch, zoom: zoom }};
+  }}
+  function lerpCamState(a, b, t) {{
+    return makeCamState(
+      lerpArray(a.target, b.target, t),
+      lerpScalar(a.orbit, b.orbit, t),
+      lerpScalar(a.pitch, b.pitch, t),
+      lerpZoom(a.zoom, b.zoom, t)
+    );
+  }}
+  function applyCamState(dk, state) {{
+    dk.setProps({{ initialViewState: {{
+      target: state.target,
+      rotationOrbit: state.orbit,
+      rotationX: state.pitch,
+      zoom: state.zoom,
+      transitionDuration: 0
+    }} }});
+  }}
+
+  // Sequential phase runner: animation phases (RAF-driven) and hold phases (setTimeout)
+  // Each phase: {{name, duration, ease?, from?, to?, onStart?, onEnd?}}
+  //   - If from/to provided: interpolates camera state via lerpCamState
+  //   - If neither from/to: hold phase (just waits duration ms)
+  function runPhases(phases, gen, onAllComplete) {{
+    var idx = 0;
+    function next() {{
+      if (!tourRunning || gen !== tourGeneration) return;
+      if (idx >= phases.length) {{ if (onAllComplete) onAllComplete(); return; }}
+      var phase = phases[idx++];
+      tourPhase = phase.name || "";
+      if (phase.onStart) phase.onStart();
+      var dur = phase.duration || 0;
+      var easeFn = phase.ease || easeInOutQuad;
+      if (phase.from && phase.to) {{
+        // RAF-driven camera interpolation
+        var dk = getDeck();
+        var startTime = performance.now();
+        function tick() {{
+          if (!tourRunning || gen !== tourGeneration) return;
+          var t = Math.min(1, (performance.now() - startTime) / dur);
+          var et = easeFn(t);
+          applyCamState(dk, lerpCamState(phase.from, phase.to, et));
+          if (phase.onTick) phase.onTick(et);
+          if (t < 1) {{ requestAnimationFrame(tick); }}
+          else {{ if (phase.onEnd) phase.onEnd(); next(); }}
+        }}
+        requestAnimationFrame(tick);
+      }} else {{
+        // Hold phase — just wait
+        setTimeout(function() {{
+          if (!tourRunning || gen !== tourGeneration) return;
+          if (phase.onEnd) phase.onEnd();
+          next();
+        }}, dur);
+      }}
+    }}
+    next();
+  }}
+
   // ── Cluster tour ───────────────────────────────────────────────────
   var tourRunning = false;
+  var tourGeneration = 0;   // incremented on each tour start; stale closures bail out
   var tourIndex = 0;
   var tourTimerId = null;   // setTimeout ID for next visit
   var tourProgressStart = 0; // timestamp when current stop started
   var tourProgressRAF = null; // requestAnimationFrame ID for progress bar
   var tourStopDuration = 10000; // duration of current stop in ms (from audio)
   var tourCentroid = null;  // current centroid for label positioning
-  var tourConnected = [];   // [{name, centroid}, ...] for connected clusters
+  var tourConnected = [];   // connected cluster objects for edge labels
+  var tourPhase = "";       // current phase name (e.g. "panToWide", "holdClose")
+  var tourActiveCallouts = [];  // active callout point objects
+  var tourCalloutHighlightSet = new Set();  // indices of points to highlight during callouts
 
   // Build label-to-clusterID mapping (same logic as rowClusterIds)
   var labelClusterIds = (function() {{
@@ -2266,6 +2688,47 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
     return labels.map(function(c, i) {{
       return i < uniqueCids.length ? uniqueCids[i] : i;
     }});
+  }})();
+
+  // Detect spatially distant outlier clusters via MAD (median absolute deviation)
+  // MAD is more robust than IQR for small n and skewed distributions
+  (function() {{
+    var centroidDists = [];
+    labels.forEach(function(c) {{
+      var d = Math.sqrt(c.x * c.x + c.y * c.y + (c.z || 0) * (c.z || 0));
+      centroidDists.push(d);
+    }});
+    if (centroidDists.length < 4) return;
+    var sorted = centroidDists.slice().sort(function(a, b) {{ return a - b; }});
+    var median = sorted[Math.floor(sorted.length / 2)];
+    // Compute MAD (median absolute deviation)
+    var absDevs = centroidDists.map(function(d) {{ return Math.abs(d - median); }});
+    absDevs.sort(function(a, b) {{ return a - b; }});
+    var mad = absDevs[Math.floor(absDevs.length / 2)];
+    // Modified z-score: flag clusters with z > 2.0 (standard MAD outlier threshold)
+    // The 0.6745 factor normalizes MAD to match std for normal distributions
+    var madThreshold = 1.5;
+    if (mad < 0.001) return;  // all clusters equidistant
+    // Tiny-cluster threshold: clusters with < 0.5% of total points
+    var totalPts = allPoints.length;
+    var tinyThreshold = totalPts * 0.005;
+    for (var i = 0; i < centroidDists.length; i++) {{
+      var z = 0.6745 * (centroidDists[i] - median) / mad;
+      var isTiny = labels[i].size < tinyThreshold && centroidDists[i] > median;
+      if (z > madThreshold || isTiny) {{
+        var cid = labels[i].cid !== undefined ? labels[i].cid : (i < labelClusterIds.length ? labelClusterIds[i] : i);
+        outlierClusterIds.add(cid);
+      }}
+    }}
+    // Hide outliers by default
+    outlierClusterIds.forEach(function(cid) {{ hiddenClusters.add(cid); }});
+    if (outlierClusterIds.size > 0) {{
+      console.log("[outliers] Hidden " + outlierClusterIds.size + " outlier clusters (MAD z>" + madThreshold + " or size<" + Math.round(tinyThreshold) + " & dist>median, median=" + median.toFixed(2) + ", MAD=" + mad.toFixed(2) + "):");
+      outlierClusterIds.forEach(function(cid) {{
+        var lbl = labels.find(function(c) {{ return c.cid === cid; }});
+        if (lbl) console.log("  [" + cid + "] " + lbl.text + " (dist=" + Math.sqrt(lbl.x*lbl.x + lbl.y*lbl.y + (lbl.z||0)*(lbl.z||0)).toFixed(2) + ")");
+      }});
+    }}
   }})();
 
   // Debug overlay for camera state during tour
@@ -2328,18 +2791,21 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
   function runTour() {{
     var tourListEl = document.getElementById("tour-list");
     if (tourRunning) {{
-      // Stop tour
+      // Stop tour — bump generation so all stale animation closures bail out
       tourRunning = false;
+      tourGeneration++;
       if (tourTimerId) {{ clearTimeout(tourTimerId); tourTimerId = null; }}
       stopTourProgress();
       stopNarration();
       tourCentroid = null;
       tourConnected = [];
+      clearTourCallouts();
       setEdgeHighlight([]);
       rebuildLayer();
       document.getElementById("tour-btn").textContent = "▶ Start Tour";
       document.getElementById("tour-label").style.display = "none";
       document.getElementById("tour-edge-labels").style.display = "none";
+      document.getElementById("tour-edge-labels").innerHTML = "";
       document.getElementById("camera-debug").style.display = "none";
       // Clear tour list highlights
       if (tourListEl) {{
@@ -2355,14 +2821,18 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
     stopAmbientMode();
 
     tourRunning = true;
+    tourGeneration++;
     document.getElementById("tour-btn").textContent = "◼ Stop Tour";
     // Debug panel disabled: document.getElementById("camera-debug").style.display = "block";
 
     // Sort labels by size (largest first), keeping track of cluster IDs
+    // Filter out hidden clusters (e.g. spatial outliers) from tour
     var sortedWithIds = labels.map(function(c, i) {{
-      return {{ label: c, cid: labelClusterIds[i] }};
+      return {{ label: c, cid: c.cid !== undefined ? c.cid : labelClusterIds[i] }};
+    }}).filter(function(item) {{
+      return !hiddenClusters.has(item.cid);
     }}).sort(function(a, b) {{
-      return (b.label.size || 0) - (a.label.size || 0);
+      return (a.label.x || 0) - (b.label.x || 0);
     }});
 
     // Check if intro/outro audio exists
@@ -2387,6 +2857,8 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
         introDiv.style.fontStyle = "italic";
         introDiv.onclick = function() {{
           if (tourTimerId) {{ clearTimeout(tourTimerId); tourTimerId = null; }}
+          tourGeneration++;
+          clearTourCallouts();
           tourIndex = -1;
           visitNext();
         }};
@@ -2403,6 +2875,8 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
         div.style.cursor = "pointer";
         div.onclick = function() {{
           if (tourTimerId) {{ clearTimeout(tourTimerId); tourTimerId = null; }}
+          tourGeneration++;
+          clearTourCallouts();
           tourIndex = idx;
           visitNext();
         }};
@@ -2420,6 +2894,8 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
         outroDiv.style.fontStyle = "italic";
         outroDiv.onclick = function() {{
           if (tourTimerId) {{ clearTimeout(tourTimerId); tourTimerId = null; }}
+          tourGeneration++;
+          clearTourCallouts();
           tourIndex = sortedWithIds.length;  // outro index
           visitNext();
         }};
@@ -2430,6 +2906,7 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
     var tourLabelEl = document.getElementById("tour-label");
 
     function visitNext() {{
+      var gen = tourGeneration;  // capture so stale closures bail out
       // Highlight current item in tour list based on data-idx attribute
       if (tourListEl) {{
         var items = tourListEl.querySelectorAll(".tour-item");
@@ -2446,8 +2923,9 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
 
       // Handle intro (tourIndex == -1)
       if (tourIndex === -1) {{
-        if (!tourRunning) return;
+        if (!tourRunning || gen !== tourGeneration) return;
         tourLabelEl.textContent = "Welcome";
+        tourLabelEl.classList.add("hero");
         tourLabelEl.style.display = "block";
         document.getElementById("tour-edge-labels").style.display = "none";
 
@@ -2461,12 +2939,13 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
 
         // Animate to overview position
         var dk = getDeck();
+        var is2d = (viewMode === "2d");
         if (dk && dk.setProps) {{
           dk.setProps({{ initialViewState: {{
             target: [0, 0, 0],
-            rotationX: 25,
+            rotationX: is2d ? 90 : 25,
             rotationOrbit: 0,
-            zoom: defaultZoom - 0.5,
+            zoom: defaultZoom,
             transitionDuration: 2000,
             transitionInterpolator: new deck.LinearInterpolator(['target', 'zoom', 'rotationOrbit', 'rotationX'])
           }} }});
@@ -2479,9 +2958,10 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
 
       // Handle outro (tourIndex == sortedWithIds.length, exactly once)
       if (tourIndex === sortedWithIds.length && hasOutro) {{
-        if (!tourRunning) return;
+        if (!tourRunning || gen !== tourGeneration) return;
 
         tourLabelEl.textContent = "Thank You";
+        tourLabelEl.classList.add("hero");
         tourLabelEl.style.display = "block";
         setEdgeHighlight([]);
         rebuildLayer();
@@ -2494,12 +2974,13 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
 
         // Animate to wide view
         var dk = getDeck();
+        var is2d = (viewMode === "2d");
         if (dk && dk.setProps) {{
           dk.setProps({{ initialViewState: {{
             target: [0, 0, 0],
-            rotationX: 15,
-            rotationOrbit: 180,
-            zoom: defaultZoom - 1,
+            rotationX: is2d ? 90 : 15,
+            rotationOrbit: is2d ? 0 : 180,
+            zoom: defaultZoom - 0.3,
             transitionDuration: 2000,
             transitionInterpolator: new deck.LinearInterpolator(['target', 'zoom', 'rotationOrbit', 'rotationX'])
           }} }});
@@ -2521,6 +3002,7 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
         stopNarration();
         tourCentroid = null;
         tourConnected = [];
+        clearTourCallouts();
         setEdgeHighlight([]);
         rebuildLayer();
         document.getElementById("tour-btn").textContent = "▶ Start Tour";
@@ -2535,11 +3017,12 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
         }}
         // Return to default view
         var dk = getDeck();
+        var is2d = (viewMode === "2d");
         if (dk && dk.setProps) {{
           dk.setProps({{ initialViewState: {{
             target: [0, 0, 0],
-            rotationX: 15,
-            rotationOrbit: 30,
+            rotationX: is2d ? 90 : 15,
+            rotationOrbit: is2d ? 0 : 30,
             zoom: defaultZoom,
             transitionDuration: 1000,
             transitionInterpolator: new deck.LinearInterpolator(['target', 'zoom', 'rotationOrbit'])
@@ -2552,7 +3035,8 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
       var cluster = item.label;
       var cid = item.cid;
 
-      // Show cluster label
+      // Show cluster label (remove hero class from intro/outro)
+      tourLabelEl.classList.remove("hero");
       tourLabelEl.textContent = cluster.text;
       tourLabelEl.style.display = "block";
 
@@ -2570,7 +3054,7 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
       if (dk && dk.setProps) {{
         // Use edge centroid if available (matches where edges connect)
         // Fall back to computing from points if cluster has no edges
-        var centroid = edgeCentroids[cid];
+        var centroid = getEdgeCentroid(cid);
         if (!centroid) {{
           var clusterPts = allPoints.filter(function(p) {{ return p.cluster === cid; }});
           centroid = [0, 0, 0];
@@ -2599,12 +3083,16 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
         tourCentroid = centroid;
 
         // Build list of connected cluster names and centroids for edge labels
+        // Only include clusters explicitly mentioned in the narration text
+        var narrationText = tourNarration[String(cid)] || "";
         tourConnected = [];
+        var _connSeen = {{}};  // deduplicate by cluster ID
         edgePairs.forEach(function(pair) {{
           var connCid = null;
           if (pair[0] === cid) connCid = pair[1];
           else if (pair[1] === cid) connCid = pair[0];
-          if (connCid !== null && edgeCentroids[connCid]) {{
+          if (connCid !== null && !_connSeen[connCid] && getEdgeCentroid(connCid)) {{
+            _connSeen[connCid] = true;
             // Find the label for this cluster
             var connLabel = null;
             for (var li = 0; li < labelClusterIds.length; li++) {{
@@ -2613,10 +3101,20 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
                 break;
               }}
             }}
-            if (connLabel) {{
+            if (connLabel && narrationText.indexOf(connLabel.text) !== -1) {{
+              // Sample up to 20 evenly-spaced points for viewport visibility check
+              var cPts = [];
+              for (var _ci = 0; _ci < allPoints.length; _ci++) {{
+                if (allPoints[_ci].cluster === connCid) cPts.push(_ci);
+              }}
+              var sampleIndices = [];
+              var step = Math.max(1, Math.floor(cPts.length / 20));
+              for (var _si = 0; _si < cPts.length; _si += step) sampleIndices.push(cPts[_si]);
               tourConnected.push({{
                 name: connLabel.text,
-                centroid: edgeCentroids[connCid]
+                cid: connCid,
+                centroid: getEdgeCentroid(connCid),
+                samplePtIndices: sampleIndices
               }});
             }}
           }}
@@ -2625,176 +3123,138 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
 
         // Compute zoom levels for the cluster
         var dx = maxX - minX, dy = maxY - minY, dz = maxZ - minZ;
-        var clusterExtent = Math.max(dx, dy, dz) || 0.5;
+        var is2d = (viewMode === "2d");
+        var clusterExtent = is2d ? Math.max(dx, dy) || 0.5 : Math.max(dx, dy, dz) || 0.5;
         var container = document.getElementById("deckgl-wrapper");
         var vpSize = container ? Math.min(container.clientWidth, container.clientHeight) : 800;
 
         // Distance from origin to centroid (how far out this cluster is)
-        var centroidDist = Math.sqrt(centroid[0]*centroid[0] + centroid[1]*centroid[1] + centroid[2]*centroid[2]);
+        var centroidDist = Math.sqrt(centroid[0]*centroid[0] + centroid[1]*centroid[1] + (is2d ? 0 : centroid[2]*centroid[2]));
 
         // Zoom to see cluster detail (accounting for its distance from center)
         var closeZoom = Math.log2(vpSize * 0.6 / clusterExtent);
         closeZoom = Math.max(defaultZoom + 0.5, Math.min(14, closeZoom));
 
-        // Zoom to see edges (need to see from center out to farthest connected centroid)
-        var maxEdgeDist = centroidDist;
+        // Zoom to see edges (distance from cluster centroid to farthest connected centroid)
+        var maxEdgeDist = clusterExtent;
         tourConnected.forEach(function(conn) {{
-          var d = Math.sqrt(conn.centroid[0]*conn.centroid[0] + conn.centroid[1]*conn.centroid[1] + conn.centroid[2]*conn.centroid[2]);
+          var dx = conn.centroid[0] - centroid[0];
+          var dy = conn.centroid[1] - centroid[1];
+          var dz = is2d ? 0 : (conn.centroid[2] - centroid[2]);
+          var d = Math.sqrt(dx*dx + dy*dy + dz*dz);
           if (d > maxEdgeDist) maxEdgeDist = d;
         }});
-        var wideZoom = Math.log2(vpSize * 0.4 / maxEdgeDist);
-        wideZoom = Math.max(defaultZoom - 1, Math.min(defaultZoom + 0.5, wideZoom));
-
-        // === SPINNING GLOBE APPROACH ===
-        // Target always at origin. Camera orbits around it.
-        // Rotate to put cluster on NEAR side (between camera and origin).
-
-        // OrbitView geometry (verified empirically):
-        // - orbit=0° → camera at -Y, orbit=90° → -X, orbit=180° → +Y, orbit=270° → +X
-        // - Camera angle from +X axis = -(orbit + 90°)
-        // - For centroid at angle A to be NEAR: -(orbit + 90) = A → orbit = -A - 90
-        var centroidAngle = Math.atan2(centroid[1], centroid[0]) * 180 / Math.PI;
-        var targetOrbit = -centroidAngle - 90;
-
-        // Vertical (pitch): camera should be on same Z side as centroid
-        // Positive pitch = camera at positive Z, negative pitch = camera at negative Z
-        var xyDist = Math.sqrt(centroid[0]*centroid[0] + centroid[1]*centroid[1]);
-        var targetPitch = Math.atan2(centroid[2], xyDist) * 180 / Math.PI;
-        // Clamp pitch to reasonable range
-        targetPitch = Math.max(-60, Math.min(60, targetPitch));
+        var wideZoom = Math.log2(vpSize * 0.35 / maxEdgeDist);
+        wideZoom = Math.max(defaultZoom - 0.3, Math.min(defaultZoom + 0.5, wideZoom));
 
         // Get current state
         var curState = dk.viewManager ? dk.viewManager.getViewState() : {{}};
-        var startOrbit = curState.rotationOrbit || 0;
-        var startPitch = curState.rotationX || 20;
         var startZoom = curState.zoom || defaultZoom;
 
-        // Handle orbit wraparound (take shortest rotation path)
-        var orbitDiff = targetOrbit - startOrbit;
-        while (orbitDiff > 180) orbitDiff -= 360;
-        while (orbitDiff < -180) orbitDiff += 360;
-        var pitchDiff = targetPitch - startPitch;
+        // === Build camera states for declarative phase runner ===
+        var phases;
 
-        // === PHASE 1: Rotate to face cluster (both orbit and pitch) ===
-        var phase1Duration = 1500;
-        var startScale1 = Math.pow(2, startZoom);
-        var survey = Math.min(startZoom, wideZoom);  // pull back if needed
-        var endScale1 = Math.pow(2, survey);
-        var startTime1 = performance.now();
+        if (is2d) {{
+          // 2D: vary target, fix orbit=0/pitch=90
+          var startTarget = curState.target || [0, 0, 0];
+          var targetXY = [centroid[0], centroid[1], 0];
 
-        function animatePhase1() {{
-          if (!tourRunning) return;
-          var elapsed = performance.now() - startTime1;
-          var t = Math.min(1, elapsed / phase1Duration);
-          var ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+          // Weighted centroid: bias toward connected clusters during wide view
+          var alpha = 0.75;
+          var wideTargetXY = [targetXY[0], targetXY[1], 0];
+          if (tourConnected.length > 0) {{
+            var avgX = 0, avgY = 0;
+            tourConnected.forEach(function(conn) {{
+              avgX += conn.centroid[0];
+              avgY += conn.centroid[1];
+            }});
+            avgX /= tourConnected.length;
+            avgY /= tourConnected.length;
+            wideTargetXY = [
+              alpha * targetXY[0] + (1 - alpha) * avgX,
+              alpha * targetXY[1] + (1 - alpha) * avgY,
+              0
+            ];
+          }}
 
-          var curScale = startScale1 + (endScale1 - startScale1) * ease;
-          var curOrbit = startOrbit + orbitDiff * ease;
-          var curPitch = startPitch + pitchDiff * ease;
+          var startState  = makeCamState(startTarget, 0, 90, startZoom);
+          var wideState   = makeCamState(wideTargetXY, 0, 90, wideZoom);
+          var closeState  = makeCamState(targetXY, 0, 90, closeZoom);
+          var cruiseState = makeCamState(targetXY, 0, 90, wideZoom);
 
-          var curZoom = Math.log2(curScale);
-          dk.setProps({{ initialViewState: {{
-            target: [0, 0, 0],
-            rotationOrbit: curOrbit,
-            rotationX: curPitch,
-            zoom: curZoom,
-            transitionDuration: 0
-          }} }});
-          updateCameraDebug(centroid, targetOrbit, targetPitch, curOrbit, curPitch, curZoom, "1: Rotate");
-          if (t < 1) requestAnimationFrame(animatePhase1);
+          phases = [
+            {{ name: "panToWide",  duration: 1500, from: startState, to: wideState }},
+            {{ name: "holdWide",   duration: 2000 }},
+            {{ name: "zoomIn",     duration: 1500, from: wideState,  to: closeState,
+               onStart: function() {{ showTourCallouts(cid); }} }},
+            {{ name: "holdClose",  duration: 2000 }},
+            {{ name: "zoomOut",    duration: 1200, ease: easeOutQuad, from: closeState, to: cruiseState,
+               onStart: function() {{ fadeTourCallouts(); rebuildLayer(); }} }}
+          ];
+
+        }} else {{
+          // 3D: vary orbit/pitch, fix target=[0,0,0]
+          var centroidAngle = Math.atan2(centroid[1], centroid[0]) * 180 / Math.PI;
+          var targetOrbit = -centroidAngle - 90;
+          var xyDist = Math.sqrt(centroid[0]*centroid[0] + centroid[1]*centroid[1]);
+          var targetPitch = Math.atan2(centroid[2], xyDist) * 180 / Math.PI;
+          targetPitch = Math.max(-60, Math.min(60, targetPitch));
+
+          var startOrbit = curState.rotationOrbit || 0;
+          var startPitch = curState.rotationX || 20;
+
+          // Handle orbit wraparound (take shortest rotation path)
+          var orbitDiff = targetOrbit - startOrbit;
+          while (orbitDiff > 180) orbitDiff -= 360;
+          while (orbitDiff < -180) orbitDiff += 360;
+          var adjustedOrbit = startOrbit + orbitDiff;
+
+          var origin = [0, 0, 0];
+          var surveyZoom = Math.min(startZoom, wideZoom);
+
+          var startState   = makeCamState(origin, startOrbit, startPitch, startZoom);
+          var surveyState  = makeCamState(origin, adjustedOrbit, targetPitch, surveyZoom);
+          var wideState    = makeCamState(origin, adjustedOrbit, targetPitch, wideZoom);
+          var closeState   = makeCamState(origin, adjustedOrbit, targetPitch, closeZoom);
+          var cruiseState  = makeCamState(origin, adjustedOrbit, targetPitch, defaultZoom);
+
+          phases = [
+            {{ name: "rotateToFace", duration: 1500, from: startState, to: surveyState,
+               onTick: function(et) {{
+                 var s = lerpCamState(startState, surveyState, et);
+                 updateCameraDebug(centroid, targetOrbit, targetPitch, s.orbit, s.pitch, s.zoom, "1: Rotate");
+               }} }},
+            {{ name: "edgeZoom",     duration: 1200, from: surveyState, to: wideState,
+               onTick: function(et) {{
+                 var s = lerpCamState(surveyState, wideState, et);
+                 updateCameraDebug(centroid, targetOrbit, targetPitch, s.orbit, s.pitch, s.zoom, "2: Wide zoom");
+               }} }},
+            {{ name: "holdWide",     duration: 2000 }},
+            {{ name: "zoomIn",       duration: 1500, from: wideState, to: closeState,
+               onStart: function() {{ showTourCallouts(cid); }},
+               onTick: function(et) {{
+                 var s = lerpCamState(wideState, closeState, et);
+                 updateCameraDebug(centroid, targetOrbit, targetPitch, s.orbit, s.pitch, s.zoom, "3: Close zoom");
+               }} }},
+            {{ name: "holdClose",    duration: 2000 }},
+            {{ name: "pullBack",     duration: 1200, ease: easeOutQuad, from: closeState, to: cruiseState,
+               onStart: function() {{ fadeTourCallouts(); rebuildLayer(); }},
+               onTick: function(et) {{
+                 var s = lerpCamState(closeState, cruiseState, et);
+                 updateCameraDebug(centroid, targetOrbit, targetPitch, s.orbit, s.pitch, s.zoom, "4: Pull back");
+               }} }}
+          ];
         }}
-        animatePhase1();
 
-        // === PHASE 2: Zoom to show edge connections ===
-        setTimeout(function() {{
-          if (!tourRunning) return;
-          var phase2Duration = 1200;
-          var startScale2 = Math.pow(2, survey);
-          var endScale2 = Math.pow(2, wideZoom);
-          var startTime2 = performance.now();
+        // Compute total animation duration from phase list
+        var totalAnimDuration = 0;
+        phases.forEach(function(p) {{ totalAnimDuration += p.duration || 0; }});
+        if (tourStopDuration < totalAnimDuration + 300) tourStopDuration = totalAnimDuration + 300;
 
-          function animatePhase2() {{
-            if (!tourRunning) return;
-            var elapsed = performance.now() - startTime2;
-            var t = Math.min(1, elapsed / phase2Duration);
-            var ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-
-            var curScale = startScale2 + (endScale2 - startScale2) * ease;
-            var curZoom = Math.log2(curScale);
-            dk.setProps({{ initialViewState: {{
-              target: [0, 0, 0],
-              rotationOrbit: targetOrbit,
-              rotationX: targetPitch,
-              zoom: curZoom,
-              transitionDuration: 0
-            }} }});
-            updateCameraDebug(centroid, targetOrbit, targetPitch, targetOrbit, targetPitch, curZoom, "2: Wide zoom");
-            if (t < 1) requestAnimationFrame(animatePhase2);
-          }}
-          animatePhase2();
-        }}, phase1Duration);
-
-        // === PHASE 3: Zoom in to cluster detail ===
-        setTimeout(function() {{
-          if (!tourRunning) return;
-          var phase3Duration = 1500;
-          var startScale3 = Math.pow(2, wideZoom);
-          var endScale3 = Math.pow(2, closeZoom);
-          var startTime3 = performance.now();
-
-          function animatePhase3() {{
-            if (!tourRunning) return;
-            var elapsed = performance.now() - startTime3;
-            var t = Math.min(1, elapsed / phase3Duration);
-            var ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-
-            var curScale = startScale3 + (endScale3 - startScale3) * ease;
-            var curZoom = Math.log2(curScale);
-            dk.setProps({{ initialViewState: {{
-              target: [0, 0, 0],
-              rotationOrbit: targetOrbit,
-              rotationX: targetPitch,
-              zoom: curZoom,
-              transitionDuration: 0
-            }} }});
-            updateCameraDebug(centroid, targetOrbit, targetPitch, targetOrbit, targetPitch, curZoom, "3: Close zoom");
-            if (t < 1) requestAnimationFrame(animatePhase3);
-          }}
-          animatePhase3();
-        }}, phase1Duration + 1200 + 2000);  // after rotate + edge-zoom + pause
-
-        // === PHASE 4: Pull back to survey for next cluster ===
-        setTimeout(function() {{
-          if (!tourRunning) return;
-          var phase4Duration = 1200;
-          var startScale4 = Math.pow(2, closeZoom);
-          var endScale4 = Math.pow(2, defaultZoom);
-          var startTime4 = performance.now();
-
-          function animatePhase4() {{
-            if (!tourRunning) return;
-            var elapsed = performance.now() - startTime4;
-            var t = Math.min(1, elapsed / phase4Duration);
-            var ease = 1 - Math.pow(1 - t, 2);  // ease-out
-
-            var curScale = startScale4 + (endScale4 - startScale4) * ease;
-            var curZoom = Math.log2(curScale);
-            dk.setProps({{ initialViewState: {{
-              target: [0, 0, 0],
-              rotationOrbit: targetOrbit,
-              rotationX: targetPitch,
-              zoom: curZoom,
-              transitionDuration: 0
-            }} }});
-            updateCameraDebug(centroid, targetOrbit, targetPitch, targetOrbit, targetPitch, curZoom, "4: Pull back");
-            if (t < 1) requestAnimationFrame(animatePhase4);
-          }}
-          animatePhase4();
-        }}, phase1Duration + 1200 + 2000 + 1500 + 2000);  // after all + hold
+        runPhases(phases, gen);
       }}
 
       tourIndex++;
-      // Total: 1.5s rotate + 1.2s edge-zoom + 2s pause + 1.5s close-zoom + 2s hold + 1.2s pull-back
       tourTimerId = setTimeout(visitNext, tourStopDuration);
     }}
 
@@ -3078,14 +3538,17 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
     if (idx === levelKeys.length - 1) return "level-fine";
     return "level-mid";
   }}
-  // Pre-create a pool of reusable label DOM elements
+  // Pre-create a pool of reusable label DOM elements inside a container
   var MAX_VISIBLE_LABELS = 40;
   var labelPool = [];
+  var labelContainer = document.createElement("div");
+  labelContainer.id = "cluster-label-container";
+  document.body.appendChild(labelContainer);
   for (var _lp = 0; _lp < MAX_VISIBLE_LABELS; _lp++) {{
     var e = document.createElement("div");
     e.className = "cl";
     e.style.opacity = "0";
-    document.body.appendChild(e);
+    labelContainer.appendChild(e);
     labelPool.push(e);
   }}
 
@@ -3121,6 +3584,11 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
     var motionIntensity = Math.min(1, velMag * velMag * 0.3);
 
     edgePaths.forEach(function(path, idx) {{
+      // Skip edges connecting to hidden clusters
+      if (idx < edgePairs.length) {{
+        var pair = edgePairs[idx];
+        if (!isClusterVisible(pair[0]) || !isClusterVisible(pair[1])) return;
+      }}
       var w = edgeWeights[idx] || 0.5;
       var width = 0.005 + w * 0.015;  // thicker for stronger connections
       var finalPath = path;
@@ -3185,12 +3653,25 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
       edgePathData.push({{ path: finalPath, color: baseColor, width: baseWidth }});
     }});
 
-    var visible = allPoints.filter(function(p) {{ return isClusterVisible(p.cluster); }});
-    if (is2d) {{
-      visible = visible.map(function(p) {{
-        return {{ x: p.x, y: p.y, z: 0, r: p.r, g: p.g, b: p.b,
-                  a: 255, title: p.title, cluster: p.cluster }};
-      }});
+    var hasCallouts = tourCalloutHighlightSet.size > 0;
+    var visible = [];
+    for (var _vi = 0; _vi < allPoints.length; _vi++) {{
+      var p = allPoints[_vi];
+      if (!isClusterVisible(p.cluster)) continue;
+      if (is2d) {{
+        visible.push({{ x: p.x, y: p.y, z: 0, r: p.r, g: p.g, b: p.b,
+                        a: 255, title: p.title, cluster: p.cluster }});
+      }} else if (hasCallouts && tourCalloutHighlightSet.has(_vi)) {{
+        // Bright yellow-white for callout points
+        visible.push({{ x: p.x, y: p.y, z: p.z, r: 255, g: 240, b: 80,
+                        a: 255, title: p.title, cluster: p.cluster }});
+      }} else if (hasCallouts) {{
+        // Dim non-callout points during callout display
+        visible.push({{ x: p.x, y: p.y, z: p.z, r: p.r, g: p.g, b: p.b,
+                        a: 60, title: p.title, cluster: p.cluster }});
+      }} else {{
+        visible.push(p);
+      }}
     }}
     var edgeData = edgePathData;
     // Use cached original layers (not current dk.props.layers which changes after setProps)
@@ -3314,6 +3795,8 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
   var lastViewJson = "";
   function updatePointAlpha(dk, vp) {{
     if (viewMode === "2d") return;
+    // Skip depth alpha when callout highlighting is active (tour Phase 3)
+    if (tourCalloutHighlightSet.size > 0) return;
     var visible = allPoints.filter(function(p) {{ return isClusterVisible(p.cluster); }});
     if (!visible.length) return;
     var depths = [];
@@ -3369,11 +3852,12 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
 
   // Label placement: project, cull off-screen, spatial separation
   function updateLabels(vp, zoom) {{
-    // Hide main labels when tour is running (tour has its own focused label)
+    // Hide entire label container when tour is running (tour has its own focused label)
     if (!labelsVisible || tourRunning) {{
-      for (var i = 0; i < MAX_VISIBLE_LABELS; i++) labelPool[i].style.opacity = "0";
+      labelContainer.style.display = "none";
       return;
     }}
+    labelContainer.style.display = "";
     var activeLevels = getActiveLevels(zoom);
     var is2d = (viewMode === "2d");
     var w = window.innerWidth - 260;  // account for panel
@@ -3396,6 +3880,14 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
 
       for (var j = 0; j < lvlLabels.length; j++) {{
         var c = lvlLabels[j];
+        // Skip labels for hidden clusters (use leaf_cids to check all constituent BIRCH clusters)
+        if (c.leaf_cids) {{
+          var anyVisible = false;
+          for (var _lc = 0; _lc < c.leaf_cids.length; _lc++) {{
+            if (isClusterVisible(c.leaf_cids[_lc])) {{ anyVisible = true; break; }}
+          }}
+          if (!anyVisible) continue;
+        }} else if (c.cid !== undefined && !isClusterVisible(c.cid)) continue;
         var lz = is2d ? 0 : c.z;
         var sp;
         try {{ sp = vp.project([c.x, c.y, lz]); }} catch(e) {{ continue; }}
@@ -3482,25 +3974,143 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
     updateLabels(vp, zoom);
     drawAnnotations(vp);
 
-    // Position tour label at centroid
-    if (tourRunning && tourCentroid) {{
+    // Position tour label at centroid (or center of screen for intro/outro)
+    if (tourRunning) {{
       var tourLabelEl = document.getElementById("tour-label");
-      try {{
-        var sp = vp.project(tourCentroid);
-        tourLabelEl.style.left = sp[0] + "px";
-        tourLabelEl.style.top = sp[1] + "px";
-      }} catch(e) {{}}
-
-      // Render edge centroid labels
-      var edgeLabelsContainer = document.getElementById("tour-edge-labels");
-      var html = "";
-      tourConnected.forEach(function(conn) {{
+      if (tourCentroid) {{
         try {{
-          var esp = vp.project(conn.centroid);
-          html += '<div class="tour-edge-label" style="left:' + esp[0] + 'px;top:' + esp[1] + 'px;">' + conn.name + '</div>';
+          var sp = vp.project(tourCentroid);
+          tourLabelEl.style.left = sp[0] + "px";
+          tourLabelEl.style.top = sp[1] + "px";
         }} catch(e) {{}}
-      }});
+      }} else if (tourLabelEl.style.display !== "none") {{
+        // Intro/outro: center label on screen (hero transform handles centering)
+        var hlc = document.getElementById("hl-canvas");
+        tourLabelEl.style.left = (hlc ? hlc.clientWidth / 2 : window.innerWidth / 2) + "px";
+        tourLabelEl.style.top = (hlc ? hlc.clientHeight / 2 : window.innerHeight / 2) + "px";
+      }}
+
+      // Render edge centroid labels only during wide-zoom phases, and only if
+      // some of the connected cluster's points are actually visible in the viewport
+      var edgeLabelsContainer = document.getElementById("tour-edge-labels");
+      var showEdgeLabels = (tourPhase === "panToWide" || tourPhase === "holdWide" || tourPhase === "zoomOut");
+      var html = "";
+      if (showEdgeLabels) {{
+        var vpW = window.innerWidth, vpH = window.innerHeight;
+        tourConnected.forEach(function(conn) {{
+          try {{
+            var esp = vp.project(conn.centroid);
+            if (esp[0] < -50 || esp[0] > vpW + 50 || esp[1] < -50 || esp[1] > vpH + 50) return;
+            // Only show label if some of this cluster's points are in the viewport
+            var hasVisiblePts = false;
+            for (var _si = 0; _si < conn.samplePtIndices.length; _si++) {{
+              var pt = allPoints[conn.samplePtIndices[_si]];
+              var sp = vp.project([pt.x, pt.y, pt.z]);
+              if (sp[0] >= 0 && sp[0] <= vpW && sp[1] >= 0 && sp[1] <= vpH) {{
+                hasVisiblePts = true;
+                break;
+              }}
+            }}
+            if (!hasVisiblePts) return;
+            html += '<div class="tour-edge-label" style="left:' + esp[0] + 'px;top:' + esp[1] + 'px;">' + conn.name + '</div>';
+          }} catch(e) {{}}
+        }});
+      }}
       edgeLabelsContainer.innerHTML = html;
+
+      // Position callout labels in a side column with connector lines
+      if (tourActiveCallouts.length > 0) {{
+        var calloutContainer = document.getElementById("tour-callout-labels");
+        var calloutDivs = calloutContainer.querySelectorAll(".tour-callout-label");
+        var hlCanvas = document.getElementById("hl-canvas");
+        var hlCtx = hlCanvas ? hlCanvas.getContext("2d") : null;
+
+        // Project all points to screen space first
+        var centroidScreen = vp.project(tourCentroid);
+        var cw = hlCanvas ? hlCanvas.clientWidth : window.innerWidth;
+        var ch = hlCanvas ? hlCanvas.clientHeight : window.innerHeight;
+        var spacing = 28;
+        var margin = 50;  // px margin for off-screen test
+
+        // Project screen positions; mark off-screen points as hidden
+        tourActiveCallouts.forEach(function(co, i) {{
+          co._onScreen = false;
+          try {{
+            co._screenPt = vp.project(co.pos);
+            var sx = co._screenPt[0], sy = co._screenPt[1];
+            co._onScreen = (sx >= -margin && sx <= cw + margin &&
+                            sy >= -margin && sy <= ch + margin);
+          }} catch(e) {{}}
+        }});
+
+        // Build sort order only for on-screen callouts
+        var sortOrder = [];
+        tourActiveCallouts.forEach(function(co, i) {{
+          if (co._onScreen) {{
+            sortOrder.push({{ idx: i, screenY: co._screenPt[1] }});
+          }}
+        }});
+        sortOrder.sort(function(a, b) {{ return a.screenY - b.screenY; }});
+
+        // Position callout column so right edges sit left of the cluster label
+        var gap = 30;  // px gap between callout right edge and cluster label left edge
+        var tlEl = document.getElementById("tour-label");
+        var tlW = tlEl ? tlEl.offsetWidth : 120;
+        var clusterLabelLeft = centroidScreen[0] - tlW / 2;
+        var maxCalloutW = 0;
+        sortOrder.forEach(function(entry) {{
+          var d = calloutDivs[entry.idx];
+          if (d) maxCalloutW = Math.max(maxCalloutW, d.offsetWidth || 180);
+        }});
+        if (maxCalloutW === 0) maxCalloutW = 180;
+        var columnX = Math.max(20, clusterLabelLeft - gap - maxCalloutW);
+
+        var totalH = sortOrder.length * spacing;
+        var startY = Math.max(40, Math.min(ch - totalH - 20,
+                     centroidScreen[1] - totalH / 2));
+
+        // Hide off-screen callout labels, position on-screen ones
+        tourActiveCallouts.forEach(function(co, i) {{
+          var div = calloutDivs[i];
+          if (div && !co._onScreen) {{
+            div.classList.remove("visible");
+          }}
+        }});
+        sortOrder.forEach(function(entry, rank) {{
+          var co = tourActiveCallouts[entry.idx];
+          var div = calloutDivs[entry.idx];
+          if (div) {{
+            co._labelX = columnX;
+            co._labelY = startY + rank * spacing;
+            div.style.left = co._labelX + "px";
+            div.style.top = co._labelY + "px";
+            co._lineStartX = co._labelX + div.offsetWidth;
+          }}
+        }});
+
+        // Draw connector lines from labels to on-screen points
+        if (hlCtx) {{
+          tourActiveCallouts.forEach(function(co, i) {{
+            if (!co._onScreen || !co._screenPt) return;
+            var div = calloutDivs[i];
+            if (!div || !div.classList.contains("visible")) return;
+            var isCore = i < 3;
+            var lineColor = isCore ? "rgba(100,200,255,0.6)" : "rgba(255,180,60,0.6)";
+            var dotColor = isCore ? "rgba(100,200,255,0.8)" : "rgba(255,180,60,0.8)";
+            hlCtx.beginPath();
+            hlCtx.moveTo(co._lineStartX || co._labelX, co._labelY);
+            hlCtx.lineTo(co._screenPt[0], co._screenPt[1]);
+            hlCtx.strokeStyle = lineColor;
+            hlCtx.lineWidth = 1;
+            hlCtx.stroke();
+            // Small dot at point end
+            hlCtx.beginPath();
+            hlCtx.arc(co._screenPt[0], co._screenPt[1], 3, 0, Math.PI * 2);
+            hlCtx.fillStyle = dotColor;
+            hlCtx.fill();
+          }});
+        }}
+      }}
     }}
   }}
 
@@ -3563,6 +4173,18 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
     }} else {{
       stopOrbit();
     }}
+  }});
+
+  // Toggle outlier clusters visibility
+  document.getElementById("toggle-outliers").addEventListener("change", function(e) {{
+    if (e.target.checked) {{
+      // Show outliers: remove them from hiddenClusters
+      outlierClusterIds.forEach(function(cid) {{ hiddenClusters.delete(cid); }});
+    }} else {{
+      // Hide outliers: add them to hiddenClusters
+      outlierClusterIds.forEach(function(cid) {{ hiddenClusters.add(cid); }});
+    }}
+    rebuildLayer();
   }});
 
   // Cluster tour button
@@ -4116,7 +4738,7 @@ def main():
     hierarchy_model = args.model
     birch_levels = build_label_hierarchy(
         coords, titles_arr, birch, embeddings=embeddings,
-        model=hierarchy_model,
+        model=hierarchy_model, base_labels=labels_birch,
     )
 
     # ── DYF tree clustering on high-D embeddings ─────────────────────────
@@ -4171,6 +4793,8 @@ def main():
                 "z": float(centroid[2]) if ndim >= 3 else 0.0,
                 "text": name[:50],
                 "size": int(mask.sum()),
+                "cid": int(cid),
+                "leaf_cids": [int(cid)],
             })
         birch_levels[n_birch] = base_level
         print(f"  Added base BIRCH level ({n_birch}): {len(base_level)} labels")
@@ -4190,13 +4814,61 @@ def main():
         rgb_birch = golden_ratio_rgb_map(labels_birch)
         rgb_dyf = golden_ratio_rgb_map(labels_dyf.tolist())
 
-        # Generate tour narration for TTS (with connection info)
+        # Compute cluster shape analysis for narration context
+        print("\n=== Computing cluster shapes ===")
+        shapes_birch = compute_cluster_shapes(coords, titles, labels_birch)
+        shapes_dyf = compute_cluster_shapes(coords, titles, labels_dyf)
+        print(f"  BIRCH: {sum(1 for s in shapes_birch.values() if s['shape'] != 'compact')}/{len(shapes_birch)} non-compact clusters")
+        print(f"  DYF: {sum(1 for s in shapes_dyf.values() if s['shape'] != 'compact')}/{len(shapes_dyf)} non-compact clusters")
+
+        # Build callout data for tour visualization
+        def _build_callouts(shapes):
+            callouts = {}
+            for cid, s in shapes.items():
+                indices = []
+                labels_list = []
+                # Core representative points
+                for idx, title in zip(s['core_indices'][:3], s['core_titles'][:3]):
+                    indices.append(idx)
+                    labels_list.append(title[:40])
+                # Outlier / tendril tip points
+                for idx, title in zip(s['outlier_indices'][:3], s['outlier_titles'][:3]):
+                    if idx not in indices:  # avoid duplicates
+                        indices.append(idx)
+                        labels_list.append(title[:40])
+                if indices:
+                    callouts[cid] = {"indices": indices, "labels": labels_list}
+            return callouts
+
+        callouts_birch = _build_callouts(shapes_birch)
+        callouts_dyf = _build_callouts(shapes_dyf)
+
+        # Build label centroids for spatial extremes in narration
+        def _build_label_centroids(labels_arr):
+            centroids = {}
+            for cid in sorted(set(int(c) for c in labels_arr)):
+                mask = np.asarray(labels_arr) == cid
+                pts = np.where(mask)[0]
+                if len(pts) == 0:
+                    continue
+                centroid = coords[pts].mean(axis=0)
+                centroids[cid] = {"x": float(centroid[0]), "y": float(centroid[1])}
+            return centroids
+
+        centroids_birch = _build_label_centroids(labels_birch)
+        centroids_dyf = _build_label_centroids(labels_dyf)
+
+        # Generate tour narration for TTS (with connection and shape info)
         narration_birch = generate_tour_narration(
             names_birch, titles, labels_birch,
-            edge_pairs=birch_pair_info, model=args.model)
+            edge_pairs=birch_pair_info, model=args.model,
+            cluster_shapes=shapes_birch,
+            label_centroids=centroids_birch)
         narration_dyf = generate_tour_narration(
             names_dyf, titles, labels_dyf,
-            edge_pairs=birch_pair_info, model=args.model)
+            edge_pairs=birch_pair_info, model=args.model,
+            cluster_shapes=shapes_dyf,
+            label_centroids=centroids_dyf)
 
         # Generate audio for tour narration
         audio_birch = generate_tour_audio(narration_birch)
@@ -4216,6 +4888,7 @@ def main():
             logo_path=args.logo,
             tour_narration=narration_birch,
             tour_audio=audio_birch,
+            tour_callouts=callouts_birch,
         )
         build_pydeck(
             coords, titles_arr, labels_dyf, rgb_dyf,
@@ -4229,6 +4902,7 @@ def main():
             logo_path=args.logo,
             tour_narration=narration_dyf,
             tour_audio=audio_dyf,
+            tour_callouts=callouts_dyf,
         )
     else:
         cmap_birch = golden_ratio_color_map(labels_birch)
