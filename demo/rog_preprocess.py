@@ -12,6 +12,7 @@ import pandas as pd
 import pickle
 from pathlib import Path
 from sklearn.cluster import Birch
+from sklearn.decomposition import PCA
 from scipy.cluster.hierarchy import linkage, fcluster
 import umap
 from datashader.bundling import hammer_bundle
@@ -1921,6 +1922,385 @@ def compute_lsh_hierarchy(
     }
 
 
+def compute_birch_3d_hierarchy(
+    coords_2d: np.ndarray,
+    coords_3d: np.ndarray,
+    titles: list[str],
+    embeddings: np.ndarray,
+    n_micro_clusters: int = 1000,
+) -> dict:
+    """Build dendrogram hierarchy using BIRCH micro-clusters on 3D UMAP coords.
+
+    BIRCH on 3D UMAP coordinates captures more manifold structure than 2D
+    (filaments, separated continents, thin bridges).  Ward linkage on
+    3D centroids with kNN connectivity builds the hierarchy.  Node centroids
+    are projected back to 2D for label placement in the browser.
+
+    Returns the same dict contract as compute_lsh_hierarchy().
+    """
+    from scipy.cluster.hierarchy import to_tree
+    from collections import defaultdict
+
+    n_points = len(coords_3d)
+    print("Computing 3D spatial hierarchy...")
+
+    # BIRCH on 3D coords
+    target_k = min(n_micro_clusters, n_points // 10)
+    print(f"  BIRCH micro-clustering (target ~{target_k}) on 3D coordinates...")
+    birch = _fit_birch(coords_3d, target_k)
+    n_micro = len(birch.subcluster_centers_)
+    print(f"    BIRCH produced {n_micro} subclusters")
+
+    point_to_micro = birch.labels_
+
+    # Connectivity-constrained Ward linkage on 3D subcluster centroids
+    from sklearn.cluster import AgglomerativeClustering
+    from sklearn.neighbors import kneighbors_graph
+
+    print("  Building dendrogram (connectivity-constrained Ward on 3D centroids)...")
+    n_neighbors = min(10, n_micro - 1)
+    connectivity = kneighbors_graph(
+        birch.subcluster_centers_, n_neighbors=n_neighbors, mode='connectivity')
+    connectivity = 0.5 * (connectivity + connectivity.T)
+
+    agg = AgglomerativeClustering(
+        n_clusters=1,
+        linkage='ward',
+        connectivity=connectivity,
+        compute_distances=True,
+    )
+    agg.fit(birch.subcluster_centers_)
+    Z = _sklearn_to_scipy_Z(agg, n_micro)
+
+    # Build tree and collect node info
+    tree = to_tree(Z, rd=True)
+    root, nodes = tree
+
+    micro_to_points = defaultdict(list)
+    for i, micro_id in enumerate(point_to_micro):
+        micro_to_points[micro_id].append(i)
+
+    node_points = {}
+    node_centroids = {}
+
+    def get_node_points(node):
+        if node.is_leaf():
+            return micro_to_points[node.id]
+        return get_node_points(node.left) + get_node_points(node.right)
+
+    print("  Collecting node info...")
+    for node in nodes:
+        points = get_node_points(node)
+        node_points[node.id] = points
+        if points:
+            # Use 2D coords for centroid placement in the browser
+            centroid = coords_2d[points].mean(axis=0)
+            node_centroids[node.id] = (float(centroid[0]), float(centroid[1]))
+        else:
+            node_centroids[node.id] = (0.0, 0.0)
+
+    # Build parent map from Z for label inheritance
+    parent_map = {}
+    for i, row in enumerate(Z):
+        node_id = n_micro + i
+        parent_map[int(row[0])] = node_id
+        parent_map[int(row[1])] = node_id
+
+    # Label leaf nodes
+    node_labels = {}
+    for node in nodes:
+        if node.is_leaf():
+            pts = node_points[node.id]
+            if pts:
+                if len(pts) > 3:
+                    sample_pts = sample_representative_points(
+                        pts, embeddings, n_samples=3, method="central")
+                else:
+                    sample_pts = pts[:3]
+                node_labels[node.id] = titles[sample_pts[0]][:25]
+            else:
+                node_labels[node.id] = f"Bucket {node.id}"
+
+    # Label internal nodes
+    for node in nodes:
+        if not node.is_leaf() and node.id not in node_labels:
+            pts = node_points[node.id]
+            if pts:
+                cluster_coords = coords_2d[pts]
+                centroid = cluster_coords.mean(axis=0)
+                dists = np.linalg.norm(cluster_coords - centroid, axis=1)
+                node_labels[node.id] = titles[pts[int(np.argmin(dists))]][:25]
+            else:
+                node_labels[node.id] = f"Node {node.id}"
+
+    print("  Tree labels assigned (placeholders for dynamic cutting).")
+
+    max_dist = float(Z[:, 2].max()) if len(Z) > 0 else 1.0
+
+    # Compute 2D centroids for each micro-cluster (for label placement)
+    kmeans_centroids_2d = np.zeros((n_micro, 2))
+    for leaf_idx in range(n_micro):
+        pts = micro_to_points[leaf_idx]
+        if pts:
+            kmeans_centroids_2d[leaf_idx] = coords_2d[pts].mean(axis=0)
+
+    return {
+        'Z': Z,
+        'kmeans_labels': point_to_micro,
+        'kmeans_centroids': kmeans_centroids_2d,
+        'node_labels': node_labels,
+        'node_points': {k: v for k, v in node_points.items()},
+        'node_centroids': node_centroids,
+        'n_micro': n_micro,
+        'max_dist': max_dist,
+    }
+
+
+def _build_pca_tree(embeddings, point_indices, depth, min_leaf_size=2):
+    """Recursively bisect points along local PC1 to build a balanced binary tree.
+
+    Each node splits its subset at the median of the first principal component
+    computed on the high-dimensional embeddings.  Returns a nested dict tree.
+
+    Args:
+        embeddings: Full embedding matrix (n_total, d).
+        point_indices: np.ndarray of indices into *embeddings* for this node.
+        depth: Remaining recursion depth.
+        min_leaf_size: Minimum points per leaf (don't split below 2× this).
+
+    Returns:
+        dict with keys 'left', 'right', 'indices', 'depth'.
+        Leaf nodes have left=right=None.
+    """
+    # Base cases: stop recursion
+    if depth == 0 or len(point_indices) < min_leaf_size * 2:
+        return {'left': None, 'right': None, 'indices': point_indices, 'depth': depth}
+
+    subset = embeddings[point_indices]
+
+    # Try PCA on the local subset
+    try:
+        pca = PCA(n_components=1)
+        projections = pca.fit_transform(subset).ravel()
+    except Exception:
+        # PCA failure (e.g. constant embeddings) → leaf
+        return {'left': None, 'right': None, 'indices': point_indices, 'depth': depth}
+
+    median = np.median(projections)
+
+    left_mask = projections <= median
+    right_mask = ~left_mask
+
+    # Edge case: all projections equal median → force balanced split by index
+    if left_mask.all() or right_mask.all():
+        mid = len(point_indices) // 2
+        left_idx = point_indices[:mid]
+        right_idx = point_indices[mid:]
+    else:
+        left_idx = point_indices[left_mask]
+        right_idx = point_indices[right_mask]
+
+    return {
+        'left': _build_pca_tree(embeddings, left_idx, depth - 1, min_leaf_size),
+        'right': _build_pca_tree(embeddings, right_idx, depth - 1, min_leaf_size),
+        'indices': point_indices,
+        'depth': depth,
+    }
+
+
+def _pca_tree_to_Z(tree, max_depth):
+    """Convert a divisive PCA tree to a scipy-compatible Z linkage matrix.
+
+    Traverses the tree bottom-up:
+    1. Collect leaves → assign IDs 0..n_leaves-1
+    2. Internal nodes sorted deepest-first become merge rows
+    3. Distance = max_depth - node_depth + 1 (deeper = smaller distance = more similar)
+
+    Sorting deepest-first naturally produces non-decreasing distances and
+    guarantees children are always processed before parents.
+
+    Returns:
+        (Z, leaf_points_list) where leaf_points_list[i] = point indices for leaf i.
+    """
+    # Collect leaves and internal nodes via DFS
+    leaves = []
+    internals = []
+
+    def _collect(node, current_depth):
+        if node['left'] is None and node['right'] is None:
+            leaves.append((node, current_depth))
+        else:
+            internals.append((node, current_depth))
+            if node['left'] is not None:
+                _collect(node['left'], current_depth + 1)
+            if node['right'] is not None:
+                _collect(node['right'], current_depth + 1)
+
+    _collect(tree, 0)
+
+    n_leaves = len(leaves)
+
+    # Assign leaf IDs 0..n_leaves-1
+    leaf_id_map = {}   # id(node) → leaf_id
+    leaf_count = {}    # id(node) → 1 for leaves
+    leaf_points_list = []
+    for i, (leaf, _depth) in enumerate(leaves):
+        leaf_id_map[id(leaf)] = i
+        leaf_count[id(leaf)] = 1
+        leaf_points_list.append(leaf['indices'])
+
+    # Sort internal nodes deepest-first: deeper merges have smaller distances
+    # and children always appear before parents (parent depth < child depth).
+    internals.sort(key=lambda x: -x[1])
+
+    n_merges = len(internals)
+    Z = np.zeros((n_merges, 4))
+    node_id_map = dict(leaf_id_map)
+
+    for merge_idx, (node, node_depth) in enumerate(internals):
+        left_child = node['left']
+        right_child = node['right']
+
+        left_id = node_id_map[id(left_child)]
+        right_id = node_id_map[id(right_child)]
+
+        # Distance: deeper splits → smaller distance (more similar)
+        distance = float(max_depth - node_depth + 1)
+
+        # Size: number of *leaves* (observations) under this node
+        left_n = leaf_count[id(left_child)]
+        right_n = leaf_count[id(right_child)]
+
+        Z[merge_idx, 0] = left_id
+        Z[merge_idx, 1] = right_id
+        Z[merge_idx, 2] = distance
+        Z[merge_idx, 3] = left_n + right_n
+
+        new_id = n_leaves + merge_idx
+        node_id_map[id(node)] = new_id
+        leaf_count[id(node)] = left_n + right_n
+
+    return Z, leaf_points_list
+
+
+def compute_pca_tree_hierarchy(
+    coords_2d: np.ndarray,
+    titles: list[str],
+    embeddings: np.ndarray,
+    max_depth: int = 10,
+    min_leaf_size: int = 2,
+) -> dict:
+    """Build dendrogram hierarchy using recursive PCA bisection on embeddings.
+
+    Recursively splits the dataset along the first principal component at each
+    level, producing a balanced binary tree.  The tree IS the dendrogram — no
+    separate micro-clustering or linkage step needed.
+
+    Returns the same dict contract as compute_lsh_hierarchy() so all downstream
+    code (cut_dendrogram, label_flat_clusters, gradients, bridges, panel)
+    works unchanged.
+    """
+    from scipy.cluster.hierarchy import to_tree
+    from collections import defaultdict
+
+    n_points = len(coords_2d)
+    print(f"Computing PCA tree hierarchy (max_depth={max_depth}, "
+          f"min_leaf={min_leaf_size}, n={n_points})...")
+
+    # 1. Build the recursive PCA tree
+    all_indices = np.arange(n_points)
+    tree = _build_pca_tree(embeddings, all_indices, max_depth, min_leaf_size)
+
+    # 2. Convert to scipy Z matrix
+    Z, leaf_points_list = _pca_tree_to_Z(tree, max_depth)
+    n_leaves = len(leaf_points_list)
+    print(f"  PCA tree produced {n_leaves} leaves "
+          f"(~{n_points / max(n_leaves, 1):.1f} pts/leaf)")
+
+    # 3. Build point_to_micro mapping (point → leaf ID)
+    point_to_micro = np.zeros(n_points, dtype=int)
+    for leaf_id, pts in enumerate(leaf_points_list):
+        for p in pts:
+            point_to_micro[p] = leaf_id
+
+    # 4. Reconstruct scipy tree for node traversal
+    scipy_tree = to_tree(Z, rd=True)
+    root, nodes = scipy_tree
+
+    # 5. Build micro_to_points lookup
+    micro_to_points = defaultdict(list)
+    for i, micro_id in enumerate(point_to_micro):
+        micro_to_points[micro_id].append(i)
+
+    # 6. Build node_points and node_centroids for every node
+    node_points = {}
+    node_centroids = {}
+
+    def get_node_points(node):
+        if node.is_leaf():
+            return micro_to_points[node.id]
+        return get_node_points(node.left) + get_node_points(node.right)
+
+    print("  Collecting node info...")
+    for node in nodes:
+        points = get_node_points(node)
+        node_points[node.id] = points
+        if points:
+            centroid = coords_2d[points].mean(axis=0)
+            node_centroids[node.id] = (float(centroid[0]), float(centroid[1]))
+        else:
+            node_centroids[node.id] = (0.0, 0.0)
+
+    # 7. Label leaf nodes (cheap placeholder using central title)
+    node_labels = {}
+    for node in nodes:
+        if node.is_leaf():
+            pts = node_points[node.id]
+            if pts:
+                if len(pts) > 3:
+                    sample_pts = sample_representative_points(
+                        pts, embeddings, n_samples=3, method="central")
+                else:
+                    sample_pts = pts[:3]
+                node_labels[node.id] = titles[sample_pts[0]][:25]
+            else:
+                node_labels[node.id] = f"Leaf {node.id}"
+
+    # 8. Label internal nodes (placeholder for dynamic cutting fallback)
+    for node in nodes:
+        if not node.is_leaf() and node.id not in node_labels:
+            pts = node_points[node.id]
+            if pts:
+                cluster_coords = coords_2d[pts]
+                centroid = cluster_coords.mean(axis=0)
+                dists = np.linalg.norm(cluster_coords - centroid, axis=1)
+                node_labels[node.id] = titles[pts[int(np.argmin(dists))]][:25]
+            else:
+                node_labels[node.id] = f"Node {node.id}"
+
+    print("  Tree labels assigned (placeholders for dynamic cutting).")
+
+    max_dist = float(Z[:, 2].max()) if len(Z) > 0 else 1.0
+
+    # 9. Compute 2D centroids for each leaf (for label placement)
+    kmeans_centroids_2d = np.zeros((n_leaves, 2))
+    for leaf_idx in range(n_leaves):
+        pts = micro_to_points[leaf_idx]
+        if pts:
+            kmeans_centroids_2d[leaf_idx] = coords_2d[pts].mean(axis=0)
+
+    return {
+        'Z': Z,
+        'kmeans_labels': point_to_micro,           # compat: point -> leaf index
+        'kmeans_centroids': kmeans_centroids_2d,    # compat: 2D centroids for label placement
+        'node_labels': node_labels,
+        'node_points': {k: v for k, v in node_points.items()},
+        'node_centroids': node_centroids,
+        'n_micro': n_leaves,
+        'max_dist': max_dist,
+    }
+
+
 def compute_bridge_edges(coords_2d: np.ndarray, embeddings: np.ndarray, cluster_labels: dict,
                          bridge_cluster_level: int = 12):
     """Compute bridge edges using dyf ROG ontology.
@@ -2328,9 +2708,21 @@ def main():
     # Compute LSH visualization data first (needed for LSH-based hierarchy)
     lsh_data = compute_lsh_visualization(coords_2d, embeddings, titles, num_bits=12)
 
-    # BIRCH-based dendrogram hierarchy
-    print("\n=== Building dendrogram hierarchy ===")
-    dendrogram = compute_lsh_hierarchy(coords_2d, titles, embeddings)
+    # 3D UMAP for hierarchy (captures filaments and manifold topology better than 2D)
+    print("\n=== Running 3D UMAP for hierarchy ===")
+    reducer_3d = umap.UMAP(
+        n_components=3,
+        n_neighbors=15,
+        min_dist=0.1,
+        n_jobs=-1,
+        random_state=42,
+        verbose=True,
+    )
+    coords_3d = reducer_3d.fit_transform(embeddings)
+
+    # BIRCH/Ward hierarchy on 3D coords
+    print("\n=== Building BIRCH/Ward 3D hierarchy ===")
+    dendrogram = compute_birch_3d_hierarchy(coords_2d, coords_3d, titles, embeddings)
 
     # Pre-compute cluster results for standard levels
     cluster_result = {'labels': {}, 'names': {}, 'centroids': {}}
@@ -2457,6 +2849,7 @@ def main():
     # Save
     cache = {
         'coords_2d': coords_2d,
+        'coords_3d': coords_3d,
         'titles': titles,
         'cluster_result': cluster_result,
         'bridge_edges': bridge_edges,

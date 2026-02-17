@@ -34,6 +34,7 @@ class SearchResult:
     indices: np.ndarray      # (k,) uint32
     scores: np.ndarray       # (k,) float32
     fields: dict = field(default_factory=dict)  # field_name -> (k,) values
+    routing: dict | None = None  # routing diagnostics when return_routing=True
 
     def __iter__(self):
         """Backward-compatible unpacking: indices, scores = idx.search(...)"""
@@ -748,6 +749,45 @@ class LazyIndex:
             ]
         return summary
 
+    def get_tree_structure(self):
+        """Export tree hierarchy for visualization (FlatBuffers only, no Arrow).
+
+        Returns:
+            list of dicts with keys: node_id, parent_id, depth, num_items,
+            is_leaf, batch_index. Cached after first call.
+        """
+        if hasattr(self, '_tree_structure_cache'):
+            return self._tree_structure_cache
+
+        n_nodes = self._index.NodesLength()
+        # Build parent map from children arrays
+        parent_map = {}  # child_id -> parent_id
+        for nid in range(n_nodes):
+            node = self._index.Nodes(nid)
+            if node is None:
+                continue
+            for ci in range(node.ChildrenLength()):
+                child_id = node.Children(ci)
+                parent_map[child_id] = nid
+
+        result = []
+        for nid in range(n_nodes):
+            node = self._index.Nodes(nid)
+            if node is None:
+                continue
+            is_leaf = node.ChildrenLength() == 0
+            result.append({
+                'node_id': nid,
+                'parent_id': parent_map.get(nid),  # None for root
+                'depth': node.Depth(),
+                'num_items': node.NumItems(),
+                'is_leaf': is_leaf,
+                'batch_index': node.BatchIndex() if is_leaf else -1,
+            })
+
+        self._tree_structure_cache = result
+        return result
+
     def _get_metadata(self):
         """Parse FlatBuffers KeyValue pairs into dict (cached)."""
         if hasattr(self, '_metadata_cache'):
@@ -985,18 +1025,22 @@ class LazyIndex:
                 cost += abs(float(projections[i]))
         return cost
 
-    def search(self, query, k=10, nprobe=3):
+    def search(self, query, k=10, nprobe=3, return_routing=False):
         """Search the index for nearest neighbors.
 
         Args:
             query: (dim,) query vector.
             k: Number of results to return.
             nprobe: Number of leaf probes (1 = single path, >1 = multi-probe).
+            return_routing: If True, populate result.routing with diagnostics.
 
         Returns:
             SearchResult with indices, scores, and fields. Supports
             backward-compatible unpacking: indices, scores = idx.search(...)
         """
+        import time
+        t0 = time.perf_counter()
+
         query = np.asarray(query, dtype=np.float32)
         if query.ndim != 1 or len(query) != self.embedding_dim:
             raise ValueError(
@@ -1023,21 +1067,30 @@ class LazyIndex:
         all_scores = []
         all_fields = {}  # field_name -> list of arrays
         sf_names = self.stored_field_names
+        candidates_scored = 0
 
         for batch_index in candidate_leaves:
             batch = self.get_leaf(batch_index)
             item_indices, scores, field_data = self._score_leaf(
                 batch, query_normed, adc_tables)
+            candidates_scored += len(item_indices)
             all_indices.append(item_indices)
             all_scores.append(scores)
             for fname in sf_names:
                 all_fields.setdefault(fname, []).append(field_data[fname])
 
         if not all_indices:
-            return SearchResult(
+            result = SearchResult(
                 np.array([], dtype=np.uint32),
                 np.array([], dtype=np.float32),
                 {fname: [] for fname in sf_names})
+            if return_routing:
+                result.routing = {
+                    'leaves_probed': list(candidate_leaves),
+                    'candidates_scored': 0,
+                    'elapsed_ms': (time.perf_counter() - t0) * 1000,
+                }
+            return result
 
         all_indices = np.concatenate(all_indices)
         all_scores = np.concatenate(all_scores)
@@ -1084,7 +1137,16 @@ class LazyIndex:
             else:
                 result_fields[fname] = [vals[i] for i in order]
 
-        return SearchResult(all_indices[order], all_scores[order], result_fields)
+        routing_info = None
+        if return_routing:
+            routing_info = {
+                'leaves_probed': list(candidate_leaves),
+                'candidates_scored': candidates_scored,
+                'elapsed_ms': (time.perf_counter() - t0) * 1000,
+            }
+
+        return SearchResult(
+            all_indices[order], all_scores[order], result_fields, routing_info)
 
     def _build_centroid_index(self):
         """Build a flat centroid matrix from all leaf nodes.

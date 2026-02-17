@@ -52,7 +52,20 @@ class WSHandler(tornado.websocket.WebSocketHandler):
         print(f"[ws] Client connected ({len(_clients)} total)")
 
     def on_message(self, message):
-        # Browser clients can also send commands (relay to all others)
+        # Print incoming messages from browser (for debugging)
+        try:
+            msg = json.loads(message)
+            if msg.get("cmd") == "state_response":
+                state_str = json.dumps(msg.get('state', {}), indent=2)
+                print(f"[browser] State: {state_str}")
+                # Write to file for external tools to read
+                with open("/tmp/viz_state.json", "w") as f:
+                    f.write(state_str)
+            else:
+                print(f"[browser] {message[:200]}")
+        except:
+            print(f"[browser] {message[:200]}")
+        # Relay to all other clients
         for c in _clients:
             if c is not self:
                 try:
