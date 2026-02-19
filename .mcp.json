@@ -4,11 +4,9 @@
       "command": "python",
       "args": [
         "/Users/jdonaldson/Projects/dyf/demo/rog_mcp.py",
-        "/Users/jdonaldson/Projects/dyf/demo/wiki_simple_50k_rog_cache.pkl",
+        "/Users/jdonaldson/Projects/dyf/demo/gudid_energy_devices_rog_cache.pkl",
         "--ws-url",
-        "ws://localhost:8766/ws",
-        "--dyf-index",
-        "/Users/jdonaldson/Projects/dyf/demo/wiki_simple_50k.dyf"
+        "ws://localhost:8766/ws"
       ]
     }
   }
