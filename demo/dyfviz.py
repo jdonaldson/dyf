@@ -41,12 +41,23 @@ from dyf.dyf_tree import (
 # ── Helpers ──────────────────────────────────────────────────────────────
 
 
-def load_and_dedup(parquet_path, sample=None):
-    """Load parquet, optionally sample, dedup via LSH."""
+def load_and_dedup(parquet_path, sample=None, pre_labels=None):
+    """Load parquet, optionally sample, dedup via LSH.
+
+    If pre_labels is provided (ndarray same length as parquet), it is
+    filtered through the same sample + dedup pipeline and returned as
+    the third element of the tuple.
+    """
     print(f"Loading {parquet_path}...")
     df = pl.read_parquet(parquet_path)
     if sample and sample < len(df):
         df = df.sample(sample, seed=42)
+        if pre_labels is not None:
+            # pl.DataFrame.sample with seed=42 uses polars internal RNG;
+            # we need to replicate the same row selection.  Polars sample
+            # returns rows in their original order, so reconstruct indices.
+            idx = df.with_row_index("__idx__")["__idx__"].to_numpy()
+            pre_labels = pre_labels[idx]
 
     titles = df["title"].to_list()
     embeddings = np.array(df["embedding"].to_list(), dtype=np.float32)
@@ -62,8 +73,10 @@ def load_and_dedup(parquet_path, sample=None):
     n_before = len(titles)
     titles = [t for t, keep in zip(titles, dedup_mask) if keep]
     embeddings = embeddings[dedup_mask]
+    if pre_labels is not None:
+        pre_labels = pre_labels[dedup_mask]
     print(f"  {n_before} -> {len(titles)} after dedup")
-    return titles, embeddings
+    return titles, embeddings, pre_labels
 
 
 def suggest_n_neighbors(embeddings, num_bits=12, min_k=15, max_k=100):
@@ -323,8 +336,16 @@ def compute_bridge_edges_3d(coords, embeddings, labels, n_clusters):
     return bundled_2d_flat, bundled_3d, pair_counts, centroids
 
 
-def fit_birch(data, target_k, max_iters=10):
-    """Fit BIRCH with enough subclusters, then agglomerative merge to target_k."""
+def fit_birch(data, target_k, max_iters=10, embeddings=None):
+    """Fit BIRCH with enough subclusters, then agglomerative merge to target_k.
+
+    If *embeddings* is provided, the agglomerative merge uses Ward linkage
+    on L2-normalised embedding-space centroids (cosine-like) instead of the
+    projected-coord subcluster centres.  This gives semantically coherent
+    clusters while BIRCH handles the spatial partitioning.
+    """
+    from scipy.cluster.hierarchy import linkage, fcluster
+
     # Binary search for a threshold that produces >= target_k subclusters
     lo, hi = 1e-4, float(np.linalg.norm(data.max(axis=0) - data.min(axis=0)))
     best_birch, best_n = None, 0
@@ -350,13 +371,71 @@ def fit_birch(data, target_k, max_iters=10):
 
     # Agglomerative merge subclusters down to exactly target_k
     n_subs = len(best_birch.subcluster_centers_)
-    if n_subs > target_k:
-        birch = Birch(n_clusters=target_k, threshold=best_birch.threshold,
-                      branching_factor=50)
-        birch.fit(data)
-        return birch
+    if n_subs <= target_k:
+        return best_birch
 
-    return best_birch
+    if embeddings is not None:
+        # Hybrid merge: combine embedding similarity with UMAP spatial
+        # proximity so clusters are both semantically coherent AND
+        # visually contiguous (no isolated fragments).
+        sub_labels = best_birch.predict(data)
+
+        # Embedding centroids (L2-normalised → cosine-like)
+        sub_emb_centroids = np.zeros((n_subs, embeddings.shape[1]),
+                                     dtype=np.float64)
+        # UMAP-space centroids
+        sub_spatial_centroids = np.zeros((n_subs, data.shape[1]),
+                                         dtype=np.float64)
+        for sid in range(n_subs):
+            mask = sub_labels == sid
+            if mask.any():
+                sub_emb_centroids[sid] = embeddings[mask].mean(axis=0)
+                sub_spatial_centroids[sid] = data[mask].mean(axis=0)
+
+        # L2-normalise embeddings so euclidean Ward ≈ cosine Ward
+        norms = np.linalg.norm(sub_emb_centroids, axis=1, keepdims=True)
+        norms[norms == 0] = 1.0
+        sub_emb_normed = sub_emb_centroids / norms
+
+        # Normalise spatial centroids to unit variance per dimension
+        # so they're on comparable scale to the embedding features
+        spatial_std = sub_spatial_centroids.std(axis=0, keepdims=True)
+        spatial_std[spatial_std == 0] = 1.0
+        sub_spatial_normed = sub_spatial_centroids / spatial_std
+
+        # Concatenate: embedding features + spatial features (weighted)
+        # spatial_weight controls how much UMAP proximity matters
+        # 0.5 = balanced; higher = more visually contiguous clusters
+        spatial_weight = 0.5
+        hybrid = np.hstack([sub_emb_normed,
+                            sub_spatial_normed * spatial_weight])
+
+        Z = linkage(hybrid, method='ward')
+        merge_labels = fcluster(Z, t=target_k, criterion='maxclust') - 1
+
+        # Attach the merge mapping so predict() returns final cluster IDs
+        # while predict_sub() preserves access to raw subcluster IDs
+        # (needed by build_label_hierarchy).
+        best_birch._emb_merge_labels = merge_labels
+        best_birch._target_k = target_k
+        best_birch.predict_sub = best_birch.predict  # raw subcluster predict
+
+        _orig_predict = best_birch.predict
+
+        def _merged_predict(X, _orig=_orig_predict, _map=merge_labels):
+            sub_ids = _orig(X)
+            return np.array([_map[s] for s in sub_ids])
+
+        best_birch.predict = _merged_predict
+        print(f"  BIRCH: {n_subs} subclusters → {target_k} via "
+              f"hybrid (embedding + spatial w={spatial_weight}) Ward linkage")
+        return best_birch
+
+    # Fallback: agglomerative merge on projected coords (original behaviour)
+    birch = Birch(n_clusters=target_k, threshold=best_birch.threshold,
+                  branching_factor=50)
+    birch.fit(data)
+    return birch
 
 
 def cluster_levels(target_k):
@@ -387,7 +466,9 @@ def build_label_hierarchy(coords, titles_arr, birch, embeddings=None,
 
     # Map each point to its subcluster (predict on same space BIRCH was fit on)
     predict_data = cluster_data if cluster_data is not None else coords
-    sub_labels = birch.predict(predict_data)
+    # Use raw subcluster predict if available (embedding-agglom mode)
+    _predict = getattr(birch, 'predict_sub', birch.predict)
+    sub_labels = _predict(predict_data)
 
     levels = {}
     for k in cluster_levels(target_k):
@@ -1628,7 +1709,7 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
                  cluster_names=None, ws_port=8766, label_levels=None,
                  bundled_edges_2d=None, bundled_edges_3d=None, edge_pairs=None,
                  logo_path=None, tour_narration=None, tour_audio=None,
-                 tour_callouts=None, tour_title=None):
+                 tour_callouts=None, tour_title=None, subtitle_str=""):
     """Build a pydeck 3D point cloud with HTML overlay labels."""
     import base64
     import pyarrow as pa
@@ -1870,6 +1951,7 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
         callouts_json=callouts_json,
         audio_json=audio_json,
         title_str=title_str,
+        subtitle_str=subtitle_str,
         client_logo_html=client_logo_html,
         tour_title=tour_title,
     )
@@ -1882,7 +1964,7 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
 def build_pydeck_overlay(*, points_ipc_b64, edges_2d_ipc_b64, edges_3d_ipc_b64,
                          label_json, levels_json, edge_pairs_json,
                          narration_json, callouts_json, audio_json,
-                         title_str, client_logo_html, tour_title):
+                         title_str, subtitle_str, client_logo_html, tour_title):
     """Render the JS overlay template. Can be called standalone for patching."""
     dyf_logo_svg = (
         '<svg class="dyf-logo" viewBox="0 0 340 105" width="85" height="26">'
@@ -1909,6 +1991,7 @@ def build_pydeck_overlay(*, points_ipc_b64, edges_2d_ipc_b64, edges_3d_ipc_b64,
   padding:12px 20px;font:14px -apple-system,'Segoe UI',sans-serif;">
   <div style="margin-bottom:6px;">{client_logo_html}</div>
   <div style="font-size:28px;font-weight:700;letter-spacing:0.01em">{title_str}</div>
+  <div style="font-size:12px;opacity:0.6;margin-top:2px;">{subtitle_str}</div>
   <div id="header-sub" class="sub" style="font-size:11px;">
     Scroll to zoom &middot; Drag to orbit &middot; Hover for details
     <span id="session-id" style="margin-left:12px;opacity:0.7;font-family:monospace;"></span>
@@ -1916,9 +1999,9 @@ def build_pydeck_overlay(*, points_ipc_b64, edges_2d_ipc_b64, edges_3d_ipc_b64,
   </div>
 </div>
 <!-- Tour cluster label overlay (positioned at centroid) -->
-<div id="tour-label" style="display:none;position:absolute;z-index:15;padding:8px 16px;
+<div id="tour-label" style="display:none;position:absolute;z-index:50;padding:8px 16px;
   background:rgba(0,0,0,0.85);border-radius:6px;
-  font:600 16px -apple-system,'Segoe UI',sans-serif;color:#fff;
+  font:600 18px -apple-system,'Segoe UI',sans-serif;color:#fff;
   text-align:center;pointer-events:none;white-space:nowrap;
   box-shadow:0 2px 12px rgba(0,0,0,0.5);
   transform:translate(-50%,-100%) translateY(-12px);"></div>
@@ -1969,11 +2052,11 @@ body.light .tour-callout-label {{
   color:#111;
 }}
 #tour-label.hero {{
-  font-size:clamp(36px, 6vw, 72px);
-  padding:24px 48px;
-  border-radius:12px;
-  background:rgba(0,0,0,0.7);
-  box-shadow:0 4px 40px rgba(0,0,0,0.6);
+  font-size:clamp(42px, 7vw, 84px);
+  padding:32px 56px;
+  border-radius:14px;
+  background:rgba(0,0,0,0.8);
+  box-shadow:0 6px 60px rgba(0,0,0,0.7);
   transform:translate(-50%,-50%);
   letter-spacing:0.02em;
 }}
@@ -2214,13 +2297,7 @@ function togglePanel() {{
     if (header) header.style.right = "260px";
   }}
 }}
-window.panelHidden = false;
 window.togglePanel = togglePanel;
-// Keep panelHidden in sync via getter/setter
-Object.defineProperty(window, 'panelHidden', {{
-  get: function() {{ return panelHidden; }},
-  set: function(v) {{ panelHidden = v; }}
-}});
 </script>
 <script type="module">
 import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+esm";
@@ -2756,6 +2833,13 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
   var currentAudioSource = null;
   var currentAudioDuration = 10000;  // duration of current clip in ms
 
+  // Eagerly unlock AudioContext on first user gesture (needed for autoplay policy)
+  document.addEventListener("click", function initAudio() {{
+    if (!audioContext) audioContext = new AudioContext();
+    if (audioContext.state === "suspended") audioContext.resume();
+    document.removeEventListener("click", initAudio);
+  }}, {{ once: true }});
+
   function playClusterAudio(cid) {{
     var entry = tourAudio[String(cid)];
     if (!entry || !entry.data) return 0;
@@ -3250,7 +3334,7 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
       tourLabelEl.style.display = "none";
 
       // Get audio duration (playback deferred to holdClose phase after zoom settles)
-      tourStopDuration = getAudioDuration(cid) + 2000 + 2000;  // panZoomIn + audio + 2s buffer
+      tourStopDuration = getAudioDuration(cid) + 2000 + 4000;  // panZoomIn + audio + 4s buffer
 
       // No edge highlighting during tour — zoom and ring identify the active cluster
       setEdgeHighlight([]);
@@ -4511,10 +4595,22 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
         case "reset_view":
           var dk = getDeck();
           if (dk && dk.setProps) {{
-            dk.setProps({{ initialViewState: {{
-              target: [0,0,0], rotationX: 15, rotationOrbit: 30, zoom: defaultZoom,
-              transitionDuration: 300
-            }} }});
+            if (viewMode === "2d") {{
+              dk.setProps({{
+                initialViewState: {{
+                  target: [0,0,0], rotationX: 90, rotationOrbit: 0, zoom: defaultZoom,
+                  minRotationX: 90, maxRotationX: 90,
+                  transitionDuration: 300
+                }},
+                controller: {{ dragMode: "pan" }}
+              }});
+            }} else {{
+              dk.setProps({{ initialViewState: {{
+                target: [0,0,0], rotationX: 15, rotationOrbit: 30, zoom: defaultZoom,
+                minRotationX: -90, maxRotationX: 90,
+                transitionDuration: 300
+              }} }});
+            }}
           }}
           break;
         case "point_size":
@@ -4575,7 +4671,6 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
         case "zoom_to":
           var dkZ = getDeck();
           if (dkZ && dkZ.setProps) {{
-            // Start from current view state to preserve rotation
             var curVS = {{}};
             if (dkZ.viewManager) {{
               try {{ curVS = JSON.parse(JSON.stringify(dkZ.viewManager.getViewState())); }} catch(e) {{}}
@@ -4583,6 +4678,13 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
             curVS.transitionDuration = msg.transitionDuration || 500;
             if (msg.target) curVS.target = msg.target;
             if (typeof msg.zoom === "number") curVS.zoom = msg.zoom;
+            if (viewMode === "2d") {{
+              curVS.rotationX = 90;
+              curVS.rotationOrbit = 0;
+              curVS.minRotationX = 90;
+              curVS.maxRotationX = 90;
+            }}
+            curVS.transitionInterpolator = new deck.LinearInterpolator(['target', 'zoom']);
             dkZ.setProps({{ initialViewState: curVS }});
           }}
           break;
@@ -4883,6 +4985,9 @@ def main():
                         help="WebSocket port for viz_server bridge (default: 8766)")
     parser.add_argument("--cluster-2d", action="store_true",
                         help="Run BIRCH clustering on 2D projection (x,y only)")
+    parser.add_argument("--pre-clusters", default=None,
+                        help="NPY file with pre-computed cluster labels "
+                             "(one int per parquet row, bypasses BIRCH)")
     parser.add_argument("--logo", default=None,
                         help="Path to logo image (PNG) to embed in header")
     parser.add_argument("--title", default=None,
@@ -4894,7 +4999,13 @@ def main():
     args = parser.parse_args()
 
     outdir = Path(args.parquet_path).parent
-    titles, embeddings = load_and_dedup(args.parquet_path, args.sample)
+    pre_labels = None
+    if args.pre_clusters:
+        pre_labels = np.load(args.pre_clusters)
+        print(f"  Loaded pre-computed clusters: {len(pre_labels)} labels, "
+              f"{len(set(pre_labels))} unique")
+    titles, embeddings, pre_labels = load_and_dedup(
+        args.parquet_path, args.sample, pre_labels=pre_labels)
     n = len(titles)
     titles_arr = np.array(titles)
     target_k = args.n_clusters
@@ -4908,52 +5019,65 @@ def main():
                        densmap=args.densmap)
     coords = orient_landscape(coords)
 
-    # ── BIRCH clustering on projected coords ─────────────────────────────
+    # ── Clustering on projected coords ────────────────────────────────────
     cluster_coords = coords[:, :2] if args.cluster_2d else coords
     cluster_dim = 2 if args.cluster_2d else n_components
-    print(f"\nFitting BIRCH (target_k={target_k}) on {cluster_dim}D coords...")
-    birch = fit_birch(cluster_coords, target_k)
-    labels_birch = birch.predict(cluster_coords)
-    n_birch = len(set(labels_birch))
-    print(f"  BIRCH: {n_birch} clusters")
 
-    # Merge tiny clusters (< 0.5% of total) into nearest large neighbor
-    min_cluster_size = max(10, int(len(labels_birch) * 0.005))
-    from collections import Counter
-    cluster_counts = Counter(labels_birch)
-    tiny_cids = {cid for cid, cnt in cluster_counts.items() if cnt < min_cluster_size}
-    if tiny_cids:
-        # Compute centroids of non-tiny clusters
-        big_cids = sorted(set(labels_birch) - tiny_cids)
-        big_centroids = {}
-        for cid in big_cids:
-            mask = labels_birch == cid
-            big_centroids[cid] = cluster_coords[mask].mean(axis=0)
-        # Reassign each tiny cluster to nearest big centroid
-        for tcid in sorted(tiny_cids):
-            mask = labels_birch == tcid
-            centroid = cluster_coords[mask].mean(axis=0)
-            dists = {cid: np.linalg.norm(centroid - c)
-                     for cid, c in big_centroids.items()}
-            nearest = min(dists, key=dists.get)
-            labels_birch[mask] = nearest
-            print(f"  Merged tiny cluster {tcid} ({cluster_counts[tcid]} pts) -> {nearest}")
-        # Relabel to contiguous IDs
+    if pre_labels is not None:
+        # Use pre-computed cluster labels (e.g. from HDBSCAN pipeline)
+        labels_birch = pre_labels.astype(int)
+        # Relabel to contiguous 0-based IDs
         old_ids = sorted(set(labels_birch))
         id_map = {old: new for new, old in enumerate(old_ids)}
         labels_birch = np.array([id_map[l] for l in labels_birch])
         n_birch = len(set(labels_birch))
-        print(f"  After merge: {n_birch} clusters")
+        print(f"\nUsing pre-computed clusters: {n_birch} clusters, {n} points")
 
-    # ── Multi-level label hierarchy from BIRCH ───────────────────────────
-    print(f"\nBuilding label hierarchy from BIRCH subclusters...")
-    hierarchy_model = args.model
-    birch_levels = build_label_hierarchy(
-        coords, titles_arr, birch, embeddings=embeddings,
-        model=hierarchy_model, base_labels=labels_birch,
-        target_k=target_k,
-        cluster_data=cluster_coords if args.cluster_2d else None,
-    )
+        # Build a simple single-level hierarchy (no BIRCH subclusters)
+        birch_levels = {}
+    else:
+        print(f"\nFitting BIRCH (target_k={target_k}) on {cluster_dim}D coords...")
+        birch = fit_birch(cluster_coords, target_k)
+        labels_birch = birch.predict(cluster_coords)
+        n_birch = len(set(labels_birch))
+        print(f"  BIRCH: {n_birch} clusters")
+
+        # Merge tiny clusters (< 0.5% of total) into nearest large neighbor
+        min_cluster_size = max(10, int(len(labels_birch) * 0.005))
+        from collections import Counter
+        cluster_counts = Counter(labels_birch)
+        tiny_cids = {cid for cid, cnt in cluster_counts.items()
+                     if cnt < min_cluster_size}
+        if tiny_cids:
+            big_cids = sorted(set(labels_birch) - tiny_cids)
+            big_centroids = {}
+            for cid in big_cids:
+                mask = labels_birch == cid
+                big_centroids[cid] = cluster_coords[mask].mean(axis=0)
+            for tcid in sorted(tiny_cids):
+                mask = labels_birch == tcid
+                centroid = cluster_coords[mask].mean(axis=0)
+                dists = {cid: np.linalg.norm(centroid - c)
+                         for cid, c in big_centroids.items()}
+                nearest = min(dists, key=dists.get)
+                labels_birch[mask] = nearest
+                print(f"  Merged tiny cluster {tcid} "
+                      f"({cluster_counts[tcid]} pts) -> {nearest}")
+            old_ids = sorted(set(labels_birch))
+            id_map = {old: new for new, old in enumerate(old_ids)}
+            labels_birch = np.array([id_map[l] for l in labels_birch])
+            n_birch = len(set(labels_birch))
+            print(f"  After merge: {n_birch} clusters")
+
+        # Multi-level label hierarchy from BIRCH subclusters
+        print(f"\nBuilding label hierarchy from BIRCH subclusters...")
+        hierarchy_model = args.model
+        birch_levels = build_label_hierarchy(
+            coords, titles_arr, birch, embeddings=embeddings,
+            model=hierarchy_model, base_labels=labels_birch,
+            target_k=target_k,
+            cluster_data=cluster_coords if args.cluster_2d else None,
+        )
 
     # ── DYF tree clustering on high-D embeddings ─────────────────────────
     print(f"\nBuilding DYF tree (depth={args.dyf_depth}, bits={args.dyf_bits}) "
@@ -5105,8 +5229,10 @@ def main():
         path_birch = str(outdir / "rog_3d_birch_clusters.html")
         path_dyf = str(outdir / "rog_3d_dyf_tree_clusters.html")
 
-        birch_title = args.title or f"BIRCH on {dim_label} (k={dyf_k} UMAP) — {n_birch} clusters, {n:,} pts"
-        dyf_title = args.title or (
+        birch_title = args.title or "GUDID Energy Devices"
+        birch_subtitle = f"BIRCH on {dim_label} (k={dyf_k} UMAP) — {n_birch} clusters, {n:,} pts"
+        dyf_title = args.title or "GUDID Energy Devices"
+        dyf_subtitle = (
             f"DYF Tree (depth={args.dyf_depth}, bits={args.dyf_bits}) "
             f"— {n_dyf} clusters, {n:,} pts"
         )
@@ -5124,6 +5250,7 @@ def main():
             tour_audio=audio_birch,
             tour_callouts=callouts_birch,
             tour_title=args.title,
+            subtitle_str=birch_subtitle,
         )
         build_pydeck(
             coords, titles_arr, labels_dyf, rgb_dyf,
@@ -5137,6 +5264,7 @@ def main():
             tour_narration=narration_dyf,
             tour_audio=audio_dyf,
             tour_callouts=callouts_dyf,
+            subtitle_str=dyf_subtitle,
             tour_title=args.title,
         )
     else:

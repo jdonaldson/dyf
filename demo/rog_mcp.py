@@ -14,8 +14,10 @@ import pickle
 import sys
 from pathlib import Path
 
+import asyncio
+
 import numpy as np
-from tornado.websocket import websocket_connect
+import websockets
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import Tool, TextContent
@@ -26,6 +28,7 @@ from mcp.types import Tool, TextContent
 
 CACHE = None
 WS_URL = "ws://localhost:8766/ws"
+WS_CONN = None         # Persistent WebSocket connection to viz_server
 DYF_INDEX = None       # LazyIndex instance (None if --dyf-index not provided)
 EMBED_MODEL = None     # Lazy-loaded embedding model for semantic_search
 
@@ -279,14 +282,23 @@ def get_bucket_members(bucket_id: int, limit: int = 20) -> list[dict]:
 # -----------------------------------------------------------------------------
 
 async def send_ws(cmd: dict) -> dict:
-    """Send a command to the viz_server via WebSocket."""
+    """Send a command to the viz_server via a persistent WebSocket."""
+    global WS_CONN
     try:
-        conn = await websocket_connect(WS_URL, connect_timeout=5)
-        await conn.write_message(json.dumps(cmd))
-        conn.close()
+        if WS_CONN is None:
+            WS_CONN = await websockets.connect(WS_URL)
+        await WS_CONN.send(json.dumps(cmd))
         return {"ok": True, "cmd": cmd.get("cmd")}
-    except Exception as e:
-        return {"error": str(e), "hint": "Is viz_server.py running?"}
+    except Exception:
+        # Connection lost — reconnect once and retry
+        WS_CONN = None
+        try:
+            WS_CONN = await websockets.connect(WS_URL)
+            await WS_CONN.send(json.dumps(cmd))
+            return {"ok": True, "cmd": cmd.get("cmd")}
+        except Exception as e:
+            WS_CONN = None
+            return {"error": str(e), "hint": "Is viz_server.py running?"}
 
 
 def _cluster_zoom_params(cluster_id: int, level: int) -> dict | None:
