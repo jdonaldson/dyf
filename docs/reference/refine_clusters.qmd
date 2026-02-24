@@ -1,0 +1,38 @@
+# refine_clusters { #dyf.refine_clusters }
+
+```python
+refine_clusters(
+    labels,
+    embeddings,
+    min_coherence=None,
+    min_cluster_size=None,
+    num_bits=6,
+    seed_offset=2000,
+)
+```
+
+Post-processing safety net: eject periphery from incoherent clusters.
+
+For each cluster below the coherence threshold, keeps core points (above
+median similarity to centroid) and ejects periphery into a shared pool.
+The pool is re-split with a rotated LSH seed.  Small resulting clusters
+are iteratively merged with their nearest neighbor until they reach
+min_cluster_size, then any remaining runts are absorbed into the nearest
+large cluster.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+| Name             | Type   | Description                                                                                               | Default    |
+|------------------|--------|-----------------------------------------------------------------------------------------------------------|------------|
+| labels           |        | (n,) cluster label array.                                                                                 | _required_ |
+| embeddings       |        | (n, d) array of embedding vectors.                                                                        | _required_ |
+| min_coherence    |        | Coherence threshold. If None, uses 25th percentile.                                                       | `None`     |
+| min_cluster_size |        | Minimum viable cluster size.  If None, uses n_points / n_clusters / 3 (one-third of the expected median). | `None`     |
+| num_bits         |        | LSH bits for re-splitting the ejected pool.                                                               | `6`        |
+| seed_offset      |        | Seed for the re-split DensityClassifier.                                                                  | `2000`     |
+
+## Returns {.doc-section .doc-section-returns}
+
+| Name   | Type   | Description                                           |
+|--------|--------|-------------------------------------------------------|
+|        |        | np.ndarray of shape (n,) with refined cluster labels. |

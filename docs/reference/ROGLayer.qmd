@@ -1,0 +1,18 @@
+# ROGLayer { #dyf.ROGLayer }
+
+```python
+ROGLayer(depth, similarity_threshold, node_indices, n_nodes, n_edges, coverage)
+```
+
+A single layer in the ROG hierarchy.
+
+## Attributes {.doc-section .doc-section-attributes}
+
+| Name                 | Type                                     | Description                             |
+|----------------------|------------------------------------------|-----------------------------------------|
+| depth                | [int](`int`)                             | Recursion depth (0 = root layer)        |
+| similarity_threshold | [float](`float`)                         | Threshold used for this layer           |
+| node_indices         | [np](`numpy`).[ndarray](`numpy.ndarray`) | Global indices of nodes in this layer   |
+| n_nodes              | [int](`int`)                             | Number of nodes                         |
+| n_edges              | [int](`int`)                             | Number of edges                         |
+| coverage             | [float](`float`)                         | Fraction of input covered by this layer |

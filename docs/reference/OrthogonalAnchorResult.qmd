@@ -1,0 +1,20 @@
+# OrthogonalAnchorResult { #dyf.OrthogonalAnchorResult }
+
+```python
+OrthogonalAnchorResult(indices, seed_indices, candidate_source)
+```
+
+Result of orthogonal anchor selection.
+
+Orthogonal anchors are maximally spread points selected using greedy
+farthest-point sampling. Starting from seed points (typically super
+connectors), each subsequent anchor is chosen to maximize minimum
+distance from all previously selected anchors.
+
+## Attributes {.doc-section .doc-section-attributes}
+
+| Name             | Type                                     | Description                                          |
+|------------------|------------------------------------------|------------------------------------------------------|
+| indices          | [np](`numpy`).[ndarray](`numpy.ndarray`) | Array of selected anchor indices                     |
+| seed_indices     | [np](`numpy`).[ndarray](`numpy.ndarray`) | Initial seed indices (e.g., super connectors)        |
+| candidate_source | [str](`str`)                             | Source of candidates ('bridges', 'all', or 'custom') |

@@ -1,0 +1,26 @@
+# cluster_quality { #dyf.cluster_quality }
+
+```python
+cluster_quality(coherence, cluster_labels, threshold_pct=75)
+```
+
+Identify meta/structural clusters from neighbor coherence.
+
+Clusters whose members have high mean coherence are structural echo
+chambers — collections of documents that reference each other heavily
+(date pages, year pages, event lists) rather than covering a genuine
+topic.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+| Name           | Type   | Description                                                                                                | Default    |
+|----------------|--------|------------------------------------------------------------------------------------------------------------|------------|
+| coherence      |        | (n,) array of per-point neighbor coherence values        (from neighbor_coherence).                        | _required_ |
+| cluster_labels |        | (n,) array of cluster assignments.                                                                         | _required_ |
+| threshold_pct  |        | Percentile of per-cluster mean coherence above            which a cluster is flagged as meta.  Default 75. | `75`       |
+
+## Returns {.doc-section .doc-section-returns}
+
+| Name   | Type   | Description                                                                                                                                                                                                             |
+|--------|--------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+|        |        | dict with: cluster_mean_coherence: (n_clusters,) array of per-cluster                         mean coherence. meta_clusters: set of cluster IDs above the threshold. threshold: the computed coherence threshold value. |

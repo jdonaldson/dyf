@@ -1,0 +1,53 @@
+# DAGMiningResult { #dyf.DAGMiningResult }
+
+```python
+DAGMiningResult(chains, diversity, parent_child_edges, n_components)
+```
+
+Result of DAG mining on an embedding space.
+
+DAG mining finds hierarchical structures by using neighbor diversity
+as a generality signal. Points with diverse neighbors (connecting
+many topics) are considered "general", while points with coherent
+neighbors (tight clusters) are "specific".
+
+## Attributes {.doc-section .doc-section-attributes}
+
+| Name               | Type                                                                                                               | Description                                     |
+|--------------------|--------------------------------------------------------------------------------------------------------------------|-------------------------------------------------|
+| chains             | [List](`typing.List`)\[[DAGChain](`dyf.rag.DAGChain`)\]                                                            | List of extracted DAG chains                    |
+| diversity          | [np](`numpy`).[ndarray](`numpy.ndarray`)                                                                           | Neighbor diversity score for each point         |
+| parent_child_edges | [List](`typing.List`)\[[Tuple](`typing.Tuple`)\[[int](`int`), [int](`int`), [float](`float`), [float](`float`)\]\] | List of (parent, child, similarity, gap) tuples |
+| n_components       | [int](`int`)                                                                                                       | Number of connected components in the DAG       |
+
+## Methods
+
+| Name | Description |
+| --- | --- |
+| [get_chains_by_coherence](#dyf.DAGMiningResult.get_chains_by_coherence) | Return chains with at least min_coherence. |
+| [get_chains_by_length](#dyf.DAGMiningResult.get_chains_by_length) | Return chains with at least min_length nodes. |
+| [summary](#dyf.DAGMiningResult.summary) | Return summary statistics. |
+
+### get_chains_by_coherence { #dyf.DAGMiningResult.get_chains_by_coherence }
+
+```python
+DAGMiningResult.get_chains_by_coherence(min_coherence=0.65)
+```
+
+Return chains with at least min_coherence.
+
+### get_chains_by_length { #dyf.DAGMiningResult.get_chains_by_length }
+
+```python
+DAGMiningResult.get_chains_by_length(min_length=3)
+```
+
+Return chains with at least min_length nodes.
+
+### summary { #dyf.DAGMiningResult.summary }
+
+```python
+DAGMiningResult.summary()
+```
+
+Return summary statistics.

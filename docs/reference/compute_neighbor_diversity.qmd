@@ -1,0 +1,31 @@
+# compute_neighbor_diversity { #dyf.compute_neighbor_diversity }
+
+```python
+compute_neighbor_diversity(embeddings, k=15, neighbors=None)
+```
+
+Compute neighbor diversity for each point.
+
+Diversity measures how dissimilar a point's neighbors are to each other.
+High diversity indicates a "general" concept that connects multiple topics.
+Low diversity indicates a "specific" concept within a tight cluster.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+| Name       | Type                                                                      | Description                                                       | Default    |
+|------------|---------------------------------------------------------------------------|-------------------------------------------------------------------|------------|
+| embeddings | [np](`numpy`).[ndarray](`numpy.ndarray`)                                  | Normalized embeddings (n, d)                                      | _required_ |
+| k          | [int](`int`)                                                              | Number of neighbors to consider                                   | `15`       |
+| neighbors  | [Optional](`typing.Optional`)\[[np](`numpy`).[ndarray](`numpy.ndarray`)\] | Pre-computed k-NN indices (n, k+1). If None, computed internally. | `None`     |
+
+## Returns {.doc-section .doc-section-returns}
+
+| Name   | Type                                     | Description                                                  |
+|--------|------------------------------------------|--------------------------------------------------------------|
+|        | [np](`numpy`).[ndarray](`numpy.ndarray`) | Diversity scores for each point (n,). Higher = more general. |
+
+## Example {.doc-section .doc-section-example}
+
+>>> diversity = compute_neighbor_diversity(embeddings, k=15)
+>>> general_idx = np.argsort(diversity)[-10:]  # Most general concepts
+>>> specific_idx = np.argsort(diversity)[:10]  # Most specific concepts

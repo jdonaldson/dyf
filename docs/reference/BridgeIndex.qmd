@@ -1,0 +1,178 @@
+# BridgeIndex { #dyf.BridgeIndex }
+
+```python
+BridgeIndex(
+    n_anchors=1000,
+    n_query_anchors=10,
+    expansion_k=200,
+    global_num_bits=12,
+    facet_num_bits=10,
+    dense_percentile=75,
+    min_bucket_size=20,
+    include_sparse_points=0,
+    seed=42,
+    _embeddings=None,
+    _anchor_indices=None,
+    _anchor_embeddings=None,
+    _neighborhoods=None,
+    _super_connectors=None,
+    _bridge_indices=None,
+    _fitted=False,
+)
+```
+
+Two-tier RAG index using bridge-based anchors for efficient retrieval.
+
+Instead of indexing all embeddings, BridgeIndex selects a small set of
+"anchor" points that provide good coverage of the embedding space.
+Queries first find nearby anchors, then expand to their neighborhoods.
+
+The key innovation is using bridge points (which connect multiple LSH
+buckets) as anchors rather than cluster centroids. Bridges naturally
+occur at semantic boundaries and provide better coverage.
+
+## Attributes {.doc-section .doc-section-attributes}
+
+| Name            | Type         | Description                                     |
+|-----------------|--------------|-------------------------------------------------|
+| n_anchors       | [int](`int`) | Number of anchor points to use                  |
+| n_query_anchors | [int](`int`) | Number of anchors to retrieve per query         |
+| expansion_k     | [int](`int`) | Size of neighborhood to expand from each anchor |
+| global_num_bits | [int](`int`) | LSH bits for global bucketing (default 12)      |
+| seed            | [int](`int`) | Random seed for reproducibility                 |
+
+## Example {.doc-section .doc-section-example}
+
+>>> index = BridgeIndex(n_anchors=1000)
+>>> index.fit(embeddings)
+>>>
+>>> # Single query
+>>> candidates, scores = index.query(query_vec, k=10)
+>>>
+>>> # Batch queries
+>>> results = index.query_batch(query_vecs, k=10)
+
+## Methods
+
+| Name | Description |
+| --- | --- |
+| [evaluate_recall](#dyf.BridgeIndex.evaluate_recall) | Evaluate recall against brute-force search. |
+| [fit](#dyf.BridgeIndex.fit) | Build the bridge index from embeddings. |
+| [get_anchors](#dyf.BridgeIndex.get_anchors) | Return the anchor point indices. |
+| [get_super_connectors](#dyf.BridgeIndex.get_super_connectors) | Return the super connector analysis. |
+| [query](#dyf.BridgeIndex.query) | Retrieve top-k candidates for a query embedding. |
+| [query_batch](#dyf.BridgeIndex.query_batch) | Batch query for multiple embeddings. |
+| [summary](#dyf.BridgeIndex.summary) | Return a summary of the index. |
+
+### evaluate_recall { #dyf.BridgeIndex.evaluate_recall }
+
+```python
+BridgeIndex.evaluate_recall(n_queries=100, k=10, seed=42)
+```
+
+Evaluate recall against brute-force search.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name      | Type         | Description                      | Default   |
+|-----------|--------------|----------------------------------|-----------|
+| n_queries | [int](`int`) | Number of random queries to test | `100`     |
+| k         | [int](`int`) | Number of results per query      | `10`      |
+| seed      | [int](`int`) | Random seed for query selection  | `42`      |
+
+#### Returns {.doc-section .doc-section-returns}
+
+| Name   | Type                                                    | Description                                             |
+|--------|---------------------------------------------------------|---------------------------------------------------------|
+|        | [Dict](`typing.Dict`)\[[str](`str`), [float](`float`)\] | Dict with 'recall', 'avg_candidates', 'speedup' metrics |
+
+### fit { #dyf.BridgeIndex.fit }
+
+```python
+BridgeIndex.fit(embeddings, verbose=True)
+```
+
+Build the bridge index from embeddings.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name       | Type                                     | Description                                               | Default    |
+|------------|------------------------------------------|-----------------------------------------------------------|------------|
+| embeddings | [np](`numpy`).[ndarray](`numpy.ndarray`) | (n, d) array of embedding vectors (will be L2-normalized) | _required_ |
+| verbose    | [bool](`bool`)                           | Print progress information                                | `True`     |
+
+#### Returns {.doc-section .doc-section-returns}
+
+| Name   | Type                                 | Description         |
+|--------|--------------------------------------|---------------------|
+|        | [BridgeIndex](`dyf.rag.BridgeIndex`) | self (for chaining) |
+
+### get_anchors { #dyf.BridgeIndex.get_anchors }
+
+```python
+BridgeIndex.get_anchors()
+```
+
+Return the anchor point indices.
+
+### get_super_connectors { #dyf.BridgeIndex.get_super_connectors }
+
+```python
+BridgeIndex.get_super_connectors()
+```
+
+Return the super connector analysis.
+
+### query { #dyf.BridgeIndex.query }
+
+```python
+BridgeIndex.query(query, k=10, n_query_anchors=None, return_scores=True)
+```
+
+Retrieve top-k candidates for a query embedding.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name            | Type                                          | Description                                 | Default    |
+|-----------------|-----------------------------------------------|---------------------------------------------|------------|
+| query           | [np](`numpy`).[ndarray](`numpy.ndarray`)      | (d,) query embedding vector                 | _required_ |
+| k               | [int](`int`)                                  | Number of results to return                 | `10`       |
+| n_query_anchors | [Optional](`typing.Optional`)\[[int](`int`)\] | Override default number of anchors to probe | `None`     |
+| return_scores   | [bool](`bool`)                                | Whether to return similarity scores         | `True`     |
+
+#### Returns {.doc-section .doc-section-returns}
+
+| Name   | Type                                                                      | Description                                                               |
+|--------|---------------------------------------------------------------------------|---------------------------------------------------------------------------|
+|        | [np](`numpy`).[ndarray](`numpy.ndarray`)                                  | (indices, scores) where indices are the top-k candidate indices           |
+|        | [Optional](`typing.Optional`)\[[np](`numpy`).[ndarray](`numpy.ndarray`)\] | and scores are their cosine similarities (or None if return_scores=False) |
+
+### query_batch { #dyf.BridgeIndex.query_batch }
+
+```python
+BridgeIndex.query_batch(queries, k=10, n_query_anchors=None)
+```
+
+Batch query for multiple embeddings.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name            | Type                                          | Description                                 | Default    |
+|-----------------|-----------------------------------------------|---------------------------------------------|------------|
+| queries         | [np](`numpy`).[ndarray](`numpy.ndarray`)      | (n_queries, d) array of query embeddings    | _required_ |
+| k               | [int](`int`)                                  | Number of results per query                 | `10`       |
+| n_query_anchors | [Optional](`typing.Optional`)\[[int](`int`)\] | Override default number of anchors to probe | `None`     |
+
+#### Returns {.doc-section .doc-section-returns}
+
+| Name   | Type                                                                                                                                   | Description                                     |
+|--------|----------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------|
+|        | [List](`typing.List`)\[[Tuple](`typing.Tuple`)\[[np](`numpy`).[ndarray](`numpy.ndarray`), [np](`numpy`).[ndarray](`numpy.ndarray`)\]\] | List of (indices, scores) tuples, one per query |
+
+### summary { #dyf.BridgeIndex.summary }
+
+```python
+BridgeIndex.summary()
+```
+
+Return a summary of the index.

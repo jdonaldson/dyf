@@ -1,0 +1,31 @@
+# load_index { #dyf.load_index }
+
+```python
+load_index(path, include_metadata=False)
+```
+
+Load a pre-computed index from safetensors format.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+| Name             | Type                                                            | Description                            | Default    |
+|------------------|-----------------------------------------------------------------|----------------------------------------|------------|
+| path             | [Union](`typing.Union`)\[[str](`str`), [Path](`pathlib.Path`)\] | Path to .safetensors file              | _required_ |
+| include_metadata | [bool](`bool`)                                                  | If True, return (data, metadata) tuple | `False`    |
+
+## Returns {.doc-section .doc-section-returns}
+
+| Name   | Type   | Description                                                                        |
+|--------|--------|------------------------------------------------------------------------------------|
+|        |        | dict with keys: statuses, bucket_ids, recovery_bucket_ids, embeddings (if present) |
+|        |        | If include_metadata=True, returns (data, metadata) tuple                           |
+
+## Example {.doc-section .doc-section-example}
+
+>>> index = load_index('index.safetensors')
+>>> dense_mask = index['statuses'] == 0
+>>> bridge_mask = index['statuses'] == 1
+>>>
+>>> # With metadata
+>>> data, meta = load_index('index.safetensors', include_metadata=True)
+>>> print(meta.get('dyf_version'))

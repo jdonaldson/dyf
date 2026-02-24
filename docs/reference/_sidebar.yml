@@ -1,0 +1,75 @@
+website:
+  sidebar:
+  - contents:
+    - reference/index.qmd
+    - contents:
+      - reference/DensityClassifierFull.qmd
+      - reference/DensityReportFull.qmd
+      section: Core
+    - contents:
+      - reference/build_pca_tree.qmd
+      - reference/cut_tree_to_labels.qmd
+      - reference/extract_boundary_persistence.qmd
+      - reference/boundary_persistence_scores.qmd
+      - reference/build_dyf_tree.qmd
+      - reference/refine_dyf_tree.qmd
+      - reference/cut_dyf_tree_to_labels.qmd
+      - reference/refine_clusters.qmd
+      section: Tree Methods
+    - contents:
+      - reference/BridgeIndex.qmd
+      - reference/find_super_connectors.qmd
+      - reference/select_orthogonal_anchors.qmd
+      - reference/diversify_by_facet.qmd
+      - reference/get_kmeans_init.qmd
+      - reference/compute_neighbor_diversity.qmd
+      - reference/compute_hub_score.qmd
+      - reference/mine_dag_chains.qmd
+      - reference/build_dag_taxonomy.qmd
+      - reference/build_unified_ontology.qmd
+      - reference/build_rog_ontology.qmd
+      section: Retrieval (RAG)
+    - contents:
+      - reference/SuperConnectorResult.qmd
+      - reference/OrthogonalAnchorResult.qmd
+      - reference/FacetDiverseResult.qmd
+      - reference/DAGChain.qmd
+      - reference/DAGMiningResult.qmd
+      - reference/DAGTaxonomy.qmd
+      - reference/UnifiedOntologyResult.qmd
+      - reference/HubScoreResult.qmd
+      - reference/ROGLayer.qmd
+      - reference/ROGResult.qmd
+      section: Result Types
+    - contents:
+      - reference/rerank_standard.qmd
+      - reference/rerank_mmr.qmd
+      - reference/rerank_bridge_boost.qmd
+      - reference/rerank_bridge_mmr.qmd
+      section: Re-ranking
+    - contents:
+      - reference/DocSpread.qmd
+      - reference/chunk_redundancy.qmd
+      - reference/deduplicate_chunks.qmd
+      - reference/doc_spread.qmd
+      - reference/cluster_quality.qmd
+      - reference/neighbor_coherence.qmd
+      section: Chunk Analysis
+    - contents:
+      - reference/save_index.qmd
+      - reference/load_index.qmd
+      - reference/PrecomputedIndex.qmd
+      section: I/O
+    - contents:
+      - reference/LazyIndex.qmd
+      - reference/write_lazy_index.qmd
+      - reference/from_faiss.qmd
+      - reference/SearchResult.qmd
+      section: Lazy Index
+    - contents:
+      - reference/EmbedderConfig.qmd
+      - reference/LabelerConfig.qmd
+      - reference/list_configs.qmd
+      section: Configuration
+    id: reference
+  - id: dummy-sidebar

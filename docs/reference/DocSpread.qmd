@@ -1,0 +1,16 @@
+# DocSpread { #dyf.DocSpread }
+
+```python
+DocSpread(n_chunks, n_buckets, concentration, bucket_distribution)
+```
+
+Per-document chunk distribution across LSH buckets.
+
+## Attributes {.doc-section .doc-section-attributes}
+
+| Name                | Type             | Description                                                                     |
+|---------------------|------------------|---------------------------------------------------------------------------------|
+| n_chunks            | [int](`int`)     | Total chunks for this document.                                                 |
+| n_buckets           | [int](`int`)     | Distinct buckets touched by chunks.                                             |
+| concentration       | [float](`float`) | n_chunks / n_buckets ratio. High = topically focused, low = multi-topic bridge. |
+| bucket_distribution | [dict](`dict`)   | Mapping of bucket_id to chunk count.                                            |

@@ -1,0 +1,24 @@
+# chunk_redundancy { #dyf.chunk_redundancy }
+
+```python
+chunk_redundancy(bucket_ids, doc_ids)
+```
+
+Count same-doc siblings sharing each point's bucket.
+
+For each point, returns how many *other* chunks from the same document
+landed in the same bucket. 0 means unique in its bucket for that document.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+| Name       | Type   | Description                                                 | Default    |
+|------------|--------|-------------------------------------------------------------|------------|
+| bucket_ids |        | Array-like of bucket assignments per point.                 | _required_ |
+| doc_ids    |        | Array-like of document identifiers per point (same length). | _required_ |
+
+## Returns {.doc-section .doc-section-returns}
+
+| Name   | Type                                     | Description                                                       |
+|--------|------------------------------------------|-------------------------------------------------------------------|
+|        | [np](`numpy`).[ndarray](`numpy.ndarray`) | Integer array of length len(bucket_ids). Each value is the number |
+|        | [np](`numpy`).[ndarray](`numpy.ndarray`) | of same-doc siblings in the same bucket (excluding self).         |

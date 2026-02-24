@@ -1,0 +1,18 @@
+# DAGChain { #dyf.DAGChain }
+
+```python
+DAGChain(indices, coherence, diversity_range)
+```
+
+A single DAG chain representing a hierarchical path.
+
+Chains flow from general concepts (high neighbor diversity) to
+specific concepts (low neighbor diversity).
+
+## Attributes {.doc-section .doc-section-attributes}
+
+| Name            | Type                                     | Description                                                 |
+|-----------------|------------------------------------------|-------------------------------------------------------------|
+| indices         | [np](`numpy`).[ndarray](`numpy.ndarray`) | Point indices in chain order (general → specific)           |
+| coherence       | [float](`float`)                         | Average pairwise similarity within chain (higher = tighter) |
+| diversity_range | [float](`float`)                         | Difference between first and last diversity scores          |

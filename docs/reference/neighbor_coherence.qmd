@@ -1,0 +1,33 @@
+# neighbor_coherence { #dyf.neighbor_coherence }
+
+```python
+neighbor_coherence(embeddings, knn_indices, sample_k=None)
+```
+
+Measure how coherent each point's neighborhood is.
+
+For each point, computes mean pairwise cosine similarity among its
+k nearest neighbors.  Topical documents have coherent neighborhoods
+(neighbors are similar to each other).  Meta/structural documents
+— date pages, event lists, disambiguation pages — pull in diverse
+neighbors that have little in common, producing low coherence.
+
+This is a general embedding-space signal that does not depend on
+titles, metadata, or domain-specific heuristics.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+| Name        | Type   | Description                                                                                                   | Default    |
+|-------------|--------|---------------------------------------------------------------------------------------------------------------|------------|
+| embeddings  |        | (n, d) array of embedding vectors.                                                                            | _required_ |
+| knn_indices |        | (n, k) array of neighbor indices per point          (as returned by sklearn NearestNeighbors, self excluded). | _required_ |
+| sample_k    |        | If set, use only the first sample_k neighbors for the       pairwise calculation (faster for large k).        | `None`     |
+
+## Returns {.doc-section .doc-section-returns}
+
+| Name   | Type                                     | Description                                                      |
+|--------|------------------------------------------|------------------------------------------------------------------|
+|        | [np](`numpy`).[ndarray](`numpy.ndarray`) | Float array of length n.  Each value is the mean pairwise cosine |
+|        | [np](`numpy`).[ndarray](`numpy.ndarray`) | similarity among that point's neighbors.  Range roughly [0, 1];  |
+|        | [np](`numpy`).[ndarray](`numpy.ndarray`) | higher values indicate meta/structural content (echo chambers of |
+|        | [np](`numpy`).[ndarray](`numpy.ndarray`) | structurally similar documents).                                 |

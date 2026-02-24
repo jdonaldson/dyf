@@ -1,0 +1,43 @@
+# rerank_bridge_mmr { #dyf.rerank_bridge_mmr }
+
+```python
+rerank_bridge_mmr(
+    query_emb,
+    candidate_indices,
+    embeddings_normed,
+    bridge_scores,
+    cluster_labels,
+    top_k,
+    lam=0.5,
+    meta_clusters=None,
+)
+```
+
+MMR with bridge-weighted diversity and optional meta-cluster awareness.
+
+Instead of max cosine similarity to selected set, penalizes candidates
+that share a cluster with already-selected results.  Bridge points get
+a diversity bonus because they span clusters.
+
+If meta_clusters is provided (set of cluster IDs), those clusters don't
+count as "new coverage" — the algorithm won't waste diversity slots
+chasing structural/meta clusters (dates, years, event lists).
+
+## Parameters {.doc-section .doc-section-parameters}
+
+| Name              | Type   | Description                                                              | Default    |
+|-------------------|--------|--------------------------------------------------------------------------|------------|
+| query_emb         |        | (d,) normalized query embedding.                                         | _required_ |
+| candidate_indices |        | 1-D array of candidate point indices.                                    | _required_ |
+| embeddings_normed |        | (n, d) L2-normalized embedding matrix.                                   | _required_ |
+| bridge_scores     |        | Array of bridge scores indexed by point index.                           | _required_ |
+| cluster_labels    |        | Array of cluster labels indexed by point index.                          | _required_ |
+| top_k             |        | Number of results to return.                                             | _required_ |
+| lam               |        | Relevance-diversity tradeoff.                                            | `0.5`      |
+| meta_clusters     |        | Optional set of cluster IDs to suppress for            diversity credit. | `None`     |
+
+## Returns {.doc-section .doc-section-returns}
+
+| Name   | Type   | Description                           |
+|--------|--------|---------------------------------------|
+|        |        | np.ndarray of selected point indices. |

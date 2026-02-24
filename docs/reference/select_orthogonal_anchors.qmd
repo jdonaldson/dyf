@@ -1,0 +1,36 @@
+# select_orthogonal_anchors { #dyf.select_orthogonal_anchors }
+
+```python
+select_orthogonal_anchors(
+    embeddings,
+    k,
+    seed_indices=None,
+    candidate_indices=None,
+    use_bridges=True,
+    global_num_bits=12,
+    seed=42,
+)
+```
+
+Select k maximally spread anchors using greedy farthest-point sampling.
+
+Achieves ~87% of full-bridge recall with ~22% of anchors by eliminating
+redundancy in anchor placement.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+| Name              | Type                                                                      | Description                                              | Default    |
+|-------------------|---------------------------------------------------------------------------|----------------------------------------------------------|------------|
+| embeddings        | [np](`numpy`).[ndarray](`numpy.ndarray`)                                  | Normalized embeddings (n_points, dim)                    | _required_ |
+| k                 | [int](`int`)                                                              | Number of anchors to select                              | _required_ |
+| seed_indices      | [Optional](`typing.Optional`)\[[np](`numpy`).[ndarray](`numpy.ndarray`)\] | Initial seed points (default: super connectors)          | `None`     |
+| candidate_indices | [Optional](`typing.Optional`)\[[np](`numpy`).[ndarray](`numpy.ndarray`)\] | Pool to select from (default: bridges or all points)     | `None`     |
+| use_bridges       | [bool](`bool`)                                                            | If True and candidate_indices is None, use bridge points | `True`     |
+| global_num_bits   | [int](`int`)                                                              | LSH bits for bridge detection                            | `12`       |
+| seed              | [int](`int`)                                                              | Random seed                                              | `42`       |
+
+## Returns {.doc-section .doc-section-returns}
+
+| Name   | Type                                                       | Description                                  |
+|--------|------------------------------------------------------------|----------------------------------------------|
+|        | [OrthogonalAnchorResult](`dyf.rag.OrthogonalAnchorResult`) | OrthogonalAnchorResult with selected indices |

@@ -1,0 +1,212 @@
+# LazyIndex { #dyf.LazyIndex }
+
+```python
+LazyIndex(path)
+```
+
+Memory-mapped DYF index for instant-start query serving.
+
+Opens a .dyf file, mmap's it, parses the FlatBuffers header, and
+serves queries by traversing the tree and decompressing Arrow IPC
+batches on demand (LRU cached).
+
+## Usage {.doc-section .doc-section-usage}
+
+idx = LazyIndex("index.dyf")
+results = idx.search(query_vector, k=10, nprobe=3)
+print(idx.tree_summary)
+
+## Attributes
+
+| Name | Description |
+| --- | --- |
+| [has_stored_fields](#dyf.LazyIndex.has_stored_fields) | True if this index has stored fields. |
+| [is_pq](#dyf.LazyIndex.is_pq) | True if this index uses Product Quantization. |
+| [quantization](#dyf.LazyIndex.quantization) | Read quantization string from BuildParams. |
+| [stored_field_names](#dyf.LazyIndex.stored_field_names) | List of stored field names (empty if no stored fields). |
+| [tree_summary](#dyf.LazyIndex.tree_summary) | Return tree stats without touching Arrow data. |
+
+## Methods
+
+| Name | Description |
+| --- | --- |
+| [close](#dyf.LazyIndex.close) | Release mmap and file handle. |
+| [get_item_vector](#dyf.LazyIndex.get_item_vector) | Extract a single item's embedding vector from the index. |
+| [get_leaf](#dyf.LazyIndex.get_leaf) | Decompress and return a leaf's Arrow RecordBatch. |
+| [get_stored_fields](#dyf.LazyIndex.get_stored_fields) | Look up stored fields for given item indices without re-searching. |
+| [get_tree_structure](#dyf.LazyIndex.get_tree_structure) | Export tree hierarchy for visualization (FlatBuffers only, no Arrow). |
+| [search](#dyf.LazyIndex.search) | Search the index for nearest neighbors. |
+| [search_ivf](#dyf.LazyIndex.search_ivf) | IVF-style search: rank leaves by centroid similarity, then score. |
+| [to_faiss](#dyf.LazyIndex.to_faiss) | Export dyf index as a FAISS IVF index. |
+
+### close { #dyf.LazyIndex.close }
+
+```python
+LazyIndex.close()
+```
+
+Release mmap and file handle.
+
+### get_item_vector { #dyf.LazyIndex.get_item_vector }
+
+```python
+LazyIndex.get_item_vector(item_index)
+```
+
+Extract a single item's embedding vector from the index.
+
+Scans leaf batches to find the item (building a cached mapping on
+first call), then returns the reconstructed float32 vector.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name       | Type   | Description                                          | Default    |
+|------------|--------|------------------------------------------------------|------------|
+| item_index |        | The item index (as stored in the item_index column). | _required_ |
+
+#### Returns {.doc-section .doc-section-returns}
+
+| Name   | Type   | Description                                         |
+|--------|--------|-----------------------------------------------------|
+|        |        | (dim,) float32 numpy array of the item's embedding. |
+
+#### Raises {.doc-section .doc-section-raises}
+
+| Name   | Type                   | Description                              |
+|--------|------------------------|------------------------------------------|
+|        | [KeyError](`KeyError`) | If item_index is not found in the index. |
+
+### get_leaf { #dyf.LazyIndex.get_leaf }
+
+```python
+LazyIndex.get_leaf(batch_index)
+```
+
+Decompress and return a leaf's Arrow RecordBatch.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name        | Type   | Description                               | Default    |
+|-------------|--------|-------------------------------------------|------------|
+| batch_index |        | The batch index (from node.BatchIndex()). | _required_ |
+
+#### Returns {.doc-section .doc-section-returns}
+
+| Name   | Type   | Description                                              |
+|--------|--------|----------------------------------------------------------|
+|        |        | pyarrow.RecordBatch with columns: item_index, embedding. |
+
+### get_stored_fields { #dyf.LazyIndex.get_stored_fields }
+
+```python
+LazyIndex.get_stored_fields(item_indices)
+```
+
+Look up stored fields for given item indices without re-searching.
+
+Scans all leaves to find matching items. Less efficient than getting
+fields from search results, but useful for post-hoc exploration.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name         | Type   | Description                            | Default    |
+|--------------|--------|----------------------------------------|------------|
+| item_indices |        | array-like of item indices to look up. | _required_ |
+
+#### Returns {.doc-section .doc-section-returns}
+
+| Name   | Type   | Description                                                 |
+|--------|--------|-------------------------------------------------------------|
+|        |        | dict mapping field name to list of values (in same order as |
+|        |        | item_indices). Missing items get None.                      |
+
+### get_tree_structure { #dyf.LazyIndex.get_tree_structure }
+
+```python
+LazyIndex.get_tree_structure()
+```
+
+Export tree hierarchy for visualization (FlatBuffers only, no Arrow).
+
+#### Returns {.doc-section .doc-section-returns}
+
+| Name   | Type   | Description                                                    |
+|--------|--------|----------------------------------------------------------------|
+|        |        | list of dicts with keys: node_id, parent_id, depth, num_items, |
+|        |        | is_leaf, batch_index. Cached after first call.                 |
+
+### search { #dyf.LazyIndex.search }
+
+```python
+LazyIndex.search(query, k=10, nprobe=3, return_routing=False)
+```
+
+Search the index for nearest neighbors.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name           | Type   | Description                                                | Default    |
+|----------------|--------|------------------------------------------------------------|------------|
+| query          |        | (dim,) query vector.                                       | _required_ |
+| k              |        | Number of results to return.                               | `10`       |
+| nprobe         |        | Number of leaf probes (1 = single path, >1 = multi-probe). | `3`        |
+| return_routing |        | If True, populate result.routing with diagnostics.         | `False`    |
+
+#### Returns {.doc-section .doc-section-returns}
+
+| Name   | Type   | Description                                                      |
+|--------|--------|------------------------------------------------------------------|
+|        |        | SearchResult with indices, scores, and fields. Supports          |
+|        |        | backward-compatible unpacking: indices, scores = idx.search(...) |
+
+### search_ivf { #dyf.LazyIndex.search_ivf }
+
+```python
+LazyIndex.search_ivf(query, k=10, nprobe=3)
+```
+
+IVF-style search: rank leaves by centroid similarity, then score.
+
+Instead of LSH tree traversal, computes query similarity to all leaf
+centroids and probes the top-nprobe leaves. Combines DYF's lazy
+loading with FAISS IVF-quality routing.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name   | Type   | Description                  | Default    |
+|--------|--------|------------------------------|------------|
+| query  |        | (dim,) query vector.         | _required_ |
+| k      |        | Number of results to return. | `10`       |
+| nprobe |        | Number of leaves to probe.   | `3`        |
+
+#### Returns {.doc-section .doc-section-returns}
+
+| Name   | Type   | Description                                                          |
+|--------|--------|----------------------------------------------------------------------|
+|        |        | SearchResult with indices, scores, and fields. Supports              |
+|        |        | backward-compatible unpacking: indices, scores = idx.search_ivf(...) |
+
+### to_faiss { #dyf.LazyIndex.to_faiss }
+
+```python
+LazyIndex.to_faiss(pq_subquantizers=None, pq_bits=8)
+```
+
+Export dyf index as a FAISS IVF index.
+
+Uses dyf's leaf centroids as the coarse quantizer and populates
+FAISS inverted lists from dyf's leaf embeddings. This gives dyf's
+PCA-LSH partitioning with FAISS's optimized search.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name             | Type   | Description                                                                                                                      | Default   |
+|------------------|--------|----------------------------------------------------------------------------------------------------------------------------------|-----------|
+| pq_subquantizers |        | If set, use IndexIVFPQ with this many subquantizers for compression (e.g., 8 or 16). If None, use IndexIVFFlat (no compression). | `None`    |
+| pq_bits          |        | Bits per subquantizer for PQ (default: 8).                                                                                       | `8`       |
+
+#### Returns {.doc-section .doc-section-returns}
+
+| Name   | Type   | Description                                              |
+|--------|--------|----------------------------------------------------------|
+|        |        | faiss.IndexIVFFlat or faiss.IndexIVFPQ, ready to search. |

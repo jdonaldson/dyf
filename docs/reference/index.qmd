@@ -1,0 +1,116 @@
+# API Reference {.doc .doc-index}
+
+## Core
+
+Core density classification and reporting. `DensityClassifierFull` wraps the Rust-accelerated core with embedding generation, DataFrame I/O, and LLM-based labeling.
+
+
+| | |
+| --- | --- |
+| [DensityClassifierFull](DensityClassifierFull.qmd#dyf.DensityClassifierFull) | Density Classifier using PCA-based LSH. |
+| [DensityReportFull](DensityReportFull.qmd#dyf.DensityReportFull) | Report on density classification. |
+
+## Tree Methods
+
+Hierarchical tree construction for multi-resolution analysis of embeddings.
+
+| | |
+| --- | --- |
+| [build_pca_tree](build_pca_tree.qmd#dyf.build_pca_tree) | Build a PCA bisection tree over embeddings. |
+| [cut_tree_to_labels](cut_tree_to_labels.qmd#dyf.cut_tree_to_labels) | Cut PCA tree at n_clusters and return point labels array. |
+| [extract_boundary_persistence](extract_boundary_persistence.qmd#dyf.extract_boundary_persistence) | Identify points that persist as boundary across multiple tree depths. |
+| [boundary_persistence_scores](boundary_persistence_scores.qmd#dyf.boundary_persistence_scores) | Compute depth-weighted boundary persistence bridge scores. |
+| [build_dyf_tree](build_dyf_tree.qmd#dyf.build_dyf_tree) | Build a DYF recursive tree over embeddings. |
+| [refine_dyf_tree](refine_dyf_tree.qmd#dyf.refine_dyf_tree) | Re-split incoherent tree leaves with rotated LSH seeds. |
+| [cut_dyf_tree_to_labels](cut_dyf_tree_to_labels.qmd#dyf.cut_dyf_tree_to_labels) | Cut DYF tree into flat cluster labels using agglomerative merge. |
+| [refine_clusters](refine_clusters.qmd#dyf.refine_clusters) | Post-processing safety net: eject periphery from incoherent clusters. |
+
+## Retrieval (RAG)
+
+Bridge-aware retrieval, anchor selection, and ontology construction.
+
+| | |
+| --- | --- |
+| [BridgeIndex](BridgeIndex.qmd#dyf.BridgeIndex) | Two-tier RAG index using bridge-based anchors for efficient retrieval. |
+| [find_super_connectors](find_super_connectors.qmd#dyf.find_super_connectors) | Find super connectors: points with high centrality in both global and local |
+| [select_orthogonal_anchors](select_orthogonal_anchors.qmd#dyf.select_orthogonal_anchors) | Select k maximally spread anchors using greedy farthest-point sampling. |
+| [diversify_by_facet](diversify_by_facet.qmd#dyf.diversify_by_facet) | Select k items from k different semantic facets (buckets). |
+| [get_kmeans_init](get_kmeans_init.qmd#dyf.get_kmeans_init) | Get bridge-seeded initial centroids for k-means/IVF index construction. |
+| [compute_neighbor_diversity](compute_neighbor_diversity.qmd#dyf.compute_neighbor_diversity) | Compute neighbor diversity for each point. |
+| [compute_hub_score](compute_hub_score.qmd#dyf.compute_hub_score) | Compute hub score for each point in the embedding space. |
+| [mine_dag_chains](mine_dag_chains.qmd#dyf.mine_dag_chains) | Mine DAG (directed acyclic graph) structures from embedding space. |
+| [build_dag_taxonomy](build_dag_taxonomy.qmd#dyf.build_dag_taxonomy) | Build a navigable DAG taxonomy from embedding space. |
+| [build_unified_ontology](build_unified_ontology.qmd#dyf.build_unified_ontology) | Build a unified ontology that covers both dense and sparse embedding regions. |
+| [build_rog_ontology](build_rog_ontology.qmd#dyf.build_rog_ontology) | Recursive Ontological Generation (ROG). |
+
+## Result Types
+
+Dataclasses returned by RAG and analysis functions.
+
+| | |
+| --- | --- |
+| [SuperConnectorResult](SuperConnectorResult.qmd#dyf.SuperConnectorResult) | Result of finding super connectors in an embedding space. |
+| [OrthogonalAnchorResult](OrthogonalAnchorResult.qmd#dyf.OrthogonalAnchorResult) | Result of orthogonal anchor selection. |
+| [FacetDiverseResult](FacetDiverseResult.qmd#dyf.FacetDiverseResult) | Result of facet-based diversification. |
+| [DAGChain](DAGChain.qmd#dyf.DAGChain) | A single DAG chain representing a hierarchical path. |
+| [DAGMiningResult](DAGMiningResult.qmd#dyf.DAGMiningResult) | Result of DAG mining on an embedding space. |
+| [DAGTaxonomy](DAGTaxonomy.qmd#dyf.DAGTaxonomy) | A navigable DAG taxonomy extracted from embedding space. |
+| [UnifiedOntologyResult](UnifiedOntologyResult.qmd#dyf.UnifiedOntologyResult) | Result of building a unified ontology from embedding space. |
+| [HubScoreResult](HubScoreResult.qmd#dyf.HubScoreResult) | Result of hub score computation. |
+| [ROGLayer](ROGLayer.qmd#dyf.ROGLayer) | A single layer in the ROG hierarchy. |
+| [ROGResult](ROGResult.qmd#dyf.ROGResult) | Result of Recursive Ontological Generation. |
+
+## Re-ranking
+
+Re-rank search results with diversity and bridge awareness.
+
+| | |
+| --- | --- |
+| [rerank_standard](rerank_standard.qmd#dyf.rerank_standard) | Take the top-k most similar candidates. |
+| [rerank_mmr](rerank_mmr.qmd#dyf.rerank_mmr) | Maximal Marginal Relevance re-ranking. |
+| [rerank_bridge_boost](rerank_bridge_boost.qmd#dyf.rerank_bridge_boost) | Re-rank by blending similarity with normalized bridge score. |
+| [rerank_bridge_mmr](rerank_bridge_mmr.qmd#dyf.rerank_bridge_mmr) | MMR with bridge-weighted diversity and optional meta-cluster awareness. |
+
+## Chunk Analysis
+
+Analyze chunk redundancy, document spread, and cluster quality.
+
+| | |
+| --- | --- |
+| [DocSpread](DocSpread.qmd#dyf.DocSpread) | Per-document chunk distribution across LSH buckets. |
+| [chunk_redundancy](chunk_redundancy.qmd#dyf.chunk_redundancy) | Count same-doc siblings sharing each point's bucket. |
+| [deduplicate_chunks](deduplicate_chunks.qmd#dyf.deduplicate_chunks) | Boolean mask keeping one representative per (bucket, doc) pair. |
+| [doc_spread](doc_spread.qmd#dyf.doc_spread) | Per-document chunk distribution analysis. |
+| [cluster_quality](cluster_quality.qmd#dyf.cluster_quality) | Identify meta/structural clusters from neighbor coherence. |
+| [neighbor_coherence](neighbor_coherence.qmd#dyf.neighbor_coherence) | Measure how coherent each point's neighborhood is. |
+
+## I/O
+
+Save and load fitted classifiers as safetensors files.
+
+| | |
+| --- | --- |
+| [save_index](save_index.qmd#dyf.save_index) | Save a fitted classifier's index to safetensors format. |
+| [load_index](load_index.qmd#dyf.load_index) | Load a pre-computed index from safetensors format. |
+| [PrecomputedIndex](PrecomputedIndex.qmd#dyf.PrecomputedIndex) | Work with a pre-computed DYF index without the Rust classifier. |
+
+## Lazy Index
+
+Memory-mapped tree index with FlatBuffers + Arrow IPC.
+
+| | |
+| --- | --- |
+| [LazyIndex](LazyIndex.qmd#dyf.LazyIndex) | Memory-mapped DYF index for instant-start query serving. |
+| [write_lazy_index](write_lazy_index.qmd#dyf.write_lazy_index) | Write a DYF lazy index file (FlatBuffers tree + Arrow IPC leaf data). |
+| [from_faiss](from_faiss.qmd#dyf.from_faiss) | Build a dyf lazy index file from a FAISS IVF index. |
+| [SearchResult](SearchResult.qmd#dyf.SearchResult) | Search result with indices, scores, and optional stored fields. |
+
+## Configuration
+
+Pre-built configurations for embedding models and LLM labelers.
+
+| | |
+| --- | --- |
+| [EmbedderConfig](EmbedderConfig.qmd#dyf.EmbedderConfig) | Configuration for text embedding models. |
+| [LabelerConfig](LabelerConfig.qmd#dyf.LabelerConfig) | Configuration for LLM-based bucket labeling. |
+| [list_configs](list_configs.qmd#dyf.list_configs) | Print available embedder and labeler configurations. |

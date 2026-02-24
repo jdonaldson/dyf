@@ -1,0 +1,44 @@
+# SuperConnectorResult { #dyf.SuperConnectorResult }
+
+```python
+SuperConnectorResult(
+    indices,
+    global_centrality,
+    local_centrality,
+    quadrant,
+    global_threshold,
+    local_threshold,
+)
+```
+
+Result of finding super connectors in an embedding space.
+
+Super connectors are points with high centrality in both global and local
+bridge networks - they connect major semantic regions AND facets within
+dense clusters. They represent ~0.1% of typical corpora but provide
+disproportionate coverage as RAG anchors.
+
+## Attributes {.doc-section .doc-section-attributes}
+
+| Name              | Type                                     | Description                                                                                                             |
+|-------------------|------------------------------------------|-------------------------------------------------------------------------------------------------------------------------|
+| indices           | [np](`numpy`).[ndarray](`numpy.ndarray`) | Array of super connector point indices                                                                                  |
+| global_centrality | [np](`numpy`).[ndarray](`numpy.ndarray`) | Global bridge centrality for all points (0 = non-bridge)                                                                |
+| local_centrality  | [np](`numpy`).[ndarray](`numpy.ndarray`) | Local (facet) bridge centrality for all points                                                                          |
+| quadrant          | [np](`numpy`).[ndarray](`numpy.ndarray`) | Category label for each point ('Regular', 'Minor Bridge',       'Cross-Domain', 'Domain Specialist', 'Super Connector') |
+| global_threshold  | [float](`float`)                         | Threshold used for "high" global centrality                                                                             |
+| local_threshold   | [float](`float`)                         | Threshold used for "high" local centrality                                                                              |
+
+## Methods
+
+| Name | Description |
+| --- | --- |
+| [summary](#dyf.SuperConnectorResult.summary) | Return a summary string of the super connector distribution. |
+
+### summary { #dyf.SuperConnectorResult.summary }
+
+```python
+SuperConnectorResult.summary()
+```
+
+Return a summary string of the super connector distribution.

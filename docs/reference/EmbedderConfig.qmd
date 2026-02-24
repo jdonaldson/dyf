@@ -1,0 +1,35 @@
+# EmbedderConfig { #dyf.EmbedderConfig }
+
+```python
+EmbedderConfig(name, model_id, dim, size_mb, provider, description='')
+```
+
+Configuration for text embedding models.
+
+## Presets available as class attributes {.doc-section .doc-section-presets-available-as-class-attributes}
+
+- TFIDF: Built-in TF-IDF + SVD (no model download)
+- LOW: all-MiniLM-L6-v2 (80MB, 384d)
+- MEDIUM: all-mpnet-base-v2 (420MB, 768d)
+- MEDIUM_BGE: BAAI/bge-base-en-v1.5 (440MB, 768d)
+- HIGH: BAAI/bge-large-en-v1.5 (1.3GB, 1024d)
+- OPENAI: text-embedding-3-large (API, 3072d)
+
+## Example {.doc-section .doc-section-example}
+
+>>> config = EmbedderConfig.MEDIUM
+>>> embeddings = config.embed(texts)
+
+## Methods
+
+| Name | Description |
+| --- | --- |
+| [embed](#dyf.EmbedderConfig.embed) | Generate embeddings for texts using this config. |
+
+### embed { #dyf.EmbedderConfig.embed }
+
+```python
+EmbedderConfig.embed(texts, batch_size=32, verbose=True)
+```
+
+Generate embeddings for texts using this config.

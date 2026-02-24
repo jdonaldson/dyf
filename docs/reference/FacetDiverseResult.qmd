@@ -1,0 +1,19 @@
+# FacetDiverseResult { #dyf.FacetDiverseResult }
+
+```python
+FacetDiverseResult(indices, bucket_ids, similarities, buckets_covered)
+```
+
+Result of facet-based diversification.
+
+Facet diversification selects one item per semantic bucket, providing
+"different perspectives on the same topic" rather than "different things".
+
+## Attributes {.doc-section .doc-section-attributes}
+
+| Name            | Type                                     | Description                             |
+|-----------------|------------------------------------------|-----------------------------------------|
+| indices         | [np](`numpy`).[ndarray](`numpy.ndarray`) | Selected item indices (one per facet)   |
+| bucket_ids      | [np](`numpy`).[ndarray](`numpy.ndarray`) | Bucket ID for each selected item        |
+| similarities    | [np](`numpy`).[ndarray](`numpy.ndarray`) | Query similarity for each selected item |
+| buckets_covered | [int](`int`)                             | Number of unique buckets in result      |

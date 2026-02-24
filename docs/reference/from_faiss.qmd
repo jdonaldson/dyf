@@ -1,0 +1,34 @@
+# from_faiss { #dyf.from_faiss }
+
+```python
+from_faiss(
+    faiss_index,
+    path,
+    compression='zstd',
+    quantization='float16',
+    metadata=None,
+    stored_fields=None,
+)
+```
+
+Build a dyf lazy index file from a FAISS IVF index.
+
+Extracts FAISS's inverted lists and centroids, builds a single-level
+dyf tree (one node per IVF cell), and writes to the dyf file format.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+| Name          | Type   | Description                                                                             | Default     |
+|---------------|--------|-----------------------------------------------------------------------------------------|-------------|
+| faiss_index   |        | A trained faiss.IndexIVFFlat or faiss.IndexIVFPQ.                                       | _required_  |
+| path          |        | Output file path (e.g., "index.dyf").                                                   | _required_  |
+| compression   |        | "none", "zstd", or "lz4" (default: "zstd").                                             | `'zstd'`    |
+| quantization  |        | "float32", "float16", or "int8" (default: "float16").                                   | `'float16'` |
+| metadata      |        | Optional dict of string key-value pairs.                                                | `None`      |
+| stored_fields |        | Optional dict mapping field name to array-like of length n_items (indexed by FAISS ID). | `None`      |
+
+## Returns {.doc-section .doc-section-returns}
+
+| Name   | Type   | Description                           |
+|--------|--------|---------------------------------------|
+|        |        | LazyIndex opened on the written file. |

@@ -1,0 +1,104 @@
+/*-- scss:defaults --*/
+
+// dyfviz-derived neutral palette
+$bg-dark: #1e1e1e;
+$fg: #ddd;
+$fg-muted: #999;
+$fg-section: #aaa;
+$border: #444;
+$btn: #444;
+$btn-hover: #555;
+
+// Light equivalents
+$bg-light: #f5f5f5;
+$fg-light: #222;
+$fg-muted-light: #666;
+$border-light: #ccc;
+
+// Brand — only for logo and rare accents
+$coral-red: #e94560;
+$golden-amber: #f9a826;
+
+// Bootstrap overrides — neutral links, not coral
+$link-color: $fg-light;
+$link-hover-color: $fg-muted-light;
+
+// Navbar
+$navbar-bg: $bg-dark;
+$navbar-fg: $fg;
+
+// Code — neutral
+$code-color: $fg-muted-light;
+$code-bg: #f0f0f0;
+
+/*-- scss:rules --*/
+
+// Navbar links — neutral grey, no saturated color
+.navbar .nav-link {
+  color: $fg-muted !important;
+}
+
+.navbar .nav-link:hover,
+.navbar .nav-link.active {
+  color: $fg !important;
+}
+
+// Sidebar — restrained
+.sidebar .sidebar-item .sidebar-item-text.active {
+  color: $fg-light;
+  font-weight: 600;
+}
+
+.sidebar .sidebar-section .sidebar-section-item {
+  font-weight: 600;
+}
+
+// Code blocks — let highlight theme handle colors, just style chrome
+div.sourceCode {
+  border: 1px solid $border-light;
+  border-radius: 6px;
+}
+
+// Inline code — neutral
+p code, li code, td code {
+  color: $fg-muted-light;
+  background-color: $code-bg;
+  padding: 0.15em 0.35em;
+  border-radius: 3px;
+}
+
+// API reference tables
+.doc-section table {
+  border-collapse: collapse;
+}
+
+.doc-section table th {
+  background-color: $bg-light;
+  border-bottom: 2px solid $border-light;
+}
+
+// Headings — dark neutral, h1 gets the gradient as the one brand moment
+h1, h2, h3 {
+  color: $fg-light;
+}
+
+h1 {
+  border-bottom: 3px solid;
+  border-image: linear-gradient(to right, $coral-red, $golden-amber) 1;
+  padding-bottom: 0.3em;
+}
+
+// Landing page logo
+.quarto-title-block img {
+  margin-bottom: 1em;
+}
+
+// Links — understated underlines
+.content a:not(.nav-link):not(.sidebar-item-text) {
+  color: $fg-light;
+  text-decoration: underline;
+  text-decoration-color: $border-light;
+  &:hover {
+    text-decoration-color: $fg-muted-light;
+  }
+}

@@ -1,0 +1,45 @@
+# build_dag_taxonomy { #dyf.build_dag_taxonomy }
+
+```python
+build_dag_taxonomy(
+    embeddings,
+    k_neighbors=30,
+    similarity_threshold=0.55,
+    diversity_gap_threshold=0.02,
+    verbose=False,
+)
+```
+
+Build a navigable DAG taxonomy from embedding space.
+
+Creates a lattice structure where:
+- Nodes with high neighbor diversity are "general" (parents)
+- Nodes with low neighbor diversity are "specific" (children)
+- Multiple parents are allowed (non-tree structure)
+
+## Parameters {.doc-section .doc-section-parameters}
+
+| Name                    | Type                                     | Description                                          | Default    |
+|-------------------------|------------------------------------------|------------------------------------------------------|------------|
+| embeddings              | [np](`numpy`).[ndarray](`numpy.ndarray`) | Embeddings to analyze (n, d). Will be L2-normalized. | _required_ |
+| k_neighbors             | [int](`int`)                             | Number of neighbors for k-NN graph.                  | `30`       |
+| similarity_threshold    | [float](`float`)                         | Minimum similarity for parent-child edges.           | `0.55`     |
+| diversity_gap_threshold | [float](`float`)                         | Minimum diversity difference for directed edge.      | `0.02`     |
+| verbose                 | [bool](`bool`)                           | Print progress information.                          | `False`    |
+
+## Returns {.doc-section .doc-section-returns}
+
+| Name   | Type                                 | Description                          |
+|--------|--------------------------------------|--------------------------------------|
+|        | [DAGTaxonomy](`dyf.rag.DAGTaxonomy`) | DAGTaxonomy with navigation methods. |
+
+## Example {.doc-section .doc-section-example}
+
+>>> from dyf import build_dag_taxonomy
+>>>
+>>> taxonomy = build_dag_taxonomy(embeddings)
+>>>
+>>> # Navigate the taxonomy
+>>> ancestors = taxonomy.get_ancestors(query_idx)
+>>> common = taxonomy.get_common_ancestors(idx_a, idx_b)
+>>> hubs = taxonomy.get_convergence_points(min_parents=10)

@@ -1,0 +1,65 @@
+# get_kmeans_init { #dyf.get_kmeans_init }
+
+```python
+get_kmeans_init(
+    embeddings,
+    nlist,
+    use_stable_bridges=True,
+    num_stability_seeds=5,
+    stability_threshold=3,
+    global_num_bits=12,
+    seed=42,
+    verbose=False,
+)
+```
+
+Get bridge-seeded initial centroids for k-means/IVF index construction.
+
+Using orthogonal bridge points as k-means initialization provides:
+- +1% recall improvement over standard k-means++
+- 17-24% fewer bucket probes needed for same recall
+- Better bucket coherence (neighbors land in same bucket more often)
+
+The returned centroids can be used with sklearn.cluster.KMeans or FAISS IVF.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+| Name                | Type                                     | Description                                                   | Default    |
+|---------------------|------------------------------------------|---------------------------------------------------------------|------------|
+| embeddings          | [np](`numpy`).[ndarray](`numpy.ndarray`) | Normalized embeddings (n, d)                                  | _required_ |
+| nlist               | [int](`int`)                             | Number of clusters/centroids (IVF nlist parameter)            | _required_ |
+| use_stable_bridges  | [bool](`bool`)                           | If True, prefer bridges stable across multiple seeds          | `True`     |
+| num_stability_seeds | [int](`int`)                             | Number of seeds for stability testing                         | `5`        |
+| stability_threshold | [int](`int`)                             | Minimum seeds a bridge must appear in (if use_stable_bridges) | `3`        |
+| global_num_bits     | [int](`int`)                             | LSH bits for bridge detection                                 | `12`       |
+| seed                | [int](`int`)                             | Random seed                                                   | `42`       |
+| verbose             | [bool](`bool`)                           | Print progress                                                | `False`    |
+
+## Returns {.doc-section .doc-section-returns}
+
+| Name   | Type                                     | Description                                                            |
+|--------|------------------------------------------|------------------------------------------------------------------------|
+|        | [np](`numpy`).[ndarray](`numpy.ndarray`) | Initial centroids array (nlist, d) suitable for k-means init parameter |
+
+## Example {.doc-section .doc-section-example}
+
+>>> from dyf import get_kmeans_init
+>>> from sklearn.cluster import KMeans
+>>>
+>>> # Get bridge-seeded initialization
+>>> init = get_kmeans_init(embeddings, nlist=1000)
+>>>
+>>> # Use with sklearn
+>>> kmeans = KMeans(n_clusters=1000, init=init, n_init=1)
+>>> kmeans.fit(embeddings)
+>>>
+>>> # Use with FAISS
+>>> import faiss
+>>> quantizer = faiss.IndexFlatIP(dim)
+>>> quantizer.add(kmeans.cluster_centers_)
+
+## Note {.doc-section .doc-section-note}
+
+For high-recall requirements (99%+), consider using
+`candidate_indices=np.arange(len(embeddings))` in select_orthogonal_anchors
+instead, as all-points expansion provides better long-tail coverage.

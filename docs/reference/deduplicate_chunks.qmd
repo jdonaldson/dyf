@@ -1,0 +1,23 @@
+# deduplicate_chunks { #dyf.deduplicate_chunks }
+
+```python
+deduplicate_chunks(bucket_ids, doc_ids)
+```
+
+Boolean mask keeping one representative per (bucket, doc) pair.
+
+Multi-topic documents retain multiple representatives (one per bucket
+they touch). Single-topic documents collapse to fewer points.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+| Name       | Type   | Description                                                 | Default    |
+|------------|--------|-------------------------------------------------------------|------------|
+| bucket_ids |        | Array-like of bucket assignments per point.                 | _required_ |
+| doc_ids    |        | Array-like of document identifiers per point (same length). | _required_ |
+
+## Returns {.doc-section .doc-section-returns}
+
+| Name   | Type                                     | Description                                                              |
+|--------|------------------------------------------|--------------------------------------------------------------------------|
+|        | [np](`numpy`).[ndarray](`numpy.ndarray`) | Boolean array of length len(bucket_ids). True for representative points. |

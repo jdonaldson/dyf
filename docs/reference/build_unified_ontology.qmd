@@ -1,0 +1,58 @@
+# build_unified_ontology { #dyf.build_unified_ontology }
+
+```python
+build_unified_ontology(
+    embeddings,
+    main_similarity_threshold=0.55,
+    outlier_similarity_threshold=0.45,
+    diversity_gap_threshold=0.02,
+    outlier_diversity_gap=0.015,
+    k_neighbors=30,
+    verbose=False,
+)
+```
+
+Build a unified ontology that covers both dense and sparse embedding regions.
+
+Uses a two-tier approach:
+1. Build main ontology with high similarity threshold (dense regions)
+2. Build outlier ontology with lower threshold (sparse regions)
+3. Add bridge edges to connect them
+4. Exclude "double outliers" that don't fit either
+
+This achieves ~96% coverage vs ~89% for single-threshold approach.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+| Name                         | Type                                     | Description                                               | Default    |
+|------------------------------|------------------------------------------|-----------------------------------------------------------|------------|
+| embeddings                   | [np](`numpy`).[ndarray](`numpy.ndarray`) | Embeddings to analyze (n, d). Will be L2-normalized.      | _required_ |
+| main_similarity_threshold    | [float](`float`)                         | Similarity threshold for main ontology (default 0.55).    | `0.55`     |
+| outlier_similarity_threshold | [float](`float`)                         | Similarity threshold for outlier ontology (default 0.45). | `0.45`     |
+| diversity_gap_threshold      | [float](`float`)                         | Diversity gap for main ontology edges (default 0.02).     | `0.02`     |
+| outlier_diversity_gap        | [float](`float`)                         | Diversity gap for outlier ontology edges (default 0.015). | `0.015`    |
+| k_neighbors                  | [int](`int`)                             | Number of neighbors for k-NN graph.                       | `30`       |
+| verbose                      | [bool](`bool`)                           | Print progress information.                               | `False`    |
+
+## Returns {.doc-section .doc-section-returns}
+
+| Name   | Type                                                     | Description                                                |
+|--------|----------------------------------------------------------|------------------------------------------------------------|
+|        | [UnifiedOntologyResult](`dyf.rag.UnifiedOntologyResult`) | UnifiedOntologyResult with combined ontology and metadata. |
+
+## Example {.doc-section .doc-section-example}
+
+>>> from dyf import build_unified_ontology
+>>>
+>>> result = build_unified_ontology(embeddings, verbose=True)
+>>> print(result.summary())
+>>>
+>>> # Access the unified ontology
+>>> ontology = result.ontology
+>>> ancestors = ontology.get_ancestors(node_idx)
+>>>
+>>> # Check which tier a node came from
+>>> if node_idx in result.main_nodes:
+...     print("From main ontology")
+>>> elif node_idx in result.outlier_nodes:
+...     print("From outlier ontology")

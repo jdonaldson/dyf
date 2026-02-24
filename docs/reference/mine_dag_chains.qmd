@@ -1,0 +1,56 @@
+# mine_dag_chains { #dyf.mine_dag_chains }
+
+```python
+mine_dag_chains(
+    embeddings,
+    k_neighbors=30,
+    similarity_threshold=0.55,
+    diversity_gap_threshold=0.02,
+    min_chain_length=3,
+    verbose=False,
+)
+```
+
+Mine DAG (directed acyclic graph) structures from embedding space.
+
+Finds hierarchical chains by using neighbor diversity as a generality
+signal. Points with diverse neighbors connect many topics (general),
+while points with coherent neighbors form tight clusters (specific).
+
+Chains flow from general → specific, following the diversity gradient.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+| Name                    | Type                                     | Description                                                   | Default    |
+|-------------------------|------------------------------------------|---------------------------------------------------------------|------------|
+| embeddings              | [np](`numpy`).[ndarray](`numpy.ndarray`) | Embeddings to analyze (n, d). Will be L2-normalized.          | _required_ |
+| k_neighbors             | [int](`int`)                             | Number of neighbors for k-NN graph and diversity computation. | `30`       |
+| similarity_threshold    | [float](`float`)                         | Minimum similarity for parent-child edges.                    | `0.55`     |
+| diversity_gap_threshold | [float](`float`)                         | Minimum diversity difference for directed edge.               | `0.02`     |
+| min_chain_length        | [int](`int`)                             | Minimum chain length to return.                               | `3`        |
+| verbose                 | [bool](`bool`)                           | Print progress information.                                   | `False`    |
+
+## Returns {.doc-section .doc-section-returns}
+
+| Name   | Type                                         | Description                                                          |
+|--------|----------------------------------------------|----------------------------------------------------------------------|
+|        | [DAGMiningResult](`dyf.rag.DAGMiningResult`) | DAGMiningResult with chains, diversity scores, and edge information. |
+
+## Example {.doc-section .doc-section-example}
+
+>>> from dyf import mine_dag_chains
+>>>
+>>> result = mine_dag_chains(embeddings, verbose=True)
+>>> print(result.summary())
+>>>
+>>> # Get clean hierarchies
+>>> clean = result.get_chains_by_coherence(min_coherence=0.65)
+>>> for chain in clean[:10]:
+...     print(f"[len={len(chain)}] {chain.indices}")
+
+## Notes {.doc-section .doc-section-notes}
+
+- Low diversity points (decades, months) have highly coherent neighbors
+- High diversity points sit at intersections of multiple topics
+- Chains often converge to common "sinks" (abstract concepts)
+- ~100% of extracted chains follow monotonic diversity gradient

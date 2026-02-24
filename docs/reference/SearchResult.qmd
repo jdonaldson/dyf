@@ -1,0 +1,7 @@
+# SearchResult { #dyf.SearchResult }
+
+```python
+SearchResult(indices, scores, fields=dict(), routing=None)
+```
+
+Search result with indices, scores, and optional stored fields.

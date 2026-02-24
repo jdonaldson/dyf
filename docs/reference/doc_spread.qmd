@@ -1,0 +1,23 @@
+# doc_spread { #dyf.doc_spread }
+
+```python
+doc_spread(bucket_ids, doc_ids)
+```
+
+Per-document chunk distribution analysis.
+
+Articles with low concentration (high spread) are content-level bridges:
+they span multiple semantic regions by their structure.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+| Name       | Type   | Description                                                 | Default    |
+|------------|--------|-------------------------------------------------------------|------------|
+| bucket_ids |        | Array-like of bucket assignments per point.                 | _required_ |
+| doc_ids    |        | Array-like of document identifiers per point (same length). | _required_ |
+
+## Returns {.doc-section .doc-section-returns}
+
+| Name   | Type           | Description                       |
+|--------|----------------|-----------------------------------|
+|        | [dict](`dict`) | Dict mapping doc_id to DocSpread. |

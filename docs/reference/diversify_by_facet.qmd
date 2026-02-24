@@ -1,0 +1,56 @@
+# diversify_by_facet { #dyf.diversify_by_facet }
+
+```python
+diversify_by_facet(
+    query,
+    candidate_indices,
+    embeddings,
+    bucket_ids,
+    k=10,
+    similarity_weight=0.0,
+)
+```
+
+Select k items from k different semantic facets (buckets).
+
+Unlike MMR which maximizes geometric diversity ("different things"),
+facet diversification maximizes semantic coverage ("different perspectives").
+Each result comes from a different DYF bucket, ensuring coverage of distinct
+semantic regions.
+
+This is preferred 2:1 over MMR for queries with high topical redundancy
+(same concept appearing in multiple results).
+
+## Parameters {.doc-section .doc-section-parameters}
+
+| Name              | Type                                     | Description                                                                                                             | Default    |
+|-------------------|------------------------------------------|-------------------------------------------------------------------------------------------------------------------------|------------|
+| query             | [np](`numpy`).[ndarray](`numpy.ndarray`) | Query embedding vector (d,)                                                                                             | _required_ |
+| candidate_indices | [np](`numpy`).[ndarray](`numpy.ndarray`) | Indices of candidate items to diversify                                                                                 | _required_ |
+| embeddings        | [np](`numpy`).[ndarray](`numpy.ndarray`) | Full embedding matrix (n, d)                                                                                            | _required_ |
+| bucket_ids        | [np](`numpy`).[ndarray](`numpy.ndarray`) | DYF bucket IDs for all items (from classifier.get_bucket_ids())                                                         | _required_ |
+| k                 | [int](`int`)                             | Number of diverse results to return                                                                                     | `10`       |
+| similarity_weight | [float](`float`)                         | Weight for similarity vs bucket order (0.0 = pure bucket diversity, 1.0 = similarity-weighted selection within buckets) | `0.0`      |
+
+## Returns {.doc-section .doc-section-returns}
+
+| Name   | Type                                               | Description                                           |
+|--------|----------------------------------------------------|-------------------------------------------------------|
+|        | [FacetDiverseResult](`dyf.rag.FacetDiverseResult`) | FacetDiverseResult with selected indices and metadata |
+
+## Example {.doc-section .doc-section-example}
+
+>>> from dyf import DensityClassifier, diversify_by_facet
+>>>
+>>> # Fit classifier
+>>> clf = DensityClassifier(embedding_dim=dim)
+>>> clf.fit(embeddings)
+>>> bucket_ids = clf.get_bucket_ids()
+>>>
+>>> # Get initial candidates (e.g., top-100 by similarity)
+>>> sims = query @ embeddings.T
+>>> candidates = np.argsort(sims)[-100:][::-1]
+>>>
+>>> # Diversify by facet
+>>> result = diversify_by_facet(query, candidates, embeddings, bucket_ids, k=10)
+>>> print(f"Selected {len(result)} items from {result.buckets_covered} buckets")

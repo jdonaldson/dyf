@@ -1,0 +1,403 @@
+# DensityClassifierFull { #dyf.DensityClassifierFull }
+
+```python
+DensityClassifierFull(
+    embedding_dim=384,
+    num_bits=14,
+    seed=31,
+    isolation_k=10,
+    isolation_sample_size=1000,
+    num_stability_seeds=3,
+)
+```
+
+Density Classifier using PCA-based LSH.
+
+Returns raw density metrics per item - classification is up to you.
+
+## Example {.doc-section .doc-section-example}
+
+>>> classifier = DensityClassifier(embedding_dim=384)
+>>> classifier.fit(embeddings, categories=categories)
+>>> print(classifier.report())
+>>>
+>>> # Get raw metrics
+>>> labels = classifier.get_labels()
+>>> sparse = labels.filter(pl.col('bucket_size') < 10)
+>>> isolated = labels.filter(pl.col('isolation_score') > 0.5)
+
+## Methods
+
+| Name | Description |
+| --- | --- |
+| [fit](#dyf.DensityClassifierFull.fit) | Fit the density classifier. |
+| [from_pandas](#dyf.DensityClassifierFull.from_pandas) | Create classifier from a Pandas DataFrame. |
+| [from_polars](#dyf.DensityClassifierFull.from_polars) | Create classifier from a Polars DataFrame. |
+| [from_texts](#dyf.DensityClassifierFull.from_texts) | Create classifier from raw texts using TF-IDF + SVD embeddings. |
+| [get_bucket_ids](#dyf.DensityClassifierFull.get_bucket_ids) | Get bucket IDs for all items. |
+| [get_bucket_sizes](#dyf.DensityClassifierFull.get_bucket_sizes) | Get bucket sizes for all items. |
+| [get_centroid_similarities](#dyf.DensityClassifierFull.get_centroid_similarities) | Get centroid similarities for all items. |
+| [get_isolation_scores](#dyf.DensityClassifierFull.get_isolation_scores) | Get isolation scores for all items. |
+| [get_labels](#dyf.DensityClassifierFull.get_labels) | Get per-record labels as a Polars DataFrame. |
+| [get_stability_scores](#dyf.DensityClassifierFull.get_stability_scores) | Get stability scores for all items (0-1, higher = more stable). |
+| [label_buckets](#dyf.DensityClassifierFull.label_buckets) | Generate descriptive labels for buckets using a local LLM. |
+| [label_buckets_keywords](#dyf.DensityClassifierFull.label_buckets_keywords) | Generate labels for buckets using keyword extraction (no LLM required). |
+| [report](#dyf.DensityClassifierFull.report) | Get the density classification report. |
+| [to_pandas](#dyf.DensityClassifierFull.to_pandas) | Return source DataFrame with density metrics columns added. |
+| [to_polars](#dyf.DensityClassifierFull.to_polars) | Return source DataFrame with density metrics columns added. |
+
+### fit { #dyf.DensityClassifierFull.fit }
+
+```python
+DensityClassifierFull.fit(
+    embeddings,
+    categories=None,
+    texts=None,
+    normalize=True,
+    verbose=True,
+)
+```
+
+Fit the density classifier.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name       | Type                                                                   | Description                        | Default    |
+|------------|------------------------------------------------------------------------|------------------------------------|------------|
+| embeddings | [np](`numpy`).[ndarray](`numpy.ndarray`)                               | (n, d) array of embedding vectors  | _required_ |
+| categories | [Optional](`typing.Optional`)\[[List](`typing.List`)\[[str](`str`)\]\] | Optional list of category labels   | `None`     |
+| texts      | [Optional](`typing.Optional`)\[[List](`typing.List`)\[[str](`str`)\]\] | Optional list of text content      | `None`     |
+| normalize  | [bool](`bool`)                                                         | Whether to L2-normalize embeddings | `True`     |
+| verbose    | [bool](`bool`)                                                         | Print progress                     | `True`     |
+
+#### Returns {.doc-section .doc-section-returns}
+
+| Name   | Type                                                    | Description         |
+|--------|---------------------------------------------------------|---------------------|
+|        | [DensityClassifier](`dyf.classifier.DensityClassifier`) | self (for chaining) |
+
+### from_pandas { #dyf.DensityClassifierFull.from_pandas }
+
+```python
+DensityClassifierFull.from_pandas(
+    df,
+    embedding_col,
+    category_col=None,
+    text_col=None,
+    **kwargs,
+)
+```
+
+Create classifier from a Pandas DataFrame.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name          | Type                                           | Description                                               | Default    |
+|---------------|------------------------------------------------|-----------------------------------------------------------|------------|
+| df            | [pd](`pandas`).[DataFrame](`pandas.DataFrame`) | Pandas DataFrame with embeddings                          | _required_ |
+| embedding_col | [str](`str`)                                   | Column name containing embedding vectors (list of floats) | _required_ |
+| category_col  | [Optional](`typing.Optional`)\[[str](`str`)\]  | Optional column name for category labels                  | `None`     |
+| text_col      | [Optional](`typing.Optional`)\[[str](`str`)\]  | Optional column name for text content (enables labeling)  | `None`     |
+| **kwargs      |                                                | Additional args passed to __init__ (num_bits, seed, etc.) | `{}`       |
+
+#### Returns {.doc-section .doc-section-returns}
+
+| Name   | Type                                                    | Description                       |
+|--------|---------------------------------------------------------|-----------------------------------|
+|        | [DensityClassifier](`dyf.classifier.DensityClassifier`) | Fitted DensityClassifier instance |
+
+#### Example {.doc-section .doc-section-example}
+
+>>> df = pd.read_parquet("embeddings.parquet")
+>>> classifier = DensityClassifier.from_pandas(
+...     df,
+...     embedding_col="embedding",
+...     category_col="category"
+... )
+>>> result = classifier.to_pandas()
+
+### from_polars { #dyf.DensityClassifierFull.from_polars }
+
+```python
+DensityClassifierFull.from_polars(
+    df,
+    embedding_col,
+    category_col=None,
+    text_col=None,
+    **kwargs,
+)
+```
+
+Create classifier from a Polars DataFrame.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name          | Type                                           | Description                                               | Default    |
+|---------------|------------------------------------------------|-----------------------------------------------------------|------------|
+| df            | [pl](`polars`).[DataFrame](`polars.DataFrame`) | Polars DataFrame with embeddings                          | _required_ |
+| embedding_col | [str](`str`)                                   | Column name containing embedding vectors (list of floats) | _required_ |
+| category_col  | [Optional](`typing.Optional`)\[[str](`str`)\]  | Optional column name for category labels                  | `None`     |
+| text_col      | [Optional](`typing.Optional`)\[[str](`str`)\]  | Optional column name for text content (enables labeling)  | `None`     |
+| **kwargs      |                                                | Additional args passed to __init__ (num_bits, seed, etc.) | `{}`       |
+
+#### Returns {.doc-section .doc-section-returns}
+
+| Name   | Type                                                    | Description                       |
+|--------|---------------------------------------------------------|-----------------------------------|
+|        | [DensityClassifier](`dyf.classifier.DensityClassifier`) | Fitted DensityClassifier instance |
+
+#### Example {.doc-section .doc-section-example}
+
+>>> df = pl.read_parquet("embeddings.parquet")
+>>> classifier = DensityClassifier.from_polars(
+...     df,
+...     embedding_col="embedding",
+...     category_col="category"
+... )
+>>> result = classifier.to_polars()
+
+### from_texts { #dyf.DensityClassifierFull.from_texts }
+
+```python
+DensityClassifierFull.from_texts(
+    texts,
+    categories=None,
+    embedding_dim=128,
+    max_features=10000,
+    min_df=2,
+    max_df=0.95,
+    ngram_range=(1, 2),
+    num_bits=12,
+    verbose=True,
+    **kwargs,
+)
+```
+
+Create classifier from raw texts using TF-IDF + SVD embeddings.
+
+No external embedding model required. Uses sklearn's TfidfVectorizer
+and TruncatedSVD to create dense embeddings from text.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name          | Type                                                                   | Description                               | Default    |
+|---------------|------------------------------------------------------------------------|-------------------------------------------|------------|
+| texts         | [List](`typing.List`)\[[str](`str`)\]                                  | List of text documents                    | _required_ |
+| categories    | [Optional](`typing.Optional`)\[[List](`typing.List`)\[[str](`str`)\]\] | Optional category labels                  | `None`     |
+| embedding_dim | [int](`int`)                                                           | SVD output dimensions (default 128)       | `128`      |
+| max_features  | [int](`int`)                                                           | Max vocabulary size for TF-IDF            | `10000`    |
+| min_df        | [int](`int`)                                                           | Min document frequency for terms          | `2`        |
+| max_df        | [float](`float`)                                                       | Max document frequency for terms          | `0.95`     |
+| ngram_range   | [Tuple](`typing.Tuple`)\[[int](`int`), [int](`int`)\]                  | N-gram range (default unigrams + bigrams) | `(1, 2)`   |
+| num_bits      | [int](`int`)                                                           | Bits for PCA LSH                          | `12`       |
+| verbose       | [bool](`bool`)                                                         | Print progress                            | `True`     |
+| **kwargs      |                                                                        | Additional args passed to __init__        | `{}`       |
+
+#### Returns {.doc-section .doc-section-returns}
+
+| Name   | Type                                                    | Description                       |
+|--------|---------------------------------------------------------|-----------------------------------|
+|        | [DensityClassifier](`dyf.classifier.DensityClassifier`) | Fitted DensityClassifier instance |
+
+#### Example {.doc-section .doc-section-example}
+
+>>> texts = ["doc about machine learning", "another ml paper", ...]
+>>> classifier = DensityClassifier.from_texts(texts, categories=cats)
+>>> print(classifier.report())
+
+### get_bucket_ids { #dyf.DensityClassifierFull.get_bucket_ids }
+
+```python
+DensityClassifierFull.get_bucket_ids()
+```
+
+Get bucket IDs for all items.
+
+### get_bucket_sizes { #dyf.DensityClassifierFull.get_bucket_sizes }
+
+```python
+DensityClassifierFull.get_bucket_sizes()
+```
+
+Get bucket sizes for all items.
+
+### get_centroid_similarities { #dyf.DensityClassifierFull.get_centroid_similarities }
+
+```python
+DensityClassifierFull.get_centroid_similarities()
+```
+
+Get centroid similarities for all items.
+
+### get_isolation_scores { #dyf.DensityClassifierFull.get_isolation_scores }
+
+```python
+DensityClassifierFull.get_isolation_scores()
+```
+
+Get isolation scores for all items.
+
+### get_labels { #dyf.DensityClassifierFull.get_labels }
+
+```python
+DensityClassifierFull.get_labels()
+```
+
+Get per-record labels as a Polars DataFrame.
+
+#### Returns DataFrame with columns {.doc-section .doc-section-returns-dataframe-with-columns}
+
+- index: Record index (0-based)
+- bucket_id: Primary LSH bucket ID
+- bucket_size: Number of items in same bucket
+- centroid_similarity: Cosine similarity to bucket centroid
+- isolation_score: How isolated the item is
+- stability_score: How stable bucket assignment is (0-1)
+- category: Category label if provided during fit
+
+#### Example {.doc-section .doc-section-example}
+
+>>> classifier.fit(embeddings, categories=categories)
+>>> labels = classifier.get_labels()
+>>> sparse = labels.filter(pl.col('bucket_size') < 10)
+
+### get_stability_scores { #dyf.DensityClassifierFull.get_stability_scores }
+
+```python
+DensityClassifierFull.get_stability_scores()
+```
+
+Get stability scores for all items (0-1, higher = more stable).
+
+### label_buckets { #dyf.DensityClassifierFull.label_buckets }
+
+```python
+DensityClassifierFull.label_buckets(
+    base_url='http://localhost:11434/v1',
+    model='qwen2.5:7b',
+    samples_per_bucket=5,
+    max_text_len=200,
+    min_bucket_size=5,
+    verbose=True,
+)
+```
+
+Generate descriptive labels for buckets using a local LLM.
+
+Uses OpenAI-compatible API (works with Ollama or MLX server).
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name               | Type           | Description                                                 | Default                       |
+|--------------------|----------------|-------------------------------------------------------------|-------------------------------|
+| base_url           | [str](`str`)   | API endpoint (Ollama: localhost:11434, MLX: localhost:8080) | `'http://localhost:11434/v1'` |
+| model              | [str](`str`)   | Model name                                                  | `'qwen2.5:7b'`                |
+| samples_per_bucket | [int](`int`)   | Number of representative texts to send                      | `5`                           |
+| max_text_len       | [int](`int`)   | Max length of each sample text                              | `200`                         |
+| min_bucket_size    | [int](`int`)   | Only label buckets with at least this many items            | `5`                           |
+| verbose            | [bool](`bool`) | Print progress                                              | `True`                        |
+
+#### Returns {.doc-section .doc-section-returns}
+
+| Name   | Type                                                         | Description                                                                 |
+|--------|--------------------------------------------------------------|-----------------------------------------------------------------------------|
+|        | [Dict](`typing.Dict`)\[[int](`int`), [Dict](`typing.Dict`)\] | Dict mapping bucket_id -> {'label': str, 'size': int, 'samples': List[str]} |
+
+#### Example {.doc-section .doc-section-example}
+
+>>> labels = classifier.label_buckets(
+...     base_url="http://localhost:11434/v1",
+...     model="qwen2.5:7b"
+... )
+>>> print(labels[1234]['label'])
+'Reinforcement Learning'
+
+### label_buckets_keywords { #dyf.DensityClassifierFull.label_buckets_keywords }
+
+```python
+DensityClassifierFull.label_buckets_keywords(
+    top_k=3,
+    min_bucket_size=5,
+    stopwords=None,
+    min_word_len=3,
+    use_tfidf=True,
+)
+```
+
+Generate labels for buckets using keyword extraction (no LLM required).
+
+Extracts top keywords from bucket texts using TF-IDF or frequency analysis.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name            | Type                                          | Description                                      | Default   |
+|-----------------|-----------------------------------------------|--------------------------------------------------|-----------|
+| top_k           | [int](`int`)                                  | Number of top keywords to include in label       | `3`       |
+| min_bucket_size | [int](`int`)                                  | Only label buckets with at least this many items | `5`       |
+| stopwords       | [Optional](`typing.Optional`)\[[set](`set`)\] | Set of words to exclude (uses default if None)   | `None`    |
+| min_word_len    | [int](`int`)                                  | Minimum word length to consider                  | `3`       |
+| use_tfidf       | [bool](`bool`)                                | Use TF-IDF weighting (vs simple frequency)       | `True`    |
+
+#### Returns {.doc-section .doc-section-returns}
+
+| Name   | Type                                                         | Description                                                                                |
+|--------|--------------------------------------------------------------|--------------------------------------------------------------------------------------------|
+|        | [Dict](`typing.Dict`)\[[int](`int`), [Dict](`typing.Dict`)\] | Dict mapping bucket_id -> {'label': str, 'keywords': List[Tuple[str, float]], 'size': int} |
+
+#### Example {.doc-section .doc-section-example}
+
+>>> labels = classifier.label_buckets_keywords()
+>>> print(labels[1234]['label'])
+'neural network training'
+
+### report { #dyf.DensityClassifierFull.report }
+
+```python
+DensityClassifierFull.report()
+```
+
+Get the density classification report.
+
+### to_pandas { #dyf.DensityClassifierFull.to_pandas }
+
+```python
+DensityClassifierFull.to_pandas()
+```
+
+Return source DataFrame with density metrics columns added.
+
+#### Returns DataFrame with original columns plus {.doc-section .doc-section-returns-dataframe-with-original-columns-plus}
+
+- bucket_id: LSH bucket ID
+- bucket_size: Number of items in same bucket
+- centroid_similarity: Cosine similarity to bucket centroid (0-1)
+- isolation_score: How isolated the item is
+- stability_score: How stable bucket assignment is (0-1)
+
+#### Example {.doc-section .doc-section-example}
+
+>>> classifier = DensityClassifier.from_pandas(df, "embedding")
+>>> result = classifier.to_pandas()
+>>> sparse = result[result["bucket_size"] < 5]
+
+### to_polars { #dyf.DensityClassifierFull.to_polars }
+
+```python
+DensityClassifierFull.to_polars()
+```
+
+Return source DataFrame with density metrics columns added.
+
+#### Returns DataFrame with original columns plus {.doc-section .doc-section-returns-dataframe-with-original-columns-plus}
+
+- bucket_id: LSH bucket ID
+- bucket_size: Number of items in same bucket
+- centroid_similarity: Cosine similarity to bucket centroid (0-1)
+- isolation_score: How isolated the item is
+- stability_score: How stable bucket assignment is (0-1)
+
+#### Example {.doc-section .doc-section-example}
+
+>>> classifier = DensityClassifier.from_polars(df, "embedding")
+>>> result = classifier.to_polars()
+>>> sparse = result.filter(pl.col("bucket_size") < 5)

@@ -1,0 +1,134 @@
+project:
+  type: website
+  output-dir: _site
+
+metadata-files:
+  - reference/_sidebar.yml
+
+website:
+  title: ""
+  navbar:
+    logo: dyf_logo.svg
+    left:
+      - href: index.qmd
+        text: Home
+      - href: getting-started.qmd
+        text: Getting Started
+      - href: reference/index.qmd
+        text: API Reference
+    right:
+      - icon: github
+        href: https://github.com/jdonaldson/dyf
+
+format:
+  html:
+    theme:
+      light:
+        - cosmo
+        - custom.scss
+      dark:
+        - darkly
+        - custom-dark.scss
+    highlight-style:
+      light: kate
+      dark: zenburn
+    toc: true
+
+quartodoc:
+  package: dyf
+  dir: reference
+  title: API Reference
+  parser: google
+  style: pkgdown
+  render_interlinks: true
+  sidebar: "reference/_sidebar.yml"
+  sections:
+    - title: Core
+      desc: >
+        Core density classification and reporting. `DensityClassifierFull` wraps
+        the Rust-accelerated core with embedding generation, DataFrame I/O, and
+        LLM-based labeling.
+      contents:
+        - DensityClassifierFull
+        - DensityReportFull
+
+    - title: Tree Methods
+      desc: Hierarchical tree construction for multi-resolution analysis of embeddings.
+      contents:
+        - build_pca_tree
+        - cut_tree_to_labels
+        - extract_boundary_persistence
+        - boundary_persistence_scores
+        - build_dyf_tree
+        - refine_dyf_tree
+        - cut_dyf_tree_to_labels
+        - refine_clusters
+
+    - title: Retrieval (RAG)
+      desc: Bridge-aware retrieval, anchor selection, and ontology construction.
+      contents:
+        - BridgeIndex
+        - find_super_connectors
+        - select_orthogonal_anchors
+        - diversify_by_facet
+        - get_kmeans_init
+        - compute_neighbor_diversity
+        - compute_hub_score
+        - mine_dag_chains
+        - build_dag_taxonomy
+        - build_unified_ontology
+        - build_rog_ontology
+
+    - title: Result Types
+      desc: Dataclasses returned by RAG and analysis functions.
+      contents:
+        - SuperConnectorResult
+        - OrthogonalAnchorResult
+        - FacetDiverseResult
+        - DAGChain
+        - DAGMiningResult
+        - DAGTaxonomy
+        - UnifiedOntologyResult
+        - HubScoreResult
+        - ROGLayer
+        - ROGResult
+
+    - title: Re-ranking
+      desc: Re-rank search results with diversity and bridge awareness.
+      contents:
+        - rerank_standard
+        - rerank_mmr
+        - rerank_bridge_boost
+        - rerank_bridge_mmr
+
+    - title: Chunk Analysis
+      desc: Analyze chunk redundancy, document spread, and cluster quality.
+      contents:
+        - DocSpread
+        - chunk_redundancy
+        - deduplicate_chunks
+        - doc_spread
+        - cluster_quality
+        - neighbor_coherence
+
+    - title: I/O
+      desc: Save and load fitted classifiers as safetensors files.
+      contents:
+        - save_index
+        - load_index
+        - PrecomputedIndex
+
+    - title: Lazy Index
+      desc: Memory-mapped tree index with FlatBuffers + Arrow IPC.
+      contents:
+        - LazyIndex
+        - write_lazy_index
+        - from_faiss
+        - SearchResult
+
+    - title: Configuration
+      desc: Pre-built configurations for embedding models and LLM labelers.
+      contents:
+        - EmbedderConfig
+        - LabelerConfig
+        - list_configs

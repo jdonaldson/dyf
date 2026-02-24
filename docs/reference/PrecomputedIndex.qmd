@@ -1,0 +1,108 @@
+# PrecomputedIndex { #dyf.PrecomputedIndex }
+
+```python
+PrecomputedIndex(data, metadata=None)
+```
+
+Work with a pre-computed DYF index without the Rust classifier.
+
+Useful for deployment when you don't want the dyf-rs dependency.
+
+## Example {.doc-section .doc-section-example}
+
+>>> index = PrecomputedIndex.load('index.safetensors')
+>>> dense_items = index.get_dense()
+>>> bridge_items = index.get_bridge()
+>>> bucket_5_items = index.get_bucket(5)
+
+## Attributes
+
+| Name | Description |
+| --- | --- |
+| [version](#dyf.PrecomputedIndex.version) | Get the dyf version used to create this index. |
+
+## Methods
+
+| Name | Description |
+| --- | --- |
+| [get_bridge](#dyf.PrecomputedIndex.get_bridge) | Get indices of bridge items. |
+| [get_bucket](#dyf.PrecomputedIndex.get_bucket) | Get indices of items in a specific bucket. |
+| [get_dense](#dyf.PrecomputedIndex.get_dense) | Get indices of dense items. |
+| [get_orphans](#dyf.PrecomputedIndex.get_orphans) | Get indices of orphan items. |
+| [get_recovery_bucket](#dyf.PrecomputedIndex.get_recovery_bucket) | Get indices of items in a specific recovery bucket. |
+| [get_unique_buckets](#dyf.PrecomputedIndex.get_unique_buckets) | Get unique bucket IDs (excluding -1). |
+| [get_unique_recovery_buckets](#dyf.PrecomputedIndex.get_unique_recovery_buckets) | Get unique recovery bucket IDs (excluding -1). |
+| [load](#dyf.PrecomputedIndex.load) | Load index from safetensors file. |
+| [report](#dyf.PrecomputedIndex.report) | Get summary statistics. |
+
+### get_bridge { #dyf.PrecomputedIndex.get_bridge }
+
+```python
+PrecomputedIndex.get_bridge()
+```
+
+Get indices of bridge items.
+
+### get_bucket { #dyf.PrecomputedIndex.get_bucket }
+
+```python
+PrecomputedIndex.get_bucket(bucket_id)
+```
+
+Get indices of items in a specific bucket.
+
+### get_dense { #dyf.PrecomputedIndex.get_dense }
+
+```python
+PrecomputedIndex.get_dense()
+```
+
+Get indices of dense items.
+
+### get_orphans { #dyf.PrecomputedIndex.get_orphans }
+
+```python
+PrecomputedIndex.get_orphans()
+```
+
+Get indices of orphan items.
+
+### get_recovery_bucket { #dyf.PrecomputedIndex.get_recovery_bucket }
+
+```python
+PrecomputedIndex.get_recovery_bucket(bucket_id)
+```
+
+Get indices of items in a specific recovery bucket.
+
+### get_unique_buckets { #dyf.PrecomputedIndex.get_unique_buckets }
+
+```python
+PrecomputedIndex.get_unique_buckets()
+```
+
+Get unique bucket IDs (excluding -1).
+
+### get_unique_recovery_buckets { #dyf.PrecomputedIndex.get_unique_recovery_buckets }
+
+```python
+PrecomputedIndex.get_unique_recovery_buckets()
+```
+
+Get unique recovery bucket IDs (excluding -1).
+
+### load { #dyf.PrecomputedIndex.load }
+
+```python
+PrecomputedIndex.load(path)
+```
+
+Load index from safetensors file.
+
+### report { #dyf.PrecomputedIndex.report }
+
+```python
+PrecomputedIndex.report()
+```
+
+Get summary statistics.

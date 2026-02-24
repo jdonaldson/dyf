@@ -1,0 +1,47 @@
+# compute_hub_score { #dyf.compute_hub_score }
+
+```python
+compute_hub_score(
+    embeddings,
+    k=30,
+    n_iterations=30,
+    neighbors=None,
+    similarities=None,
+)
+```
+
+Compute hub score for each point in the embedding space.
+
+Hub score identifies structural hub nodes that hold the embedding space
+together, as opposed to popular instances that fill it. The score combines:
+- Eigenvector centrality: rewards being in a tightly woven neighborhood
+- Distance to global centroid: rewards central position in the space
+
+General/structural concepts score high on both signals; specific instances
+score low on both.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+| Name         | Type                                                                      | Description                                                       | Default    |
+|--------------|---------------------------------------------------------------------------|-------------------------------------------------------------------|------------|
+| embeddings   | [np](`numpy`).[ndarray](`numpy.ndarray`)                                  | Normalized embeddings (n, d)                                      | _required_ |
+| k            | [int](`int`)                                                              | Number of neighbors for k-NN graph                                | `30`       |
+| n_iterations | [int](`int`)                                                              | Iterations for eigenvector power method                           | `30`       |
+| neighbors    | [Optional](`typing.Optional`)\[[np](`numpy`).[ndarray](`numpy.ndarray`)\] | Pre-computed k-NN indices (n, k+1). If None, computed internally. | `None`     |
+| similarities | [Optional](`typing.Optional`)\[[np](`numpy`).[ndarray](`numpy.ndarray`)\] | Pre-computed similarities (n, k+1). If None, computed internally. | `None`     |
+
+## Returns {.doc-section .doc-section-returns}
+
+| Name   | Type                                       | Description                                       |
+|--------|--------------------------------------------|---------------------------------------------------|
+|        | [HubScoreResult](`dyf.rag.HubScoreResult`) | HubScoreResult with scores and component signals. |
+
+## Example {.doc-section .doc-section-example}
+
+>>> result = compute_hub_score(embeddings)
+>>> hub_nodes = result.get_hub_nodes(threshold=1.0)
+>>> print(f"Found {len(hub_nodes)} hub nodes")
+>>>
+>>> # Use for taxonomy direction
+>>> if result.scores[idx_animal] > result.scores[idx_dog]:
+...     print("Animal is more general than Dog")

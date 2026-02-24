@@ -1,0 +1,35 @@
+# build_dyf_tree { #dyf.build_dyf_tree }
+
+```python
+build_dyf_tree(
+    embeddings,
+    max_depth,
+    num_bits=3,
+    min_leaf_size=4,
+    seed=42,
+    fit_method='raw_pca',
+)
+```
+
+Build a DYF recursive tree over embeddings.
+
+At each level, fits a DensityClassifier with ``num_bits`` bits, producing
+up to 2^num_bits children per node.  Centroid similarities are stored as
+per-point margins for boundary persistence analysis.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+| Name          | Type   | Description                                                                                                                                                       | Default     |
+|---------------|--------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------|
+| embeddings    |        | (n, d) array of embedding vectors.                                                                                                                                | _required_  |
+| max_depth     |        | Maximum tree depth (number of recursive splits).                                                                                                                  | _required_  |
+| num_bits      |        | LSH bits per level (default 3 = up to 8-way splits).                                                                                                              | `3`         |
+| min_leaf_size |        | Stop splitting when a node has fewer than            2 * min_leaf_size points.                                                                                    | `4`         |
+| seed          |        | Random seed for DensityClassifier.                                                                                                                                | `42`        |
+| fit_method    |        | Fitting method — 'raw_pca' (default, PCA on full data),         'pca' (PCA on centroid subset), or 'itq'         (iterative quantization for tighter partitions). | `'raw_pca'` |
+
+## Returns {.doc-section .doc-section-returns}
+
+| Name   | Type   | Description                                                      |
+|--------|--------|------------------------------------------------------------------|
+|        |        | Tree dict with keys: children, indices, depth, point_margin_map. |

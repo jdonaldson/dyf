@@ -1,0 +1,41 @@
+# find_super_connectors { #dyf.find_super_connectors }
+
+```python
+find_super_connectors(
+    embeddings,
+    global_num_bits=12,
+    facet_num_bits=10,
+    dense_percentile=75,
+    global_threshold_percentile=50,
+    local_threshold_percentile=50,
+    min_bucket_size=20,
+    seed=42,
+)
+```
+
+Find super connectors: points with high centrality in both global and local
+bridge networks.
+
+Super connectors are ideal RAG anchor points because they:
+- Bridge across major semantic regions (high global centrality)
+- Connect facets within dense clusters (high local centrality)
+- Provide 10x better coverage efficiency than random anchors
+
+## Parameters {.doc-section .doc-section-parameters}
+
+| Name                        | Type                                     | Description                             | Default    |
+|-----------------------------|------------------------------------------|-----------------------------------------|------------|
+| embeddings                  | [np](`numpy`).[ndarray](`numpy.ndarray`) | Normalized embeddings (n_points, dim)   | _required_ |
+| global_num_bits             | [int](`int`)                             | LSH bits for global bucketing           | `12`       |
+| facet_num_bits              | [int](`int`)                             | LSH bits for facet bucketing            | `10`       |
+| dense_percentile            | [float](`float`)                         | Percentile threshold for dense buckets  | `75`       |
+| global_threshold_percentile | [float](`float`)                         | Percentile for "high" global centrality | `50`       |
+| local_threshold_percentile  | [float](`float`)                         | Percentile for "high" local centrality  | `50`       |
+| min_bucket_size             | [int](`int`)                             | Minimum bucket size for faceting        | `20`       |
+| seed                        | [int](`int`)                             | Random seed                             | `42`       |
+
+## Returns {.doc-section .doc-section-returns}
+
+| Name   | Type                                                   | Description                                           |
+|--------|--------------------------------------------------------|-------------------------------------------------------|
+|        | [SuperConnectorResult](`dyf.rag.SuperConnectorResult`) | SuperConnectorResult with indices and centrality data |

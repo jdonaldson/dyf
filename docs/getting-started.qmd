@@ -1,0 +1,156 @@
+---
+title: "Getting Started"
+---
+
+This guide walks through the core DYF workflow: fitting a classifier, inspecting results, and integrating with DataFrames.
+
+## Basic Usage
+
+The fastest way to get started is with `DensityClassifier` (Rust-accelerated):
+
+```python
+import numpy as np
+from dyf import DensityClassifier
+
+# Load or generate embeddings
+embeddings = np.random.randn(10000, 384).astype(np.float32)
+
+# Create classifier and fit
+classifier = DensityClassifier(embedding_dim=384)
+classifier.fit(embeddings)
+
+# Inspect the report
+report = classifier.report()
+print(report)
+```
+
+The report shows how items distribute across Dense, Bridge, and Orphan categories.
+
+### Retrieving Items
+
+```python
+# Get item indices by category
+dense_items = classifier.get_dense()
+bridge_items = classifier.get_bridge()
+orphan_items = classifier.get_orphans()
+
+# Get per-item metrics
+bucket_ids = classifier.get_bucket_ids()
+bucket_sizes = classifier.get_bucket_sizes()
+isolation_scores = classifier.get_isolation_scores()
+```
+
+## Full-Featured Classifier
+
+`DensityClassifierFull` wraps the Rust core with embedding generation, DataFrame I/O, and LLM-based labeling:
+
+```python
+from dyf import DensityClassifierFull, EmbedderConfig, LabelerConfig
+
+# From raw texts (auto-generates TF-IDF embeddings)
+classifier = DensityClassifierFull.from_texts(
+    texts=["document one", "document two", ...],
+    categories=["cat_a", "cat_b", ...],
+)
+
+# Label buckets with a local LLM
+labels = classifier.label_buckets(**LabelerConfig.MEDIUM.as_kwargs())
+```
+
+### DataFrame Integration
+
+Create classifiers directly from Polars or Pandas DataFrames:
+
+```python
+import polars as pl
+
+df = pl.DataFrame({
+    "text": ["doc1", "doc2", ...],
+    "embedding": [emb1, emb2, ...],  # list of numpy arrays
+    "category": ["a", "b", ...],
+})
+
+# From Polars
+classifier = DensityClassifierFull.from_polars(
+    df,
+    embedding_col="embedding",
+    category_col="category",
+    text_col="text",
+)
+
+# Export results back to Polars
+results_df = classifier.to_polars()
+```
+
+Pandas works the same way via `from_pandas()` / `to_pandas()`.
+
+## Saving and Loading
+
+Save a fitted classifier for later use without needing the Rust dependency:
+
+```python
+from dyf import save_index, PrecomputedIndex
+
+# Save
+save_index(
+    classifier, "index.safetensors", embeddings,
+    metadata={"model": "all-MiniLM-L6-v2"}
+)
+
+# Load (no dyf-rs needed)
+index = PrecomputedIndex.load("index.safetensors")
+dense = index.get_dense()
+bucket_5 = index.get_bucket(5)
+print(index.metadata)
+```
+
+## Tree Methods
+
+Build hierarchical structure from embeddings for multi-resolution analysis:
+
+```python
+from dyf import build_pca_tree, cut_tree_to_labels
+
+# Build a PCA-based binary tree
+tree = build_pca_tree(embeddings, max_depth=8)
+
+# Cut to get cluster labels
+labels = cut_tree_to_labels(tree, max_depth=8, n_points=len(embeddings), n_clusters=25)
+```
+
+## Bridge-Aware Retrieval (RAG)
+
+Use `BridgeIndex` for structure-aware approximate nearest neighbor search:
+
+```python
+from dyf import BridgeIndex
+
+# Build index
+index = BridgeIndex(n_anchors=1000)
+index.fit(embeddings)
+
+# Query
+query = np.random.randn(384).astype(np.float32)
+indices, scores = index.query(query, k=10)
+```
+
+## Re-ranking
+
+Apply diversity-aware re-ranking to search results:
+
+```python
+from dyf import rerank_mmr, rerank_bridge_mmr
+
+# Standard MMR re-ranking
+reranked = rerank_mmr(query_emb, candidate_indices, embeddings_normed, top_k=10)
+
+# Bridge-aware MMR (boosts items that span clusters)
+reranked = rerank_bridge_mmr(
+    query_emb, candidate_indices, embeddings_normed,
+    bridge_scores, cluster_labels, top_k=10,
+)
+```
+
+## Next Steps
+
+See the [API Reference](reference/index.qmd) for complete documentation of all classes and functions.

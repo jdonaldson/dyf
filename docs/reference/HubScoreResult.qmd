@@ -1,0 +1,56 @@
+# HubScoreResult { #dyf.HubScoreResult }
+
+```python
+HubScoreResult(
+    scores,
+    eigenvector,
+    distance_to_center,
+    eigenvector_z,
+    distance_z,
+)
+```
+
+Result of hub score computation.
+
+Hub nodes are structural centers that hold the embedding space together.
+They are characterized by:
+- High eigenvector centrality (in tightly woven neighborhoods)
+- Low distance to global centroid (central position in space)
+
+Unlike PageRank, which rewards being pointed to by many nodes (both categories
+AND popular instances qualify), eigenvector centrality rewards being in a
+tightly interconnected cluster. Abstract concepts cluster more tightly than
+popular instances.
+
+## Attributes {.doc-section .doc-section-attributes}
+
+| Name               | Type                                     | Description                                                 |
+|--------------------|------------------------------------------|-------------------------------------------------------------|
+| scores             | [np](`numpy`).[ndarray](`numpy.ndarray`) | Hub score for each point (higher = more structural/general) |
+| eigenvector        | [np](`numpy`).[ndarray](`numpy.ndarray`) | Eigenvector centrality for each point                       |
+| distance_to_center | [np](`numpy`).[ndarray](`numpy.ndarray`) | Distance to global centroid for each point                  |
+| eigenvector_z      | [np](`numpy`).[ndarray](`numpy.ndarray`) | Z-scored eigenvector centrality                             |
+| distance_z         | [np](`numpy`).[ndarray](`numpy.ndarray`) | Z-scored distance to center                                 |
+
+## Methods
+
+| Name | Description |
+| --- | --- |
+| [get_hub_nodes](#dyf.HubScoreResult.get_hub_nodes) | Return indices of nodes with hub score above threshold. |
+| [get_top_hubs](#dyf.HubScoreResult.get_top_hubs) | Return indices of top k hub nodes. |
+
+### get_hub_nodes { #dyf.HubScoreResult.get_hub_nodes }
+
+```python
+HubScoreResult.get_hub_nodes(threshold=0.0)
+```
+
+Return indices of nodes with hub score above threshold.
+
+### get_top_hubs { #dyf.HubScoreResult.get_top_hubs }
+
+```python
+HubScoreResult.get_top_hubs(k=100)
+```
+
+Return indices of top k hub nodes.

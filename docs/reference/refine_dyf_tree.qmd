@@ -1,0 +1,40 @@
+# refine_dyf_tree { #dyf.refine_dyf_tree }
+
+```python
+refine_dyf_tree(
+    tree,
+    embeddings,
+    min_coherence=None,
+    num_bits=3,
+    min_leaf_size=4,
+    max_retries=3,
+    seed_offset=1000,
+)
+```
+
+Re-split incoherent tree leaves with rotated LSH seeds.
+
+Walks the tree and finds leaves whose mean cosine similarity to centroid
+is below a threshold.  For each, tries re-splitting with different LSH
+seeds and accepts the split if weighted child coherence improves.
+
+Modifies the tree in-place.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+| Name          | Type   | Description                                                                                                               | Default    |
+|---------------|--------|---------------------------------------------------------------------------------------------------------------------------|------------|
+| tree          |        | DYF tree dict from build_dyf_tree().                                                                                      | _required_ |
+| embeddings    |        | (n, d) array of embedding vectors.                                                                                        | _required_ |
+| min_coherence |        | Coherence threshold. Leaves below this are candidates for re-splitting. If None, uses 25th percentile of leaf coherences. | `None`     |
+| num_bits      |        | LSH bits for re-splitting (default 3).                                                                                    | `3`        |
+| min_leaf_size |        | Don't try to split leaves smaller than 2x this.                                                                           | `4`        |
+| max_retries   |        | Number of different seeds to try per leaf.                                                                                | `3`        |
+| seed_offset   |        | Base seed for re-splitting (offset from original tree seed).                                                              | `1000`     |
+
+## Returns {.doc-section .doc-section-returns}
+
+| Name   | Type   | Description                                                  |
+|--------|--------|--------------------------------------------------------------|
+|        |        | dict with stats: n_refined, n_leaves_before, n_leaves_after, |
+|        |        | coherence_before, coherence_after.                           |

@@ -1,0 +1,27 @@
+# save_index { #dyf.save_index }
+
+```python
+save_index(
+    classifier,
+    path,
+    embeddings=None,
+    include_embeddings=True,
+    metadata=None,
+)
+```
+
+Save a fitted classifier's index to safetensors format.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+| Name               | Type                                                                      | Description                                               | Default    |
+|--------------------|---------------------------------------------------------------------------|-----------------------------------------------------------|------------|
+| classifier         |                                                                           | Fitted OutlierClassifier instance                         | _required_ |
+| path               | [Union](`typing.Union`)\[[str](`str`), [Path](`pathlib.Path`)\]           | Output file path (.safetensors)                           | _required_ |
+| embeddings         | [Optional](`typing.Optional`)\[[np](`numpy`).[ndarray](`numpy.ndarray`)\] | Original embeddings (required if include_embeddings=True) | `None`     |
+| include_embeddings | [bool](`bool`)                                                            | Whether to include embeddings in the file                 | `True`     |
+
+## Example {.doc-section .doc-section-example}
+
+>>> classifier.fit(embeddings)
+>>> save_index(classifier, 'index.safetensors', embeddings)

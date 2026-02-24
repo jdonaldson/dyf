@@ -1,0 +1,309 @@
+# DAGTaxonomy { #dyf.DAGTaxonomy }
+
+```python
+DAGTaxonomy(n_nodes, diversity, children, parents, roots, leaves)
+```
+
+A navigable DAG taxonomy extracted from embedding space.
+
+Provides lattice operations for exploring hierarchical relationships:
+- Find ancestors/descendants of a concept
+- Find common ancestors between concepts
+- Find paths through the taxonomy
+- Identify convergence points (abstract attractors)
+
+The taxonomy is a true lattice (not a tree) - nodes can have multiple
+parents, enabling multiple inheritance and diamond patterns.
+
+## Attributes {.doc-section .doc-section-attributes}
+
+| Name      | Type                                                                                                                                        | Description                                           |
+|-----------|---------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------|
+| n_nodes   | [int](`int`)                                                                                                                                | Total number of nodes in the taxonomy                 |
+| diversity | [np](`numpy`).[ndarray](`numpy.ndarray`)                                                                                                    | Neighbor diversity score for each node                |
+| children  | [Dict](`typing.Dict`)\[[int](`int`), [List](`typing.List`)\[[Tuple](`typing.Tuple`)\[[int](`int`), [float](`float`), [float](`float`)\]\]\] | Dict mapping node → list of (child, similarity, gap)  |
+| parents   | [Dict](`typing.Dict`)\[[int](`int`), [List](`typing.List`)\[[Tuple](`typing.Tuple`)\[[int](`int`), [float](`float`), [float](`float`)\]\]\] | Dict mapping node → list of (parent, similarity, gap) |
+| roots     | [List](`typing.List`)\[[int](`int`)\]                                                                                                       | Nodes with no parents (most general concepts)         |
+| leaves    | [List](`typing.List`)\[[int](`int`)\]                                                                                                       | Nodes with no children (most specific concepts)       |
+
+## Example {.doc-section .doc-section-example}
+
+>>> from dyf import build_dag_taxonomy
+>>>
+>>> taxonomy = build_dag_taxonomy(embeddings, verbose=True)
+>>> print(taxonomy.summary())
+>>>
+>>> # Find ancestors of a concept
+>>> ancestors = taxonomy.get_ancestors(node_idx, max_depth=5)
+>>>
+>>> # Find common ancestors between two concepts
+>>> common = taxonomy.get_common_ancestors(idx_a, idx_b)
+>>>
+>>> # Get convergence points (highly connected abstract concepts)
+>>> hubs = taxonomy.get_convergence_points(min_parents=10)
+
+## Methods
+
+| Name | Description |
+| --- | --- |
+| [get_all_paths](#dyf.DAGTaxonomy.get_all_paths) | Find all paths from start to end. |
+| [get_ancestors](#dyf.DAGTaxonomy.get_ancestors) | Get all ancestors of a node (transitive closure upward). |
+| [get_children](#dyf.DAGTaxonomy.get_children) | Get direct children of a node. |
+| [get_common_ancestors](#dyf.DAGTaxonomy.get_common_ancestors) | Find common ancestors of two nodes. |
+| [get_convergence_points](#dyf.DAGTaxonomy.get_convergence_points) | Find convergence points (nodes with many incoming edges). |
+| [get_descendants](#dyf.DAGTaxonomy.get_descendants) | Get all descendants of a node (transitive closure downward). |
+| [get_diamond_patterns](#dyf.DAGTaxonomy.get_diamond_patterns) | Find diamond patterns (A → B, A → C, B → D, C → D). |
+| [get_divergence_points](#dyf.DAGTaxonomy.get_divergence_points) | Find divergence points (nodes with many outgoing edges). |
+| [get_lowest_common_ancestors](#dyf.DAGTaxonomy.get_lowest_common_ancestors) | Find lowest common ancestors (LCAs) of two nodes. |
+| [get_node_depth](#dyf.DAGTaxonomy.get_node_depth) | Get the depth of a node (distance from nearest root). |
+| [get_parents](#dyf.DAGTaxonomy.get_parents) | Get direct parents of a node. |
+| [get_path](#dyf.DAGTaxonomy.get_path) | Find a path from start to end (following parent→child direction). |
+| [summary](#dyf.DAGTaxonomy.summary) | Return summary statistics. |
+
+### get_all_paths { #dyf.DAGTaxonomy.get_all_paths }
+
+```python
+DAGTaxonomy.get_all_paths(start, end, max_depth=10)
+```
+
+Find all paths from start to end.
+
+In a lattice, there can be multiple paths between nodes.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name      | Type         | Description                  | Default    |
+|-----------|--------------|------------------------------|------------|
+| start     | [int](`int`) | Starting node (more general) | _required_ |
+| end       | [int](`int`) | Ending node (more specific)  | _required_ |
+| max_depth | [int](`int`) | Maximum path length          | `10`       |
+
+#### Returns {.doc-section .doc-section-returns}
+
+| Name   | Type                                                           | Description                                              |
+|--------|----------------------------------------------------------------|----------------------------------------------------------|
+|        | [List](`typing.List`)\[[List](`typing.List`)\[[int](`int`)\]\] | List of paths, where each path is a list of node indices |
+
+### get_ancestors { #dyf.DAGTaxonomy.get_ancestors }
+
+```python
+DAGTaxonomy.get_ancestors(node, max_depth=10)
+```
+
+Get all ancestors of a node (transitive closure upward).
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name      | Type         | Description               | Default    |
+|-----------|--------------|---------------------------|------------|
+| node      | [int](`int`) | Starting node index       | _required_ |
+| max_depth | [int](`int`) | Maximum depth to traverse | `10`       |
+
+#### Returns {.doc-section .doc-section-returns}
+
+| Name   | Type         | Description                      |
+|--------|--------------|----------------------------------|
+|        | [set](`set`) | Set of all ancestor node indices |
+
+### get_children { #dyf.DAGTaxonomy.get_children }
+
+```python
+DAGTaxonomy.get_children(node)
+```
+
+Get direct children of a node.
+
+### get_common_ancestors { #dyf.DAGTaxonomy.get_common_ancestors }
+
+```python
+DAGTaxonomy.get_common_ancestors(node_a, node_b, max_depth=10)
+```
+
+Find common ancestors of two nodes.
+
+In a lattice (vs tree), there can be multiple common ancestors,
+not just a single LCA.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name      | Type         | Description             | Default    |
+|-----------|--------------|-------------------------|------------|
+| node_a    | [int](`int`) | First node index        | _required_ |
+| node_b    | [int](`int`) | Second node index       | _required_ |
+| max_depth | [int](`int`) | Maximum depth to search | `10`       |
+
+#### Returns {.doc-section .doc-section-returns}
+
+| Name   | Type         | Description                    |
+|--------|--------------|--------------------------------|
+|        | [set](`set`) | Set of common ancestor indices |
+
+### get_convergence_points { #dyf.DAGTaxonomy.get_convergence_points }
+
+```python
+DAGTaxonomy.get_convergence_points(min_parents=5)
+```
+
+Find convergence points (nodes with many incoming edges).
+
+These are abstract concepts where many paths converge.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name        | Type         | Description                          | Default   |
+|-------------|--------------|--------------------------------------|-----------|
+| min_parents | [int](`int`) | Minimum number of parents to qualify | `5`       |
+
+#### Returns {.doc-section .doc-section-returns}
+
+| Name   | Type                                                                           | Description                                                         |
+|--------|--------------------------------------------------------------------------------|---------------------------------------------------------------------|
+|        | [List](`typing.List`)\[[Tuple](`typing.Tuple`)\[[int](`int`), [int](`int`)\]\] | List of (node_idx, parent_count) tuples, sorted by count descending |
+
+### get_descendants { #dyf.DAGTaxonomy.get_descendants }
+
+```python
+DAGTaxonomy.get_descendants(node, max_depth=10)
+```
+
+Get all descendants of a node (transitive closure downward).
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name      | Type         | Description               | Default    |
+|-----------|--------------|---------------------------|------------|
+| node      | [int](`int`) | Starting node index       | _required_ |
+| max_depth | [int](`int`) | Maximum depth to traverse | `10`       |
+
+#### Returns {.doc-section .doc-section-returns}
+
+| Name   | Type         | Description                        |
+|--------|--------------|------------------------------------|
+|        | [set](`set`) | Set of all descendant node indices |
+
+### get_diamond_patterns { #dyf.DAGTaxonomy.get_diamond_patterns }
+
+```python
+DAGTaxonomy.get_diamond_patterns(limit=100)
+```
+
+Find diamond patterns (A → B, A → C, B → D, C → D).
+
+Diamonds indicate multiple inheritance / non-tree structure.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name   | Type         | Description                          | Default   |
+|--------|--------------|--------------------------------------|-----------|
+| limit  | [int](`int`) | Maximum number of diamonds to return | `100`     |
+
+#### Returns {.doc-section .doc-section-returns}
+
+| Name   | Type                                                                                                       | Description                               |
+|--------|------------------------------------------------------------------------------------------------------------|-------------------------------------------|
+|        | [List](`typing.List`)\[[Tuple](`typing.Tuple`)\[[int](`int`), [int](`int`), [int](`int`), [int](`int`)\]\] | List of (top, left, right, bottom) tuples |
+
+### get_divergence_points { #dyf.DAGTaxonomy.get_divergence_points }
+
+```python
+DAGTaxonomy.get_divergence_points(min_children=5)
+```
+
+Find divergence points (nodes with many outgoing edges).
+
+These are branching hubs where paths diverge.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name         | Type         | Description                           | Default   |
+|--------------|--------------|---------------------------------------|-----------|
+| min_children | [int](`int`) | Minimum number of children to qualify | `5`       |
+
+#### Returns {.doc-section .doc-section-returns}
+
+| Name   | Type                                                                           | Description                                                        |
+|--------|--------------------------------------------------------------------------------|--------------------------------------------------------------------|
+|        | [List](`typing.List`)\[[Tuple](`typing.Tuple`)\[[int](`int`), [int](`int`)\]\] | List of (node_idx, child_count) tuples, sorted by count descending |
+
+### get_lowest_common_ancestors { #dyf.DAGTaxonomy.get_lowest_common_ancestors }
+
+```python
+DAGTaxonomy.get_lowest_common_ancestors(node_a, node_b, max_depth=10)
+```
+
+Find lowest common ancestors (LCAs) of two nodes.
+
+Returns ancestors that are common to both nodes but have no
+descendants that are also common ancestors.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name      | Type         | Description             | Default    |
+|-----------|--------------|-------------------------|------------|
+| node_a    | [int](`int`) | First node index        | _required_ |
+| node_b    | [int](`int`) | Second node index       | _required_ |
+| max_depth | [int](`int`) | Maximum depth to search | `10`       |
+
+#### Returns {.doc-section .doc-section-returns}
+
+| Name   | Type                                  | Description                                        |
+|--------|---------------------------------------|----------------------------------------------------|
+|        | [List](`typing.List`)\[[int](`int`)\] | List of LCA indices (may be multiple in a lattice) |
+
+### get_node_depth { #dyf.DAGTaxonomy.get_node_depth }
+
+```python
+DAGTaxonomy.get_node_depth(node)
+```
+
+Get the depth of a node (distance from nearest root).
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name   | Type         | Description   | Default    |
+|--------|--------------|---------------|------------|
+| node   | [int](`int`) | Node index    | _required_ |
+
+#### Returns {.doc-section .doc-section-returns}
+
+| Name   | Type         | Description                                          |
+|--------|--------------|------------------------------------------------------|
+|        | [int](`int`) | Minimum distance to any root, or -1 if not connected |
+
+### get_parents { #dyf.DAGTaxonomy.get_parents }
+
+```python
+DAGTaxonomy.get_parents(node)
+```
+
+Get direct parents of a node.
+
+### get_path { #dyf.DAGTaxonomy.get_path }
+
+```python
+DAGTaxonomy.get_path(start, end, max_depth=10)
+```
+
+Find a path from start to end (following parent→child direction).
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name      | Type         | Description                  | Default    |
+|-----------|--------------|------------------------------|------------|
+| start     | [int](`int`) | Starting node (more general) | _required_ |
+| end       | [int](`int`) | Ending node (more specific)  | _required_ |
+| max_depth | [int](`int`) | Maximum path length          | `10`       |
+
+#### Returns {.doc-section .doc-section-returns}
+
+| Name   | Type                                                                   | Description                                                |
+|--------|------------------------------------------------------------------------|------------------------------------------------------------|
+|        | [Optional](`typing.Optional`)\[[List](`typing.List`)\[[int](`int`)\]\] | List of node indices from start to end, or None if no path |
+
+### summary { #dyf.DAGTaxonomy.summary }
+
+```python
+DAGTaxonomy.summary()
+```
+
+Return summary statistics.

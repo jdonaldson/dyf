@@ -1,0 +1,46 @@
+# UnifiedOntologyResult { #dyf.UnifiedOntologyResult }
+
+```python
+UnifiedOntologyResult(
+    ontology,
+    main_nodes,
+    outlier_nodes,
+    excluded_nodes,
+    bridge_edges,
+    main_threshold,
+    outlier_threshold,
+)
+```
+
+Result of building a unified ontology from embedding space.
+
+The unified ontology combines:
+1. Main ontology (high similarity threshold) for dense regions
+2. Outlier ontology (lower threshold) for sparse regions
+3. Bridge edges connecting the two
+
+## Attributes {.doc-section .doc-section-attributes}
+
+| Name              | Type                                     | Description                                            |
+|-------------------|------------------------------------------|--------------------------------------------------------|
+| ontology          | [DAGTaxonomy](`dyf.rag.DAGTaxonomy`)     | The unified DAGTaxonomy                                |
+| main_nodes        | [np](`numpy`).[ndarray](`numpy.ndarray`) | Indices of nodes from main ontology                    |
+| outlier_nodes     | [np](`numpy`).[ndarray](`numpy.ndarray`) | Indices of nodes from outlier ontology                 |
+| excluded_nodes    | [np](`numpy`).[ndarray](`numpy.ndarray`) | Indices of double outliers (excluded)                  |
+| bridge_edges      | [int](`int`)                             | Number of edges connecting main and outlier components |
+| main_threshold    | [float](`float`)                         | Similarity threshold used for main ontology            |
+| outlier_threshold | [float](`float`)                         | Similarity threshold used for outlier ontology         |
+
+## Methods
+
+| Name | Description |
+| --- | --- |
+| [summary](#dyf.UnifiedOntologyResult.summary) | Return summary statistics. |
+
+### summary { #dyf.UnifiedOntologyResult.summary }
+
+```python
+UnifiedOntologyResult.summary()
+```
+
+Return summary statistics.

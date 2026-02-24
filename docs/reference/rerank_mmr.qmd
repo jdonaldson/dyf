@@ -1,0 +1,27 @@
+# rerank_mmr { #dyf.rerank_mmr }
+
+```python
+rerank_mmr(query_emb, candidate_indices, embeddings_normed, top_k, lam=0.5)
+```
+
+Maximal Marginal Relevance re-ranking.
+
+## Iteratively selects candidates that maximize {.doc-section .doc-section-iteratively-selects-candidates-that-maximize}
+
+lam * sim(query, doc) - (1-lam) * max_sim(doc, already_selected)
+
+## Parameters {.doc-section .doc-section-parameters}
+
+| Name              | Type   | Description                                        | Default    |
+|-------------------|--------|----------------------------------------------------|------------|
+| query_emb         |        | (d,) normalized query embedding.                   | _required_ |
+| candidate_indices |        | 1-D array of candidate point indices.              | _required_ |
+| embeddings_normed |        | (n, d) L2-normalized embedding matrix.             | _required_ |
+| top_k             |        | Number of results to return.                       | _required_ |
+| lam               |        | Relevance-diversity tradeoff (1 = pure relevance). | `0.5`      |
+
+## Returns {.doc-section .doc-section-returns}
+
+| Name   | Type   | Description                           |
+|--------|--------|---------------------------------------|
+|        |        | np.ndarray of selected point indices. |

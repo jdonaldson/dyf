@@ -1,0 +1,149 @@
+/*-- scss:defaults --*/
+
+// dyfviz dark palette
+$bg-dark: #1e1e1e;
+$bg-panel: #1c1c1c;
+$fg: #ddd;
+$fg-muted: #999;
+$fg-section: #aaa;
+$border: #444;
+$btn: #444;
+$btn-hover: #555;
+
+// Brand — logo gradient only
+$coral-red: #e94560;
+$golden-amber: #f9a826;
+
+// Bootstrap dark overrides
+$body-bg: $bg-dark;
+$body-color: $fg;
+$link-color: $fg;
+$link-hover-color: #fff;
+$navbar-bg: $bg-dark;
+$navbar-fg: $fg;
+$code-color: #bbb;
+$code-bg: #282828;
+
+/*-- scss:rules --*/
+
+// All rules scoped under .quarto-dark so they beat the light theme
+// (Quarto layers dark ON TOP of light — light CSS stays active)
+body.quarto-dark {
+  color: $fg;
+  background-color: $bg-dark;
+
+  // Navbar — neutral greys
+  .navbar {
+    border-bottom: 1px solid $border;
+  }
+
+  .navbar .nav-link {
+    color: $fg-muted !important;
+  }
+
+  .navbar .nav-link:hover,
+  .navbar .nav-link.active {
+    color: $fg !important;
+  }
+
+  // Sidebar
+  .sidebar {
+    background-color: $bg-panel;
+    border-right: 1px solid $border;
+  }
+
+  .sidebar .sidebar-item .sidebar-item-text.active {
+    color: $fg;
+    font-weight: 600;
+  }
+
+  .sidebar .sidebar-section .sidebar-section-item {
+    font-weight: 600;
+    color: $fg-section;
+  }
+
+  // Code blocks
+  div.sourceCode {
+    background-color: #282828;
+    border: 1px solid #555;
+    border-radius: 6px;
+  }
+
+  // Base code text — override light theme's near-black .sourceCode color
+  // (workaround for https://github.com/quarto-dev/quarto-cli/issues/14099)
+  pre.sourceCode,
+  div.sourceCode pre.sourceCode,
+  .sourceCode > span,
+  code.sourceCode > span {
+    color: #dcdccc; // zenburn fg
+  }
+
+  // Inline code
+  p code, li code, td code {
+    color: #bbb;
+    background-color: #282828;
+    padding: 0.15em 0.35em;
+    border-radius: 3px;
+  }
+
+  // API reference tables
+  .doc-section table th {
+    background-color: rgba(40, 40, 40, 0.95);
+    border-bottom: 2px solid $border;
+  }
+
+  // General table styling
+  table {
+    color: $fg;
+  }
+
+  th, td {
+    border-color: $border;
+  }
+
+  // Headings — h1 gets the gradient accent
+  h1, h2, h3, h4, h5, h6 {
+    color: $fg;
+  }
+
+  h1 {
+    border-bottom: 3px solid;
+    border-image: linear-gradient(to right, $coral-red, $golden-amber) 1;
+    padding-bottom: 0.3em;
+  }
+
+  // Body text, paragraphs, lists
+  p, li, dt, dd, label, figcaption {
+    color: $fg;
+  }
+
+  // Links — subtle underlines
+  .content a:not(.nav-link):not(.sidebar-item-text) {
+    color: $fg;
+    text-decoration: underline;
+    text-decoration-color: $border;
+    &:hover {
+      text-decoration-color: $fg-muted;
+    }
+  }
+
+  // TOC sidebar
+  .nav-link {
+    color: $fg-muted;
+  }
+
+  // Landing page logo
+  .quarto-title-block img {
+    margin-bottom: 1em;
+  }
+
+  // Logo letters adapt to dark
+  .dyf-logo .dyf-letter {
+    fill: #dddddd;
+  }
+
+  // Bold text
+  strong, b {
+    color: $fg;
+  }
+}

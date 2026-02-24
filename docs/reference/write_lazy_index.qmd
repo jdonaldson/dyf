@@ -1,0 +1,29 @@
+# write_lazy_index { #dyf.write_lazy_index }
+
+```python
+write_lazy_index(
+    tree,
+    embeddings,
+    path,
+    compression='zstd',
+    quantization='float16',
+    metadata=None,
+    build_params=None,
+    stored_fields=None,
+)
+```
+
+Write a DYF lazy index file (FlatBuffers tree + Arrow IPC leaf data).
+
+## Parameters {.doc-section .doc-section-parameters}
+
+| Name          | Type   | Description                                                                                                                                                                       | Default     |
+|---------------|--------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------|
+| tree          |        | Tree dict from build_dyf_tree() (must include hyperplanes/bucket mapping from updated _build_dyf_tree).                                                                           | _required_  |
+| embeddings    |        | (n, d) array of embedding vectors.                                                                                                                                                | _required_  |
+| path          |        | Output file path (e.g. "index.dyf").                                                                                                                                              | _required_  |
+| compression   |        | "none", "zstd", or "lz4" (default: "zstd").                                                                                                                                       | `'zstd'`    |
+| quantization  |        | "float32", "float16", "int8", or "pq-M" where M is the number of sub-quantizers (default: "float16"). For PQ, dim must be divisible by M. Example: "pq-8" for 8 sub-quantizers.   | `'float16'` |
+| metadata      |        | Optional dict of string key-value pairs.                                                                                                                                          | `None`      |
+| build_params  |        | Optional dict with keys: max_depth, num_bits, min_leaf_size, seed. Auto-detected from tree if not provided.                                                                       | `None`      |
+| stored_fields |        | Optional dict mapping field name to array-like of length n_items. Supported types: str/list[str] (Arrow utf8), np.int32/int64/float32/float64 arrays, list[bytes] (Arrow binary). | `None`      |

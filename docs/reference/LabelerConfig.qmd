@@ -1,0 +1,62 @@
+# LabelerConfig { #dyf.LabelerConfig }
+
+```python
+LabelerConfig(
+    name,
+    model_id,
+    size_b,
+    provider,
+    ollama_name='',
+    mlx_name='',
+    base_url='http://localhost:11434/v1',
+    description='',
+)
+```
+
+Configuration for LLM-based bucket labeling.
+
+## Presets available as class attributes {.doc-section .doc-section-presets-available-as-class-attributes}
+
+- KEYWORDS: Built-in TF-IDF keywords (no LLM)
+- LOW: phi3:mini / Phi-3-mini-4k (3.8B)
+- LOW_QWEN: qwen2.5:1.5b (1.5B, fastest)
+- MEDIUM: qwen2.5:7b (7B, good balance)
+- MEDIUM_LLAMA: llama3.1:8b (8B)
+- HIGH: qwen2.5:14b (14B, best local)
+
+## Example {.doc-section .doc-section-example}
+
+>>> config = LabelerConfig.MEDIUM
+>>> labels = classifier.label_buckets(**config.as_kwargs())
+
+## Methods
+
+| Name | Description |
+| --- | --- |
+| [as_kwargs](#dyf.LabelerConfig.as_kwargs) | Get kwargs for label_buckets() method. |
+| [install_cmd](#dyf.LabelerConfig.install_cmd) | Get command to install/pull this model. |
+| [serve_cmd](#dyf.LabelerConfig.serve_cmd) | Get command to start serving this model. |
+
+### as_kwargs { #dyf.LabelerConfig.as_kwargs }
+
+```python
+LabelerConfig.as_kwargs(use_mlx=False)
+```
+
+Get kwargs for label_buckets() method.
+
+### install_cmd { #dyf.LabelerConfig.install_cmd }
+
+```python
+LabelerConfig.install_cmd(use_mlx=False)
+```
+
+Get command to install/pull this model.
+
+### serve_cmd { #dyf.LabelerConfig.serve_cmd }
+
+```python
+LabelerConfig.serve_cmd(use_mlx=False)
+```
+
+Get command to start serving this model.

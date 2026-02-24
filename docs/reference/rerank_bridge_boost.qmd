@@ -1,0 +1,25 @@
+# rerank_bridge_boost { #dyf.rerank_bridge_boost }
+
+```python
+rerank_bridge_boost(sims, candidate_indices, bridge_scores, top_k, alpha=0.3)
+```
+
+Re-rank by blending similarity with normalized bridge score.
+
+score = (1-alpha) * sim_normalized + alpha * bridge_normalized
+
+## Parameters {.doc-section .doc-section-parameters}
+
+| Name              | Type   | Description                                        | Default    |
+|-------------------|--------|----------------------------------------------------|------------|
+| sims              |        | 1-D array of similarity scores for each candidate. | _required_ |
+| candidate_indices |        | 1-D array of candidate point indices.              | _required_ |
+| bridge_scores     |        | Array of bridge scores indexed by point index.     | _required_ |
+| top_k             |        | Number of results to return.                       | _required_ |
+| alpha             |        | Weight for bridge score (0 = pure similarity).     | `0.3`      |
+
+## Returns {.doc-section .doc-section-returns}
+
+| Name   | Type   | Description                           |
+|--------|--------|---------------------------------------|
+|        |        | np.ndarray of selected point indices. |
