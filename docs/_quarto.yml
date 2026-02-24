@@ -12,6 +12,7 @@ website:
   google-analytics: "G-QXBFEQPED2"
   navbar:
     logo: dyf_logo.svg
+    logo-alt: "DYF"
     left:
       - href: index.qmd
         text: Home

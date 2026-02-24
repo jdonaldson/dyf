@@ -32,9 +32,11 @@ body.quarto-dark {
   color: $fg;
   background-color: $bg-dark;
 
-  // Navbar — neutral greys
+  // Navbar — isoline background
   .navbar {
-    border-bottom: 1px solid $border;
+    background: url('navbar-bg.png') center/cover no-repeat !important;
+    background-color: $bg-dark !important;
+    border-bottom: 1px solid rgba($golden-amber, 0.2);
   }
 
   .navbar .nav-link {
@@ -62,11 +64,28 @@ body.quarto-dark {
     color: $fg-section;
   }
 
-  // Code blocks
+  // Code blocks — same fixed isoline as hero for parallax continuity
   div.sourceCode {
-    background-color: #282828;
-    border: 1px solid #555;
+    position: relative;
+    background: url('hero-bg.png') top center / 100% auto no-repeat fixed !important;
+    background-color: #1e1e1e !important;
+    border: 1px solid rgba($golden-amber, 0.15);
     border-radius: 6px;
+
+    &::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(20, 20, 20, 0.45);
+      border-radius: inherit;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    pre.sourceCode {
+      position: relative;
+      z-index: 1;
+    }
   }
 
   // Base code text — override light theme's near-black .sourceCode color

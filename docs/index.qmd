@@ -2,28 +2,47 @@
 title: "DYF - Density Yields Features"
 resources:
   - hero-bg.png
+  - hero-bg-light.png
+  - navbar-bg.svg
 ---
 
 ```{=html}
-<style>#title-block-header { display: none !important; }</style>
-
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&display=swap" rel="stylesheet">
-
-<div class="dyf-hero" style="
+<style>
+#title-block-header { display: none !important; }
+.dyf-hero {
   position: relative;
   width: 100%;
   height: 140px;
   border-radius: 8px;
-  background: url('hero-bg.png?v=2') center/cover no-repeat;
+  background: url('hero-bg-light.png') top center / 100% auto no-repeat fixed;
   overflow: hidden;
   margin-bottom: 1.5em;
-">
-  <!-- Subtle overlay for text readability -->
-  <div style="
-    position: absolute;
-    inset: 0;
-    background: rgba(20, 20, 20, 0.35);
-  "></div>
+}
+body.quarto-dark .dyf-hero {
+  background-image: url('hero-bg.png');
+}
+.dyf-hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(245, 245, 245, 0.45);
+  pointer-events: none;
+}
+body.quarto-dark .dyf-hero-overlay {
+  background: rgba(20, 20, 20, 0.4);
+}
+body.quarto-dark .dyf-hero .dyf-letter {
+  fill: #f0f0f0;
+}
+body.quarto-dark .dyf-hero .dyf-tagline {
+  color: #999;
+}
+</style>
+
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&display=swap" rel="stylesheet">
+
+<div class="dyf-hero">
+  <!-- Overlay — darkens in light mode, lightens slightly in dark mode -->
+  <div class="dyf-hero-overlay"></div>
 
   <!-- Logo — left -->
   <div style="
@@ -40,13 +59,13 @@ resources:
         </linearGradient>
       </defs>
       <text x="4" y="82" font-family="Montserrat, sans-serif" font-size="88" font-weight="700">
-        <tspan fill="#f0f0f0">d</tspan><tspan fill="url(#hero-accent)">&#x28e;</tspan><tspan fill="#f0f0f0">f</tspan>
+        <tspan class="dyf-letter" fill="#222222">d</tspan><tspan fill="url(#hero-accent)">&#x28e;</tspan><tspan class="dyf-letter" fill="#222222">f</tspan>
       </text>
     </svg>
   </div>
 
   <!-- Tagline — lower right -->
-  <div style="
+  <div class="dyf-tagline" style="
     position: absolute;
     right: 1.5em;
     bottom: 1em;
@@ -54,7 +73,7 @@ resources:
     font-size: 0.8em;
     font-weight: 700;
     letter-spacing: 0.18em;
-    color: #999;
+    color: #555;
   "><span>density </span><span style="background:linear-gradient(to right,#e94560,#f9a826);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">yields</span><span> features</span></div>
 </div>
 ```

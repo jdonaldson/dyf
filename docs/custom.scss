@@ -33,6 +33,25 @@ $code-bg: #f0f0f0;
 
 /*-- scss:rules --*/
 
+// Navbar — dark isoline background in both modes
+.navbar {
+  background: url('navbar-bg.png') center/cover no-repeat !important;
+  background-color: $bg-dark !important;
+  border-bottom: 1px solid rgba($golden-amber, 0.2);
+  min-height: 0 !important;
+  padding-top: 0.2rem !important;
+  padding-bottom: 0.2rem !important;
+}
+
+.navbar .navbar-brand {
+  padding-top: 0.1rem;
+  padding-bottom: 0.1rem;
+}
+
+.navbar .navbar-brand img {
+  height: 24px;
+}
+
 // Navbar links — neutral grey, no saturated color
 .navbar .nav-link {
   color: $fg-muted !important;
@@ -41,6 +60,12 @@ $code-bg: #f0f0f0;
 .navbar .nav-link:hover,
 .navbar .nav-link.active {
   color: $fg !important;
+}
+
+// Search icon on dark navbar
+.navbar .aa-DetachedSearchButton {
+  color: $fg-muted;
+  border-color: rgba($fg-muted, 0.3);
 }
 
 // Sidebar — restrained
@@ -53,10 +78,28 @@ $code-bg: #f0f0f0;
   font-weight: 600;
 }
 
-// Code blocks — let highlight theme handle colors, just style chrome
+// Code blocks — same fixed isoline as hero for parallax continuity
 div.sourceCode {
-  border: 1px solid $border-light;
+  position: relative;
+  background: url('hero-bg-light.png') top center / 100% auto no-repeat fixed !important;
+  background-color: $bg-light !important;
+  border: 1px solid rgba($golden-amber, 0.15);
   border-radius: 6px;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(245, 245, 245, 0.55);
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  pre.sourceCode {
+    position: relative;
+    z-index: 1;
+  }
 }
 
 // Inline code — neutral
