@@ -1,5 +1,22 @@
 ---
 title: "DYF - Density Yields Features"
+citation:
+  type: software
+  title: "DYF: Density Yields Features"
+  author:
+    - name: Justin Donaldson
+      orcid: 0009-0009-9207-961X
+  url: https://dyf.io
+  repository-code: https://github.com/jdonaldson/dyf
+  version: "0.4.0"
+  date-released: "2025-01-01"
+  license: MIT
+  abstract: >
+    DYF discovers structure in embedding spaces using density-based locality-sensitive
+    hashing. It classifies items as dense (core), bridge (transitional), or orphan
+    (unique) and provides tools for hierarchical tree construction, bridge-aware
+    retrieval, re-ranking, and ontology building.
+appendix-cite-as: true
 resources:
   - hero-bg.png
   - hero-bg-light.png
