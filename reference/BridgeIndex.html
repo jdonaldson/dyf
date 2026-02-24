@@ -1245,7 +1245,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
     }
       var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
       var mailtoRegex = new RegExp(/^mailto:/);
-        var filterRegex = new RegExp("https:\/\/jdonaldson\.github\.io\/dyf\/");
+        var filterRegex = new RegExp("https:\/\/dyf\.io");
       var isInternal = (href) => {
           return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
       }

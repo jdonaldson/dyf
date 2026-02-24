@@ -1,1 +1,1 @@
-Sitemap: https://jdonaldson.github.io/dyf/sitemap.xml
+Sitemap: https://dyf.io/sitemap.xml

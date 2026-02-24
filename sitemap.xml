@@ -1,219 +1,219 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/PrecomputedIndex.html</loc>
+    <loc>https://dyf.io/reference/PrecomputedIndex.html</loc>
     <lastmod>2026-02-23T00:50:18.474Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/select_orthogonal_anchors.html</loc>
+    <loc>https://dyf.io/reference/select_orthogonal_anchors.html</loc>
     <lastmod>2026-02-23T00:50:18.359Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/rerank_mmr.html</loc>
+    <loc>https://dyf.io/reference/rerank_mmr.html</loc>
     <lastmod>2026-02-23T00:50:18.442Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/load_index.html</loc>
+    <loc>https://dyf.io/reference/load_index.html</loc>
     <lastmod>2026-02-23T00:50:18.465Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/build_dyf_tree.html</loc>
+    <loc>https://dyf.io/reference/build_dyf_tree.html</loc>
     <lastmod>2026-02-23T00:50:18.329Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/rerank_bridge_boost.html</loc>
+    <loc>https://dyf.io/reference/rerank_bridge_boost.html</loc>
     <lastmod>2026-02-23T00:50:18.445Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/from_faiss.html</loc>
+    <loc>https://dyf.io/reference/from_faiss.html</loc>
     <lastmod>2026-02-23T00:50:18.497Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/build_dag_taxonomy.html</loc>
+    <loc>https://dyf.io/reference/build_dag_taxonomy.html</loc>
     <lastmod>2026-02-23T00:50:18.376Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/build_unified_ontology.html</loc>
+    <loc>https://dyf.io/reference/build_unified_ontology.html</loc>
     <lastmod>2026-02-23T00:50:18.380Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/UnifiedOntologyResult.html</loc>
+    <loc>https://dyf.io/reference/UnifiedOntologyResult.html</loc>
     <lastmod>2026-02-23T00:50:18.426Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/DAGMiningResult.html</loc>
+    <loc>https://dyf.io/reference/DAGMiningResult.html</loc>
     <lastmod>2026-02-23T00:50:18.399Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/doc_spread.html</loc>
+    <loc>https://dyf.io/reference/doc_spread.html</loc>
     <lastmod>2026-02-23T00:50:18.456Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/rerank_bridge_mmr.html</loc>
+    <loc>https://dyf.io/reference/rerank_bridge_mmr.html</loc>
     <lastmod>2026-02-23T00:50:18.448Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/DensityClassifierFull.html</loc>
+    <loc>https://dyf.io/reference/DensityClassifierFull.html</loc>
     <lastmod>2026-02-23T00:50:18.316Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/extract_boundary_persistence.html</loc>
+    <loc>https://dyf.io/reference/extract_boundary_persistence.html</loc>
     <lastmod>2026-02-23T00:50:18.324Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/ROGLayer.html</loc>
+    <loc>https://dyf.io/reference/ROGLayer.html</loc>
     <lastmod>2026-02-23T00:50:18.433Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/DAGChain.html</loc>
+    <loc>https://dyf.io/reference/DAGChain.html</loc>
     <lastmod>2026-02-23T00:50:18.394Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/build_pca_tree.html</loc>
+    <loc>https://dyf.io/reference/build_pca_tree.html</loc>
     <lastmod>2026-02-23T00:50:18.320Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/chunk_redundancy.html</loc>
+    <loc>https://dyf.io/reference/chunk_redundancy.html</loc>
     <lastmod>2026-02-23T00:50:18.452Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/boundary_persistence_scores.html</loc>
+    <loc>https://dyf.io/reference/boundary_persistence_scores.html</loc>
     <lastmod>2026-02-23T00:50:18.326Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/FacetDiverseResult.html</loc>
+    <loc>https://dyf.io/reference/FacetDiverseResult.html</loc>
     <lastmod>2026-02-23T00:50:18.392Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/DensityReportFull.html</loc>
+    <loc>https://dyf.io/reference/DensityReportFull.html</loc>
     <lastmod>2026-02-23T00:50:18.318Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/neighbor_coherence.html</loc>
+    <loc>https://dyf.io/reference/neighbor_coherence.html</loc>
     <lastmod>2026-02-23T00:50:18.460Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/SuperConnectorResult.html</loc>
+    <loc>https://dyf.io/reference/SuperConnectorResult.html</loc>
     <lastmod>2026-02-23T00:50:18.387Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/find_super_connectors.html</loc>
+    <loc>https://dyf.io/reference/find_super_connectors.html</loc>
     <lastmod>2026-02-23T00:50:18.356Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/LabelerConfig.html</loc>
+    <loc>https://dyf.io/reference/LabelerConfig.html</loc>
     <lastmod>2026-02-23T00:50:18.506Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/getting-started.html</loc>
+    <loc>https://dyf.io/getting-started.html</loc>
     <lastmod>2026-02-23T00:25:41.035Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/index.html</loc>
+    <loc>https://dyf.io/index.html</loc>
     <lastmod>2026-02-24T01:26:42.895Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/EmbedderConfig.html</loc>
+    <loc>https://dyf.io/reference/EmbedderConfig.html</loc>
     <lastmod>2026-02-23T00:50:18.501Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/ROGResult.html</loc>
+    <loc>https://dyf.io/reference/ROGResult.html</loc>
     <lastmod>2026-02-23T00:50:18.437Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/SearchResult.html</loc>
+    <loc>https://dyf.io/reference/SearchResult.html</loc>
     <lastmod>2026-02-23T00:50:18.498Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/write_lazy_index.html</loc>
+    <loc>https://dyf.io/reference/write_lazy_index.html</loc>
     <lastmod>2026-02-23T00:50:18.494Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/DAGTaxonomy.html</loc>
+    <loc>https://dyf.io/reference/DAGTaxonomy.html</loc>
     <lastmod>2026-02-23T00:50:18.423Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/get_kmeans_init.html</loc>
+    <loc>https://dyf.io/reference/get_kmeans_init.html</loc>
     <lastmod>2026-02-23T00:50:18.366Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/LazyIndex.html</loc>
+    <loc>https://dyf.io/reference/LazyIndex.html</loc>
     <lastmod>2026-02-23T00:50:18.491Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/cut_tree_to_labels.html</loc>
+    <loc>https://dyf.io/reference/cut_tree_to_labels.html</loc>
     <lastmod>2026-02-23T00:50:18.323Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/list_configs.html</loc>
+    <loc>https://dyf.io/reference/list_configs.html</loc>
     <lastmod>2026-02-23T00:50:18.507Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/deduplicate_chunks.html</loc>
+    <loc>https://dyf.io/reference/deduplicate_chunks.html</loc>
     <lastmod>2026-02-23T00:50:18.454Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/cut_dyf_tree_to_labels.html</loc>
+    <loc>https://dyf.io/reference/cut_dyf_tree_to_labels.html</loc>
     <lastmod>2026-02-23T00:50:18.334Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/index.html</loc>
+    <loc>https://dyf.io/reference/index.html</loc>
     <lastmod>2026-02-23T00:50:18.273Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/mine_dag_chains.html</loc>
+    <loc>https://dyf.io/reference/mine_dag_chains.html</loc>
     <lastmod>2026-02-23T00:50:18.374Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/HubScoreResult.html</loc>
+    <loc>https://dyf.io/reference/HubScoreResult.html</loc>
     <lastmod>2026-02-23T00:50:18.430Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/cluster_quality.html</loc>
+    <loc>https://dyf.io/reference/cluster_quality.html</loc>
     <lastmod>2026-02-23T00:50:18.458Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/BridgeIndex.html</loc>
+    <loc>https://dyf.io/reference/BridgeIndex.html</loc>
     <lastmod>2026-02-23T00:50:18.352Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/refine_clusters.html</loc>
+    <loc>https://dyf.io/reference/refine_clusters.html</loc>
     <lastmod>2026-02-23T00:50:18.337Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/diversify_by_facet.html</loc>
+    <loc>https://dyf.io/reference/diversify_by_facet.html</loc>
     <lastmod>2026-02-23T00:50:18.362Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/refine_dyf_tree.html</loc>
+    <loc>https://dyf.io/reference/refine_dyf_tree.html</loc>
     <lastmod>2026-02-23T00:50:18.332Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/DocSpread.html</loc>
+    <loc>https://dyf.io/reference/DocSpread.html</loc>
     <lastmod>2026-02-23T00:50:18.450Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/rerank_standard.html</loc>
+    <loc>https://dyf.io/reference/rerank_standard.html</loc>
     <lastmod>2026-02-23T00:50:18.439Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/OrthogonalAnchorResult.html</loc>
+    <loc>https://dyf.io/reference/OrthogonalAnchorResult.html</loc>
     <lastmod>2026-02-23T00:50:18.389Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/compute_neighbor_diversity.html</loc>
+    <loc>https://dyf.io/reference/compute_neighbor_diversity.html</loc>
     <lastmod>2026-02-23T00:50:18.368Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/save_index.html</loc>
+    <loc>https://dyf.io/reference/save_index.html</loc>
     <lastmod>2026-02-23T00:50:18.462Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/build_rog_ontology.html</loc>
+    <loc>https://dyf.io/reference/build_rog_ontology.html</loc>
     <lastmod>2026-02-23T00:50:18.384Z</lastmod>
   </url>
   <url>
-    <loc>https://jdonaldson.github.io/dyf/reference/compute_hub_score.html</loc>
+    <loc>https://dyf.io/reference/compute_hub_score.html</loc>
     <lastmod>2026-02-23T00:50:18.371Z</lastmod>
   </url>
 </urlset>
