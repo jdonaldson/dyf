@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>DYF - Density Yields Features</title>
+<title>Getting Started</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -292,11 +292,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
           <div class="collapse navbar-collapse" id="navbarCollapse">
             <ul class="navbar-nav navbar-nav-scroll me-auto">
   <li class="nav-item">
-    <a class="nav-link active" href="./index.html" aria-current="page"> 
+    <a class="nav-link" href="./index.html"> 
 <span class="menu-text">Home</span></a>
   </li>  
   <li class="nav-item">
-    <a class="nav-link" href="./getting-started.html"> 
+    <a class="nav-link active" href="./getting-started.html" aria-current="page"> 
 <span class="menu-text">Getting Started</span></a>
   </li>  
   <li class="nav-item">
@@ -327,12 +327,18 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#what-it-does" id="toc-what-it-does" class="nav-link active" data-scroll-target="#what-it-does">What it does</a></li>
-  <li><a href="#installation" id="toc-installation" class="nav-link" data-scroll-target="#installation">Installation</a></li>
-  <li><a href="#quick-start" id="toc-quick-start" class="nav-link" data-scroll-target="#quick-start">Quick Start</a></li>
-  <li><a href="#how-it-works" id="toc-how-it-works" class="nav-link" data-scroll-target="#how-it-works">How It Works</a></li>
-  <li><a href="#performance" id="toc-performance" class="nav-link" data-scroll-target="#performance">Performance</a></li>
-  <li><a href="#see-it-in-action" id="toc-see-it-in-action" class="nav-link" data-scroll-target="#see-it-in-action">See It in Action</a></li>
+  <li><a href="#basic-usage" id="toc-basic-usage" class="nav-link active" data-scroll-target="#basic-usage">Basic Usage</a>
+  <ul class="collapse">
+  <li><a href="#retrieving-items" id="toc-retrieving-items" class="nav-link" data-scroll-target="#retrieving-items">Retrieving Items</a></li>
+  </ul></li>
+  <li><a href="#full-featured-classifier" id="toc-full-featured-classifier" class="nav-link" data-scroll-target="#full-featured-classifier">Full-Featured Classifier</a>
+  <ul class="collapse">
+  <li><a href="#dataframe-integration" id="toc-dataframe-integration" class="nav-link" data-scroll-target="#dataframe-integration">DataFrame Integration</a></li>
+  </ul></li>
+  <li><a href="#saving-and-loading" id="toc-saving-and-loading" class="nav-link" data-scroll-target="#saving-and-loading">Saving and Loading</a></li>
+  <li><a href="#tree-methods" id="toc-tree-methods" class="nav-link" data-scroll-target="#tree-methods">Tree Methods</a></li>
+  <li><a href="#bridge-aware-retrieval-rag" id="toc-bridge-aware-retrieval-rag" class="nav-link" data-scroll-target="#bridge-aware-retrieval-rag">Bridge-Aware Retrieval (RAG)</a></li>
+  <li><a href="#re-ranking" id="toc-re-ranking" class="nav-link" data-scroll-target="#re-ranking">Re-ranking</a></li>
   <li><a href="#next-steps" id="toc-next-steps" class="nav-link" data-scroll-target="#next-steps">Next Steps</a></li>
   </ul>
 </nav>
@@ -343,7 +349,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">DYF - Density Yields Features</h1>
+<h1 class="title">Getting Started</h1>
 </div>
 
 
@@ -360,153 +366,132 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </header>
 
 
-<style>#title-block-header { display: none !important; }</style>
-
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&amp;display=swap" rel="stylesheet">
-
-<div class="dyf-hero" style="
-  position: relative;
-  width: 100%;
-  height: 140px;
-  border-radius: 8px;
-  background: url('hero-bg.png?v=2') center/cover no-repeat;
-  overflow: hidden;
-  margin-bottom: 1.5em;
-">
-  <!-- Subtle overlay for text readability -->
-  <div style="
-    position: absolute;
-    inset: 0;
-    background: rgba(20, 20, 20, 0.35);
-  "></div>
-
-  <!-- Logo — left -->
-  <div style="
-    position: absolute;
-    left: 1.5em;
-    top: 50%;
-    transform: translateY(-50%);
-  ">
-    <svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 170 105" style="width: 130px; height: auto;">
-      <defs>
-        <lineargradient id="hero-accent" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#e94560"></stop>
-          <stop offset="100%" stop-color="#f9a826"></stop>
-        </lineargradient>
-      </defs>
-      <text x="4" y="82" font-family="Montserrat, sans-serif" font-size="88" font-weight="700">
-        <tspan fill="#f0f0f0">d</tspan><tspan fill="url(#hero-accent)">ʎ</tspan><tspan fill="#f0f0f0">f</tspan>
-      </text>
-    </svg>
-  </div>
-
-  <!-- Tagline — lower right -->
-  <div style="
-    position: absolute;
-    right: 1.5em;
-    bottom: 1em;
-    font-family: Montserrat, sans-serif;
-    font-size: 0.8em;
-    font-weight: 700;
-    letter-spacing: 0.18em;
-    color: #999;
-  "><span>density </span><span style="background:linear-gradient(to right,#e94560,#f9a826);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">yields</span><span> features</span></div>
-</div>
-<p>Discover structure in embedding spaces. DYF uses density-based LSH to reveal the natural organization of your data:</p>
-<ul>
-<li><strong>Dense</strong>: Core items in well-populated semantic regions</li>
-<li><strong>Bridge</strong>: Transitional items connecting different clusters</li>
-<li><strong>Orphan</strong>: Unique items with no semantic neighbors</li>
-</ul>
-<section id="what-it-does" class="level2">
-<h2 class="anchored" data-anchor-id="what-it-does">What it does</h2>
-<p>DYF transforms raw embeddings into navigable semantic maps. Instead of just clustering, it reveals the <em>topology</em> — which regions are dense, which items bridge between concepts, and which are truly unique.</p>
-<p><strong>Use cases:</strong></p>
-<ul>
-<li><strong>Semantic navigation</strong>: Find paths between concepts</li>
-<li><strong>Structure discovery</strong>: Understand how your data organizes itself</li>
-<li><strong>Anomaly detection</strong>: Identify orphans and bridges</li>
-<li><strong>Index building</strong>: Pre-compute structure for fast queries</li>
-</ul>
+<p>This guide walks through the core DYF workflow: fitting a classifier, inspecting results, and integrating with DataFrames.</p>
+<section id="basic-usage" class="level2">
+<h2 class="anchored" data-anchor-id="basic-usage">Basic Usage</h2>
+<p>The fastest way to get started is with <code>DensityClassifier</code> (Rust-accelerated):</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dyf <span class="im">import</span> DensityClassifier</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Load or generate embeddings</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>embeddings <span class="op">=</span> np.random.randn(<span class="dv">10000</span>, <span class="dv">384</span>).astype(np.float32)</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Create classifier and fit</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>classifier <span class="op">=</span> DensityClassifier(embedding_dim<span class="op">=</span><span class="dv">384</span>)</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>classifier.fit(embeddings)</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="co"># Inspect the report</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>report <span class="op">=</span> classifier.report()</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(report)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The report shows how items distribute across Dense, Bridge, and Orphan categories.</p>
+<section id="retrieving-items" class="level3">
+<h3 class="anchored" data-anchor-id="retrieving-items">Retrieving Items</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Get item indices by category</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>dense_items <span class="op">=</span> classifier.get_dense()</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>bridge_items <span class="op">=</span> classifier.get_bridge()</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>orphan_items <span class="op">=</span> classifier.get_orphans()</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Get per-item metrics</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>bucket_ids <span class="op">=</span> classifier.get_bucket_ids()</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>bucket_sizes <span class="op">=</span> classifier.get_bucket_sizes()</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>isolation_scores <span class="op">=</span> classifier.get_isolation_scores()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
-<section id="installation" class="level2">
-<h2 class="anchored" data-anchor-id="installation">Installation</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">pip</span> install dyf</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>For serialization (save/load indexes):</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">pip</span> install dyf<span class="pp">[</span><span class="ss">io</span><span class="pp">]</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>For full features (embedding generation, LLM labeling):</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">pip</span> install dyf<span class="pp">[</span><span class="ss">full</span><span class="pp">]</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
-<section id="quick-start" class="level2">
-<h2 class="anchored" data-anchor-id="quick-start">Quick Start</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dyf <span class="im">import</span> DensityClassifier</span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Your embeddings (e.g., from sentence-transformers)</span></span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>embeddings <span class="op">=</span> np.random.randn(<span class="dv">10000</span>, <span class="dv">384</span>).astype(np.float32)</span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Find structure</span></span>
-<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>classifier <span class="op">=</span> DensityClassifier(embedding_dim<span class="op">=</span><span class="dv">384</span>)</span>
-<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>classifier.fit(embeddings)</span>
-<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a><span class="co"># What did we find?</span></span>
-<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(classifier.report())</span>
-<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Corpus: 10000 items</span></span>
-<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a><span class="co">#   Dense: 9500 (95.0%)</span></span>
-<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a><span class="co">#   Bridge: 450 (4.5%)</span></span>
-<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a><span class="co">#   Orphan: 50 (0.5%)</span></span>
-<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a><span class="co"># Get indices</span></span>
-<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>bridges <span class="op">=</span> classifier.get_bridge()   <span class="co"># Transitional items</span></span>
-<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a>orphans <span class="op">=</span> classifier.get_orphans()  <span class="co"># Unique items</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<section id="full-featured-classifier" class="level2">
+<h2 class="anchored" data-anchor-id="full-featured-classifier">Full-Featured Classifier</h2>
+<p><code>DensityClassifierFull</code> wraps the Rust core with embedding generation, DataFrame I/O, and LLM-based labeling:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dyf <span class="im">import</span> DensityClassifierFull, EmbedderConfig, LabelerConfig</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="co"># From raw texts (auto-generates TF-IDF embeddings)</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>classifier <span class="op">=</span> DensityClassifierFull.from_texts(</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    texts<span class="op">=</span>[<span class="st">"document one"</span>, <span class="st">"document two"</span>, ...],</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>    categories<span class="op">=</span>[<span class="st">"cat_a"</span>, <span class="st">"cat_b"</span>, ...],</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Label buckets with a local LLM</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>labels <span class="op">=</span> classifier.label_buckets(<span class="op">**</span>LabelerConfig.MEDIUM.as_kwargs())</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<section id="dataframe-integration" class="level3">
+<h3 class="anchored" data-anchor-id="dataframe-integration">DataFrame Integration</h3>
+<p>Create classifiers directly from Polars or Pandas DataFrames:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> polars <span class="im">as</span> pl</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>df <span class="op">=</span> pl.DataFrame({</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    <span class="st">"text"</span>: [<span class="st">"doc1"</span>, <span class="st">"doc2"</span>, ...],</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    <span class="st">"embedding"</span>: [emb1, emb2, ...],  <span class="co"># list of numpy arrays</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    <span class="st">"category"</span>: [<span class="st">"a"</span>, <span class="st">"b"</span>, ...],</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>})</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a><span class="co"># From Polars</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>classifier <span class="op">=</span> DensityClassifierFull.from_polars(</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>    df,</span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>    embedding_col<span class="op">=</span><span class="st">"embedding"</span>,</span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>    category_col<span class="op">=</span><span class="st">"category"</span>,</span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>    text_col<span class="op">=</span><span class="st">"text"</span>,</span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a><span class="co"># Export results back to Polars</span></span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>results_df <span class="op">=</span> classifier.to_polars()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Pandas works the same way via <code>from_pandas()</code> / <code>to_pandas()</code>.</p>
 </section>
-<section id="how-it-works" class="level2">
-<h2 class="anchored" data-anchor-id="how-it-works">How It Works</h2>
-<p>Two-stage PCA-based LSH:</p>
-<ol type="1">
-<li><strong>Initial bucketing</strong>: PCA projections create semantic buckets</li>
-<li><strong>Density check</strong>: Items in sparse buckets are candidates for reclassification</li>
-<li><strong>Recovery stage</strong>: Coarser PCA finds structure among sparse items</li>
-<li><strong>Classification</strong>: Dense (core), Bridge (recovered), Orphan (truly unique)</li>
-</ol>
-<p>The key insight: items that appear as outliers globally often share structure at coarser resolution. Bridges are these “misplaced” items — they connect different semantic regions.</p>
 </section>
-<section id="performance" class="level2">
-<h2 class="anchored" data-anchor-id="performance">Performance</h2>
-<table class="caption-top table">
-<thead>
-<tr class="header">
-<th>Dataset</th>
-<th>Time</th>
-<th>Per item</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>60K embeddings (384d)</td>
-<td>~60ms</td>
-<td>1.0 us</td>
-</tr>
-</tbody>
-</table>
-<p>Rust-accelerated via PyO3. ~4x faster than pure Python.</p>
+<section id="saving-and-loading" class="level2">
+<h2 class="anchored" data-anchor-id="saving-and-loading">Saving and Loading</h2>
+<p>Save a fitted classifier for later use without needing the Rust dependency:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dyf <span class="im">import</span> save_index, PrecomputedIndex</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Save</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>save_index(</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>    classifier, <span class="st">"index.safetensors"</span>, embeddings,</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>    metadata<span class="op">=</span>{<span class="st">"model"</span>: <span class="st">"all-MiniLM-L6-v2"</span>}</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Load (no dyf-rs needed)</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>index <span class="op">=</span> PrecomputedIndex.load(<span class="st">"index.safetensors"</span>)</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>dense <span class="op">=</span> index.get_dense()</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>bucket_5 <span class="op">=</span> index.get_bucket(<span class="dv">5</span>)</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(index.metadata)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
-<section id="see-it-in-action" class="level2">
-<h2 class="anchored" data-anchor-id="see-it-in-action">See It in Action</h2>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><a href="https://jdonaldson.github.io/gudid-energy-landscape/"><img src="viz_thumbnail.png" class="img-fluid figure-img" alt="Interactive 3D visualization of ~34,000 FDA electrosurgical devices showing colored clusters with bridge connections"></a></p>
-<figcaption>GUDID Energy Device Landscape</figcaption>
-</figure>
-</div>
-<p><a href="https://jdonaldson.github.io/gudid-energy-landscape/"><strong>GUDID Energy Device Landscape</strong></a> — Interactive 3D visualization of ~34,000 FDA electrosurgical devices, built with DYF. Explore dense clusters, bridge devices, and orphan outliers in the embedding space.</p>
+<section id="tree-methods" class="level2">
+<h2 class="anchored" data-anchor-id="tree-methods">Tree Methods</h2>
+<p>Build hierarchical structure from embeddings for multi-resolution analysis:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dyf <span class="im">import</span> build_pca_tree, cut_tree_to_labels</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Build a PCA-based binary tree</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>tree <span class="op">=</span> build_pca_tree(embeddings, max_depth<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Cut to get cluster labels</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>labels <span class="op">=</span> cut_tree_to_labels(tree, max_depth<span class="op">=</span><span class="dv">8</span>, n_points<span class="op">=</span><span class="bu">len</span>(embeddings), n_clusters<span class="op">=</span><span class="dv">25</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="bridge-aware-retrieval-rag" class="level2">
+<h2 class="anchored" data-anchor-id="bridge-aware-retrieval-rag">Bridge-Aware Retrieval (RAG)</h2>
+<p>Use <code>BridgeIndex</code> for structure-aware approximate nearest neighbor search:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dyf <span class="im">import</span> BridgeIndex</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Build index</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>index <span class="op">=</span> BridgeIndex(n_anchors<span class="op">=</span><span class="dv">1000</span>)</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>index.fit(embeddings)</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Query</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>query <span class="op">=</span> np.random.randn(<span class="dv">384</span>).astype(np.float32)</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>indices, scores <span class="op">=</span> index.query(query, k<span class="op">=</span><span class="dv">10</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="re-ranking" class="level2">
+<h2 class="anchored" data-anchor-id="re-ranking">Re-ranking</h2>
+<p>Apply diversity-aware re-ranking to search results:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dyf <span class="im">import</span> rerank_mmr, rerank_bridge_mmr</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Standard MMR re-ranking</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>reranked <span class="op">=</span> rerank_mmr(query_emb, candidate_indices, embeddings_normed, top_k<span class="op">=</span><span class="dv">10</span>)</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Bridge-aware MMR (boosts items that span clusters)</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>reranked <span class="op">=</span> rerank_bridge_mmr(</span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>    query_emb, candidate_indices, embeddings_normed,</span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>    bridge_scores, cluster_labels, top_k<span class="op">=</span><span class="dv">10</span>,</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 <section id="next-steps" class="level2">
 <h2 class="anchored" data-anchor-id="next-steps">Next Steps</h2>
-<ul>
-<li><a href="./getting-started.html">Getting Started</a> — Walkthrough of the core workflow</li>
-<li><a href="./reference/index.html">API Reference</a> — Full API documentation</li>
-</ul>
+<p>See the <a href="./reference/index.html">API Reference</a> for complete documentation of all classes and functions.</p>
 
 
 </section>
