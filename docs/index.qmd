@@ -7,9 +7,8 @@ citation:
     - name: Justin Donaldson
       orcid: 0009-0009-9207-961X
   url: https://dyf.io
-  repository-code: https://github.com/jdonaldson/dyf
   version: "0.4.0"
-  issued: 2025-01-01
+  issued: 2025
   abstract: >
     DYF discovers structure in embedding spaces using density-based locality-sensitive
     hashing. It classifies items as dense (core), bridge (transitional), or orphan
