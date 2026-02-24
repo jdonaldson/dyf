@@ -1,5 +1,9 @@
 # DYF - Density Yields Features
 
+[![CI](https://github.com/jdonaldson/dyf/actions/workflows/ci.yml/badge.svg)](https://github.com/jdonaldson/dyf/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/dyf)](https://pypi.org/project/dyf/)
+[![Python](https://img.shields.io/pypi/pyversions/dyf)](https://pypi.org/project/dyf/)
+
 Discover structure in embedding spaces. DYF uses density-based LSH to reveal the natural organization of your data:
 
 - **Dense**: Core items in well-populated semantic regions
@@ -153,6 +157,10 @@ index.get_bucket(5)
 index.metadata
 index.version
 ```
+
+## Documentation
+
+Full documentation and API reference at [dyf.io](https://dyf.io).
 
 ## License
 

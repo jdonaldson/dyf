@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dyf"
-version = "0.4.0"
+version = "0.4.1"
 description = "Density Yields Features - discover structure in embedding spaces"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -65,7 +65,8 @@ mcp = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/jdonaldson/dyf"
+Homepage = "https://dyf.io"
+Documentation = "https://dyf.io"
 Repository = "https://github.com/jdonaldson/dyf"
 Issues = "https://github.com/jdonaldson/dyf/issues"
 

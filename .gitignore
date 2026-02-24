@@ -35,3 +35,17 @@ htmlcov/
 
 # Wheels (stored in releases, not repo)
 *.whl
+
+# Demo artifacts (large data files, generated HTML, caches)
+demo/*.parquet
+demo/*.pkl
+demo/*.npy
+demo/*.dyf
+demo/*.html
+demo/*.mp4
+demo/*.wav
+demo/*.json
+demo/*.png
+demo/*.svg
+demo/archive/
+demo/hf_space/

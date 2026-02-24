@@ -7,7 +7,7 @@ citation:
     - name: Justin Donaldson
       orcid: 0009-0009-9207-961X
   url: https://dyf.io
-  version: "0.4.0"
+  version: "0.4.1"
   issued: 2025
   abstract: >
     DYF discovers structure in embedding spaces using density-based locality-sensitive
