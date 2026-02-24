@@ -9,8 +9,7 @@ citation:
   url: https://dyf.io
   repository-code: https://github.com/jdonaldson/dyf
   version: "0.4.0"
-  date-released: "2025-01-01"
-  license: MIT
+  issued: 2025-01-01
   abstract: >
     DYF discovers structure in embedding spaces using density-based locality-sensitive
     hashing. It classifies items as dense (core), bridge (transitional), or orphan
