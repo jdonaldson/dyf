@@ -165,4 +165,23 @@ body.quarto-dark {
   strong, b {
     color: $fg;
   }
+
+  // Mermaid diagrams — fix unreadable text in dark mode
+  // Quarto dark theme uses #375a7f for label text which has poor contrast
+  // on colored node fills, and edge labels get hardcoded light backgrounds
+  --mermaid-fg-color: #eee;
+  --mermaid-label-fg-color: #eee;
+  --mermaid-edge-color: #ccc;
+  --mermaid-label-bg-color: transparent;
+  --mermaid-node-fg-color: #888;
+
+  // Mermaid edge label backgrounds are hardcoded on .labelBkg and <p> elements
+  // inside foreignObject — not controlled by CSS variables
+  .labelBkg,
+  .edgeLabel p {
+    background-color: transparent !important;
+  }
+  .edgeLabel {
+    color: #fff !important;
+  }
 }

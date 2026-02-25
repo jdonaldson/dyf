@@ -177,10 +177,6 @@ flowchart LR
         SH --> RE["Re-hash<br/>All Items"]
         RE --> FB["Final Semantic<br/>Buckets"]
     end
-
-    style Stage1 fill:#f0f4ff,stroke:#4a6fa5
-    style Stage2 fill:#fff4e6,stroke:#e8a838
-    style Stage3 fill:#e6ffe6,stroke:#4caf50
 ```
 
 Random hyperplanes find coarse structure cheaply. PCA on those bucket centroids discovers the actual semantic directions in the data — this is the key insight. Re-hashing every item with the PCA-derived hyperplanes produces clean, semantically meaningful buckets.
@@ -199,11 +195,6 @@ flowchart TD
     SIM -->|"sim ≥ threshold"| BR["Bridge<br/>(connects regions)"]
     SIM -->|"sim below threshold"| MORE
     MORE -->|"No"| O["Orphan<br/>(truly unique)"]
-
-    style D fill:#e6ffe6,stroke:#4caf50
-    style BR fill:#fff4e6,stroke:#e8a838
-    style O fill:#ffe6e6,stroke:#e57373
-    style SIM fill:#f0f4ff,stroke:#4a6fa5
 ```
 
 The recovery loop is the key mechanism. At each coarsening step, adjacent buckets merge by masking off one LSH bit. When a sparse item lands in a large enough coarsened bucket, it must also pass a centroid similarity check — does it actually belong there semantically, or did it just get swept in by aggressive coarsening? Items that fail the centroid check stay in the pool and try again at the next coarser level. Items that never pass both checks at any resolution are orphans — genuinely unique items with no semantic home in the corpus.
