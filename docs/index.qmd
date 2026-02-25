@@ -155,14 +155,58 @@ orphans = classifier.get_orphans()  # Unique items
 
 ## How It Works
 
-Two-stage PCA-based LSH:
+DYF uses a two-stage PCA-based LSH to classify every item in your corpus.
 
-1. **Initial bucketing**: PCA projections create semantic buckets
-2. **Density check**: Items in sparse buckets are candidates for reclassification
-3. **Recovery stage**: Coarser PCA finds structure among sparse items
-4. **Classification**: Dense (core), Bridge (recovered), Orphan (truly unique)
+### Fit Pipeline
 
-The key insight: items that appear as outliers globally often share structure at coarser resolution. Bridges are these "misplaced" items — they connect different semantic regions.
+```{mermaid}
+flowchart LR
+    subgraph Stage1["Stage 1: Random Hashing"]
+        E["Embeddings"] --> N["L2 Normalize"]
+        N --> RH["Random<br/>Hyperplanes"]
+        RH --> CB["Coarse<br/>Buckets"]
+    end
+
+    subgraph Stage2["Stage 2: Learn Semantics"]
+        CB --> BC["Bucket<br/>Centroids"]
+        BC --> PCA["PCA on<br/>Centroids"]
+        PCA --> SH["Semantic<br/>Hyperplanes"]
+    end
+
+    subgraph Stage3["Stage 3: Re-hash"]
+        SH --> RE["Re-hash<br/>All Items"]
+        RE --> FB["Final Semantic<br/>Buckets"]
+    end
+
+    style Stage1 fill:#f0f4ff,stroke:#4a6fa5
+    style Stage2 fill:#fff4e6,stroke:#e8a838
+    style Stage3 fill:#e6ffe6,stroke:#4caf50
+```
+
+Random hyperplanes find coarse structure cheaply. PCA on those bucket centroids discovers the actual semantic directions in the data — this is the key insight. Re-hashing every item with the PCA-derived hyperplanes produces clean, semantically meaningful buckets.
+
+### Density Classification
+
+```{mermaid}
+flowchart TD
+    I["For each item"] --> B["Check bucket size<br/>at current resolution"]
+    B -->|"Large bucket"| D["Dense<br/>(core cluster member)"]
+    B -->|"Small bucket"| C["Coarsen: mask off<br/>least-informative bit"]
+    C --> B2["Check coarsened<br/>bucket size"]
+    B2 -->|"Still small"| MORE{"More bits<br/>to mask?"}
+    MORE -->|"Yes"| C
+    B2 -->|"Large bucket"| SIM["Check similarity to<br/>bucket centroid"]
+    SIM -->|"sim ≥ threshold"| BR["Bridge<br/>(connects regions)"]
+    SIM -->|"sim below threshold"| MORE
+    MORE -->|"No"| O["Orphan<br/>(truly unique)"]
+
+    style D fill:#e6ffe6,stroke:#4caf50
+    style BR fill:#fff4e6,stroke:#e8a838
+    style O fill:#ffe6e6,stroke:#e57373
+    style SIM fill:#f0f4ff,stroke:#4a6fa5
+```
+
+The recovery loop is the key mechanism. At each coarsening step, adjacent buckets merge by masking off one LSH bit. When a sparse item lands in a large enough coarsened bucket, it must also pass a centroid similarity check — does it actually belong there semantically, or did it just get swept in by aggressive coarsening? Items that fail the centroid check stay in the pool and try again at the next coarser level. Items that never pass both checks at any resolution are orphans — genuinely unique items with no semantic home in the corpus.
 
 ## Performance
 
