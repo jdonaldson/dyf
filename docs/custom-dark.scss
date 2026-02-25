@@ -167,21 +167,27 @@ body.quarto-dark {
   }
 
   // Mermaid diagrams — fix unreadable text in dark mode
-  // Quarto dark theme uses #375a7f for label text which has poor contrast
-  // on colored node fills, and edge labels get hardcoded light backgrounds
-  --mermaid-fg-color: #eee;
-  --mermaid-label-fg-color: #eee;
-  --mermaid-edge-color: #ccc;
-  --mermaid-label-bg-color: transparent;
-  --mermaid-node-fg-color: #888;
+  --mermaid-fg-color: #ddd;
+  --mermaid-label-fg-color: #ddd;
+  --mermaid-node-bg-color: #333;
+  --mermaid-node-fg-color: #666;
+  --mermaid-edge-color: #999;
+  --mermaid-label-bg-color: #1e1e1e;
+  --mermaid-fg-color--lighter: #555;
+  --mermaid-fg-color--lightest: #2a2a2a;
 
-  // Mermaid edge label backgrounds are hardcoded on .labelBkg and <p> elements
-  // inside foreignObject — not controlled by CSS variables
-  .labelBkg,
-  .edgeLabel p {
-    background-color: transparent !important;
+  // Mermaid edge labels — dark pill background
+  // Only style labels that have text content (empty labels get no border)
+  .labelBkg:has(span.edgeLabel:not(:empty)) {
+    background-color: #2a2a2a !important;
+    border: 1px solid #444 !important;
+    border-radius: 3px !important;
+    padding: 2px 8px !important;
   }
-  .edgeLabel {
-    color: #fff !important;
+  span.edgeLabel {
+    color: #ccc !important;
+  }
+  span.edgeLabel p {
+    background-color: transparent !important;
   }
 }
