@@ -83,12 +83,16 @@ from .dyf_tree import (
 
 # Lazy index (FlatBuffers + Arrow IPC)
 try:
-    from .lazy_index import LazyIndex, write_lazy_index, from_faiss, SearchResult
+    from .lazy_index import (
+        LazyIndex, write_lazy_index, rewrite_lazy_index,
+        from_faiss, SearchResult,
+    )
     _HAS_LAZY = True
 except ImportError:
     _HAS_LAZY = False
     LazyIndex = None
     write_lazy_index = None
+    rewrite_lazy_index = None
     from_faiss = None
     SearchResult = None
 
@@ -186,6 +190,7 @@ __all__ = [
     # Lazy index
     "LazyIndex",
     "write_lazy_index",
+    "rewrite_lazy_index",
     "from_faiss",
     "SearchResult",
     # Re-ranking

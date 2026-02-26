@@ -1384,6 +1384,102 @@ class LazyIndex:
 
         return result
 
+    def extract_all_fields(self):
+        """Bulk-read all leaf batches, concatenate, sort by item_index.
+
+        Returns:
+            dict with keys:
+                'embeddings': (n, d) float32 array (PQ indexes return
+                    approximate reconstructions)
+                'fields': {field_name: array} for all stored fields
+                'metadata': dict of metadata key-value pairs
+        """
+        n = self.total_items
+        dim = self.embedding_dim
+
+        embeddings = np.zeros((n, dim), dtype=np.float32)
+        sf_names = self.stored_field_names
+        sf_types = self._get_stored_field_types()
+
+        # Initialize stored field arrays
+        fields = {}
+        for fname in sf_names:
+            tname = sf_types[fname]
+            if tname in ('utf8', 'binary'):
+                fields[fname] = [None] * n
+            elif tname == 'float32':
+                fields[fname] = np.zeros(n, dtype=np.float32)
+            elif tname == 'float64':
+                fields[fname] = np.zeros(n, dtype=np.float64)
+            elif tname == 'int32':
+                fields[fname] = np.zeros(n, dtype=np.int32)
+            elif tname == 'int64':
+                fields[fname] = np.zeros(n, dtype=np.int64)
+            else:
+                fields[fname] = [None] * n
+
+        n_batches = self._index.BatchesLength()
+        for bi in range(n_batches):
+            batch = self.get_leaf(bi)
+            item_indices = batch.column('item_index').to_numpy()
+
+            # Extract embeddings
+            emb_col = batch.column('embedding')
+            n_rows = len(emb_col)
+            flat_values = emb_col.values.to_numpy()
+
+            if self.is_pq:
+                meta = self._get_metadata()
+                m = int(meta['pq_n_subquantizers'])
+                codes = flat_values.reshape(n_rows, m)
+                leaf_emb = self._pq_reconstruct(codes)
+            else:
+                leaf_emb = flat_values.reshape(n_rows, dim).astype(np.float32)
+
+            embeddings[item_indices] = leaf_emb
+
+            # Extract stored fields
+            for fname in sf_names:
+                col = batch.column(fname)
+                tname = sf_types[fname]
+                if tname in ('utf8', 'binary'):
+                    values = col.to_pylist()
+                    for i, item_idx in enumerate(item_indices):
+                        fields[fname][int(item_idx)] = values[i]
+                else:
+                    values = col.to_numpy()
+                    fields[fname][item_indices] = values
+
+        return {
+            'embeddings': embeddings,
+            'fields': fields,
+            'metadata': dict(self._get_metadata()),
+        }
+
+    def detect_enrichment_level(self):
+        """Detect enrichment level based on stored fields and metadata.
+
+        Returns 0-3:
+            0: Base (embeddings + tree only)
+            1: Projected (has umap_x, umap_y, umap_z stored fields)
+            2: Clustered (has cluster_* stored fields)
+            3: Viz-ready (has edge_pairs or tour_narration in metadata)
+        """
+        sf = set(self.stored_field_names)
+        meta = self._get_metadata()
+
+        has_umap = {'umap_x', 'umap_y', 'umap_z'}.issubset(sf)
+        has_clusters = any(f.startswith('cluster_') for f in sf)
+        has_viz = 'edge_pairs' in meta or 'tour_narration' in meta
+
+        if has_viz:
+            return 3
+        if has_clusters:
+            return 2
+        if has_umap:
+            return 1
+        return 0
+
     def _find_candidate_leaves(self, query, nprobe):
         """Traverse tree to find candidate leaf batch indices.
 
@@ -1694,3 +1790,155 @@ def from_faiss(faiss_index, path, compression='zstd', quantization='float16',
                      stored_fields=stored_fields)
 
     return LazyIndex(path)
+
+
+def _reconstruct_tree(idx):
+    """Reconstruct tree dict from LazyIndex FlatBuffers + Arrow batches.
+
+    Rebuilds the recursive tree structure that write_lazy_index expects,
+    including hyperplanes, bucket_id_to_child mappings, and per-leaf
+    item indices from the Arrow batches.
+
+    Args:
+        idx: An open LazyIndex instance.
+
+    Returns:
+        dict compatible with write_lazy_index's tree parameter.
+    """
+    n_nodes = idx._index.NodesLength()
+    dim = idx.embedding_dim
+
+    # Parse all FlatBuffers nodes into flat dicts
+    node_data = []
+    for nid in range(n_nodes):
+        fb_node = idx._index.Nodes(nid)
+        children_ids = [fb_node.Children(i)
+                        for i in range(fb_node.ChildrenLength())]
+
+        # Hyperplanes
+        hp = None
+        num_bits = fb_node.NumBits()
+        if (not fb_node.HyperplanesIsNone()
+                and fb_node.HyperplanesLength() > 0
+                and num_bits > 0):
+            hp_flat = fb_node.HyperplanesAsNumpy()
+            hp = np.array(hp_flat, dtype=np.float32).reshape(num_bits, dim)
+
+        # Bucket IDs to children mapping
+        # In write_lazy_index: bucket_id_to_child = {bucket_id: child_index}
+        # In FlatBuffers: BucketIdsToChildren[ci] = bucket_id for child ci
+        bid_to_child = None
+        if (not fb_node.BucketIdsToChildrenIsNone()
+                and fb_node.BucketIdsToChildrenLength() > 0):
+            bid_to_child = {}
+            for ci in range(fb_node.BucketIdsToChildrenLength()):
+                bid = int(fb_node.BucketIdsToChildren(ci))
+                bid_to_child[bid] = ci
+
+        is_leaf = len(children_ids) == 0
+        batch_index = fb_node.BatchIndex()
+
+        # For leaves, extract item indices from Arrow batch
+        indices = None
+        if is_leaf and batch_index >= 0:
+            batch = idx.get_leaf(batch_index)
+            indices = batch.column('item_index').to_numpy().astype(np.intp)
+
+        node_data.append({
+            'children_ids': children_ids,
+            'hyperplanes': hp,
+            'bucket_id_to_child': bid_to_child,
+            'depth': int(fb_node.Depth()),
+            'is_leaf': is_leaf,
+            'indices': indices,
+        })
+
+    # Build recursive tree structure (bottom-up index aggregation)
+    def _build(nid):
+        nd = node_data[nid]
+        children = []
+        all_indices = []
+
+        for child_id in nd['children_ids']:
+            child = _build(child_id)
+            children.append(child)
+            all_indices.append(child['indices'])
+
+        if nd['is_leaf']:
+            indices = nd['indices']
+        else:
+            indices = (np.concatenate(all_indices) if all_indices
+                       else np.array([], dtype=np.intp))
+
+        return {
+            'children': children,
+            'indices': indices,
+            'depth': nd['depth'],
+            'hyperplanes': nd['hyperplanes'],
+            'bucket_id_to_child': nd['bucket_id_to_child'],
+        }
+
+    root_id = idx._index.Root()
+    return _build(root_id)
+
+
+def rewrite_lazy_index(path, new_stored_fields=None, new_metadata=None,
+                       output_path=None):
+    """Rewrite a .dyf file with additional stored fields and/or metadata.
+
+    Preserves the tree structure, embeddings, and existing stored fields.
+    Adds new per-point stored_fields columns and/or metadata key-value pairs.
+
+    Args:
+        path: Path to existing .dyf file.
+        new_stored_fields: Optional dict mapping field name to array-like
+            of length total_items. Values are indexed by item_index.
+        new_metadata: Optional dict of string key-value pairs to add.
+        output_path: Output file path. If None, overwrites the input file.
+
+    Raises:
+        ValueError: If the index uses PQ quantization (lossy round-trip).
+    """
+    out_path = output_path or path
+
+    # Read everything while file is open
+    with LazyIndex(path) as idx:
+        if idx.is_pq:
+            raise ValueError(
+                "rewrite_lazy_index does not support PQ-quantized indexes "
+                "(round-trip through float32 is lossy)")
+
+        tree = _reconstruct_tree(idx)
+        data = idx.extract_all_fields()
+
+        bp = idx._index.BuildParams()
+        build_params = {
+            'max_depth': bp.MaxDepth() if bp else 8,
+            'num_bits': bp.NumBits() if bp else 3,
+            'min_leaf_size': bp.MinLeafSize() if bp else 4,
+            'seed': bp.Seed() if bp else 42,
+        }
+        quantization = idx.quantization
+        compression = (bp.Compression().decode()
+                       if bp and bp.Compression() else 'zstd')
+
+    # Merge stored fields (existing + new)
+    merged_sf = dict(data['fields'])
+    if new_stored_fields:
+        merged_sf.update(new_stored_fields)
+
+    # Merge metadata (existing + new)
+    merged_meta = dict(data['metadata'])
+    # Remove keys that write_lazy_index will regenerate
+    merged_meta.pop('stored_fields', None)
+    if new_metadata:
+        merged_meta.update(new_metadata)
+
+    write_lazy_index(
+        tree, data['embeddings'], out_path,
+        compression=compression,
+        quantization=quantization,
+        metadata=merged_meta if merged_meta else None,
+        build_params=build_params,
+        stored_fields=merged_sf if merged_sf else None,
+    )
