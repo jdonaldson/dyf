@@ -51,10 +51,14 @@ def _build_dyf_tree(embeddings, point_indices, depth, num_bits, min_leaf_size,
     dim = subset.shape[1]
 
     try:
-        clf = DensityClassifier(embedding_dim=dim, num_bits=num_bits, seed=seed, skip_isolation=True)
+        # Try with skip_isolation first (faster), fall back without it
+        try:
+            clf = DensityClassifier(embedding_dim=dim, num_bits=num_bits, seed=seed, skip_isolation=True)
+        except TypeError:
+            clf = DensityClassifier(embedding_dim=dim, num_bits=num_bits, seed=seed)
         if fit_method == 'itq':
             clf.fit_itq(subset)
-        elif fit_method == 'raw_pca':
+        elif fit_method == 'raw_pca' and hasattr(clf, 'fit_raw_pca'):
             clf.fit_raw_pca(subset)
         else:
             clf.fit(subset)
