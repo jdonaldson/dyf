@@ -1709,7 +1709,8 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
                  cluster_names=None, ws_port=8766, label_levels=None,
                  bundled_edges_2d=None, bundled_edges_3d=None, edge_pairs=None,
                  logo_path=None, tour_narration=None, tour_audio=None,
-                 tour_callouts=None, tour_title=None, subtitle_str=""):
+                 tour_callouts=None, tour_title=None, subtitle_str="",
+                 multi_level_data=None):
     """Build a pydeck 3D point cloud with HTML overlay labels."""
     import base64
     import pyarrow as pa
@@ -1851,18 +1852,74 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
     # Tour callouts: cluster_id -> {indices: [...], labels: [...]}
     callouts_json = json.dumps({str(k): v for k, v in (tour_callouts or {}).items()})
 
+    # Multi-level cluster metadata (when ROG cache provided)
+    if multi_level_data:
+        cluster_meta = {
+            "levels": {},
+            "default": str(multi_level_data["default"]),
+            "multiLevel": True,
+        }
+        for lvl in sorted(multi_level_data["label_data"].keys()):
+            cluster_meta["levels"][str(lvl)] = {
+                "names": {str(k): v for k, v in multi_level_data["names"][lvl].items()},
+                "label_data": multi_level_data["label_data"][lvl],
+            }
+        if multi_level_data.get("lsh_labels") is not None:
+            cluster_meta["lsh"] = {
+                "names": {str(k): v for k, v in multi_level_data["lsh_names"].items()},
+                "label_data": multi_level_data["lsh_label_data"],
+            }
+        # Dual 2D/3D cluster data
+        if multi_level_data.get("has_dual_clusters"):
+            cluster_meta["hasDualClusters"] = True
+            cluster_meta["levels_3d"] = {}
+            for lvl in sorted(multi_level_data["label_data_3d"].keys()):
+                cluster_meta["levels_3d"][str(lvl)] = {
+                    "names": {str(k): v for k, v in multi_level_data["names_3d"][lvl].items()},
+                    "label_data": multi_level_data["label_data_3d"][lvl],
+                }
+        cluster_meta_json = json.dumps(cluster_meta)
+    else:
+        cluster_meta_json = "null"
+
     # ── Arrow IPC for compact binary transfer ───────────────────────
-    points_batch = pa.record_batch({
-        "x": pa.array([p["x"] for p in point_data], type=pa.float32()),
-        "y": pa.array([p["y"] for p in point_data], type=pa.float32()),
-        "z": pa.array([p["z"] for p in point_data], type=pa.float32()),
-        "r": pa.array([p["r"] for p in point_data], type=pa.uint8()),
-        "g": pa.array([p["g"] for p in point_data], type=pa.uint8()),
-        "b": pa.array([p["b"] for p in point_data], type=pa.uint8()),
-        "a": pa.array([p["a"] for p in point_data], type=pa.uint8()),
-        "cluster": pa.array([p["cluster"] for p in point_data], type=pa.int32()),
-        "title": pa.array([p["title"] for p in point_data], type=pa.utf8()),
-    })
+    if multi_level_data:
+        # Multi-level mode: store per-level cluster IDs instead of RGB
+        batch_dict = {
+            "x": pa.array([p["x"] for p in point_data], type=pa.float32()),
+            "y": pa.array([p["y"] for p in point_data], type=pa.float32()),
+            "z": pa.array([p["z"] for p in point_data], type=pa.float32()),
+            "a": pa.array([p["a"] for p in point_data], type=pa.uint8()),
+        }
+        for lvl in sorted(multi_level_data["labels"].keys()):
+            col_name = f"cluster_{lvl}"
+            batch_dict[col_name] = pa.array(
+                multi_level_data["labels"][lvl].tolist(), type=pa.int32())
+        # Add 3D cluster columns if dual clusters
+        if multi_level_data.get("has_dual_clusters"):
+            for lvl in sorted(multi_level_data["labels_3d"].keys()):
+                col_name = f"cluster_{lvl}_3d"
+                batch_dict[col_name] = pa.array(
+                    multi_level_data["labels_3d"][lvl].tolist(),
+                    type=pa.int32())
+        if multi_level_data.get("lsh_labels") is not None:
+            batch_dict["cluster_lsh"] = pa.array(
+                multi_level_data["lsh_labels"].tolist(), type=pa.int32())
+        batch_dict["title"] = pa.array(
+            [p["title"] for p in point_data], type=pa.utf8())
+        points_batch = pa.record_batch(batch_dict)
+    else:
+        points_batch = pa.record_batch({
+            "x": pa.array([p["x"] for p in point_data], type=pa.float32()),
+            "y": pa.array([p["y"] for p in point_data], type=pa.float32()),
+            "z": pa.array([p["z"] for p in point_data], type=pa.float32()),
+            "r": pa.array([p["r"] for p in point_data], type=pa.uint8()),
+            "g": pa.array([p["g"] for p in point_data], type=pa.uint8()),
+            "b": pa.array([p["b"] for p in point_data], type=pa.uint8()),
+            "a": pa.array([p["a"] for p in point_data], type=pa.uint8()),
+            "cluster": pa.array([p["cluster"] for p in point_data], type=pa.int32()),
+            "title": pa.array([p["title"] for p in point_data], type=pa.utf8()),
+        })
     sink = pa.BufferOutputStream()
     with pa.ipc.new_stream(sink, points_batch.schema) as writer:
         writer.write_batch(points_batch)
@@ -1954,6 +2011,7 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
         subtitle_str=subtitle_str,
         client_logo_html=client_logo_html,
         tour_title=tour_title,
+        cluster_meta_json=cluster_meta_json,
     )
 
     html = html.replace("</html>", overlay_html + "\n</html>", 1)
@@ -1964,7 +2022,8 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
 def build_pydeck_overlay(*, points_ipc_b64, edges_2d_ipc_b64, edges_3d_ipc_b64,
                          label_json, levels_json, edge_pairs_json,
                          narration_json, callouts_json, audio_json,
-                         title_str, subtitle_str, client_logo_html, tour_title):
+                         title_str, subtitle_str, client_logo_html, tour_title,
+                         cluster_meta_json="null"):
     """Render the JS overlay template. Can be called standalone for patching."""
     dyf_logo_svg = (
         '<svg class="dyf-logo" viewBox="0 0 340 105" width="85" height="26">'
@@ -2140,7 +2199,11 @@ body.light .tour-callout-label {{
       <span class="palette-arrow"></span>Clusters
     </div>
     <div class="palette-body">
-      <div id="cluster-list" style="font-size:12px;line-height:1.8;"></div>
+      <div id="level-selector" style="display:none;margin-bottom:8px;">
+        <div style="font-size:10px;opacity:0.6;margin-bottom:4px;">Cluster level</div>
+        <div id="level-buttons" style="display:flex;flex-wrap:wrap;gap:3px;"></div>
+      </div>
+      <div id="cluster-list" style="font-size:12px;line-height:1.8;max-height:400px;overflow-y:auto;"></div>
     </div>
   </div>
 
@@ -2225,6 +2288,16 @@ body.light .header-logo {{ filter:grayscale(1) brightness(0.3); }}
   cursor:pointer; font-size:11px; font-family:inherit;
 }}
 .panel-btn:hover {{ background:var(--bg-btn-hover); }}
+.level-btn {{
+  padding:3px 8px; border-radius:3px; border:1px solid var(--border);
+  background:var(--bg-btn); color:var(--fg); cursor:pointer;
+  font-size:10px; font-family:monospace; transition:all 0.15s;
+}}
+.level-btn:hover {{ background:var(--bg-btn-hover); }}
+.level-btn.active {{
+  background:var(--fg-section); color:var(--bg); border-color:var(--fg-section);
+  font-weight:700;
+}}
 .palette {{
   border-bottom:1px solid var(--border);
 }}
@@ -2322,26 +2395,117 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
   var sessionEl = document.getElementById("session-id");
   if (sessionEl) sessionEl.textContent = "Session: " + sessionId;
 
+  // ── Multi-level cluster metadata and color functions ──────────────
+  var clusterMeta = {cluster_meta_json};
+  var currentLevelKey = clusterMeta ? clusterMeta["default"] : null;
+  var defaultLevelKey = currentLevelKey;  // edges/tour only at this level
+
+  // Golden ratio HLS→RGB (matches Python colorsys.hls_to_rgb exactly)
+  function _hlsHelper(m1, m2, hue) {{
+    hue = hue % 1.0;
+    if (hue < 1/6) return m1 + (m2 - m1) * hue * 6;
+    if (hue < 0.5) return m2;
+    if (hue < 2/3) return m1 + (m2 - m1) * (2/3 - hue) * 6;
+    return m1;
+  }}
+  function hlsToRgb(h, l, s) {{
+    if (s === 0) return [Math.round(l*255), Math.round(l*255), Math.round(l*255)];
+    var m2 = l <= 0.5 ? l * (1 + s) : l + s - l * s;
+    var m1 = 2 * l - m2;
+    return [
+      Math.round(_hlsHelper(m1, m2, h + 1/3) * 255),
+      Math.round(_hlsHelper(m1, m2, h) * 255),
+      Math.round(_hlsHelper(m1, m2, h - 1/3) * 255)
+    ];
+  }}
+  function buildColorMap(uniqueCids) {{
+    var sorted = uniqueCids.slice().sort(function(a,b) {{ return a - b; }});
+    var map = {{}};
+    for (var i = 0; i < sorted.length; i++) {{
+      var hue = (i * 0.618033988749895) % 1.0;
+      map[sorted[i]] = hlsToRgb(hue, 0.45, 0.6);
+    }}
+    return map;
+  }}
+
   // ── Reconstruct point data from gzipped Arrow IPC ─────────────────
   var _pt = tableFromIPC(await ungzip(b64toBytes("{points_ipc_b64}")));
   var _x = _pt.getChild("x").toArray();
   var _y = _pt.getChild("y").toArray();
   var _z = _pt.getChild("z").toArray();
-  var _r = _pt.getChild("r").toArray();
-  var _g = _pt.getChild("g").toArray();
-  var _b = _pt.getChild("b").toArray();
   var _a = _pt.getChild("a").toArray();
-  var _clu = _pt.getChild("cluster").toArray();
   var _titles = _pt.getChild("title");
   var _nPts = _pt.numRows;
   var allPoints = new Array(_nPts);
-  for (var _i = 0; _i < _nPts; _i++) {{
-    allPoints[_i] = {{
-      x: _x[_i], y: _y[_i], z: 0,
-      r: _r[_i], g: _g[_i], b: _b[_i], a: _a[_i],
-      title: _titles.get(_i), cluster: _clu[_i]
-    }};
+
+  var _mlCols = {{}};  // per-level cluster ID arrays (populated in multi-level mode)
+
+  // Apply cluster IDs and colors from a specific level
+  var applyLevelColors = function(levelKey) {{
+    var col = _mlCols[levelKey];
+    if (!col) return;
+    var uniqueCids = [];
+    var seen = {{}};
+    for (var i = 0; i < _nPts; i++) {{
+      var c = col[i];
+      if (!(c in seen)) {{ seen[c] = true; uniqueCids.push(c); }}
+    }}
+    var cmap = buildColorMap(uniqueCids);
+    for (var i = 0; i < _nPts; i++) {{
+      var rgb = cmap[col[i]];
+      allPoints[i].r = rgb[0];
+      allPoints[i].g = rgb[1];
+      allPoints[i].b = rgb[2];
+      allPoints[i].cluster = col[i];
+    }}
+  }};
+
+  var _mlCols3d = {{}};  // per-level 3D cluster ID arrays (dual cluster mode)
+
+  if (clusterMeta) {{
+    // Multi-level mode: decode per-level cluster IDs, compute colors at runtime
+    var _mlKeys = Object.keys(clusterMeta.levels);
+    _mlKeys.forEach(function(k) {{
+      var col = _pt.getChild("cluster_" + k);
+      if (col) _mlCols[k] = col.toArray();
+    }});
+    // Decode 3D cluster columns if dual mode
+    if (clusterMeta.hasDualClusters && clusterMeta.levels_3d) {{
+      Object.keys(clusterMeta.levels_3d).forEach(function(k) {{
+        var col3d = _pt.getChild("cluster_" + k + "_3d");
+        if (col3d) _mlCols3d[k] = col3d.toArray();
+      }});
+    }}
+    var _lshCol = _pt.getChild("cluster_lsh");
+    if (_lshCol) _mlCols["lsh"] = _lshCol.toArray();
+
+    // Store per-point cluster IDs for all levels
+    for (var _i = 0; _i < _nPts; _i++) {{
+      var clusters = {{}};
+      for (var _mk in _mlCols) clusters[_mk] = _mlCols[_mk][_i];
+      allPoints[_i] = {{
+        x: _x[_i], y: _y[_i], z: 0,
+        r: 128, g: 128, b: 128, a: _a[_i],
+        title: _titles.get(_i), cluster: 0,
+        clusters: clusters
+      }};
+    }}
+    applyLevelColors(currentLevelKey);
+  }} else {{
+    // Single-level mode: colors baked in Arrow IPC
+    var _r = _pt.getChild("r").toArray();
+    var _g = _pt.getChild("g").toArray();
+    var _b = _pt.getChild("b").toArray();
+    var _clu = _pt.getChild("cluster").toArray();
+    for (var _i = 0; _i < _nPts; _i++) {{
+      allPoints[_i] = {{
+        x: _x[_i], y: _y[_i], z: 0,
+        r: _r[_i], g: _g[_i], b: _b[_i], a: _a[_i],
+        title: _titles.get(_i), cluster: _clu[_i]
+      }};
+    }}
   }}
+
   // Backup original Z for 3D toggle (points start flat in 2D)
   var _zBackupInit = new Float32Array(_nPts);
   for (var _i = 0; _i < _nPts; _i++) _zBackupInit[_i] = _z[_i];
@@ -3731,6 +3895,16 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
   }}
 
   // ── Multi-level label system ─────────────────────────────────────────
+  // When clusterMeta exists, populate labelLevels from it (the legacy
+  // levels_json may have mismatched keys like "22" instead of "25")
+  if (clusterMeta && clusterMeta.levels) {{
+    labelLevels = {{}};
+    Object.keys(clusterMeta.levels).forEach(function(k) {{
+      if (clusterMeta.levels[k].label_data) {{
+        labelLevels[k] = clusterMeta.levels[k].label_data;
+      }}
+    }});
+  }}
   // Parse levels: keys are cluster counts (as strings), values are label arrays
   var levelKeys = Object.keys(labelLevels).map(Number).sort(function(a,b) {{ return a - b; }});
   // Store z backups per level for 2D/3D toggle, then flatten for 2D init
@@ -3898,13 +4072,6 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
     }}
     dk.setProps({{ layers: newLayers }});
     updateRowStyles();
-    // Trigger depth alpha recalc (3D only)
-    if (!is2d) {{
-      var vps = dk.getViewports ? dk.getViewports() : null;
-      if (vps && vps.length) {{
-        setTimeout(function() {{ updatePointAlpha(dk, vps[0]); }}, 50);
-      }}
-    }}
   }}
 
   function updateRowStyles() {{
@@ -3927,7 +4094,14 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
   var listEl = document.getElementById("cluster-list");
   var rows = [];
   var rowClusterIds = [];
-  (function() {{
+
+  function rebuildClusterList() {{
+    // Clear existing rows
+    listEl.innerHTML = "";
+    rows = [];
+    rowClusterIds = [];
+
+    // Get unique cluster IDs from current point assignments
     var uniqueCids = [];
     var cset = {{}};
     allPoints.forEach(function(p) {{
@@ -3935,23 +4109,49 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
     }});
     uniqueCids.sort(function(a,b) {{ return a - b; }});
 
-    labels.forEach(function(c, i) {{
-      var cid = i < uniqueCids.length ? uniqueCids[i] : i;
+    // Get color map for current clusters
+    var cmap = buildColorMap(uniqueCids);
+
+    // Get current label data
+    var curLabels = labels;  // fallback
+    if (clusterMeta && currentLevelKey) {{
+      if (currentLevelKey === "lsh" && clusterMeta.lsh) {{
+        curLabels = clusterMeta.lsh.label_data;
+      }} else if (clusterMeta.levels[currentLevelKey]) {{
+        curLabels = clusterMeta.levels[currentLevelKey].label_data;
+      }}
+    }}
+
+    // Build name lookup from label_data
+    var nameMap = {{}};
+    curLabels.forEach(function(c) {{ nameMap[c.cid] = c; }});
+
+    uniqueCids.forEach(function(cid) {{
+      var rgb = cmap[cid];
+      var info = nameMap[cid];
+      var text = info ? info.text : ("Cluster " + cid);
+      var size = info ? info.size : 0;
+      if (!size) {{
+        // Count from data
+        size = 0;
+        allPoints.forEach(function(p) {{ if (p.cluster === cid) size++; }});
+      }}
+
       var row = document.createElement("div");
       row.style.cursor = "pointer";
       row.style.padding = "2px 0";
       row.style.transition = "opacity 0.15s";
       row.innerHTML =
         '<span style="display:inline-block;width:10px;height:10px;border-radius:2px;' +
-        'background:rgb(' + c.r + ',' + c.g + ',' + c.b + ');margin-right:6px;' +
+        'background:rgb(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ');margin-right:6px;' +
         'vertical-align:middle;"></span>' +
-        '<span style="vertical-align:middle;">' + c.text +
-        ' <span style="color:var(--fg-muted);">(' + c.size + ')</span></span>';
+        '<span style="vertical-align:middle;">' + text +
+        ' <span style="color:var(--fg-muted);">(' + size + ')</span></span>';
 
       // Single click: toggle hide
       row.addEventListener("click", function(e) {{
         e.preventDefault();
-        if (isolatedCluster !== null) return;  // in isolation mode, use dblclick
+        if (isolatedCluster !== null) return;
         if (hiddenClusters.has(cid)) {{
           hiddenClusters.delete(cid);
         }} else {{
@@ -3964,11 +4164,9 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
       row.addEventListener("dblclick", function(e) {{
         e.preventDefault();
         if (isolatedCluster === cid) {{
-          // Reset: show all
           isolatedCluster = null;
           hiddenClusters.clear();
         }} else {{
-          // Isolate this cluster
           isolatedCluster = cid;
           hiddenClusters.clear();
         }}
@@ -3979,7 +4177,123 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
       rows.push(row);
       rowClusterIds.push(cid);
     }});
+  }}
+
+  // ── switchLevel: recolor all points and rebuild cluster list ──
+  function switchLevel(key) {{
+    if (!clusterMeta) return;
+    currentLevelKey = String(key);
+
+    // In dual cluster mode, use dimension-appropriate cluster columns
+    if (clusterMeta.hasDualClusters && currentLevelKey !== "lsh") {{
+      var activeCols = (viewMode === "3d") ? _mlCols3d : _mlCols;
+      var col = activeCols[currentLevelKey];
+      if (col) {{
+        var uniqueCids = [];
+        var seenC = {{}};
+        for (var i = 0; i < _nPts; i++) {{
+          var c = col[i];
+          if (!(c in seenC)) {{ seenC[c] = true; uniqueCids.push(c); }}
+        }}
+        var cmap = buildColorMap(uniqueCids);
+        for (var i = 0; i < _nPts; i++) {{
+          var rgb = cmap[col[i]];
+          allPoints[i].r = rgb[0];
+          allPoints[i].g = rgb[1];
+          allPoints[i].b = rgb[2];
+          allPoints[i].cluster = col[i];
+        }}
+      }}
+    }} else {{
+      applyLevelColors(currentLevelKey);
+    }}
+
+    // Reset visibility state
+    hiddenClusters.clear();
+    isolatedCluster = null;
+
+    // Update label overlays from clusterMeta (dimension-aware)
+    if (currentLevelKey === "lsh" && clusterMeta.lsh) {{
+      labels = clusterMeta.lsh.label_data;
+      labelLevels = {{}};
+      labelLevels[currentLevelKey] = clusterMeta.lsh.label_data;
+    }} else {{
+      var dimLevels = (clusterMeta.hasDualClusters && viewMode === "3d"
+                       && clusterMeta.levels_3d)
+                       ? clusterMeta.levels_3d : clusterMeta.levels;
+      if (dimLevels[currentLevelKey]) {{
+        labels = dimLevels[currentLevelKey].label_data;
+        labelLevels = {{}};
+        labelLevels[currentLevelKey] = dimLevels[currentLevelKey].label_data;
+      }}
+    }}
+
+    // Re-derive levelKeys and zLevelsBackup for the new level set
+    levelKeys = Object.keys(labelLevels).map(function(k) {{
+      return isNaN(Number(k)) ? k : Number(k);
+    }}).sort(function(a,b) {{
+      if (typeof a === "string") return 1;
+      if (typeof b === "string") return -1;
+      return a - b;
+    }});
+    zLevelsBackup = {{}};
+    levelKeys.forEach(function(k) {{
+      zLevelsBackup[k] = labelLevels[k].map(function(c) {{ return c.z || 0; }});
+      if (viewMode === "2d") {{
+        labelLevels[k].forEach(function(c) {{ c.z = 0; }});
+      }}
+    }});
+
+    // Hide edges for non-default levels, restore for default
+    var isDefault = (currentLevelKey === defaultLevelKey);
+    var edgeCb = document.getElementById("toggle-edges");
+    if (!isDefault) {{
+      edgesVisible = false;
+      if (edgeCb) edgeCb.checked = false;
+    }} else {{
+      edgesVisible = true;
+      if (edgeCb) edgeCb.checked = true;
+    }}
+    var tourBtn = document.getElementById("tour-btn");
+    if (tourBtn) {{
+      tourBtn.disabled = !isDefault;
+      tourBtn.style.opacity = isDefault ? "1" : "0.4";
+    }}
+
+    // Update level button styles
+    var btns = document.querySelectorAll("#level-buttons .level-btn");
+    btns.forEach(function(btn) {{
+      btn.classList.toggle("active", btn.dataset.level === currentLevelKey);
+    }});
+
+    rebuildClusterList();
+    rebuildLayer();
+  }}
+
+  // ── Initialize level selector UI ──
+  (function() {{
+    if (!clusterMeta) return;
+    var container = document.getElementById("level-selector");
+    var btnContainer = document.getElementById("level-buttons");
+    if (!container || !btnContainer) return;
+    container.style.display = "block";
+
+    var lvlKeys = Object.keys(clusterMeta.levels).sort(function(a,b) {{
+      return Number(a) - Number(b);
+    }});
+    if (clusterMeta.lsh) lvlKeys.push("lsh");
+
+    lvlKeys.forEach(function(k) {{
+      var btn = document.createElement("button");
+      btn.className = "level-btn" + (k === currentLevelKey ? " active" : "");
+      btn.dataset.level = k;
+      btn.textContent = (k === "lsh") ? "LSH" : k;
+      btn.addEventListener("click", function() {{ switchLevel(k); }});
+      btnContainer.appendChild(btn);
+    }});
   }})();
+
+  rebuildClusterList();
 
   // Deck access
   var _origPointLayer = null;
@@ -4005,12 +4319,10 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
     if (viewMode === "2d") return;
     // Skip depth alpha when callout highlighting is active (tour Phase 3)
     if (tourCalloutHighlightSet.size > 0) return;
-    var visible = allPoints.filter(function(p) {{ return isClusterVisible(p.cluster); }});
-    if (!visible.length) return;
     var depths = [];
-    for (var i = 0; i < visible.length; i++) {{
+    for (var i = 0; i < allPoints.length; i++) {{
       try {{
-        var sp = vp.project([visible[i].x, visible[i].y, visible[i].z]);
+        var sp = vp.project([allPoints[i].x, allPoints[i].y, allPoints[i].z]);
         depths.push(sp[2] || 0);
       }} catch(e) {{ depths.push(0); }}
     }}
@@ -4020,25 +4332,12 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
       if (depths[i] > maxD) maxD = depths[i];
     }}
     var rangeD = maxD - minD || 1;
-    var updated = visible.map(function(p, i) {{
+    for (var i = 0; i < allPoints.length; i++) {{
       var t = (depths[i] - minD) / rangeD;
-      var alpha = Math.round(255 - t * 200);
-      return {{ x: p.x, y: p.y, z: p.z, r: p.r, g: p.g, b: p.b,
-                a: alpha, title: p.title, cluster: p.cluster }};
-    }});
-    if (!_origPointLayer) return;
-    var newLayers = [_origPointLayer.clone({{ data: updated }})];
-    // Recreate edge layer from cached original with current edge data
-    if (edgesVisible && _origEdgeLayer && edgePathData.length > 0) {{
-      var newEdgeLayer = _origEdgeLayer.clone({{
-        data: edgePathData,
-        getPath: function(d) {{ return d.path; }},
-        getColor: function(d) {{ return d.color; }},
-        getWidth: function(d) {{ return d.width; }}
-      }});
-      newLayers.push(newEdgeLayer);
+      allPoints[i].a = Math.round(255 - t * 200);
     }}
-    dk.setProps({{ layers: newLayers }});
+    // rebuildLayer will pick up the updated .a values
+    rebuildLayer();
   }}
 
   // ── Multi-level zoom-aware label placement ───────────────────────────
@@ -4046,16 +4345,9 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
   // deck.gl OrbitView zoom ~5.5 default; higher = more zoomed in
   // Show one level at a time: coarse at default zoom, finer when zoomed in.
   // Separation scales inversely with zoom so more labels fit when zoomed in.
-  var ZOOM_THRESHOLDS = [
-    {{ zoom: 0, levels: levelKeys }}
-  ];
-
   function getActiveLevels(zoom) {{
-    var active = ZOOM_THRESHOLDS[0].levels;
-    for (var i = 0; i < ZOOM_THRESHOLDS.length; i++) {{
-      if (zoom >= ZOOM_THRESHOLDS[i].zoom) active = ZOOM_THRESHOLDS[i].levels;
-    }}
-    return active;
+    // Always use current levelKeys (may be reassigned on level switch)
+    return levelKeys;
   }}
 
   // Label placement: project, cull off-screen, spatial separation
@@ -4487,8 +4779,45 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
     if (sub) sub.textContent = (mode === "2d")
       ? "Scroll to zoom \u00b7 Drag to pan \u00b7 Hover for details"
       : "Scroll to zoom \u00b7 Drag to orbit \u00b7 Hover for details";
+    // ── Dual cluster swap FIRST (before any render) ──
+    if (clusterMeta && clusterMeta.hasDualClusters) {{
+      // Re-apply cluster colors from the dimension-appropriate set
+      var swapCols = (mode === "3d") ? _mlCols3d : _mlCols;
+      var col = swapCols[currentLevelKey];
+      if (col) {{
+        var uniqueCids = [];
+        var seenC = {{}};
+        for (var i = 0; i < _nPts; i++) {{
+          var c = col[i];
+          if (!(c in seenC)) {{ seenC[c] = true; uniqueCids.push(c); }}
+        }}
+        var cmap = buildColorMap(uniqueCids);
+        for (var i = 0; i < _nPts; i++) {{
+          var rgb = cmap[col[i]];
+          allPoints[i].r = rgb[0];
+          allPoints[i].g = rgb[1];
+          allPoints[i].b = rgb[2];
+          allPoints[i].cluster = col[i];
+        }}
+      }}
+      // Swap label overlays to dimension-appropriate clusterMeta
+      var dimLevels = (mode === "3d") ? clusterMeta.levels_3d : clusterMeta.levels;
+      if (dimLevels && dimLevels[currentLevelKey]) {{
+        labels = dimLevels[currentLevelKey].label_data;
+        labelLevels = {{}};
+        labelLevels[currentLevelKey] = dimLevels[currentLevelKey].label_data;
+        levelKeys = [currentLevelKey];
+        zLevelsBackup = {{}};
+        zLevelsBackup[currentLevelKey] = labelLevels[currentLevelKey].map(
+          function(c) {{ return c.z || 0; }});
+      }}
+      rebuildClusterList();
+    }}
+
     var dk = getDeck();
     if (!dk || !dk.setProps) return;
+    // Reset alpha to full opacity for clean transition
+    for (var i = 0; i < allPoints.length; i++) allPoints[i].a = 255;
     if (mode === "2d") {{
       // Flatten Z (XY already landscape-oriented from Python)
       for (var i = 0; i < allPoints.length; i++) allPoints[i].z = 0;
@@ -4738,6 +5067,9 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
             if (lcbW) lcbW.checked = labelsVisible;
           }}
           break;
+        case "set_level":
+          switchLevel(String(msg.level));
+          break;
         case "draw_circle":
           // Fit smooth ellipse around cluster's points
           var cid = msg.cluster;
@@ -4955,13 +5287,595 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
 """
 
 
+# ── Agglomerated DYF tree buckets ─────────────────────────────────────
+
+
+def _agglomerate_tree_leaves(idx, coords, embeddings, n_groups=50):
+    """Agglomerate DYF tree leaves into ~n_groups using embedding centroids.
+
+    Walks the tree to find leaf nodes, computes per-leaf embedding centroids,
+    then uses Ward linkage to merge leaves into n_groups agglomerated clusters.
+    After initial assignment, reassigns individual points to their nearest
+    bucket centroid to clean up impure leaves and bad merges.
+
+    Returns (lsh_labels, lsh_names, lsh_label_data) ready for multi_level_data.
+    """
+    from scipy.cluster.hierarchy import linkage, fcluster
+
+    tree = idx.get_tree_structure()
+    leaves = [n for n in tree if n['is_leaf'] and n['batch_index'] >= 0]
+
+    if len(leaves) < 2:
+        return None, {}, []
+
+    dim = idx.embedding_dim
+    is_pq = idx.is_pq
+    if is_pq:
+        idx._load_pq_codebook()
+
+    # Collect per-leaf centroids and point mappings
+    leaf_centroids = []
+    leaf_point_indices = []  # list of arrays, one per leaf
+
+    for leaf in leaves:
+        batch = idx.get_leaf(leaf['batch_index'])
+        item_ids = batch.column('item_index').to_numpy()
+        emb_col = batch.column('embedding')
+        flat = emb_col.values.to_numpy()
+        n_rows = len(emb_col)
+
+        if is_pq:
+            meta = idx._get_metadata()
+            m = int(meta['pq_n_subquantizers'])
+            codes = flat.reshape(n_rows, m)
+            leaf_emb = idx._pq_reconstruct(codes)
+        else:
+            leaf_emb = flat.reshape(n_rows, dim).astype(np.float32)
+
+        centroid = leaf_emb.mean(axis=0)
+        leaf_centroids.append(centroid)
+        leaf_point_indices.append(item_ids)
+
+    centroids = np.vstack(leaf_centroids).astype(np.float32)
+
+    # L2-normalize centroids for cosine-like Ward clustering
+    norms = np.linalg.norm(centroids, axis=1, keepdims=True)
+    norms[norms == 0] = 1.0
+    centroids_normed = centroids / norms
+
+    # Agglomerate
+    actual_groups = min(n_groups, len(centroids_normed))
+    Z = linkage(centroids_normed, method='ward')
+    agg_labels = fcluster(Z, actual_groups, criterion='maxclust')  # 1-based
+
+    # Map points → leaf → agglomerated group (initial assignment)
+    n_points = coords.shape[0]
+    point_labels = np.full(n_points, -1, dtype=np.int32)
+    for leaf_idx, item_ids in enumerate(leaf_point_indices):
+        group_id = int(agg_labels[leaf_idx]) - 1  # 0-based
+        valid = item_ids < n_points
+        point_labels[item_ids[valid]] = group_id
+
+    # Handle any unassigned points
+    unassigned = point_labels == -1
+    if unassigned.any():
+        max_id = point_labels.max() + 1
+        point_labels[unassigned] = max_id
+
+    # ── Point-level reassignment pass ─────────────────────────────────
+    # Compute bucket centroids, then reassign each point to nearest bucket.
+    unique_groups = sorted(set(point_labels.tolist()))
+    n_buckets = len(unique_groups)
+    gid_to_idx = {gid: i for i, gid in enumerate(unique_groups)}
+
+    # Normalize all point embeddings once
+    emb_norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+    emb_normed = embeddings / np.maximum(emb_norms, 1e-10)
+
+    # Iterative reassignment (converges in 2-3 rounds)
+    for _iter in range(5):
+        # Compute bucket centroids from current assignments
+        bucket_centroids = np.zeros((n_buckets, embeddings.shape[1]),
+                                    dtype=np.float32)
+        for gid in unique_groups:
+            mask = point_labels == gid
+            pts = np.where(mask)[0]
+            if len(pts) > 0:
+                cent = emb_normed[pts].mean(axis=0)
+                norm = np.linalg.norm(cent)
+                if norm > 1e-10:
+                    cent /= norm
+                bucket_centroids[gid_to_idx[gid]] = cent
+
+        # Similarity of every point to every bucket centroid: (N, n_buckets)
+        all_sims = emb_normed @ bucket_centroids.T
+
+        # Best bucket for each point
+        best_bucket_idx = np.argmax(all_sims, axis=1)
+        new_labels = np.array([unique_groups[bi] for bi in best_bucket_idx],
+                              dtype=np.int32)
+
+        changed = int((new_labels != point_labels).sum())
+        point_labels = new_labels
+        if changed == 0:
+            break
+    print(f"    Point reassignment: {_iter + 1} iterations, "
+          f"{changed} changed in last round")
+
+    # Rebuild unique_groups after reassignment (some buckets may have emptied)
+    unique_groups = sorted(set(point_labels.tolist()))
+
+    # Build names and label_data
+    lsh_names = {gid: f"Bucket {gid}" for gid in unique_groups}
+    ndim = coords.shape[1]
+    lsh_label_data = []
+    for gid in unique_groups:
+        mask = point_labels == gid
+        pts = np.where(mask)[0]
+        centroid = coords[pts].mean(axis=0)
+        lsh_label_data.append({
+            "x": float(centroid[0]),
+            "y": float(centroid[1]),
+            "z": float(centroid[2]) if ndim >= 3 else 0.0,
+            "text": f"Bucket {gid}",
+            "size": int(mask.sum()),
+            "cid": int(gid),
+            "leaf_cids": [int(gid)],
+        })
+
+    return point_labels, lsh_names, lsh_label_data
+
+
 # ── Main ─────────────────────────────────────────────────────────────────
+
+
+def _render_from_dyf(dyf_path, args):
+    """Render directly from an enriched .dyf file (Level 1+). No compute."""
+    from dyf.lazy_index import LazyIndex
+
+    print(f"\n=== Rendering from .dyf: {dyf_path} ===")
+    with LazyIndex(dyf_path) as idx:
+        level = idx.detect_enrichment_level()
+        print(f"  Enrichment level: {level}")
+        if level < 1:
+            print(f"  ERROR: .dyf file is level 0 (no UMAP coords). "
+                  f"Run 'python demo/dyf_enrich.py project {dyf_path}' first.")
+            return
+        data = idx.extract_all_fields()
+
+    n = len(data['embeddings'])
+    umap_x = data['fields']['umap_x']
+    umap_y = data['fields']['umap_y']
+    umap_z = data['fields']['umap_z']
+    coords = np.column_stack([umap_x, umap_y, umap_z])
+
+    titles_list = data['fields'].get('title')
+    if titles_list is None:
+        titles_list = [f"Item {i}" for i in range(n)]
+    titles_arr = np.array(titles_list)
+
+    # Pick best cluster level — handle cluster_{k}, cluster_{k}_2d, cluster_{k}_3d
+    _cluster_re = re.compile(r'^cluster_(\d+)(?:_(2d|3d))?$')
+    all_cluster_fields = sorted(
+        [f for f in data['fields'] if _cluster_re.match(f)],
+        key=lambda f: (int(_cluster_re.match(f).group(1)),
+                       _cluster_re.match(f).group(2) or ''))
+
+    # Separate into 2d, 3d, and bare fields
+    cluster_fields_2d = [f for f in all_cluster_fields
+                         if f.endswith('_2d')]
+    cluster_fields_3d = [f for f in all_cluster_fields
+                         if f.endswith('_3d')]
+    cluster_fields_bare = [f for f in all_cluster_fields
+                           if not f.endswith('_2d')
+                           and not f.endswith('_3d')]
+    has_dual_clusters = len(cluster_fields_2d) > 0
+
+    # For backward compat, cluster_fields is the primary set (2d if dual,
+    # bare otherwise)
+    cluster_fields = cluster_fields_2d if has_dual_clusters \
+        else cluster_fields_bare
+
+    # Check for tree labels in metadata
+    tree_labels_meta = None
+    for mk in sorted(data['metadata'].keys()):
+        if mk.startswith('tree_labels_depth_'):
+            tree_labels_meta = json.loads(data['metadata'][mk])
+            print(f"  Found tree labels: {mk}")
+            break
+
+    if not cluster_fields and tree_labels_meta:
+        # Use tree labels to create cluster assignments
+        print("  Building clusters from tree labels...")
+        from dyf.lazy_index import LazyIndex
+        with LazyIndex(dyf_path) as idx2:
+            tree_struct = idx2.get_tree_structure()
+        by_id = {n['node_id']: n for n in tree_struct}
+        # Map each point to its ancestor at the child level
+        child_labels_map = tree_labels_meta.get('child_labels', {})
+        branch_labels_map = tree_labels_meta.get('branch_labels', {})
+        hierarchy = tree_labels_meta.get('hierarchy', {})
+        # Build node_id→cluster_id mapping for labeled children
+        labeled_nodes = sorted(child_labels_map.keys(), key=int)
+        node_to_cluster = {int(nid): i for i, nid in enumerate(labeled_nodes)}
+        # Map each point to its tree leaf, then walk up to a labeled node
+        parent_of = {n['node_id']: n['parent_id'] for n in tree_struct}
+        leaf_nodes = [n for n in tree_struct if n['is_leaf']]
+        labels_birch = np.full(n, -1, dtype=np.int32)
+        with LazyIndex(dyf_path) as idx2:
+            for ln in leaf_nodes:
+                if ln['batch_index'] < 0:
+                    continue
+                batch = idx2.get_leaf(ln['batch_index'])
+                item_indices = batch.column('item_index').to_numpy()
+                # Walk up to find a labeled ancestor
+                nid = ln['node_id']
+                while nid is not None:
+                    if str(nid) in child_labels_map:
+                        labels_birch[item_indices] = node_to_cluster[nid]
+                        break
+                    nid = parent_of.get(nid)
+                else:
+                    # Assign to nearest branch
+                    nid = ln['node_id']
+                    while nid is not None:
+                        if str(nid) in branch_labels_map:
+                            # Use branch as a fallback cluster
+                            if nid not in node_to_cluster:
+                                node_to_cluster[nid] = len(node_to_cluster)
+                                child_labels_map[str(nid)] = \
+                                    branch_labels_map[str(nid)]
+                            labels_birch[item_indices] = node_to_cluster[nid]
+                            break
+                        nid = parent_of.get(nid)
+        # Handle any unassigned points
+        unassigned = labels_birch == -1
+        if unassigned.any():
+            fallback_id = max(node_to_cluster.values()) + 1
+            labels_birch[unassigned] = fallback_id
+            child_labels_map[str(fallback_id)] = "Other"
+            node_to_cluster[-1] = fallback_id
+        n_birch = len(set(labels_birch.tolist()))
+        names_birch = {}
+        for str_nid, cid in node_to_cluster.items():
+            label = child_labels_map.get(str(str_nid), f"Cluster {cid}")
+            names_birch[cid] = label
+        print(f"  {n_birch} clusters from tree labels")
+    elif not cluster_fields:
+        # Level 1 only: do a quick inline BIRCH
+        print("  No cluster fields found, running quick BIRCH...")
+        target_k = getattr(args, 'n_clusters', 25)
+        birch = fit_birch(coords[:, :2], target_k)
+        labels_birch = birch.predict(coords[:, :2])
+        n_birch = len(set(labels_birch.tolist()))
+        names_birch = {i: f"Cluster {i}" for i in range(n_birch)}
+    else:
+        # Use the cluster level closest to --n-clusters
+        target_k = getattr(args, 'n_clusters', 25)
+        best_field = min(cluster_fields,
+                         key=lambda f: abs(
+                             int(_cluster_re.match(f).group(1)) - target_k))
+        best_k = int(_cluster_re.match(best_field).group(1))
+        suffix = '_2d' if has_dual_clusters else ''
+        print(f"  Using cluster level: {best_field}")
+
+        labels_birch = np.asarray(data['fields'][best_field])
+        n_birch = len(set(labels_birch.tolist()))
+
+        # Load cluster names from metadata
+        names_key = f'cluster_names_{best_k}{suffix}'
+        names_json = data['metadata'].get(names_key, '{}')
+        names_birch = {int(k): v for k, v in json.loads(names_json).items()}
+        if not names_birch:
+            names_birch = {i: f"Cluster {i}"
+                           for i in sorted(set(labels_birch.tolist()))}
+
+    # Multi-level data: from tree labels or cluster_* fields
+    multi_level_data = None
+    if tree_labels_meta and not cluster_fields:
+        # Build two-level view from tree: branches (coarse) + children (fine)
+        branch_labels_map = tree_labels_meta.get('branch_labels', {})
+        child_labels_map2 = tree_labels_meta.get('child_labels', {})
+        hierarchy2 = tree_labels_meta.get('hierarchy', {})
+
+        # Coarse level: branch labels
+        # Assign each point to its branch (grandparent of leaf)
+        branch_labels = np.full(n, -1, dtype=np.int32)
+        branch_nids = sorted(branch_labels_map.keys(), key=int)
+        branch_to_id = {int(nid): i for i, nid in enumerate(branch_nids)}
+
+        with LazyIndex(dyf_path) as idx2:
+            tree_struct2 = idx2.get_tree_structure()
+        parent_of2 = {n2['node_id']: n2['parent_id'] for n2 in tree_struct2}
+        leaf_nodes2 = [n2 for n2 in tree_struct2 if n2['is_leaf']]
+
+        with LazyIndex(dyf_path) as idx2:
+            for ln in leaf_nodes2:
+                if ln['batch_index'] < 0:
+                    continue
+                batch = idx2.get_leaf(ln['batch_index'])
+                item_indices = batch.column('item_index').to_numpy()
+                nid = ln['node_id']
+                while nid is not None:
+                    if str(nid) in branch_labels_map:
+                        branch_labels[item_indices] = branch_to_id[nid]
+                        break
+                    nid = parent_of2.get(nid)
+
+        unassigned = branch_labels == -1
+        if unassigned.any():
+            branch_labels[unassigned] = len(branch_to_id)
+
+        branch_names = {i: branch_labels_map[nid]
+                        for nid, i in branch_to_id.items()}
+        n_branches = len(set(branch_labels.tolist()))
+
+        ndim = coords.shape[1]
+        ml_labels = {}
+        ml_names = {}
+        ml_label_data = {}
+
+        # Coarse level (branches)
+        branch_level_labels = []
+        for cid in sorted(set(branch_labels.tolist())):
+            mask = branch_labels == cid
+            pts_idx = np.where(mask)[0]
+            centroid = coords[pts_idx].mean(axis=0)
+            name = branch_names.get(cid, f"Branch {cid}")
+            branch_level_labels.append({
+                "x": float(centroid[0]),
+                "y": float(centroid[1]),
+                "z": float(centroid[2]) if ndim >= 3 else 0.0,
+                "text": str(name)[:50],
+                "size": int(mask.sum()),
+                "cid": int(cid),
+                "leaf_cids": [int(cid)],
+            })
+        ml_labels[n_branches] = branch_labels
+        ml_names[n_branches] = branch_names
+        ml_label_data[n_branches] = branch_level_labels
+
+        # Fine level (children = labels_birch from above)
+        child_level_labels = []
+        for cid in sorted(set(labels_birch.tolist())):
+            mask = labels_birch == cid
+            pts_idx = np.where(mask)[0]
+            centroid = coords[pts_idx].mean(axis=0)
+            name = names_birch.get(cid, f"Cluster {cid}")
+            child_level_labels.append({
+                "x": float(centroid[0]),
+                "y": float(centroid[1]),
+                "z": float(centroid[2]) if ndim >= 3 else 0.0,
+                "text": str(name)[:50],
+                "size": int(mask.sum()),
+                "cid": int(cid),
+                "leaf_cids": [int(cid)],
+            })
+        ml_labels[n_birch] = labels_birch
+        ml_names[n_birch] = names_birch
+        ml_label_data[n_birch] = child_level_labels
+
+        multi_level_data = {
+            "labels": ml_labels,
+            "names": ml_names,
+            "label_data": ml_label_data,
+            "lsh_labels": None,
+            "lsh_names": {},
+            "lsh_label_data": [],
+            "default": n_birch,
+        }
+
+        # Agglomerate DYF tree leaves into ~50 semantic buckets
+        print("  Computing agglomerated DYF tree buckets...")
+        with LazyIndex(dyf_path) as idx_agg:
+            lsh_labels, lsh_names, lsh_label_data = _agglomerate_tree_leaves(
+                idx_agg, coords, data['embeddings'], n_groups=50)
+        if lsh_labels is not None:
+            # Label buckets via contrastive TF-IDF + LLM
+            model = getattr(args, 'model', 'gemma2:9b')
+            cache_file = getattr(args, 'label_cache', None)
+            print("  Labeling agglomerated buckets...")
+            bucket_names = label_clusters(
+                titles_arr, coords, lsh_labels, data['embeddings'],
+                model=model, cache_file=cache_file, cache_key="lsh_buckets")
+            lsh_names = bucket_names
+            for entry in lsh_label_data:
+                cid = entry["cid"]
+                if cid in bucket_names:
+                    entry["text"] = bucket_names[cid][:50]
+            multi_level_data["lsh_labels"] = lsh_labels
+            multi_level_data["lsh_names"] = lsh_names
+            multi_level_data["lsh_label_data"] = lsh_label_data
+            print(f"    {len(set(lsh_labels.tolist()))} agglomerated buckets")
+
+    elif len(cluster_fields) > 1:
+        ndim = coords.shape[1]
+        suffix = '_2d' if has_dual_clusters else ''
+
+        def _build_level_data(fields_list, name_suffix):
+            """Build ml_labels/names/label_data from a list of cluster fields."""
+            _labels = {}
+            _names = {}
+            _label_data = {}
+            for cf in fields_list:
+                m = _cluster_re.match(cf)
+                lvl = int(m.group(1))
+                arr = np.asarray(data['fields'][cf])
+                _labels[lvl] = arr
+                nk = f'cluster_names_{lvl}{name_suffix}'
+                nj = data['metadata'].get(nk, '{}')
+                _names[lvl] = {int(k): v
+                               for k, v in json.loads(nj).items()}
+                level_labels = []
+                for cid in sorted(set(arr.tolist())):
+                    mask = arr == cid
+                    pts = np.where(mask)[0]
+                    centroid = coords[pts].mean(axis=0)
+                    name = _names[lvl].get(cid, f"Cluster {cid}")
+                    level_labels.append({
+                        "x": float(centroid[0]),
+                        "y": float(centroid[1]),
+                        "z": float(centroid[2]) if ndim >= 3 else 0.0,
+                        "text": str(name)[:50],
+                        "size": int(mask.sum()),
+                        "cid": int(cid),
+                        "leaf_cids": [int(cid)],
+                    })
+                _label_data[lvl] = level_labels
+            return _labels, _names, _label_data
+
+        ml_labels, ml_names, ml_label_data = _build_level_data(
+            cluster_fields, suffix)
+
+        multi_level_data = {
+            "labels": ml_labels,
+            "names": ml_names,
+            "label_data": ml_label_data,
+            "lsh_labels": None,
+            "lsh_names": {},
+            "lsh_label_data": [],
+            "default": target_k,
+        }
+
+        # Agglomerate DYF tree leaves into ~50 semantic buckets
+        print("  Computing agglomerated DYF tree buckets...")
+        with LazyIndex(dyf_path) as idx_agg:
+            lsh_labels, lsh_names_agg, lsh_label_data = \
+                _agglomerate_tree_leaves(idx_agg, coords, data['embeddings'],
+                                         n_groups=50)
+        if lsh_labels is not None:
+            # Label buckets via contrastive TF-IDF + LLM
+            model = getattr(args, 'model', 'gemma2:9b')
+            cache_file = getattr(args, 'label_cache', None)
+            print("  Labeling agglomerated buckets...")
+            bucket_names = label_clusters(
+                titles_arr, coords, lsh_labels, data['embeddings'],
+                model=model, cache_file=cache_file, cache_key="lsh_buckets")
+            lsh_names_agg = bucket_names
+            for entry in lsh_label_data:
+                cid = entry["cid"]
+                if cid in bucket_names:
+                    entry["text"] = bucket_names[cid][:50]
+            multi_level_data["lsh_labels"] = lsh_labels
+            multi_level_data["lsh_names"] = lsh_names_agg
+            multi_level_data["lsh_label_data"] = lsh_label_data
+            print(f"    {len(set(lsh_labels.tolist()))} agglomerated buckets")
+
+        # Build 3D cluster data if dual clusters exist
+        if has_dual_clusters and cluster_fields_3d:
+            ml_labels_3d, ml_names_3d, ml_label_data_3d = \
+                _build_level_data(cluster_fields_3d, '_3d')
+            multi_level_data["labels_3d"] = ml_labels_3d
+            multi_level_data["names_3d"] = ml_names_3d
+            multi_level_data["label_data_3d"] = ml_label_data_3d
+            multi_level_data["has_dual_clusters"] = True
+
+    # Edge data from metadata
+    bundled_birch_2d = None
+    bundled_birch_3d = None
+    birch_pair_info = None
+    edge_pairs_json = data['metadata'].get('edge_pairs')
+    if edge_pairs_json:
+        raw_pairs = json.loads(edge_pairs_json)
+        birch_pair_info = {(p[0], p[1]): p[2] for p in raw_pairs}
+
+        # 2D edge paths from metadata
+        paths_2d_json = data['metadata'].get('edge_paths_2d')
+        if paths_2d_json:
+            paths_2d = json.loads(paths_2d_json)
+            bundled_birch_2d = [
+                np.array([[x, y, 0.0] for x, y in path], dtype=np.float32)
+                for path in paths_2d
+            ]
+
+        # Generate 3D catenary paths from centroids
+        n_cls = max(labels_birch) + 1
+        centroids = np.zeros((n_cls, coords.shape[1]), dtype=np.float32)
+        for c in range(n_cls):
+            mask = labels_birch == c
+            if mask.any():
+                centroids[c] = coords[mask].mean(axis=0)
+        edge_list = sorted(birch_pair_info.keys(),
+                           key=lambda p: -birch_pair_info[p])
+        max_count = max(birch_pair_info.values()) if birch_pair_info else 1
+        bundled_birch_3d = []
+        for c1, c2 in edge_list:
+            if c1 >= n_cls or c2 >= n_cls:
+                continue
+            p1, p2 = centroids[c1], centroids[c2]
+            count = birch_pair_info.get((c1, c2), 1)
+            dist = np.linalg.norm(p2 - p1)
+            strength = count / max_count
+            sag = 0.15 * dist * (1.0 - 0.5 * strength)
+            path = []
+            for j in range(21):
+                t = j / 20
+                pt = p1 + t * (p2 - p1)
+                pt = pt.copy()
+                pt[2] += 4 * sag * t * (1 - t)
+                path.append(pt.tolist())
+            bundled_birch_3d.append(np.array(path, dtype=np.float32))
+
+    # Tour narration from metadata
+    narration_birch = {}
+    narration_json = data['metadata'].get('tour_narration')
+    if narration_json:
+        raw = json.loads(narration_json)
+        for k, v in raw.items():
+            try:
+                narration_birch[int(k)] = v
+            except ValueError:
+                narration_birch[k] = v  # "intro", "outro"
+
+    # Generate audio if narration exists
+    audio_birch = {}
+    if narration_birch:
+        audio_birch = generate_tour_audio(narration_birch)
+
+    outdir = Path(dyf_path).parent
+    display_title = getattr(args, 'title', None) or "Embedding Landscape"
+
+    use_3d = getattr(args, 'renderer', 'pydeck') == 'pydeck'
+
+    if use_3d:
+        rgb_birch = golden_ratio_rgb_map(labels_birch)
+        path_birch = str(outdir / "rog_3d_birch_clusters.html")
+        subtitle = f"BIRCH — {n_birch} clusters, {n:,} pts (from .dyf)"
+
+        build_pydeck(
+            coords, titles_arr, labels_birch, rgb_birch,
+            display_title, path_birch,
+            cluster_names=names_birch,
+            ws_port=getattr(args, 'port', 8766),
+            bundled_edges_2d=bundled_birch_2d,
+            bundled_edges_3d=bundled_birch_3d,
+            edge_pairs=birch_pair_info,
+            logo_path=getattr(args, 'logo', None),
+            tour_narration=narration_birch,
+            tour_audio=audio_birch,
+            tour_title=getattr(args, 'title', None),
+            subtitle_str=subtitle,
+            multi_level_data=multi_level_data,
+        )
+        print(f"\nWrote {path_birch}")
+        subprocess.run(["open", path_birch])
+    else:
+        cmap_birch = golden_ratio_color_map(labels_birch)
+        html_birch = build_html(
+            coords, titles_arr, labels_birch, cmap_birch,
+            f"BIRCH — {n_birch} clusters, {n:,} pts (from .dyf)",
+            cluster_names=names_birch)
+        path_birch = str(outdir / "rog_2d_birch_clusters.html")
+        Path(path_birch).write_text(html_birch)
+        print(f"\nWrote {path_birch}")
+        subprocess.run(["open", path_birch])
 
 
 def main():
     parser = argparse.ArgumentParser(
         description="Compare BIRCH (2D) vs DYF tree (high-D) clustering")
-    parser.add_argument("parquet_path", help="Path to embeddings parquet")
+    parser.add_argument("parquet_path",
+                        help="Path to embeddings parquet or enriched .dyf")
     parser.add_argument("--sample", type=int, default=8000)
     parser.add_argument("--n-clusters", type=int, default=25,
                         help="Target number of clusters")
@@ -4996,7 +5910,14 @@ def main():
                         help="JSON file to cache cluster labels (avoids re-running Ollama)")
     parser.add_argument("--narrate", action="store_true",
                         help="Generate tour narration via Ollama (no narration file needed)")
+    parser.add_argument("--rog-cache", default=None,
+                        help="Path to ROG preprocessing cache (.pkl) for multi-level cluster toggle")
     args = parser.parse_args()
+
+    # .dyf fast path: skip all compute, go straight to render
+    if args.parquet_path.endswith('.dyf'):
+        _render_from_dyf(args.parquet_path, args)
+        return
 
     outdir = Path(args.parquet_path).parent
     pre_labels = None
@@ -5151,6 +6072,112 @@ def main():
         if bundled_birch_2d:
             print(f"  Bundled {len(bundled_birch_2d)} 2D + {len(bundled_birch_3d)} 3D bridge edges")
 
+    # ── Load ROG cache for multi-level cluster toggle ───────────────────
+    multi_level_data = None
+    if args.rog_cache:
+        import pickle
+        cache_path = Path(args.rog_cache)
+        if not cache_path.exists():
+            print(f"WARNING: --rog-cache {cache_path} not found, skipping multi-level")
+        else:
+            print(f"\n=== Loading ROG cache: {cache_path} ===")
+            with open(cache_path, "rb") as f:
+                rog_cache = pickle.load(f)
+            cr = rog_cache['cluster_result']
+            lsh = rog_cache['lsh_data']
+            cache_n = len(cr['labels'][next(iter(cr['labels']))])
+            if cache_n != n:
+                print(f"  WARNING: ROG cache has {cache_n} points, "
+                      f"current pipeline has {n}. Use --sample 0 or "
+                      f"matching --sample to align point counts.")
+
+            # Extract multi-level cluster labels
+            ml_labels = {}
+            ml_names = {}
+            for lvl in sorted(cr['labels'].keys()):
+                arr = np.asarray(cr['labels'][lvl])
+                if len(arr) == n:
+                    ml_labels[lvl] = arr
+                    # names can be list (indexed by position) or dict (keyed by cid)
+                    raw_names = cr['names'].get(lvl, {})
+                    if isinstance(raw_names, list):
+                        ml_names[lvl] = {i: name for i, name in enumerate(raw_names)}
+                    else:
+                        ml_names[lvl] = raw_names
+                    print(f"  Level {lvl}: {len(set(arr.tolist()))} clusters")
+                else:
+                    print(f"  Level {lvl}: length mismatch ({len(arr)} vs {n}), skipping")
+
+            # Extract LSH bucket IDs → remap sparse uint64 to contiguous int32
+            raw_bids = np.asarray(lsh['bucket_ids'], dtype=np.int64)
+            if len(raw_bids) == n:
+                unique_bids = sorted(set(raw_bids.tolist()))
+                bid_remap = {old: new for new, old in enumerate(unique_bids)}
+                lsh_labels = np.array([bid_remap[int(b)] for b in raw_bids], dtype=np.int32)
+                lsh_names = {}
+                for old_bid, name in lsh.get('bucket_names', {}).items():
+                    new_bid = bid_remap.get(int(old_bid))
+                    if new_bid is not None:
+                        lsh_names[new_bid] = name
+                print(f"  LSH: {len(unique_bids)} buckets")
+            else:
+                lsh_labels = None
+                lsh_names = {}
+                print(f"  LSH: length mismatch ({len(raw_bids)} vs {n}), skipping")
+
+            # Build label_data dicts for each level (centroid + name + size)
+            ndim = coords.shape[1]
+            ml_label_data = {}
+            for lvl, arr in ml_labels.items():
+                names_dict = ml_names[lvl]
+                level_labels = []
+                for cid in sorted(set(arr.tolist())):
+                    mask = arr == cid
+                    pts = np.where(mask)[0]
+                    centroid = coords[pts].mean(axis=0)
+                    name = names_dict.get(cid, f"Cluster {cid}")
+                    if isinstance(name, list):
+                        name = name[0] if name else f"Cluster {cid}"
+                    level_labels.append({
+                        "x": float(centroid[0]),
+                        "y": float(centroid[1]),
+                        "z": float(centroid[2]) if ndim >= 3 else 0.0,
+                        "text": str(name)[:50],
+                        "size": int(mask.sum()),
+                        "cid": int(cid),
+                        "leaf_cids": [int(cid)],
+                    })
+                ml_label_data[lvl] = level_labels
+
+            # LSH label data
+            lsh_label_data = []
+            if lsh_labels is not None:
+                for cid in sorted(set(lsh_labels.tolist())):
+                    mask = lsh_labels == cid
+                    pts = np.where(mask)[0]
+                    centroid = coords[pts].mean(axis=0)
+                    name = lsh_names.get(cid, f"Bucket {cid}")
+                    lsh_label_data.append({
+                        "x": float(centroid[0]),
+                        "y": float(centroid[1]),
+                        "z": float(centroid[2]) if ndim >= 3 else 0.0,
+                        "text": str(name)[:50],
+                        "size": int(mask.sum()),
+                        "cid": int(cid),
+                        "leaf_cids": [int(cid)],
+                    })
+
+            multi_level_data = {
+                "labels": ml_labels,          # {5: ndarray, 12: ..., 25: ..., 50: ...}
+                "names": ml_names,            # {5: {cid: name}, ...}
+                "label_data": ml_label_data,  # {5: [label_dicts], ...}
+                "lsh_labels": lsh_labels,     # ndarray or None
+                "lsh_names": lsh_names,       # {cid: name}
+                "lsh_label_data": lsh_label_data,
+                "default": target_k,
+            }
+            print(f"  Multi-level data ready (default level: {target_k})")
+
     if args.renderer == "pydeck":
         rgb_birch = golden_ratio_rgb_map(labels_birch)
         rgb_dyf = golden_ratio_rgb_map(labels_dyf.tolist())
@@ -5251,6 +6278,7 @@ def main():
             tour_callouts=callouts_birch,
             tour_title=args.title,
             subtitle_str=birch_subtitle,
+            multi_level_data=multi_level_data,
         )
         build_pydeck(
             coords, titles_arr, labels_dyf, rgb_dyf,
@@ -5266,6 +6294,7 @@ def main():
             tour_callouts=callouts_dyf,
             subtitle_str=dyf_subtitle,
             tour_title=args.title,
+            multi_level_data=multi_level_data,
         )
     else:
         cmap_birch = golden_ratio_color_map(labels_birch)
