@@ -5,6 +5,7 @@ Provides tools to search, explore clusters, and control the deck.gl
 visualization via WebSocket commands to viz_server.py.
 
 Run: python demo/rog_mcp.py demo/wiki_simple_50k_rog_cache.pkl
+     python demo/rog_mcp.py demo/gudid_50k_titled.dyf   # enriched .dyf
 """
 
 import argparse
@@ -34,11 +35,220 @@ EMBED_MODEL = None     # Lazy-loaded embedding model for semantic_search
 
 
 def load_cache(cache_path: str):
-    """Load preprocessed cache."""
+    """Load preprocessed cache from .pkl or enriched .dyf file."""
+    if cache_path.endswith('.dyf'):
+        _load_cache_from_dyf(cache_path)
+        return
     global CACHE
     with open(cache_path, 'rb') as f:
         CACHE = pickle.load(f)
     print(f"Loaded cache: {len(CACHE['titles'])} points", file=sys.stderr)
+
+
+def _load_cache_from_dyf(dyf_path: str):
+    """Populate CACHE from an enriched .dyf file (Level 1+)."""
+    global CACHE, DYF_INDEX
+    src_dir = str(Path(__file__).resolve().parent.parent / "src")
+    if src_dir not in sys.path:
+        sys.path.insert(0, src_dir)
+    from dyf.lazy_index import LazyIndex
+
+    idx = LazyIndex(dyf_path)
+    level = idx.detect_enrichment_level()
+    print(f"Loading .dyf: {dyf_path} (enrichment level {level})",
+          file=sys.stderr)
+    if level < 1:
+        print("ERROR: .dyf needs at least level 1 (UMAP coords). "
+              "Run 'python demo/dyf_enrich.py project' first.",
+              file=sys.stderr)
+        sys.exit(1)
+
+    data = idx.extract_all_fields()
+    n = len(data['embeddings'])
+
+    # Titles
+    titles = data['fields'].get('title')
+    if titles is None:
+        titles = [f"Item {i}" for i in range(n)]
+    if isinstance(titles, np.ndarray):
+        titles = titles.tolist()
+
+    # 2D coords
+    coords_2d = np.column_stack([
+        data['fields']['umap_x'],
+        data['fields']['umap_y'],
+    ])
+
+    # Cluster data — parse cluster_{k}, cluster_{k}_2d, cluster_{k}_3d
+    import re as _re
+    _cluster_re = _re.compile(r'^cluster_(\d+)(?:_(2d|3d))?$')
+    cluster_result = {
+        'labels': {}, 'names': {}, 'centroids': {},
+        'labels_2d': {}, 'names_2d': {}, 'centroids_2d': {},
+        'labels_3d': {}, 'names_3d': {}, 'centroids_3d': {},
+    }
+    cluster_fields = sorted(
+        [f for f in data['fields'] if _cluster_re.match(f)],
+        key=lambda f: (int(_cluster_re.match(f).group(1)),
+                       _cluster_re.match(f).group(2) or ''))
+
+    def _load_cluster_level(field_name, lvl, suffix):
+        """Load labels/names/centroids for a cluster field into result."""
+        labels_arr = np.asarray(data['fields'][field_name])
+
+        # Names from metadata
+        names_key = f'cluster_names_{lvl}' + (f'_{suffix}' if suffix else '')
+        names_json = data['metadata'].get(names_key, '{}')
+        parsed = json.loads(names_json)
+        if parsed:
+            max_id = max(int(k) for k in parsed)
+            names_list = [parsed.get(str(i), f"Cluster {i}")
+                          for i in range(max_id + 1)]
+        else:
+            unique = sorted(set(labels_arr.tolist()))
+            names_list = [f"Cluster {i}" for i in range(max(unique) + 1)]
+
+        # Centroids from metadata or computed
+        cent_key = f'cluster_centroids_{lvl}' + (f'_{suffix}' if suffix
+                                                  else '')
+        cent_json = data['metadata'].get(cent_key, '{}')
+        cent_parsed = json.loads(cent_json)
+        if cent_parsed:
+            max_cid = max(int(k) for k in cent_parsed)
+            centroids = np.zeros((max_cid + 1, 2), dtype=np.float32)
+            for k, v in cent_parsed.items():
+                centroids[int(k)] = [v[0], v[1]]
+        else:
+            unique = sorted(set(labels_arr.tolist()))
+            centroids = np.zeros((max(unique) + 1, 2), dtype=np.float32)
+            for cid in unique:
+                mask = labels_arr == cid
+                centroids[cid] = coords_2d[mask].mean(axis=0)
+
+        return labels_arr, names_list, centroids
+
+    has_dual = False
+    for cf in cluster_fields:
+        m = _cluster_re.match(cf)
+        lvl = int(m.group(1))
+        suffix = m.group(2)  # None, '2d', or '3d'
+
+        labels_arr, names_list, centroids = _load_cluster_level(
+            cf, lvl, suffix)
+
+        if suffix == '2d':
+            has_dual = True
+            cluster_result['labels_2d'][lvl] = labels_arr
+            cluster_result['names_2d'][lvl] = names_list
+            cluster_result['centroids_2d'][lvl] = centroids
+            # 2D is the default view
+            cluster_result['labels'][lvl] = labels_arr
+            cluster_result['names'][lvl] = names_list
+            cluster_result['centroids'][lvl] = centroids
+        elif suffix == '3d':
+            has_dual = True
+            cluster_result['labels_3d'][lvl] = labels_arr
+            cluster_result['names_3d'][lvl] = names_list
+            cluster_result['centroids_3d'][lvl] = centroids
+        else:
+            # Bare cluster_{k} — backward compat: populate both 2d and 3d
+            cluster_result['labels'][lvl] = labels_arr
+            cluster_result['names'][lvl] = names_list
+            cluster_result['centroids'][lvl] = centroids
+            cluster_result['labels_2d'][lvl] = labels_arr
+            cluster_result['names_2d'][lvl] = names_list
+            cluster_result['centroids_2d'][lvl] = centroids
+            cluster_result['labels_3d'][lvl] = labels_arr
+            cluster_result['names_3d'][lvl] = names_list
+            cluster_result['centroids_3d'][lvl] = centroids
+
+    # If no BIRCH clusters but tree labels exist, build from tree
+    if not cluster_fields:
+        for mk in sorted(data['metadata'].keys()):
+            if mk.startswith('tree_labels_depth_'):
+                tree_data = json.loads(data['metadata'][mk])
+                child_labels_map = tree_data.get('child_labels', {})
+                branch_labels_map = tree_data.get('branch_labels', {})
+
+                # Assign points to tree children
+                tree_struct = idx.get_tree_structure()
+                parent_of = {nd['node_id']: nd['parent_id']
+                             for nd in tree_struct}
+                leaf_nodes = [nd for nd in tree_struct if nd['is_leaf']]
+                labeled_nids = sorted(child_labels_map.keys(), key=int)
+                nid_to_cid = {int(nid): i
+                              for i, nid in enumerate(labeled_nids)}
+
+                labels_arr = np.full(n, -1, dtype=np.int32)
+                for ln in leaf_nodes:
+                    if ln['batch_index'] < 0:
+                        continue
+                    batch = idx.get_leaf(ln['batch_index'])
+                    item_idx = batch.column('item_index').to_numpy()
+                    nid = ln['node_id']
+                    while nid is not None:
+                        if str(nid) in child_labels_map:
+                            labels_arr[item_idx] = nid_to_cid[nid]
+                            break
+                        if str(nid) in branch_labels_map:
+                            if nid not in nid_to_cid:
+                                nid_to_cid[nid] = len(nid_to_cid)
+                                child_labels_map[str(nid)] = \
+                                    branch_labels_map[str(nid)]
+                            labels_arr[item_idx] = nid_to_cid[nid]
+                            break
+                        nid = parent_of.get(nid)
+
+                unassigned = labels_arr == -1
+                if unassigned.any():
+                    fb = max(nid_to_cid.values()) + 1
+                    labels_arr[unassigned] = fb
+                    child_labels_map[str(fb)] = "Other"
+                    nid_to_cid[-1] = fb
+
+                n_cls = len(set(labels_arr.tolist()))
+                names_list = [""] * (max(labels_arr) + 1)
+                for str_nid, cid in nid_to_cid.items():
+                    if cid < len(names_list):
+                        names_list[cid] = child_labels_map.get(
+                            str(str_nid), f"Cluster {cid}")
+
+                centroids = np.zeros((len(names_list), 2), dtype=np.float32)
+                for cid in range(len(names_list)):
+                    mask = labels_arr == cid
+                    if mask.any():
+                        centroids[cid] = coords_2d[mask].mean(axis=0)
+
+                # Store as the default cluster level
+                for lvl in [5, 12, 25, 50]:
+                    cluster_result['labels'][lvl] = labels_arr
+                    cluster_result['names'][lvl] = names_list
+                    cluster_result['centroids'][lvl] = centroids
+
+                print(f"  Built {n_cls} clusters from tree labels",
+                      file=sys.stderr)
+                break
+
+    # Edge pairs from metadata
+    cluster_pairs = {}
+    edge_json = data['metadata'].get('edge_pairs')
+    if edge_json:
+        for src, dst, weight in json.loads(edge_json):
+            cluster_pairs[(src, dst)] = weight
+
+    CACHE = {
+        'titles': titles,
+        'coords_2d': coords_2d,
+        'cluster_result': cluster_result,
+        'cluster_pairs': cluster_pairs,
+    }
+
+    # Also set DYF_INDEX for semantic search
+    DYF_INDEX = idx
+
+    print(f"Loaded .dyf cache: {n} points, level {level}, "
+          f"cluster levels: {sorted(cluster_result['labels'].keys())}",
+          file=sys.stderr)
 
 
 def load_dyf_index(index_path: str):
@@ -165,15 +375,21 @@ def get_cluster_info(level: int = 5) -> list[dict]:
     centroids = CACHE['cluster_result']['centroids'][level]
 
     clusters = []
-    for i in range(level):
+    unique_ids = sorted(set(int(x) for x in labels))
+    for i in unique_ids:
         mask = labels == i
         count = int(mask.sum())
+        if count == 0:
+            continue
+        name = names[i] if i < len(names) else f"Cluster {i}"
+        cx = float(centroids[i, 0]) if i < len(centroids) else 0.0
+        cy = float(centroids[i, 1]) if i < len(centroids) else 0.0
         clusters.append({
             'cluster_id': i,
-            'name': names[i],
+            'name': name,
             'count': count,
-            'centroid_x': float(centroids[i, 0]),
-            'centroid_y': float(centroids[i, 1]),
+            'centroid_x': cx,
+            'centroid_y': cy,
         })
 
     return sorted(clusters, key=lambda c: -c['count'])
@@ -877,7 +1093,8 @@ async def call_tool(name: str, arguments: dict):
 
 async def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("cache_path", default="demo/wiki_simple_50k_rog_cache.pkl", nargs="?")
+    parser.add_argument("cache_path", default="demo/wiki_simple_50k_rog_cache.pkl", nargs="?",
+                        help="Path to .pkl cache or enriched .dyf file")
     parser.add_argument("--ws-url", default="ws://localhost:8766/ws",
                         help="WebSocket URL for viz_server.py")
     parser.add_argument("--dyf-index", default=None,
