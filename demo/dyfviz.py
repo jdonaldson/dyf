@@ -30,6 +30,7 @@ from scipy.ndimage import gaussian_filter
 from sklearn.cluster import Birch
 from sklearn.neighbors import NearestNeighbors
 
+from dyf.provenance import provenance_from_dict, check_compatible
 from dyf.dyf_tree import (
     build_dyf_tree,
     refine_dyf_tree,
@@ -41,12 +42,16 @@ from dyf.dyf_tree import (
 # ── Helpers ──────────────────────────────────────────────────────────────
 
 
-def load_and_dedup(parquet_path, sample=None, pre_labels=None):
+def load_and_dedup(parquet_path, sample=None, pre_labels=None, extra_cols=None):
     """Load parquet, optionally sample, dedup via LSH.
 
     If pre_labels is provided (ndarray same length as parquet), it is
     filtered through the same sample + dedup pipeline and returned as
     the third element of the tuple.
+
+    If extra_cols is provided (list of column names), those columns are
+    extracted from the parquet and filtered through the same pipeline,
+    returned as a dict[str, list] in the fourth element.
     """
     print(f"Loading {parquet_path}...")
     df = pl.read_parquet(parquet_path)
@@ -62,6 +67,13 @@ def load_and_dedup(parquet_path, sample=None, pre_labels=None):
     titles = df["title"].to_list()
     embeddings = np.array(df["embedding"].to_list(), dtype=np.float32)
 
+    # Extract extra columns before dedup filtering
+    extra_data = {}
+    if extra_cols:
+        for col in extra_cols:
+            if col in df.columns:
+                extra_data[col] = df[col].to_list()
+
     from dyf_rs import DensityClassifier
     from dyf.chunks import deduplicate_chunks
 
@@ -75,8 +87,10 @@ def load_and_dedup(parquet_path, sample=None, pre_labels=None):
     embeddings = embeddings[dedup_mask]
     if pre_labels is not None:
         pre_labels = pre_labels[dedup_mask]
+    for col in extra_data:
+        extra_data[col] = [v for v, keep in zip(extra_data[col], dedup_mask) if keep]
     print(f"  {n_before} -> {len(titles)} after dedup")
-    return titles, embeddings, pre_labels
+    return titles, embeddings, pre_labels, extra_data
 
 
 def suggest_n_neighbors(embeddings, num_bits=12, min_k=15, max_k=100):
@@ -1476,6 +1490,14 @@ html, body { width: 100%%; height: 100%%; overflow: hidden; background: #1e1e1e;
   transition: opacity 0.12s;
   text-shadow: 0 1px 2px rgba(0,0,0,0.6);
 }
+.glyph-badge {
+  display: inline-block;
+  margin-right: 3px;
+  font-size: 9px;
+  opacity: 0.8;
+  letter-spacing: 1px;
+  vertical-align: baseline;
+}
 
 </style>
 </head>
@@ -1547,7 +1569,17 @@ html, body { width: 100%%; height: 100%%; overflow: hidden; background: #1e1e1e;
   const labelEls = CENTROIDS.map(function(c) {
     var el = document.createElement('div');
     el.className = 'cluster-label';
-    el.textContent = c.label;
+    // Split glyph prefix from label text
+    var glyphMatch = c.label.match(/^([^A-Za-z0-9]+)\s+(.*)$/);
+    if (glyphMatch) {
+      var badge = document.createElement('span');
+      badge.className = 'glyph-badge';
+      badge.textContent = glyphMatch[1];
+      el.appendChild(badge);
+      el.appendChild(document.createTextNode(glyphMatch[2]));
+    } else {
+      el.textContent = c.label;
+    }
     el.style.borderLeftColor = c.color;
     el.style.borderLeftWidth = '3px';
     container.appendChild(el);
@@ -2180,7 +2212,7 @@ body.light .tour-callout-label {{
         <span>Auto-orbit</span>
       </label>
       <label class="palette-check">
-        <input type="checkbox" id="toggle-outliers">
+        <input type="checkbox" id="toggle-outliers" checked>
         <span>Show outliers</span>
       </label>
       <div style="margin-top:8px;">
@@ -2204,6 +2236,21 @@ body.light .tour-callout-label {{
         <div id="level-buttons" style="display:flex;flex-wrap:wrap;gap:3px;"></div>
       </div>
       <div id="cluster-list" style="font-size:12px;line-height:1.8;max-height:400px;overflow-y:auto;"></div>
+    </div>
+  </div>
+
+  <!-- Legend palette -->
+  <div class="palette collapsed">
+    <div class="palette-header" onclick="this.parentElement.classList.toggle('collapsed')">
+      <span class="palette-arrow"></span>Legend
+    </div>
+    <div class="palette-body">
+      <div style="font-size:11px;line-height:1.9;">
+        <div style="font-size:10px;opacity:0.6;margin-bottom:2px;">Size</div>
+        <div>⭑ big hub &nbsp;⭒ small hub</div>
+        <div style="font-size:10px;opacity:0.6;margin-top:6px;margin-bottom:2px;">Purity</div>
+        <div>≈ mixed (flagged outliers)</div>
+      </div>
     </div>
   </div>
 
@@ -3169,10 +3216,9 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
         outlierClusterIds.add(cid);
       }}
     }}
-    // Hide outliers by default
-    outlierClusterIds.forEach(function(cid) {{ hiddenClusters.add(cid); }});
+    // Show outliers by default (toggle checkbox hides them)
     if (outlierClusterIds.size > 0) {{
-      console.log("[outliers] Hidden " + outlierClusterIds.size + " outlier clusters (MAD z>" + madThreshold + " or size<" + Math.round(tinyThreshold) + " & dist>median, median=" + median.toFixed(2) + ", MAD=" + mad.toFixed(2) + "):");
+      console.log("[outliers] Detected " + outlierClusterIds.size + " outlier clusters (MAD z>" + madThreshold + " or size<" + Math.round(tinyThreshold) + " & dist>median, median=" + median.toFixed(2) + ", MAD=" + mad.toFixed(2) + "):");
       outlierClusterIds.forEach(function(cid) {{
         var lbl = labels.find(function(c) {{ return c.cid === cid; }});
         if (lbl) console.log("  [" + cid + "] " + lbl.text + " (dist=" + Math.sqrt(lbl.x*lbl.x + lbl.y*lbl.y + (lbl.z||0)*(lbl.z||0)).toFixed(2) + ")");
@@ -5338,14 +5384,17 @@ def _agglomerate_tree_leaves(idx, coords, embeddings, n_groups=50):
 
     centroids = np.vstack(leaf_centroids).astype(np.float32)
 
-    # L2-normalize centroids for cosine-like Ward clustering
+    # L2-normalize centroids for cosine-distance complete linkage
     norms = np.linalg.norm(centroids, axis=1, keepdims=True)
     norms[norms == 0] = 1.0
     centroids_normed = centroids / norms
 
-    # Agglomerate
+    # Agglomerate — complete linkage refuses merges where the most
+    # dissimilar pair across two groups exceeds the threshold, which
+    # prevents merging semantically distinct subgroups (e.g. catheters
+    # with irrigation forceps) that Ward would combine.
     actual_groups = min(n_groups, len(centroids_normed))
-    Z = linkage(centroids_normed, method='ward')
+    Z = linkage(centroids_normed, method='complete')
     agg_labels = fcluster(Z, actual_groups, criterion='maxclust')  # 1-based
 
     # Map points → leaf → agglomerated group (initial assignment)
@@ -5442,6 +5491,13 @@ def _render_from_dyf(dyf_path, args):
                   f"Run 'python demo/dyf_enrich.py project {dyf_path}' first.")
             return
         data = idx.extract_all_fields()
+
+    # Check for stored category graphs
+    from dyf.categorical import load_category_graphs
+    cat_graphs = load_category_graphs(data.get('metadata', {}))
+    if cat_graphs:
+        names = ", ".join(cat_graphs.keys())
+        print(f"  Category graphs detected: {names}")
 
     n = len(data['embeddings'])
     umap_x = data['fields']['umap_x']
@@ -5912,6 +5968,9 @@ def main():
                         help="Generate tour narration via Ollama (no narration file needed)")
     parser.add_argument("--rog-cache", default=None,
                         help="Path to ROG preprocessing cache (.pkl) for multi-level cluster toggle")
+    parser.add_argument("--fisher-col", default=None,
+                        help="Parquet column for Fisher dimension weighting "
+                             "(e.g. gmdn_terms). Applied before UMAP and tree building.")
     args = parser.parse_args()
 
     # .dyf fast path: skip all compute, go straight to render
@@ -5925,8 +5984,20 @@ def main():
         pre_labels = np.load(args.pre_clusters)
         print(f"  Loaded pre-computed clusters: {len(pre_labels)} labels, "
               f"{len(set(pre_labels))} unique")
-    titles, embeddings, pre_labels = load_and_dedup(
-        args.parquet_path, args.sample, pre_labels=pre_labels)
+    extra_cols = [args.fisher_col] if args.fisher_col else None
+    titles, embeddings, pre_labels, extra_data = load_and_dedup(
+        args.parquet_path, args.sample, pre_labels=pre_labels,
+        extra_cols=extra_cols)
+
+    # ── Optional Fisher dimension weighting ──────────────────────────────
+    if args.fisher_col and args.fisher_col in extra_data:
+        from dyf.fisher import extract_fisher_labels, compute_fisher_weights, apply_fisher_weights
+        fisher_labels = extract_fisher_labels(extra_data[args.fisher_col])
+        fisher_weights = compute_fisher_weights(embeddings, fisher_labels)
+        embeddings = apply_fisher_weights(embeddings, fisher_weights)
+        print(f"  Fisher weighting applied ({args.fisher_col}): "
+              f"top-5 dims {np.argsort(fisher_weights)[-5:][::-1]}")
+
     n = len(titles)
     titles_arr = np.array(titles)
     target_k = args.n_clusters
@@ -6086,7 +6157,27 @@ def main():
             cr = rog_cache['cluster_result']
             lsh = rog_cache['lsh_data']
             cache_n = len(cr['labels'][next(iter(cr['labels']))])
-            if cache_n != n:
+
+            # Provenance check — fail loud on mismatch
+            cache_prov_dict = rog_cache.get('_provenance')
+            if cache_prov_dict:
+                prov = provenance_from_dict(cache_prov_dict)
+                ok, warnings = check_compatible(
+                    prov,
+                    downstream_n_items=n,
+                    downstream_sample_n=args.sample,
+                )
+                if not ok:
+                    print(f"\n  ERROR: ROG cache is incompatible with current pipeline:")
+                    for w in warnings:
+                        print(f"    - {w}")
+                    print(f"  Cache: sample={prov.sample_n}, n_items={prov.n_items}")
+                    print(f"  Current: sample={args.sample}, n_items={n}")
+                    print(f"  Rebuild ROG cache with matching parameters.")
+                    import sys
+                    sys.exit(1)
+            elif cache_n != n:
+                # Fallback for caches without provenance
                 print(f"  WARNING: ROG cache has {cache_n} points, "
                       f"current pipeline has {n}. Use --sample 0 or "
                       f"matching --sample to align point counts.")

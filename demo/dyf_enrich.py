@@ -882,20 +882,25 @@ def enrich_tree(dyf_path, model="gemma2:9b", target_depth=3,
     print(f"  Done. Tree labels at depth {target_depth} stored.")
 
 
-def annotate_cluster_names(names, labels, embeddings, n_total,
-                           rog_ontology=None, max_sample=200, seed=42):
-    """Prepend emoji annotations to cluster names based on quality metrics.
+def annotate_cluster_names(names, labels, embeddings,
+                           max_sample=200, seed=42):
+    """Prepend glyph annotations to cluster names for size and purity.
 
-    Emojis:
-        🗑️  Junk drawer — low intra-cluster cosine similarity (bottom 15%)
-        🎯  Very pure — high intra-cluster cosine similarity (top 85%)
-        🔗  Hub — many cross-cluster ROG edges (top 15%)
-        🏝️  Isolated — zero cross-cluster connections
-        🐘  Mega-cluster — >2x median size
-        🔬  Tiny — <1% of total points
+    Size (point count, z-score based):
+        ⭑ big hub   — count > 1 stdev above mean
+        ⭒ small hub — count above mean
+        (no star)   — below mean
+
+    Purity (intra-cluster cosine similarity, z-score based):
+        ≈ appended when purity > 1 stdev below mean (impure flag)
     """
     rng = np.random.RandomState(seed)
     cluster_ids = sorted(set(int(c) for c in labels))
+
+    # ── Per-cluster size ──
+    sizes = {}
+    for cid in cluster_ids:
+        sizes[cid] = int(np.sum(labels == cid))
 
     # ── Per-cluster purity (sampled cosine similarity) ──
     purities = {}
@@ -915,59 +920,42 @@ def annotate_cluster_names(names, labels, embeddings, n_total,
         triu_idx = np.triu_indices(n_pts, k=1)
         purities[cid] = float(gram[triu_idx].mean())
 
-    # ── Per-cluster size ──
-    sizes = {}
-    for cid in cluster_ids:
-        sizes[cid] = int((labels == cid).sum())
-    median_size = float(np.median(list(sizes.values())))
+    # ── Z-score thresholds ──
+    size_vals = np.array([sizes[c] for c in cluster_ids], dtype=float)
+    size_mean = float(size_vals.mean())
+    size_std = float(size_vals.std())
+    size_threshold = size_mean + size_std  # capital if > 1σ above mean
 
-    # ── Bridge connectivity ──
-    bridge_counts = {cid: 0 for cid in cluster_ids}
-    if rog_ontology is not None:
-        for parent, children_list in rog_ontology.children.items():
-            for child, _sim, _gap in children_list:
-                c1, c2 = int(labels[parent]), int(labels[child])
-                if c1 != c2:
-                    bridge_counts[c1] += 1
-                    bridge_counts[c2] += 1
-
-    # ── Compute thresholds ──
     purity_vals = np.array([purities[c] for c in cluster_ids])
-    p15 = float(np.percentile(purity_vals, 15))
-    p85 = float(np.percentile(purity_vals, 85))
+    pur_mean = float(purity_vals.mean())
+    pur_std = float(purity_vals.std())
+    pur_threshold = pur_mean - pur_std  # impure if > 1σ below mean
 
-    bridge_vals = np.array([bridge_counts[c] for c in cluster_ids])
-    b85 = float(np.percentile(bridge_vals, 85)) if bridge_vals.max() > 0 else 0
+    n_capitals = int(np.sum(size_vals > size_threshold))
+    n_impure = int(np.sum(purity_vals < pur_threshold))
+    print(f"    Size: mean={size_mean:.0f}, σ={size_std:.0f}, "
+          f"threshold={size_threshold:.0f} → {n_capitals} capitals")
+    print(f"    Purity: mean={pur_mean:.3f}, σ={pur_std:.3f}, "
+          f"threshold={pur_threshold:.3f} → {n_impure} impure")
 
     # ── Annotate ──
     annotated = {}
     for cid in cluster_ids:
-        emojis = []
-
-        if purities[cid] <= p15:
-            emojis.append('🗑️')
-        elif purities[cid] >= p85:
-            emojis.append('🎯')
-
-        if bridge_counts[cid] > 0 and bridge_counts[cid] >= b85:
-            emojis.append('🔗')
-        elif bridge_counts[cid] == 0:
-            emojis.append('🏝️')
-
-        if sizes[cid] > 2 * median_size:
-            emojis.append('🐘')
-        elif sizes[cid] < 0.01 * n_total:
-            emojis.append('🔬')
+        if sizes[cid] > size_threshold:
+            star = '⭑'
+        elif sizes[cid] > size_mean:
+            star = '⭒'
+        else:
+            star = ''
+        impure = '≈' if purities[cid] < pur_threshold else ''
+        prefix = f'{star}{impure} ' if (star or impure) else ''
 
         name = names.get(cid, names.get(str(cid), f"Cluster {cid}"))
-        if emojis:
-            annotated[cid] = ''.join(emojis) + ' ' + name
-        else:
-            annotated[cid] = name
+        annotated[cid] = f'{prefix}{name}'
 
     n_annotated = sum(1 for c in cluster_ids
                       if annotated[c] != names.get(c, names.get(str(c), '')))
-    print(f"    Annotated {n_annotated}/{len(cluster_ids)} clusters with emojis")
+    print(f"    Annotated {n_annotated}/{len(cluster_ids)} clusters")
     return annotated
 
 
@@ -1025,14 +1013,6 @@ def enrich_cluster(dyf_path, n_clusters_list=None, model="gemma2:9b",
     if label_cache_data:
         print(f"  Loaded {len(label_cache_data)} label cache entries from .dyf")
 
-    # Build ROG ontology once for emoji annotations
-    import dyf
-    print("  Building ROG ontology for cluster annotations...")
-    rog_result = dyf.build_rog_ontology(
-        embeddings, initial_threshold=0.55, min_threshold=0.35,
-        target_coverage=0.95, verbose=False)
-    rog_ontology = rog_result.ontology
-
     # Cluster at each level — dual 2D/3D clustering
     new_sf = {}
     new_meta = {}
@@ -1070,8 +1050,8 @@ def enrich_cluster(dyf_path, n_clusters_list=None, model="gemma2:9b",
         label_cache_data[f"cluster_{target_k}_2d"] = {
             str(k): v for k, v in names_2d_raw.items()}
         names_2d = annotate_cluster_names(
-            names_2d_raw, labels_2d, embeddings, n,
-            rog_ontology=rog_ontology)
+            names_2d_raw, labels_2d, embeddings,
+)
         new_meta[f'cluster_names_{target_k}_2d'] = json.dumps(
             {str(k): v for k, v in names_2d.items()})
 
@@ -1100,8 +1080,8 @@ def enrich_cluster(dyf_path, n_clusters_list=None, model="gemma2:9b",
         names_3d_raw = transfer_labels_majority_vote(
             labels_2d, names_2d_raw, labels_3d)
         names_3d = annotate_cluster_names(
-            names_3d_raw, labels_3d, embeddings, n,
-            rog_ontology=rog_ontology)
+            names_3d_raw, labels_3d, embeddings,
+)
         new_meta[f'cluster_names_{target_k}_3d'] = json.dumps(
             {str(k): v for k, v in names_3d.items()})
 
@@ -1132,6 +1112,79 @@ def enrich_cluster(dyf_path, n_clusters_list=None, model="gemma2:9b",
     rewrite_lazy_index(dyf_path, new_stored_fields=new_sf,
                        new_metadata=new_meta, output_path=out)
     print(f"  Done. Level 1 → 2 (dual 2D/3D)")
+
+
+def reannotate(dyf_path, output_path=None):
+    """Re-run glyph annotations on existing cluster names without re-clustering.
+
+    Reads raw names from _label_cache, recomputes purity/connectivity glyphs,
+    writes updated cluster_names_* metadata. Does not touch clusters, edges,
+    or narration.
+    """
+    print(f"\n=== Reannotate Cluster Glyphs ===")
+    print(f"  Input: {dyf_path}")
+
+    with LazyIndex(dyf_path) as idx:
+        level = idx.detect_enrichment_level()
+        if level < 2:
+            print(f"  ERROR: Need level 2 (clusters), got level {level}.")
+            return
+        data = idx.extract_all_fields()
+
+    label_cache_data = json.loads(data['metadata'].get('_label_cache', '{}'))
+    if not label_cache_data:
+        print("  ERROR: No _label_cache in metadata. Run 'cluster' first.")
+        return
+
+    embeddings = data['embeddings']
+
+    # Discover cluster levels (e.g. 12, 25, 50) from stored fields
+    cluster_ks = sorted({
+        parts[1]
+        for sf_name in data['fields']
+        if sf_name.startswith('cluster_')
+        for parts in [sf_name.split('_')]
+        if len(parts) == 3 and parts[2] in ('2d', '3d')
+    })
+
+    new_meta = {}
+    for target_k in cluster_ks:
+        # Get 2D raw names from cache
+        cache_key_2d = f"cluster_{target_k}_2d"
+        raw_2d = label_cache_data.get(cache_key_2d)
+        if raw_2d is None:
+            raw_2d = label_cache_data.get(f"cluster_{target_k}")
+        if raw_2d is None:
+            print(f"  Skipping k={target_k}: no raw names in cache")
+            continue
+        raw_2d = {int(k): v for k, v in raw_2d.items()}
+
+        # Reannotate 2D
+        sf_2d = f'cluster_{target_k}_2d'
+        if sf_2d in data['fields']:
+            labels_2d = data['fields'][sf_2d].astype(np.int32)
+            print(f"  Reannotating {sf_2d}...")
+            ann_2d = annotate_cluster_names(
+                raw_2d, labels_2d, embeddings)
+            new_meta[f'cluster_names_{target_k}_2d'] = json.dumps(
+                {str(k): v for k, v in ann_2d.items()})
+
+        # Reannotate 3D (transfer from 2D raw names, then annotate)
+        sf_3d = f'cluster_{target_k}_3d'
+        if sf_3d in data['fields'] and sf_2d in data['fields']:
+            labels_3d = data['fields'][sf_3d].astype(np.int32)
+            raw_3d = transfer_labels_majority_vote(
+                labels_2d, raw_2d, labels_3d)
+            print(f"  Reannotating {sf_3d}...")
+            ann_3d = annotate_cluster_names(
+                raw_3d, labels_3d, embeddings)
+            new_meta[f'cluster_names_{target_k}_3d'] = json.dumps(
+                {str(k): v for k, v in ann_3d.items()})
+
+    out = output_path or dyf_path
+    print(f"\n  Writing: {out}")
+    rewrite_lazy_index(dyf_path, new_metadata=new_meta, output_path=out)
+    print("  Done.")
 
 
 # ── Bridge edges + narration (Level 2 → 3) ─────────────────────────────
@@ -1534,6 +1587,12 @@ def main():
                         help="Ollama model for labeling")
     p_tree.add_argument("-o", "--output", default=None)
 
+    # reannotate
+    p_reann = subparsers.add_parser(
+        "reannotate", help="Re-run glyph annotations without re-clustering")
+    p_reann.add_argument("dyf_path", help="Path to .dyf file")
+    p_reann.add_argument("-o", "--output", default=None)
+
     # all
     p_all = subparsers.add_parser(
         "all", help="Run all enrichment levels in sequence")
@@ -1568,6 +1627,9 @@ def main():
         enrich_viz(args.dyf_path, cluster_level=args.cluster_level,
                    model=args.model, title=args.title,
                    output_path=args.output, force=args.force)
+
+    elif args.command == "reannotate":
+        reannotate(args.dyf_path, output_path=args.output)
 
     elif args.command == "tree":
         enrich_tree(args.dyf_path, model=args.model,
