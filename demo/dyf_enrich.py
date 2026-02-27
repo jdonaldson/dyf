@@ -24,6 +24,7 @@ from pathlib import Path
 import numpy as np
 
 from dyf.lazy_index import LazyIndex, rewrite_lazy_index
+from dyf.provenance import create_provenance, provenance_to_dict
 
 
 # ── UMAP projection (Level 0 → 1) ──────────────────────────────────────
@@ -200,6 +201,17 @@ def enrich_project(dyf_path, n_components=3, densmap=False, output_path=None,
         from dyf.categorical import CategoryGraph, store_category_graph
         graph = CategoryGraph.from_single_level(fisher_labels)
         new_meta.update(store_category_graph(graph, fisher_col))
+
+    # Stamp provenance for Level 1
+    new_meta['_provenance_level_1'] = json.dumps(provenance_to_dict(
+        create_provenance(
+            artifact_type="dyf",
+            n_items=len(embeddings),
+            source_paths=[str(dyf_path)],
+            params={"n_components": n_components, "densmap": densmap,
+                    "fisher_col": fisher_col},
+        )
+    ))
 
     out = output_path or dyf_path
     print(f"  Writing enriched file: {out}")
@@ -409,19 +421,27 @@ def _sample_spatial(point_indices, coords, k):
 
 
 def label_clusters(titles, coords, labels, embeddings, model="gemma2:9b",
-                   n_samples=20, cache_file=None, cache_key=None):
+                   n_samples=20, cache_file=None, cache_key=None,
+                   cache_data=None):
     """Label clusters via contrastive TF-IDF + local Ollama LLM."""
     from concurrent.futures import ThreadPoolExecutor, as_completed
     from collections import Counter
 
     unique_labels = sorted(set(int(l) for l in labels))
 
-    # Check cache
-    if cache_file:
+    # Check cache: cache_data (in-memory) → cache_file (on-disk)
+    _cache_key = cache_key or "default"
+    if cache_data is not None:
+        cached = cache_data.get(_cache_key, {})
+        if cached and len(cached) == len(unique_labels):
+            cluster_names = {int(k): v for k, v in cached.items()}
+            print(f"  Loaded {len(cluster_names)} labels from cache")
+            return cluster_names
+    elif cache_file:
         cache_path = Path(cache_file)
         if cache_path.exists():
-            cache_data = json.loads(cache_path.read_text())
-            cached = cache_data.get(cache_key or "default", {})
+            file_cache = json.loads(cache_path.read_text())
+            cached = file_cache.get(_cache_key, {})
             if cached and len(cached) == len(unique_labels):
                 cluster_names = {int(k): v for k, v in cached.items()}
                 print(f"  Loaded {len(cluster_names)} labels from cache")
@@ -564,16 +584,16 @@ def label_clusters(titles, coords, labels, embeddings, model="gemma2:9b",
         n_pts = len(cluster_points[cid])
         print(f"    [{cid:2d}] {cluster_names[cid]:<35s} ({n_pts} pts)")
 
-    # Save to cache
-    if cache_file:
+    # Save to cache (only write file if cache_file was used, not cache_data)
+    if cache_file and cache_data is None:
         cache_path = Path(cache_file)
-        cache_data = {}
+        file_cache = {}
         if cache_path.exists():
-            cache_data = json.loads(cache_path.read_text())
-        cache_data[cache_key or "default"] = {
+            file_cache = json.loads(cache_path.read_text())
+        file_cache[_cache_key] = {
             str(k): v for k, v in cluster_names.items()
         }
-        cache_path.write_text(json.dumps(cache_data, indent=2))
+        cache_path.write_text(json.dumps(file_cache, indent=2))
         print(f"  Saved labels to cache ({cache_file})")
 
     return cluster_names
@@ -618,7 +638,7 @@ def _call_ollama(model, prompt, timeout=300):
 
 def label_tree_bottomup(idx, titles, model="gemma2:9b", target_depth=3,
                         samples_per_child=8, min_child_size=20,
-                        cache_file=None):
+                        cache_file=None, cache_data=None):
     """Label tree nodes bottom-up using the DYF tree hierarchy.
 
     For each internal node at target_depth, samples titles from each child,
@@ -634,6 +654,7 @@ def label_tree_bottomup(idx, titles, model="gemma2:9b", target_depth=3,
         samples_per_child: How many titles to sample from each child.
         min_child_size: Skip children smaller than this.
         cache_file: Optional JSON cache path.
+        cache_data: Optional in-memory cache dict (takes priority over cache_file).
 
     Returns:
         dict with:
@@ -665,12 +686,18 @@ def label_tree_bottomup(idx, titles, model="gemma2:9b", target_depth=3,
 
     print(f"  Tree labeling: {len(target_nodes)} branches at depth {target_depth}")
 
-    # Check cache
-    if cache_file:
+    # Check cache: cache_data (in-memory) → cache_file (on-disk)
+    _cache_key = f"tree_depth_{target_depth}"
+    if cache_data is not None:
+        cached = cache_data.get(_cache_key, {})
+        if cached.get("branch_labels") and cached.get("child_labels"):
+            print(f"  Loaded tree labels from cache")
+            return cached
+    elif cache_file:
         cache_path = Path(cache_file)
         if cache_path.exists():
-            cache_data = json.loads(cache_path.read_text())
-            cached = cache_data.get(f"tree_depth_{target_depth}", {})
+            file_cache = json.loads(cache_path.read_text())
+            cached = file_cache.get(_cache_key, {})
             if cached.get("branch_labels") and cached.get("child_labels"):
                 print(f"  Loaded tree labels from cache")
                 return cached
@@ -788,22 +815,24 @@ def label_tree_bottomup(idx, titles, model="gemma2:9b", target_depth=3,
         'hierarchy': {str(k): v for k, v in hierarchy.items()},
     }
 
-    # Save to cache
-    if cache_file:
+    # Save to cache (only write file if cache_file was used, not cache_data)
+    if cache_file and cache_data is None:
         cache_path = Path(cache_file)
-        cache_data = {}
+        file_cache = {}
         if cache_path.exists():
-            cache_data = json.loads(cache_path.read_text())
-        cache_data[f"tree_depth_{target_depth}"] = result
-        cache_path.write_text(json.dumps(cache_data, indent=2))
+            file_cache = json.loads(cache_path.read_text())
+        file_cache[_cache_key] = result
+        cache_path.write_text(json.dumps(file_cache, indent=2))
         print(f"  Saved tree labels to cache ({cache_file})")
 
     return result
 
 
 def enrich_tree(dyf_path, model="gemma2:9b", target_depth=3,
-                samples_per_child=8, label_cache=None, output_path=None):
+                samples_per_child=8, output_path=None):
     """Add tree-based hierarchical labels to a .dyf file.
+
+    Label cache is stored in .dyf metadata under '_label_cache'.
 
     Uses the existing DYF tree structure for bottom-up labeling:
     each branch at target_depth gets a summary label, and each of
@@ -815,7 +844,6 @@ def enrich_tree(dyf_path, model="gemma2:9b", target_depth=3,
         model: Ollama model name.
         target_depth: Tree depth for branches (3 = 16 branches for 4-bit tree).
         samples_per_child: Titles to sample per child node.
-        label_cache: Optional JSON cache path.
         output_path: Output path (defaults to overwriting input).
     """
     print(f"\n=== Tree Labeling (depth={target_depth}) ===")
@@ -831,14 +859,21 @@ def enrich_tree(dyf_path, model="gemma2:9b", target_depth=3,
         data = idx.extract_all_fields()
         titles = data['fields']['title']
 
+        # Load label cache from .dyf metadata
+        label_cache_data = json.loads(data['metadata'].get('_label_cache', '{}'))
+        if label_cache_data:
+            print(f"  Loaded {len(label_cache_data)} label cache entries from .dyf")
+
         result = label_tree_bottomup(
             idx, titles, model=model, target_depth=target_depth,
             samples_per_child=samples_per_child,
-            cache_file=label_cache)
+            cache_data=label_cache_data)
+        label_cache_data[f"tree_depth_{target_depth}"] = result
 
     # Store results in metadata
     new_meta = {
         f'tree_labels_depth_{target_depth}': json.dumps(result),
+        '_label_cache': json.dumps(label_cache_data),
     }
 
     out = output_path or dyf_path
@@ -847,17 +882,109 @@ def enrich_tree(dyf_path, model="gemma2:9b", target_depth=3,
     print(f"  Done. Tree labels at depth {target_depth} stored.")
 
 
+def annotate_cluster_names(names, labels, embeddings, n_total,
+                           rog_ontology=None, max_sample=200, seed=42):
+    """Prepend emoji annotations to cluster names based on quality metrics.
+
+    Emojis:
+        🗑️  Junk drawer — low intra-cluster cosine similarity (bottom 15%)
+        🎯  Very pure — high intra-cluster cosine similarity (top 85%)
+        🔗  Hub — many cross-cluster ROG edges (top 15%)
+        🏝️  Isolated — zero cross-cluster connections
+        🐘  Mega-cluster — >2x median size
+        🔬  Tiny — <1% of total points
+    """
+    rng = np.random.RandomState(seed)
+    cluster_ids = sorted(set(int(c) for c in labels))
+
+    # ── Per-cluster purity (sampled cosine similarity) ──
+    purities = {}
+    for cid in cluster_ids:
+        mask = labels == cid
+        embs = embeddings[mask]
+        if len(embs) < 2:
+            purities[cid] = 1.0
+            continue
+        if len(embs) > max_sample:
+            idx = rng.choice(len(embs), max_sample, replace=False)
+            embs = embs[idx]
+        norms = np.linalg.norm(embs, axis=1, keepdims=True)
+        embs_normed = embs / np.maximum(norms, 1e-8)
+        gram = embs_normed @ embs_normed.T
+        n_pts = len(embs)
+        triu_idx = np.triu_indices(n_pts, k=1)
+        purities[cid] = float(gram[triu_idx].mean())
+
+    # ── Per-cluster size ──
+    sizes = {}
+    for cid in cluster_ids:
+        sizes[cid] = int((labels == cid).sum())
+    median_size = float(np.median(list(sizes.values())))
+
+    # ── Bridge connectivity ──
+    bridge_counts = {cid: 0 for cid in cluster_ids}
+    if rog_ontology is not None:
+        for parent, children_list in rog_ontology.children.items():
+            for child, _sim, _gap in children_list:
+                c1, c2 = int(labels[parent]), int(labels[child])
+                if c1 != c2:
+                    bridge_counts[c1] += 1
+                    bridge_counts[c2] += 1
+
+    # ── Compute thresholds ──
+    purity_vals = np.array([purities[c] for c in cluster_ids])
+    p15 = float(np.percentile(purity_vals, 15))
+    p85 = float(np.percentile(purity_vals, 85))
+
+    bridge_vals = np.array([bridge_counts[c] for c in cluster_ids])
+    b85 = float(np.percentile(bridge_vals, 85)) if bridge_vals.max() > 0 else 0
+
+    # ── Annotate ──
+    annotated = {}
+    for cid in cluster_ids:
+        emojis = []
+
+        if purities[cid] <= p15:
+            emojis.append('🗑️')
+        elif purities[cid] >= p85:
+            emojis.append('🎯')
+
+        if bridge_counts[cid] > 0 and bridge_counts[cid] >= b85:
+            emojis.append('🔗')
+        elif bridge_counts[cid] == 0:
+            emojis.append('🏝️')
+
+        if sizes[cid] > 2 * median_size:
+            emojis.append('🐘')
+        elif sizes[cid] < 0.01 * n_total:
+            emojis.append('🔬')
+
+        name = names.get(cid, names.get(str(cid), f"Cluster {cid}"))
+        if emojis:
+            annotated[cid] = ''.join(emojis) + ' ' + name
+        else:
+            annotated[cid] = name
+
+    n_annotated = sum(1 for c in cluster_ids
+                      if annotated[c] != names.get(c, names.get(str(c), '')))
+    print(f"    Annotated {n_annotated}/{len(cluster_ids)} clusters with emojis")
+    return annotated
+
+
 def enrich_cluster(dyf_path, n_clusters_list=None, model="gemma2:9b",
-                   label_cache=None, output_path=None):
+                   output_path=None, force=False):
     """Add BIRCH cluster labels to a .dyf file (Level 1 → 2).
+
+    Label cache is stored in .dyf metadata under '_label_cache'.
 
     Args:
         dyf_path: Path to .dyf file (must be at least Level 1).
         n_clusters_list: List of cluster counts, e.g. [12, 25, 50].
             Defaults to [12, 25, 50].
         model: Ollama model for LLM labeling.
-        label_cache: Optional JSON file for caching labels.
         output_path: Output path (defaults to overwriting input).
+        force: Re-run even if already at level 2+.
+            Strips stale level 3 metadata (edges, narration).
     """
     if n_clusters_list is None:
         n_clusters_list = [12, 25, 50]
@@ -872,8 +999,9 @@ def enrich_cluster(dyf_path, n_clusters_list=None, model="gemma2:9b",
             print(f"  ERROR: Need level 1 (UMAP coords), got level {level}. "
                   f"Run 'project' first.")
             return
-        if level >= 2:
-            print(f"  Already at level {level} (has clusters), skipping.")
+        if level >= 2 and not force:
+            print(f"  Already at level {level} (has clusters), skipping. "
+                  f"Use --force to re-run.")
             return
 
     # Extract data
@@ -891,6 +1019,19 @@ def enrich_cluster(dyf_path, n_clusters_list=None, model="gemma2:9b",
     if titles is None:
         titles = [f"Item {i}" for i in range(n)]
     embeddings = data['embeddings']
+
+    # Load label cache from .dyf metadata
+    label_cache_data = json.loads(data['metadata'].get('_label_cache', '{}'))
+    if label_cache_data:
+        print(f"  Loaded {len(label_cache_data)} label cache entries from .dyf")
+
+    # Build ROG ontology once for emoji annotations
+    import dyf
+    print("  Building ROG ontology for cluster annotations...")
+    rog_result = dyf.build_rog_ontology(
+        embeddings, initial_threshold=0.55, min_threshold=0.35,
+        target_coverage=0.95, verbose=False)
+    rog_ontology = rog_result.ontology
 
     # Cluster at each level — dual 2D/3D clustering
     new_sf = {}
@@ -922,10 +1063,15 @@ def enrich_cluster(dyf_path, n_clusters_list=None, model="gemma2:9b",
 
         # LLM-label 2D clusters
         print(f"  Labeling 2D k={target_k} clusters...")
-        names_2d = label_clusters(
+        names_2d_raw = label_clusters(
             titles, coords, labels_2d, embeddings,
-            model=model, cache_file=label_cache,
+            model=model, cache_data=label_cache_data,
             cache_key=f"cluster_{target_k}_2d")
+        label_cache_data[f"cluster_{target_k}_2d"] = {
+            str(k): v for k, v in names_2d_raw.items()}
+        names_2d = annotate_cluster_names(
+            names_2d_raw, labels_2d, embeddings, n,
+            rog_ontology=rog_ontology)
         new_meta[f'cluster_names_{target_k}_2d'] = json.dumps(
             {str(k): v for k, v in names_2d.items()})
 
@@ -950,13 +1096,36 @@ def enrich_cluster(dyf_path, n_clusters_list=None, model="gemma2:9b",
         new_meta[f'cluster_centroids_{target_k}_3d'] = json.dumps(
             centroids_3d)
 
-        # Transfer 2D labels to 3D via majority vote
-        names_3d = transfer_labels_majority_vote(
-            labels_2d, names_2d, labels_3d)
+        # Transfer 2D labels to 3D via majority vote (use raw names)
+        names_3d_raw = transfer_labels_majority_vote(
+            labels_2d, names_2d_raw, labels_3d)
+        names_3d = annotate_cluster_names(
+            names_3d_raw, labels_3d, embeddings, n,
+            rog_ontology=rog_ontology)
         new_meta[f'cluster_names_{target_k}_3d'] = json.dumps(
             {str(k): v for k, v in names_3d.items()})
 
         print(f"    Transferred labels to {n_3d} 3D clusters")
+
+    # Strip stale level 3 metadata when re-clustering (None = delete key)
+    if force and level >= 3:
+        for stale_key in ['edge_pairs', 'edge_paths_2d', 'tour_narration',
+                          '_provenance_level_3']:
+            new_meta[stale_key] = None
+        print("  Stripped stale level 3 metadata (re-run 'viz' to regenerate)")
+
+    # Store label cache in metadata
+    new_meta['_label_cache'] = json.dumps(label_cache_data)
+
+    # Stamp provenance for Level 2
+    new_meta['_provenance_level_2'] = json.dumps(provenance_to_dict(
+        create_provenance(
+            artifact_type="dyf",
+            n_items=n,
+            source_paths=[str(dyf_path)],
+            params={"n_clusters_list": n_clusters_list, "model": model},
+        )
+    ))
 
     out = output_path or dyf_path
     print(f"\n  Writing enriched file: {out}")
@@ -1112,6 +1281,16 @@ def enrich_viz(dyf_path, cluster_level=25, model="gpt-oss:20b",
         'tour_narration': json.dumps(
             {str(k): v for k, v in narration.items()}),
     }
+
+    # Stamp provenance for Level 3
+    new_meta['_provenance_level_3'] = json.dumps(provenance_to_dict(
+        create_provenance(
+            artifact_type="dyf",
+            n_items=n,
+            source_paths=[str(dyf_path)],
+            params={"cluster_level": cluster_level, "model": model},
+        )
+    ))
 
     out = output_path or dyf_path
     print(f"\n  Writing enriched file: {out}")
@@ -1326,8 +1505,8 @@ def main():
                          help="Comma-separated cluster counts (default: 12,25,50)")
     p_clust.add_argument("--model", default="gemma2:9b",
                          help="Ollama model for labeling")
-    p_clust.add_argument("--label-cache", default=None,
-                         help="JSON file for caching labels")
+    p_clust.add_argument("--force", action="store_true",
+                         help="Re-run even if already at level 2+")
     p_clust.add_argument("-o", "--output", default=None)
 
     # viz
@@ -1353,8 +1532,6 @@ def main():
                         help="Titles to sample per child (default: 8)")
     p_tree.add_argument("--model", default="gemma2:9b",
                         help="Ollama model for labeling")
-    p_tree.add_argument("--label-cache", default=None,
-                        help="JSON file for caching labels")
     p_tree.add_argument("-o", "--output", default=None)
 
     # all
@@ -1363,7 +1540,6 @@ def main():
     p_all.add_argument("dyf_path", help="Path to .dyf file")
     p_all.add_argument("--n-clusters", default="12,25,50")
     p_all.add_argument("--model", default="gemma2:9b")
-    p_all.add_argument("--label-cache", default=None)
     p_all.add_argument("--title", default=None)
     p_all.add_argument("--fisher-col", default=None,
                        help="Column name for Fisher dimension weighting")
@@ -1385,8 +1561,8 @@ def main():
     elif args.command == "cluster":
         levels = [int(x) for x in args.n_clusters.split(",")]
         enrich_cluster(args.dyf_path, n_clusters_list=levels,
-                       model=args.model, label_cache=args.label_cache,
-                       output_path=args.output)
+                       model=args.model,
+                       output_path=args.output, force=args.force)
 
     elif args.command == "viz":
         enrich_viz(args.dyf_path, cluster_level=args.cluster_level,
@@ -1397,7 +1573,6 @@ def main():
         enrich_tree(args.dyf_path, model=args.model,
                     target_depth=args.depth,
                     samples_per_child=args.samples,
-                    label_cache=args.label_cache,
                     output_path=args.output)
 
     elif args.command == "all":
@@ -1408,7 +1583,7 @@ def main():
                        fisher_parquet=getattr(args, 'fisher_parquet', None),
                        diagnose_parquet=getattr(args, 'diagnose_parquet', None))
         enrich_cluster(out, n_clusters_list=levels,
-                       model=args.model, label_cache=args.label_cache,
+                       model=args.model,
                        output_path=out)
         enrich_viz(out, cluster_level=levels[1] if len(levels) > 1
                    else levels[0],
