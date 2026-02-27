@@ -96,6 +96,27 @@ except ImportError:
     from_faiss = None
     SearchResult = None
 
+# Fisher dimension weighting
+from .fisher import (
+    compute_fisher_weights,
+    apply_fisher_weights,
+    extract_fisher_labels,
+)
+
+# Categorical DAG
+from .categorical import (
+    AxisDiagnostic,
+    CategoryGraph,
+    coarsen,
+    diagnose_axes,
+    diagnostics_to_metadata,
+    discover_categorical_columns,
+    embed_with_diagnostics,
+    multi_level_fisher_weights,
+    store_category_graph,
+    load_category_graphs,
+)
+
 # Re-ranking
 from .rerank import (
     rerank_standard,
@@ -193,6 +214,21 @@ __all__ = [
     "rewrite_lazy_index",
     "from_faiss",
     "SearchResult",
+    # Fisher dimension weighting
+    "compute_fisher_weights",
+    "apply_fisher_weights",
+    "extract_fisher_labels",
+    # Categorical DAG
+    "AxisDiagnostic",
+    "CategoryGraph",
+    "coarsen",
+    "diagnose_axes",
+    "diagnostics_to_metadata",
+    "discover_categorical_columns",
+    "embed_with_diagnostics",
+    "multi_level_fisher_weights",
+    "store_category_graph",
+    "load_category_graphs",
     # Re-ranking
     "rerank_standard",
     "rerank_mmr",
