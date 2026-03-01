@@ -609,16 +609,6 @@ def golden_ratio_color_map(labels):
     return cmap
 
 
-def golden_ratio_rgb_map(labels):
-    """Return dict mapping label -> [r, g, b] (label-order, not spatial)."""
-    unique = sorted(set(labels))
-    hues = [(i * 0.618033988749895) % 1.0 for i in range(len(unique))]
-    cmap = {}
-    for i, lbl in enumerate(unique):
-        r, g, b = colorsys.hls_to_rgb(hues[i], 0.45, 0.6)
-        cmap[int(lbl)] = [int(r * 255), int(g * 255), int(b * 255)]
-    return cmap
-
 
 # ── Contrastive cluster labeling ──────────────────────────────────────
 
@@ -1104,70 +1094,6 @@ def _approx_number_words(n):
     # Round to nearest 1000
     rounded = round(n / 1000) * 1000
     return "about " + _number_to_words(rounded)
-
-
-def _clean_product_name(title):
-    """Extract a short, speakable product name from a raw catalog title.
-
-    Strips part numbers, dimensions, and manufacturer prefixes to get
-    something a narrator can say naturally.
-    """
-    t = title.strip()
-    # Remove leading "MANUFACTURER - " prefix
-    if ' - ' in t:
-        parts = t.split(' - ', 1)
-        # If the part after dash is longer and more descriptive, use it
-        if len(parts[1]) > len(parts[0]) and len(parts[1]) > 10:
-            t = parts[1].strip()
-        # If left side is ALL CAPS short name, it's a brand — drop it
-        elif parts[0].isupper() and len(parts[0]) < 30:
-            t = parts[1].strip()
-    # Strip trailing part numbers, dimensions, sizes
-    t = re.sub(r'\s*[,•]\s*#?\d.*$', '', t)
-    t = re.sub(r'\s*\(.*?\)\s*$', '', t)
-    t = re.sub(r'\s+\d+(\.\d+)?\s*x\s*\d+.*$', '', t, flags=re.IGNORECASE)
-    t = re.sub(r'\s+(Size|Dia|Qty|Pkg|Pk|USP|mmHg)\.?\s.*$', '', t, flags=re.IGNORECASE)
-    t = re.sub(r'\s+\d{3,}.*$', '', t)
-    # Truncate to ~50 chars at a word boundary
-    if len(t) > 50:
-        t = t[:50].rsplit(' ', 1)[0]
-    return t.strip(' ,.-•')
-
-
-def _pick_recognizable_products(titles_list, max_items=2):
-    """Pick product titles most likely to be recognizable to a general audience."""
-    familiar = {
-        'hearing', 'aid', 'aids', 'glove', 'gloves', 'stocking', 'stockings',
-        'glasses', 'eyeglasses', 'lens', 'lenses', 'contact', 'suture', 'sutures',
-        'catheter', 'needle', 'syringe', 'bandage', 'splint', 'brace', 'crutch',
-        'wheelchair', 'prosthesis', 'prosthetic', 'pacemaker', 'stent', 'hip',
-        'knee', 'ankle', 'shoulder', 'spine', 'spinal', 'screw', 'plate', 'rod',
-        'nail', 'wire', 'cement', 'drill', 'saw', 'retractor', 'forceps', 'clamp',
-        'scissors', 'scalpel', 'implant', 'crown', 'denture', 'bridge', 'bracket',
-        'toothbrush', 'floss', 'x-ray', 'monitor', 'thermometer', 'mask', 'gown',
-        'apron', 'shield', 'table', 'lamp', 'light', 'camera', 'scope',
-        'replacement', 'joint', 'fusion', 'fixation', 'compression', 'ventilator',
-        'defibrillator', 'insulin', 'pump', 'oxygen', 'dental', 'orthodontic',
-        'ankle', 'brace', 'wrap', 'support', 'collar', 'cane', 'walker',
-    }
-    scored = []
-    seen_clean = set()
-    for t in titles_list:
-        cleaned = _clean_product_name(t)
-        cl = cleaned.lower()
-        if cl in seen_clean or len(cleaned) < 5:
-            continue
-        seen_clean.add(cl)
-        words = set(re.findall(r'[a-z]+', cl))
-        familiarity = len(words & familiar)
-        # Prefer moderate-length cleaned names
-        length_score = 1.0 if 8 < len(cleaned) < 45 else 0.5
-        # Penalize remaining part numbers
-        if re.search(r'\d{3,}', cleaned):
-            length_score *= 0.3
-        scored.append((cleaned, familiarity * length_score + 0.1))
-    scored.sort(key=lambda x: -x[1])
-    return [s[0] for s in scored[:max_items]]
 
 
 def generate_tour_narration(cluster_names, titles, labels, edge_pairs=None,
@@ -5325,11 +5251,9 @@ def _render_from_dyf(dyf_path, args):
         from dyf.lazy_index import LazyIndex
         with LazyIndex(dyf_path) as idx2:
             tree_struct = idx2.get_tree_structure()
-        by_id = {n['node_id']: n for n in tree_struct}
         # Map each point to its ancestor at the child level
         child_labels_map = tree_labels_meta.get('child_labels', {})
         branch_labels_map = tree_labels_meta.get('branch_labels', {})
-        hierarchy = tree_labels_meta.get('hierarchy', {})
         # Build node_id→cluster_id mapping for labeled children
         labeled_nodes = sorted(child_labels_map.keys(), key=int)
         node_to_cluster = {int(nid): i for i, nid in enumerate(labeled_nodes)}
@@ -5410,9 +5334,6 @@ def _render_from_dyf(dyf_path, args):
     if tree_labels_meta and not cluster_fields:
         # Build two-level view from tree: branches (coarse) + children (fine)
         branch_labels_map = tree_labels_meta.get('branch_labels', {})
-        child_labels_map2 = tree_labels_meta.get('child_labels', {})
-        hierarchy2 = tree_labels_meta.get('hierarchy', {})
-
         # Coarse level: branch labels
         # Assign each point to its branch (grandparent of leaf)
         branch_labels = np.full(n, -1, dtype=np.int32)
@@ -6057,21 +5978,6 @@ def main():
 
     callouts_birch = _build_callouts(shapes_birch)
     callouts_dyf = _build_callouts(shapes_dyf)
-
-    # Build label centroids for spatial extremes in narration
-    def _build_label_centroids(labels_arr):
-        centroids = {}
-        for cid in sorted(set(int(c) for c in labels_arr)):
-            mask = np.asarray(labels_arr) == cid
-            pts = np.where(mask)[0]
-            if len(pts) == 0:
-                continue
-            centroid = coords[pts].mean(axis=0)
-            centroids[cid] = {"x": float(centroid[0]), "y": float(centroid[1])}
-        return centroids
-
-    centroids_birch = _build_label_centroids(labels_birch)
-    centroids_dyf = _build_label_centroids(labels_dyf)
 
     # Generate tour narration for TTS
     if args.narrate:
