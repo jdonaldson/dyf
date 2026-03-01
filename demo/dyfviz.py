@@ -1,15 +1,15 @@
 """
 BIRCH (2D) vs DYF tree (high-D) clustering comparison.
 
-Both visualizations share the same DYF-parameterized UMAP 2D projection.
+Both visualizations share the same DYF-parameterized UMAP 3D projection.
 BIRCH clusters on the 2D coordinates; DYF tree clusters on the original
 high-dimensional embeddings, then colors are mapped onto the shared layout.
 
-Renders standalone HTML files using scatter-gl (Three.js) with
-zoom-dependent cluster labels.
+Renders standalone pydeck HTML files with WebSocket bridge for live control,
+bridge edges, guided tours, and 2D/3D toggle.
 
 Usage:
-    python demo/wiki_clustering_viz.py demo/wiki_simple_50k.parquet [--sample 8000]
+    python demo/dyfviz.py demo/gudid_50k_titled.dyf [--sample 8000]
 """
 
 import argparse
@@ -530,22 +530,76 @@ def build_label_hierarchy(coords, titles_arr, birch, embeddings=None,
     return levels
 
 
-def golden_ratio_colors(labels):
-    """Generate colors using golden ratio hue spacing. Returns per-label hex."""
-    unique = sorted(set(labels))
+def _hue_order_from_embeddings(labels, embeddings):
+    """Order cluster labels by angular position of their embedding centroids.
+
+    Projects cluster centroids onto PCA-2D, computes polar angle from the
+    grand centroid, and returns labels sorted by angle.  Clusters that are
+    semantically close in embedding space get adjacent positions in the
+    ordering, which translates to similar hues when mapped to a color wheel.
+    """
+    from sklearn.decomposition import PCA
+
+    labels_arr = np.asarray(labels)
+    unique = sorted(set(int(l) for l in labels_arr))
     n = len(unique)
-    hues = [(i * 0.618033988749895) % 1.0 for i in range(n)]
-    label_to_hue = {lbl: hues[i] for i, lbl in enumerate(unique)}
-    colors = []
-    for lbl in labels:
-        hue = label_to_hue[lbl]
+    if n <= 1:
+        return unique
+
+    # Compute L2-normalized centroid per cluster
+    centroids = np.zeros((n, embeddings.shape[1]), dtype=np.float32)
+    for i, cid in enumerate(unique):
+        mask = labels_arr == cid
+        centroids[i] = embeddings[mask].mean(axis=0)
+    norms = np.linalg.norm(centroids, axis=1, keepdims=True)
+    norms[norms == 0] = 1.0
+    centroids = centroids / norms
+
+    # Project to 2D, compute angle from grand centroid
+    if centroids.shape[1] > 2:
+        proj = PCA(n_components=2).fit_transform(centroids)
+    else:
+        proj = centroids[:, :2]
+
+    grand = proj.mean(axis=0)
+    angles = np.arctan2(proj[:, 1] - grand[1], proj[:, 0] - grand[0])
+
+    # Sort by angle → clusters close in embedding space get adjacent hues
+    order = np.argsort(angles)
+    return [unique[i] for i in order]
+
+
+def spatial_rgb_map(labels, embeddings):
+    """Return dict mapping label -> [r, g, b] with spatially coherent hues.
+
+    Clusters that are close in embedding space get similar colors.
+    Hues are evenly spaced in the sorted angular order so every cluster
+    remains visually distinguishable from its neighbors.
+    """
+    ordered = _hue_order_from_embeddings(labels, embeddings)
+    n = len(ordered)
+    cmap = {}
+    for rank, cid in enumerate(ordered):
+        hue = rank / max(n, 1)
         r, g, b = colorsys.hls_to_rgb(hue, 0.45, 0.6)
-        colors.append(f"#{int(r*255):02x}{int(g*255):02x}{int(b*255):02x}")
-    return colors
+        cmap[int(cid)] = [int(r * 255), int(g * 255), int(b * 255)]
+    return cmap
+
+
+def spatial_color_map(labels, embeddings):
+    """Return dict mapping label -> hex color with spatially coherent hues."""
+    ordered = _hue_order_from_embeddings(labels, embeddings)
+    n = len(ordered)
+    cmap = {}
+    for rank, cid in enumerate(ordered):
+        hue = rank / max(n, 1)
+        r, g, b = colorsys.hls_to_rgb(hue, 0.45, 0.6)
+        cmap[int(cid)] = f"#{int(r*255):02x}{int(g*255):02x}{int(b*255):02x}"
+    return cmap
 
 
 def golden_ratio_color_map(labels):
-    """Return dict mapping label -> hex color."""
+    """Return dict mapping label -> hex color (label-order, not spatial)."""
     unique = sorted(set(labels))
     hues = [(i * 0.618033988749895) % 1.0 for i in range(len(unique))]
     cmap = {}
@@ -556,7 +610,7 @@ def golden_ratio_color_map(labels):
 
 
 def golden_ratio_rgb_map(labels):
-    """Return dict mapping label -> [r, g, b] (0-255)."""
+    """Return dict mapping label -> [r, g, b] (label-order, not spatial)."""
     unique = sorted(set(labels))
     hues = [(i * 0.618033988749895) % 1.0 for i in range(len(unique))]
     cmap = {}
@@ -883,33 +937,6 @@ def label_clusters(titles, coords, labels, embeddings, model="gemma2:9b",
 
     return cluster_names
 
-
-# ── Scatter-GL normalization (mirrors generatePointPositionArray) ────────
-
-SCATTER_PLOT_CUBE_LENGTH = 2
-
-
-def scatter_gl_normalize(coords):
-    """Replicate scatter-gl's point normalization. Returns normalized coords."""
-    x_ext = [float(coords[:, 0].min()), float(coords[:, 0].max())]
-    y_ext = [float(coords[:, 1].min()), float(coords[:, 1].max())]
-    x_range = x_ext[1] - x_ext[0]
-    y_range = y_ext[1] - y_ext[0]
-    max_range = max(x_range, y_range)
-    half = SCATTER_PLOT_CUBE_LENGTH / 2
-
-    def scale_linear(val, extent, scale):
-        t = (val - extent[0]) / (extent[1] - extent[0]) if extent[1] != extent[0] else 0.5
-        return scale[0] + t * (scale[1] - scale[0])
-
-    x_scale = [-half * x_range / max_range, half * x_range / max_range]
-    y_scale = [-half * y_range / max_range, half * y_range / max_range]
-
-    norm = np.zeros_like(coords)
-    for i in range(len(coords)):
-        norm[i, 0] = scale_linear(coords[i, 0], x_ext, x_scale)
-        norm[i, 1] = scale_linear(coords[i, 1], y_ext, y_scale)
-    return norm
 
 
 def compute_cluster_shapes(coords, titles, labels):
@@ -1461,279 +1488,6 @@ def generate_tour_audio(narration, voice="bm_george"):
     return audio_data
 
 
-# ── HTML template ────────────────────────────────────────────────────────
-
-HTML_TEMPLATE = r"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<title>%(title)s</title>
-<style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-html, body { width: 100%%; height: 100%%; overflow: hidden; background: #1e1e1e; }
-#container { width: 100%%; height: 100%%; position: relative; }
-#header {
-  position: absolute; top: 0; left: 0; right: 0; z-index: 20;
-  padding: 12px 20px; background: rgba(30,30,30,0.75);
-  border-bottom: 1px solid rgba(68,68,68,0.5); color: #ddd;
-  font: 14px -apple-system, 'Segoe UI', sans-serif;
-  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-}
-#header h1 { font-size: 16px; font-weight: 600; margin-bottom: 2px; }
-#header .sub { font-size: 12px; color: #999; }
-.cluster-label {
-  position: absolute; pointer-events: none; z-index: 5;
-  color: #fff; font: bold 10px -apple-system, 'Segoe UI', sans-serif;
-  background: rgba(30,30,30,0.88); border: 1px solid rgba(120,120,120,0.5);
-  padding: 2px 5px; border-radius: 3px;
-  white-space: nowrap; transform: translate(-50%%, -50%%);
-  transition: opacity 0.12s;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.6);
-}
-.glyph-badge {
-  display: inline-block;
-  margin-right: 3px;
-  font-size: 9px;
-  opacity: 0.8;
-  letter-spacing: 1px;
-  vertical-align: baseline;
-}
-
-</style>
-</head>
-<body>
-<div id="header">
-  <h1>%(title)s</h1>
-  <div class="sub">Scroll to zoom &middot; Drag to pan &middot; Hover for details</div>
-</div>
-<div id="container"></div>
-
-<script src="https://cdn.jsdelivr.net/npm/three@0.125.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/scatter-gl@0.0.13/lib/scatter-gl.min.js"></script>
-<script>
-(function() {
-  // ── Embedded data ─────────────────────────────────────────────────────
-  const POINTS = %(points_json)s;
-  const META   = %(meta_json)s;
-  const COLORS = %(colors_json)s;
-  const CENTROIDS = %(centroids_json)s;
-
-  // ── Build dataset ─────────────────────────────────────────────────────
-  const dataPoints = POINTS.map(p => [p[0], p[1]]);
-  const metadata = META.map(m => ({ label: m.title + ' [cluster ' + m.cid + ']' }));
-  const dataset = new ScatterGL.Dataset(dataPoints, metadata);
-
-  // ── Create scatter-gl ─────────────────────────────────────────────────
-  const container = document.getElementById('container');
-  const scatterGL = new ScatterGL(container, {
-    rotateOnStart: false,
-    selectEnabled: false,
-    showLabelsOnHover: true,
-    renderMode: 'POINT',
-    styles: {
-      backgroundColor: 0x1e1e1e,
-      fog: { enabled: false },
-      point: {
-        colorNoSelection: 'rgba(150,150,150,0.5)',
-        scaleDefault: 1.0,
-        scaleHover: 2.0,
-      },
-      label: {
-        fillColorHover: '#ffffff',
-        strokeColorHover: '#1e1e1e',
-        strokeWidth: 3,
-        fillWidth: 6,
-        fontSize: 12,
-      },
-    },
-    pointColorer: function(i, selectedIndices, hoverIndex) {
-      if (hoverIndex === i) return '#ffffff';
-      return COLORS[i];
-    },
-  });
-  scatterGL.render(dataset);
-  scatterGL.setDimensions(2);
-  scatterGL.setPanMode();
-
-  // Increase zoom speed (default is too sluggish with orthographic camera)
-  (function tweakZoom() {
-    try {
-      var ctrl = scatterGL.scatterPlot.orbitCameraControls;
-      if (ctrl) { ctrl.zoomSpeed = 3.0; }
-      else { setTimeout(tweakZoom, 100); }
-    } catch(e) { setTimeout(tweakZoom, 100); }
-  })();
-
-  // ── Zoom-dependent label overlay ──────────────────────────────────────
-  // Create label DOM elements
-  const labelEls = CENTROIDS.map(function(c) {
-    var el = document.createElement('div');
-    el.className = 'cluster-label';
-    // Split glyph prefix from label text
-    var glyphMatch = c.label.match(/^([^A-Za-z0-9]+)\s+(.*)$/);
-    if (glyphMatch) {
-      var badge = document.createElement('span');
-      badge.className = 'glyph-badge';
-      badge.textContent = glyphMatch[1];
-      el.appendChild(badge);
-      el.appendChild(document.createTextNode(glyphMatch[2]));
-    } else {
-      el.textContent = c.label;
-    }
-    el.style.borderLeftColor = c.color;
-    el.style.borderLeftWidth = '3px';
-    container.appendChild(el);
-    return el;
-  });
-
-  // Access scatter-gl internal camera (TS private = JS public at runtime)
-  function getCamera() {
-    try { return scatterGL.scatterPlot.camera; }
-    catch(e) { return null; }
-  }
-
-  // Project world point to screen coords using camera matrices
-  function projectToScreen(wx, wy, cam, w, h) {
-    // matrixWorldInverse: world -> camera space
-    var m = cam.matrixWorldInverse.elements;
-    var vx = m[0]*wx + m[4]*wy + m[8]*0 + m[12];
-    var vy = m[1]*wx + m[5]*wy + m[9]*0 + m[13];
-    var vz = m[2]*wx + m[6]*wy + m[10]*0 + m[14];
-    // projectionMatrix: camera -> clip space
-    var p = cam.projectionMatrix.elements;
-    var cx = p[0]*vx + p[4]*vy + p[8]*vz + p[12];
-    var cy = p[1]*vx + p[5]*vy + p[9]*vz + p[13];
-    var cw = p[3]*vx + p[7]*vy + p[11]*vz + p[15];
-    // NDC to screen
-    var ndcX = cx / cw;
-    var ndcY = cy / cw;
-    return {
-      x: (ndcX + 1) / 2 * w,
-      y: (1 - ndcY) / 2 * h,
-      visible: ndcX >= -1.2 && ndcX <= 1.2 && ndcY >= -1.2 && ndcY <= 1.2
-    };
-  }
-
-  // Compute visible world-space area for label density control
-  function getVisibleArea(cam) {
-    // For ortho camera: area = (right-left)/zoom * (top-bottom)/zoom
-    // Default frustum half-extent is 1.2, so full range = 2.4
-    var zoom = cam.zoom || 1;
-    var ar = container.clientWidth / container.clientHeight;
-    var w, h;
-    if (ar > 1) { w = 2.4 * ar / zoom; h = 2.4 / zoom; }
-    else { w = 2.4 / zoom; h = 2.4 / ar / zoom; }
-    return w * h;
-  }
-
-  // How many labels to show at a given area
-  // Default view area ~ 2.4*ar * 2.4 ~ 7-10 for a wide screen
-  var defaultArea = 0;
-  var MAX_LABELS = CENTROIDS.length;
-  function maxLabelsForArea(area) {
-    if (defaultArea === 0) return MAX_LABELS;
-    var ratio = defaultArea / Math.max(area, 0.01);
-    // ratio=1 at default zoom, >1 when zoomed in
-    if (ratio < 0.8) return 0;              // zoomed out beyond default
-    if (ratio < 1.5) return Math.min(8, MAX_LABELS);  // near default
-    if (ratio < 3)   return Math.min(15, MAX_LABELS); // moderate zoom
-    return MAX_LABELS;                       // zoomed in
-  }
-
-  // Label update loop
-  var frameId = 0;
-  function updateLabels() {
-    frameId = requestAnimationFrame(updateLabels);
-    var cam = getCamera();
-    if (!cam) return;
-
-    if (defaultArea === 0) defaultArea = getVisibleArea(cam);
-
-    var w = container.clientWidth;
-    var h = container.clientHeight;
-    var area = getVisibleArea(cam);
-    var maxShow = maxLabelsForArea(area);
-
-    // CENTROIDS are sorted by size descending in Python
-    for (var i = 0; i < CENTROIDS.length; i++) {
-      var c = CENTROIDS[i];
-      var el = labelEls[i];
-      if (i >= maxShow) {
-        el.style.opacity = '0';
-        continue;
-      }
-      var p = projectToScreen(c.nx, c.ny, cam, w, h);
-      if (!p.visible) {
-        el.style.opacity = '0';
-        continue;
-      }
-      el.style.left = p.x + 'px';
-      el.style.top = p.y + 'px';
-      el.style.opacity = '1';
-    }
-  }
-
-  // Start label loop after first render settles
-  setTimeout(function() { updateLabels(); }, 200);
-
-  // Handle window resize
-  window.addEventListener('resize', function() { scatterGL.resize(); });
-})();
-</script>
-</body>
-</html>
-"""
-
-
-def build_html(coords, titles_arr, labels, color_map, title_str,
-               cluster_names=None):
-    """Build scatter-gl HTML string with zoom-dependent labels."""
-    labels_list = labels.tolist() if hasattr(labels, 'tolist') else list(labels)
-
-    # Scatter-gl normalized coordinates (mirrors generatePointPositionArray)
-    norm_coords = scatter_gl_normalize(coords)
-
-    # Points as [x, y] in original data space (scatter-gl normalizes internally)
-    points = [[float(coords[i, 0]), float(coords[i, 1])] for i in range(len(coords))]
-
-    # Per-point metadata and colors
-    meta = [{"title": str(titles_arr[i]), "cid": int(labels_list[i])}
-            for i in range(len(titles_arr))]
-    colors = [color_map[int(labels_list[i])] for i in range(len(labels_list))]
-
-    # Cluster centroids (in scatter-gl normalized space)
-    centroids = []
-    for cid in sorted(set(labels_list)):
-        mask = np.array(labels_list) == cid
-        pts = np.where(mask)[0]
-        centroid = coords[pts].mean(axis=0)
-        norm_centroid = norm_coords[pts].mean(axis=0)
-        dists = np.linalg.norm(coords[pts] - centroid, axis=1)
-        if cluster_names and cid in cluster_names:
-            name = cluster_names[cid]
-        else:
-            name = str(titles_arr[pts[np.argmin(dists)]])
-        centroids.append({
-            "nx": float(norm_centroid[0]),
-            "ny": float(norm_centroid[1]),
-            "label": name[:45],
-            "cluster": int(cid),
-            "size": int(mask.sum()),
-            "color": color_map[int(cid)],
-        })
-
-    # Sort by size descending (largest clusters get label priority)
-    centroids.sort(key=lambda c: -c["size"])
-
-    return HTML_TEMPLATE % {
-        "title": title_str,
-        "points_json": json.dumps(points),
-        "meta_json": json.dumps(meta),
-        "colors_json": json.dumps(colors),
-        "centroids_json": json.dumps(centroids),
-    }
-
-
 # ── Pydeck builder ───────────────────────────────────────────────────────
 
 
@@ -1742,7 +1496,7 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
                  bundled_edges_2d=None, bundled_edges_3d=None, edge_pairs=None,
                  logo_path=None, tour_narration=None, tour_audio=None,
                  tour_callouts=None, tour_title=None, subtitle_str="",
-                 multi_level_data=None):
+                 multi_level_data=None, embeddings=None):
     """Build a pydeck 3D point cloud with HTML overlay labels."""
     import base64
     import pyarrow as pa
@@ -1910,6 +1664,19 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
                     "names": {str(k): v for k, v in multi_level_data["names_3d"][lvl].items()},
                     "label_data": multi_level_data["label_data_3d"][lvl],
                 }
+        # Precompute spatial color maps per level so JS level switcher
+        # uses embedding-aware colors instead of golden ratio fallback
+        if embeddings is not None:
+            color_maps = {}
+            for lvl in sorted(multi_level_data["labels"].keys()):
+                lvl_labels = multi_level_data["labels"][lvl]
+                smap = spatial_rgb_map(lvl_labels, embeddings)
+                color_maps[str(lvl)] = {str(k): v for k, v in smap.items()}
+            if multi_level_data.get("lsh_labels") is not None:
+                smap = spatial_rgb_map(multi_level_data["lsh_labels"], embeddings)
+                color_maps["lsh"] = {str(k): v for k, v in smap.items()}
+            cluster_meta["colorMaps"] = color_maps
+
         cluster_meta_json = json.dumps(cluster_meta)
     else:
         cluster_meta_json = "null"
@@ -2447,7 +2214,8 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
   var currentLevelKey = clusterMeta ? clusterMeta["default"] : null;
   var defaultLevelKey = currentLevelKey;  // edges/tour only at this level
 
-  // Golden ratio HLS→RGB (matches Python colorsys.hls_to_rgb exactly)
+  // HLS→RGB for color map generation; precomputed spatial maps preferred,
+  // golden ratio fallback when no precomputed map exists for a level
   function _hlsHelper(m1, m2, hue) {{
     hue = hue % 1.0;
     if (hue < 1/6) return m1 + (m2 - m1) * hue * 6;
@@ -2465,7 +2233,18 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
       Math.round(_hlsHelper(m1, m2, h - 1/3) * 255)
     ];
   }}
-  function buildColorMap(uniqueCids) {{
+  function buildColorMap(uniqueCids, levelKey) {{
+    // Use precomputed spatial color map if available for this level
+    if (levelKey && clusterMeta && clusterMeta.colorMaps && clusterMeta.colorMaps[levelKey]) {{
+      var pre = clusterMeta.colorMaps[levelKey];
+      var map = {{}};
+      for (var i = 0; i < uniqueCids.length; i++) {{
+        var cid = uniqueCids[i];
+        map[cid] = pre[String(cid)] || hlsToRgb((i * 0.618033988749895) % 1.0, 0.45, 0.6);
+      }}
+      return map;
+    }}
+    // Fallback: golden ratio
     var sorted = uniqueCids.slice().sort(function(a,b) {{ return a - b; }});
     var map = {{}};
     for (var i = 0; i < sorted.length; i++) {{
@@ -2497,7 +2276,7 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
       var c = col[i];
       if (!(c in seen)) {{ seen[c] = true; uniqueCids.push(c); }}
     }}
-    var cmap = buildColorMap(uniqueCids);
+    var cmap = buildColorMap(uniqueCids, levelKey);
     for (var i = 0; i < _nPts; i++) {{
       var rgb = cmap[col[i]];
       allPoints[i].r = rgb[0];
@@ -4156,7 +3935,7 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
     uniqueCids.sort(function(a,b) {{ return a - b; }});
 
     // Get color map for current clusters
-    var cmap = buildColorMap(uniqueCids);
+    var cmap = buildColorMap(uniqueCids, currentLevelKey);
 
     // Get current label data
     var curLabels = labels;  // fallback
@@ -4241,7 +4020,7 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
           var c = col[i];
           if (!(c in seenC)) {{ seenC[c] = true; uniqueCids.push(c); }}
         }}
-        var cmap = buildColorMap(uniqueCids);
+        var cmap = buildColorMap(uniqueCids, currentLevelKey);
         for (var i = 0; i < _nPts; i++) {{
           var rgb = cmap[col[i]];
           allPoints[i].r = rgb[0];
@@ -4837,7 +4616,7 @@ import {{ tableFromIPC }} from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0
           var c = col[i];
           if (!(c in seenC)) {{ seenC[c] = true; uniqueCids.push(c); }}
         }}
-        var cmap = buildColorMap(uniqueCids);
+        var cmap = buildColorMap(uniqueCids, currentLevelKey);
         for (var i = 0; i < _nPts; i++) {{
           var rgb = cmap[col[i]];
           allPoints[i].r = rgb[0];
@@ -5891,40 +5670,28 @@ def _render_from_dyf(dyf_path, args):
     outdir = Path(dyf_path).parent
     display_title = getattr(args, 'title', None) or "Embedding Landscape"
 
-    use_3d = getattr(args, 'renderer', 'pydeck') == 'pydeck'
+    rgb_birch = spatial_rgb_map(labels_birch, data['embeddings'])
+    path_birch = str(outdir / "rog_3d_birch_clusters.html")
+    subtitle = f"BIRCH — {n_birch} clusters, {n:,} pts (from .dyf)"
 
-    if use_3d:
-        rgb_birch = golden_ratio_rgb_map(labels_birch)
-        path_birch = str(outdir / "rog_3d_birch_clusters.html")
-        subtitle = f"BIRCH — {n_birch} clusters, {n:,} pts (from .dyf)"
-
-        build_pydeck(
-            coords, titles_arr, labels_birch, rgb_birch,
-            display_title, path_birch,
-            cluster_names=names_birch,
-            ws_port=getattr(args, 'port', 8766),
-            bundled_edges_2d=bundled_birch_2d,
-            bundled_edges_3d=bundled_birch_3d,
-            edge_pairs=birch_pair_info,
-            logo_path=getattr(args, 'logo', None),
-            tour_narration=narration_birch,
-            tour_audio=audio_birch,
-            tour_title=getattr(args, 'title', None),
-            subtitle_str=subtitle,
-            multi_level_data=multi_level_data,
-        )
-        print(f"\nWrote {path_birch}")
-        subprocess.run(["open", path_birch])
-    else:
-        cmap_birch = golden_ratio_color_map(labels_birch)
-        html_birch = build_html(
-            coords, titles_arr, labels_birch, cmap_birch,
-            f"BIRCH — {n_birch} clusters, {n:,} pts (from .dyf)",
-            cluster_names=names_birch)
-        path_birch = str(outdir / "rog_2d_birch_clusters.html")
-        Path(path_birch).write_text(html_birch)
-        print(f"\nWrote {path_birch}")
-        subprocess.run(["open", path_birch])
+    build_pydeck(
+        coords, titles_arr, labels_birch, rgb_birch,
+        display_title, path_birch,
+        cluster_names=names_birch,
+        ws_port=getattr(args, 'port', 8766),
+        bundled_edges_2d=bundled_birch_2d,
+        bundled_edges_3d=bundled_birch_3d,
+        edge_pairs=birch_pair_info,
+        logo_path=getattr(args, 'logo', None),
+        tour_narration=narration_birch,
+        tour_audio=audio_birch,
+        tour_title=getattr(args, 'title', None),
+        subtitle_str=subtitle,
+        multi_level_data=multi_level_data,
+        embeddings=data['embeddings'],
+    )
+    print(f"\nWrote {path_birch}")
+    subprocess.run(["open", path_birch])
 
 
 def main():
@@ -5939,9 +5706,6 @@ def main():
                         help="DYF tree max depth")
     parser.add_argument("--dyf-bits", type=int, default=3,
                         help="DYF tree LSH bits per level")
-    parser.add_argument("--renderer", choices=["scattergl", "pydeck"],
-                        default="scattergl",
-                        help="Rendering backend (default: scattergl)")
     parser.add_argument("--refine", action=argparse.BooleanOptionalAction,
                         default=True,
                         help="Refine incoherent clusters (default: on)")
@@ -6001,8 +5765,7 @@ def main():
     n = len(titles)
     titles_arr = np.array(titles)
     target_k = args.n_clusters
-    use_3d = args.renderer == "pydeck"
-    n_components = 3 if use_3d else 2
+    n_components = 3
 
     # ── Shared projection (DYF-parameterized UMAP) ───────────────────────
     print(f"\n=== DYF-parameterized UMAP ({n_components}D) ===")
@@ -6095,8 +5858,6 @@ def main():
     n_dyf = len(set(labels_dyf.tolist()))
     print(f"  DYF tree: {n_dyf} clusters ({time.time() - t0:.1f}s)")
 
-    dim_label = "3D" if use_3d else "2D"
-
     # ── Contrastive cluster labeling via LLM ─────────────────────────────
     label_cache = getattr(args, 'label_cache', None)
     print("\n=== Labeling BIRCH clusters ===")
@@ -6136,7 +5897,7 @@ def main():
     bundled_birch_2d = None
     bundled_birch_3d = None
     birch_pair_info = None
-    if args.renderer == "pydeck" and not args.no_edges:
+    if not args.no_edges:
         print("\n=== Computing bridge edges (BIRCH) ===")
         bundled_birch_2d, bundled_birch_3d, birch_pair_info, _ = compute_bridge_edges_3d(
             coords, embeddings, labels_birch, n_birch)
@@ -6269,147 +6030,125 @@ def main():
             }
             print(f"  Multi-level data ready (default level: {target_k})")
 
-    if args.renderer == "pydeck":
-        rgb_birch = golden_ratio_rgb_map(labels_birch)
-        rgb_dyf = golden_ratio_rgb_map(labels_dyf.tolist())
+    rgb_birch = spatial_rgb_map(labels_birch, embeddings)
+    rgb_dyf = spatial_rgb_map(labels_dyf.tolist(), embeddings)
 
-        # Compute cluster shape analysis for narration context
-        print("\n=== Computing cluster shapes ===")
-        coords_2d = coords[:, :2]
-        shapes_birch = compute_cluster_shapes(coords_2d, titles, labels_birch)
-        shapes_dyf = compute_cluster_shapes(coords_2d, titles, labels_dyf)
-        print(f"  BIRCH: {sum(1 for s in shapes_birch.values() if s['shape'] != 'compact')}/{len(shapes_birch)} non-compact clusters")
-        print(f"  DYF: {sum(1 for s in shapes_dyf.values() if s['shape'] != 'compact')}/{len(shapes_dyf)} non-compact clusters")
+    # Compute cluster shape analysis for narration context
+    print("\n=== Computing cluster shapes ===")
+    coords_2d = coords[:, :2]
+    shapes_birch = compute_cluster_shapes(coords_2d, titles, labels_birch)
+    shapes_dyf = compute_cluster_shapes(coords_2d, titles, labels_dyf)
+    print(f"  BIRCH: {sum(1 for s in shapes_birch.values() if s['shape'] != 'compact')}/{len(shapes_birch)} non-compact clusters")
+    print(f"  DYF: {sum(1 for s in shapes_dyf.values() if s['shape'] != 'compact')}/{len(shapes_dyf)} non-compact clusters")
 
-        # Build callout data for tour visualization
-        def _build_callouts(shapes):
-            callouts = {}
-            for cid, s in shapes.items():
-                indices = []
-                labels_list = []
-                # Core representative points only (nearest to centroid = best examples)
-                for idx, title in zip(s['core_indices'][:5], s['core_titles'][:5]):
-                    indices.append(idx)
-                    labels_list.append(title[:40])
-                if indices:
-                    callouts[cid] = {"indices": indices, "labels": labels_list}
-            return callouts
+    # Build callout data for tour visualization
+    def _build_callouts(shapes):
+        callouts = {}
+        for cid, s in shapes.items():
+            indices = []
+            labels_list = []
+            # Core representative points only (nearest to centroid = best examples)
+            for idx, title in zip(s['core_indices'][:5], s['core_titles'][:5]):
+                indices.append(idx)
+                labels_list.append(title[:40])
+            if indices:
+                callouts[cid] = {"indices": indices, "labels": labels_list}
+        return callouts
 
-        callouts_birch = _build_callouts(shapes_birch)
-        callouts_dyf = _build_callouts(shapes_dyf)
+    callouts_birch = _build_callouts(shapes_birch)
+    callouts_dyf = _build_callouts(shapes_dyf)
 
-        # Build label centroids for spatial extremes in narration
-        def _build_label_centroids(labels_arr):
-            centroids = {}
-            for cid in sorted(set(int(c) for c in labels_arr)):
-                mask = np.asarray(labels_arr) == cid
-                pts = np.where(mask)[0]
-                if len(pts) == 0:
-                    continue
-                centroid = coords[pts].mean(axis=0)
-                centroids[cid] = {"x": float(centroid[0]), "y": float(centroid[1])}
-            return centroids
+    # Build label centroids for spatial extremes in narration
+    def _build_label_centroids(labels_arr):
+        centroids = {}
+        for cid in sorted(set(int(c) for c in labels_arr)):
+            mask = np.asarray(labels_arr) == cid
+            pts = np.where(mask)[0]
+            if len(pts) == 0:
+                continue
+            centroid = coords[pts].mean(axis=0)
+            centroids[cid] = {"x": float(centroid[0]), "y": float(centroid[1])}
+        return centroids
 
-        centroids_birch = _build_label_centroids(labels_birch)
-        centroids_dyf = _build_label_centroids(labels_dyf)
+    centroids_birch = _build_label_centroids(labels_birch)
+    centroids_dyf = _build_label_centroids(labels_dyf)
 
-        # Generate tour narration for TTS
-        if args.narrate:
-            # Inline narration via Ollama — no pre-written file needed
-            narration_birch = _generate_narration_ollama(
-                names_birch, titles, labels_birch, coords,
-                model=args.model, title=args.title)
-            narration_dyf = _generate_narration_ollama(
-                names_dyf, titles, labels_dyf, coords,
-                model=args.model, title=args.title)
-        else:
-            # Look for narration file next to the input parquet or in demo/
-            narration_file = None
-            for candidate in [
-                Path(args.parquet_path).parent / "tour_narration.json",
-                outdir / "tour_narration.json",
-            ]:
-                if candidate.exists():
-                    narration_file = str(candidate)
-                    break
-
-            narration_birch = generate_tour_narration(
-                names_birch, titles, labels_birch,
-                title=args.title, narration_file=narration_file)
-            narration_dyf = generate_tour_narration(
-                names_dyf, titles, labels_dyf,
-                title=args.title, narration_file=narration_file)
-
-        # Generate audio for tour narration
-        audio_birch = generate_tour_audio(narration_birch)
-        audio_dyf = generate_tour_audio(narration_dyf)
-
-        path_birch = str(outdir / "rog_3d_birch_clusters.html")
-        path_dyf = str(outdir / "rog_3d_dyf_tree_clusters.html")
-
-        birch_title = args.title or "GUDID Energy Devices"
-        birch_subtitle = f"BIRCH on {dim_label} (k={dyf_k} UMAP) — {n_birch} clusters, {n:,} pts"
-        dyf_title = args.title or "GUDID Energy Devices"
-        dyf_subtitle = (
-            f"DYF Tree (depth={args.dyf_depth}, bits={args.dyf_bits}) "
-            f"— {n_dyf} clusters, {n:,} pts"
-        )
-
-        build_pydeck(
-            coords, titles_arr, labels_birch, rgb_birch,
-            birch_title,
-            path_birch, cluster_names=names_birch, ws_port=args.port,
-            label_levels=birch_levels,
-            bundled_edges_2d=bundled_birch_2d,
-            bundled_edges_3d=bundled_birch_3d,
-            edge_pairs=birch_pair_info,
-            logo_path=args.logo,
-            tour_narration=narration_birch,
-            tour_audio=audio_birch,
-            tour_callouts=callouts_birch,
-            tour_title=args.title,
-            subtitle_str=birch_subtitle,
-            multi_level_data=multi_level_data,
-        )
-        build_pydeck(
-            coords, titles_arr, labels_dyf, rgb_dyf,
-            dyf_title,
-            path_dyf, cluster_names=names_dyf, ws_port=args.port,
-            label_levels=birch_levels,
-            bundled_edges_2d=bundled_birch_2d,
-            bundled_edges_3d=bundled_birch_3d,
-            edge_pairs=birch_pair_info,
-            logo_path=args.logo,
-            tour_narration=narration_dyf,
-            tour_audio=audio_dyf,
-            tour_callouts=callouts_dyf,
-            subtitle_str=dyf_subtitle,
-            tour_title=args.title,
-            multi_level_data=multi_level_data,
-        )
+    # Generate tour narration for TTS
+    if args.narrate:
+        # Inline narration via Ollama — no pre-written file needed
+        narration_birch = _generate_narration_ollama(
+            names_birch, titles, labels_birch, coords,
+            model=args.model, title=args.title)
+        narration_dyf = _generate_narration_ollama(
+            names_dyf, titles, labels_dyf, coords,
+            model=args.model, title=args.title)
     else:
-        cmap_birch = golden_ratio_color_map(labels_birch)
-        cmap_dyf = golden_ratio_color_map(labels_dyf.tolist())
+        # Look for narration file next to the input parquet or in demo/
+        narration_file = None
+        for candidate in [
+            Path(args.parquet_path).parent / "tour_narration.json",
+            outdir / "tour_narration.json",
+        ]:
+            if candidate.exists():
+                narration_file = str(candidate)
+                break
 
-        html_birch = build_html(
-            coords, titles_arr, labels_birch, cmap_birch,
-            f"BIRCH on {dim_label} (k={dyf_k} UMAP) \u2014 {n_birch} clusters, {n:,} points",
-            cluster_names=names_birch,
-        )
-        html_dyf = build_html(
-            coords, titles_arr, labels_dyf, cmap_dyf,
-            f"DYF Tree on high-D (depth={args.dyf_depth}, bits={args.dyf_bits}) "
-            f"\u2014 {n_dyf} clusters, {n:,} points",
-            cluster_names=names_dyf,
-        )
+        narration_birch = generate_tour_narration(
+            names_birch, titles, labels_birch,
+            title=args.title, narration_file=narration_file)
+        narration_dyf = generate_tour_narration(
+            names_dyf, titles, labels_dyf,
+            title=args.title, narration_file=narration_file)
 
-        path_birch = str(outdir / "rog_2d_birch_clusters.html")
-        path_dyf = str(outdir / "rog_2d_dyf_tree_clusters.html")
+    # Generate audio for tour narration
+    audio_birch = generate_tour_audio(narration_birch)
+    audio_dyf = generate_tour_audio(narration_dyf)
 
-        Path(path_birch).write_text(html_birch)
-        Path(path_dyf).write_text(html_dyf)
-        print(f"\nWrote {path_birch}")
-        print(f"Wrote {path_dyf}")
+    path_birch = str(outdir / "rog_3d_birch_clusters.html")
+    path_dyf = str(outdir / "rog_3d_dyf_tree_clusters.html")
+
+    birch_title = args.title or "GUDID Energy Devices"
+    birch_subtitle = f"BIRCH on 3D (k={dyf_k} UMAP) — {n_birch} clusters, {n:,} pts"
+    dyf_title = args.title or "GUDID Energy Devices"
+    dyf_subtitle = (
+        f"DYF Tree (depth={args.dyf_depth}, bits={args.dyf_bits}) "
+        f"— {n_dyf} clusters, {n:,} pts"
+    )
+
+    build_pydeck(
+        coords, titles_arr, labels_birch, rgb_birch,
+        birch_title,
+        path_birch, cluster_names=names_birch, ws_port=args.port,
+        label_levels=birch_levels,
+        bundled_edges_2d=bundled_birch_2d,
+        bundled_edges_3d=bundled_birch_3d,
+        edge_pairs=birch_pair_info,
+        logo_path=args.logo,
+        tour_narration=narration_birch,
+        tour_audio=audio_birch,
+        tour_callouts=callouts_birch,
+        tour_title=args.title,
+        subtitle_str=birch_subtitle,
+        multi_level_data=multi_level_data,
+        embeddings=embeddings,
+    )
+    build_pydeck(
+        coords, titles_arr, labels_dyf, rgb_dyf,
+        dyf_title,
+        path_dyf, cluster_names=names_dyf, ws_port=args.port,
+        label_levels=birch_levels,
+        bundled_edges_2d=bundled_birch_2d,
+        bundled_edges_3d=bundled_birch_3d,
+        edge_pairs=birch_pair_info,
+        logo_path=args.logo,
+        tour_narration=narration_dyf,
+        tour_audio=audio_dyf,
+        tour_callouts=callouts_dyf,
+        subtitle_str=dyf_subtitle,
+        tour_title=args.title,
+        multi_level_data=multi_level_data,
+        embeddings=embeddings,
+    )
 
     subprocess.run(["open", path_birch])
     subprocess.run(["open", path_dyf])
