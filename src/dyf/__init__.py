@@ -135,6 +135,14 @@ from .splits import (
     format_split_path,
 )
 
+# Cluster-tree DAG
+from .cluster_tree import (
+    build_cluster_tree_dag,
+    compute_sibling_keywords,
+    derive_path_labels,
+    format_cluster_context,
+)
+
 # Spatial cluster coloring
 from .colors import spatial_rgb_map, spatial_color_map
 
@@ -276,6 +284,11 @@ __all__ = [
     "compute_domain_stopwords",
     "compute_split_keywords",
     "format_split_path",
+    # Cluster-tree DAG
+    "build_cluster_tree_dag",
+    "compute_sibling_keywords",
+    "derive_path_labels",
+    "format_cluster_context",
     # Spatial cluster coloring
     "spatial_rgb_map",
     "spatial_color_map",

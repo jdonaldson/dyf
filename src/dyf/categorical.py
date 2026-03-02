@@ -628,6 +628,7 @@ def store_category_graph(
     graph: CategoryGraph,
     name: str,
     field_mapping: Optional[dict[str, str]] = None,
+    existing_metadata: Optional[dict[str, str]] = None,
 ) -> dict[str, str]:
     """Serialize a CategoryGraph for .dyf metadata.
 
@@ -638,6 +639,9 @@ def store_category_graph(
         Identifier for this graph (e.g. ``"gmdn"``).
     field_mapping : dict, optional
         Maps depth → stored field name (e.g. ``{0: "gmdn_family", 1: "gmdn_term"}``).
+    existing_metadata : dict, optional
+        When provided and contains ``category_graphs``, the new graph is
+        merged into the existing dict rather than replacing it.
 
     Returns
     -------
@@ -645,11 +649,16 @@ def store_category_graph(
         Suitable for passing to ``write_lazy_index`` or ``rewrite_lazy_index``
         as metadata entries.
     """
-    payload = {
-        name: {
-            "graph": graph.to_dict(),
-            "field_mapping": field_mapping or {},
-        }
+    # Start from existing graphs if available
+    payload: dict = {}
+    if existing_metadata:
+        raw = existing_metadata.get("category_graphs")
+        if raw:
+            payload = json.loads(raw)
+
+    payload[name] = {
+        "graph": graph.to_dict(),
+        "field_mapping": field_mapping or {},
     }
     return {"category_graphs": json.dumps(payload)}
 

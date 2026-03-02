@@ -502,11 +502,14 @@ def _get_cluster_path_context(point_indices, split_keywords, titles,
 
 def label_clusters(titles, coords, labels, embeddings, model="gemma2:9b",
                    n_samples=20, cache_file=None, cache_key=None,
-                   cache_data=None, split_keywords=None):
+                   cache_data=None, split_keywords=None,
+                   path_labels=None, sibling_keywords=None):
     """Label clusters via contrastive TF-IDF + local Ollama LLM.
 
-    When split_keywords is provided, replaces per-cluster contrastive TF-IDF
-    with tree path context derived from the DYF tree splits.
+    Label context priority (highest first):
+    1. ``path_labels`` + ``sibling_keywords`` from cluster-tree DAG
+    2. ``split_keywords`` tree path heuristic (deprecated)
+    3. Contrastive TF-IDF vs nearest neighbor (baseline fallback)
     """
     from concurrent.futures import ThreadPoolExecutor, as_completed
     from collections import Counter
@@ -569,11 +572,21 @@ def label_clusters(titles, coords, labels, embeddings, model="gemma2:9b",
                 if len(sample_titles) >= n_samples:
                     break
 
-        # Build context string: prefer split path keywords, fallback to
-        # contrastive TF-IDF vs nearest neighbor
+        # Build context string — priority:
+        # 1. DAG path labels + sibling keywords (best)
+        # 2. Split keyword tree path heuristic (deprecated)
+        # 3. Contrastive TF-IDF vs nearest neighbor (baseline)
         kw_str = ""
-        if split_keywords:
-            # Use tree path context from split keywords
+        if path_labels is not None and sibling_keywords is not None:
+            from dyf.cluster_tree import format_cluster_context
+            pl = path_labels.get(cid, "")
+            sk = sibling_keywords.get(cid, [])
+            ctx = format_cluster_context(cid, pl, sk)
+            if ctx:
+                kw_str = f"\n{ctx}"
+
+        if not kw_str and split_keywords:
+            # Deprecated: heuristic tree path via keyword matching
             path_context = _get_cluster_path_context(
                 pts, split_keywords, titles)
             if path_context:
@@ -1118,6 +1131,17 @@ def enrich_cluster(dyf_path, n_clusters_list=None, model="gemma2:9b",
         n_splits = len(split_kw_data.get('splits', {}))
         print(f"  Using split keywords ({n_splits} splits) for label context")
 
+    # Load tree structure for cluster-tree DAG (when split keywords available)
+    tree_maps = None
+    if split_kw_data:
+        try:
+            from dyf.splits import build_tree_maps
+            with LazyIndex(dyf_path) as idx_tree:
+                tree_maps = build_tree_maps(idx_tree)
+            print(f"  Loaded tree structure for cluster-tree DAG")
+        except Exception as e:
+            print(f"  WARNING: Could not load tree structure: {e}")
+
     # Cluster at each level — dual 2D/3D clustering
     new_sf = {}
     new_meta = {}
@@ -1146,13 +1170,46 @@ def enrich_cluster(dyf_path, n_clusters_list=None, model="gemma2:9b",
         new_meta[f'cluster_centroids_{target_k}_2d'] = json.dumps(
             centroids_2d)
 
+        # Build cluster-tree DAG for this cluster level (when tree available)
+        dag_path_labels = None
+        dag_sibling_kw = None
+        if tree_maps and split_kw_data:
+            try:
+                from dyf.cluster_tree import (
+                    build_cluster_tree_dag,
+                    compute_sibling_keywords,
+                    derive_path_labels,
+                )
+                tree_list, cmap_tree, lbatch_tree = tree_maps
+                dag = build_cluster_tree_dag(
+                    tree_list, cmap_tree, lbatch_tree,
+                    labels_2d, target_k)
+                dag_path_labels = derive_path_labels(
+                    dag, split_kw_data, target_k)
+                dag_sibling_kw = compute_sibling_keywords(
+                    dag, titles if isinstance(titles, list)
+                    else list(titles),
+                    labels_2d, target_k)
+                print(f"    Built cluster-tree DAG: "
+                      f"{len(dag_path_labels)} path labels, "
+                      f"{len(dag_sibling_kw)} sibling keyword sets")
+                # Store DAG and path labels in metadata
+                new_meta[f'cluster_tree_dag_{target_k}_2d'] = json.dumps(
+                    dag.to_dict())
+                new_meta[f'cluster_path_labels_{target_k}_2d'] = json.dumps(
+                    {str(k): v for k, v in dag_path_labels.items()})
+            except Exception as e:
+                print(f"    WARNING: cluster-tree DAG failed: {e}")
+
         # LLM-label 2D clusters
         print(f"  Labeling 2D k={target_k} clusters...")
         names_2d_raw = label_clusters(
             titles, coords, labels_2d, embeddings,
             model=model, cache_data=label_cache_data,
             cache_key=f"cluster_{target_k}_2d",
-            split_keywords=split_kw_data)
+            split_keywords=split_kw_data,
+            path_labels=dag_path_labels,
+            sibling_keywords=dag_sibling_kw)
         label_cache_data[f"cluster_{target_k}_2d"] = {
             str(k): v for k, v in names_2d_raw.items()}
         names_2d = annotate_cluster_names(

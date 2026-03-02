@@ -223,11 +223,28 @@ def load_cache(dyf_path: str):
         for src, dst, weight in json.loads(edge_json):
             cluster_pairs[(src, dst)] = weight
 
+    # Path labels from cluster-tree DAG
+    path_labels = {}
+    for mk, mv in data['metadata'].items():
+        if mk.startswith('cluster_path_labels_') and mv:
+            # e.g. cluster_path_labels_25_2d → level 25
+            parts = mk.replace('cluster_path_labels_', '').split('_')
+            if parts:
+                try:
+                    lvl = int(parts[0])
+                    path_labels[lvl] = json.loads(mv)
+                except (ValueError, json.JSONDecodeError):
+                    pass
+    if path_labels:
+        print(f"  Loaded path labels for levels: {sorted(path_labels.keys())}",
+              file=sys.stderr)
+
     CACHE = {
         'titles': titles,
         'coords_2d': coords_2d,
         'cluster_result': cluster_result,
         'cluster_pairs': cluster_pairs,
+        'path_labels': path_labels,
     }
 
     # Also set DYF_INDEX for semantic search
@@ -346,6 +363,7 @@ def get_cluster_info(level: int = 5) -> list[dict]:
     labels = CACHE['cluster_result']['labels'][level]
     names = CACHE['cluster_result']['names'][level]
     centroids = CACHE['cluster_result']['centroids'][level]
+    level_path_labels = CACHE.get('path_labels', {}).get(level, {})
 
     clusters = []
     unique_ids = sorted(set(int(x) for x in labels))
@@ -357,13 +375,18 @@ def get_cluster_info(level: int = 5) -> list[dict]:
         name = names[i] if i < len(names) else f"Cluster {i}"
         cx = float(centroids[i, 0]) if i < len(centroids) else 0.0
         cy = float(centroids[i, 1]) if i < len(centroids) else 0.0
-        clusters.append({
+        entry = {
             'cluster_id': i,
             'name': name,
             'count': count,
             'centroid_x': cx,
             'centroid_y': cy,
-        })
+        }
+        # Include path label from cluster-tree DAG if available
+        pl = level_path_labels.get(str(i), "")
+        if pl:
+            entry['path_label'] = pl
+        clusters.append(entry)
 
     return sorted(clusters, key=lambda c: -c['count'])
 
