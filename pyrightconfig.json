@@ -1,0 +1,23 @@
+{
+  "pythonVersion": "3.12",
+  "venvPath": ".direnv",
+  "venv": "python-3.12",
+  "typeCheckingMode": "basic",
+  "reportMissingTypeStubs": false,
+  "reportUnknownMemberType": false,
+  "reportUnknownArgumentType": false,
+  "reportUnknownVariableType": false,
+  "reportUnknownParameterType": false,
+  "reportMissingParameterType": false,
+  "reportUnnecessaryIsInstance": false,
+  "reportPrivateImportUsage": false,
+  "exclude": [
+    ".direnv",
+    ".venv",
+    "build",
+    "dist",
+    "**/__pycache__",
+    "demo/*.html",
+    "benchmarks"
+  ]
+}
