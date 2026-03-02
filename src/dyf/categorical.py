@@ -108,6 +108,26 @@ class CategoryGraph:
                     queue.append(child)
         return visited.get(node, -1)
 
+    def lca_depth(self, node_a: str, node_b: str) -> int:
+        """Depth of the lowest common ancestor of two nodes.
+
+        Returns the depth of the deepest node that is an ancestor of both
+        *node_a* and *node_b* (or one of them, if one is an ancestor of the
+        other).  Returns -1 if either node is absent or they share no
+        common ancestor.
+        """
+        all_nodes = self.all_nodes()
+        if node_a not in all_nodes or node_b not in all_nodes:
+            return -1
+        if node_a == node_b:
+            return self.get_depth(node_a)
+        ancestors_a = self.get_ancestors(node_a) | {node_a}
+        ancestors_b = self.get_ancestors(node_b) | {node_b}
+        common = ancestors_a & ancestors_b
+        if not common:
+            return -1
+        return max(self.get_depth(c) for c in common)
+
     def max_depth(self) -> int:
         """Maximum depth across all nodes."""
         if not self.roots:

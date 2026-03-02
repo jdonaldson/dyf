@@ -145,6 +145,45 @@ class TestNavigation:
         assert "5 edges" in s
 
 
+# ── LCA depth ────────────────────────────────────────────────────────────
+
+
+class TestLCADepth:
+    @pytest.fixture()
+    def tree(self):
+        return CategoryGraph.from_edges([
+            ("root", "A", 1.0),
+            ("root", "B", 1.0),
+            ("A", "A1", 1.0),
+            ("A", "A2", 1.0),
+            ("B", "B1", 1.0),
+        ])
+
+    def test_lca_siblings(self, tree):
+        """A1 and A2 share parent A at depth 1."""
+        assert tree.lca_depth("A1", "A2") == 1
+
+    def test_lca_cousins(self, tree):
+        """A1 and B1 share root at depth 0."""
+        assert tree.lca_depth("A1", "B1") == 0
+
+    def test_lca_parent_child(self, tree):
+        """A is ancestor of A1; LCA is A itself at depth 1."""
+        assert tree.lca_depth("A", "A1") == 1
+
+    def test_lca_same_node(self, tree):
+        """Same node → own depth."""
+        assert tree.lca_depth("A1", "A1") == 2
+
+    def test_lca_root(self, tree):
+        """Root and any descendant → LCA is root at depth 0."""
+        assert tree.lca_depth("root", "A1") == 0
+
+    def test_lca_unknown(self, tree):
+        """Unknown node → -1."""
+        assert tree.lca_depth("A1", "unknown") == -1
+
+
 # ── JSON roundtrip ───────────────────────────────────────────────────────
 
 
