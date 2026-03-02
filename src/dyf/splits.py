@@ -35,7 +35,7 @@ _ENGLISH_STOP = frozenset({
 })
 
 
-def _tokenize(text: str) -> list[str]:
+def tokenize(text: str) -> list[str]:
     """Lowercase, extract words of 3+ chars, filter stop words."""
     words = re.findall(r'[a-z]{3,}', text.lower())
     return [w for w in words if w not in _ENGLISH_STOP]
@@ -113,7 +113,7 @@ def compute_domain_stopwords(
     # Count document frequency (how many titles contain each word)
     doc_freq: Counter = Counter()
     for title in titles:
-        unique_words = set(_tokenize(title))
+        unique_words = set(tokenize(title))
         doc_freq.update(unique_words)
 
     cutoff = n * threshold
@@ -206,7 +206,7 @@ def compute_split_keywords(
             total_bigrams = 0
             for idx in indices:
                 if idx < len(titles):
-                    words = [w for w in _tokenize(titles[idx])
+                    words = [w for w in tokenize(titles[idx])
                              if w not in all_stopwords]
                     word_counts.update(words)
                     total_words += len(words)
@@ -310,6 +310,167 @@ def compute_split_keywords(
                 children_result, top_k=20)
 
         splits[nid] = split_entry
+
+    return {
+        'domain_stopwords': sorted(domain_stopwords or []),
+        'splits': splits,
+    }
+
+
+def compute_embedding_keywords(
+    titles: list[str],
+    embeddings: np.ndarray,
+    tree: list[dict],
+    leaf_batches: dict[int, np.ndarray],
+    children_map: dict[int, list[int]],
+    hyperplanes: dict[int, np.ndarray],
+    *,
+    max_depth_from_root: int = 3,
+    min_child_items: int = 50,
+    top_k: int = 10,
+    domain_stopwords: set[str] | None = None,
+    min_term_count: int = 3,
+) -> dict:
+    """Compute discriminative keywords by projecting term embeddings onto split hyperplanes.
+
+    For each internal node, builds a "term embedding" (centroid of all item embeddings
+    whose titles contain that term), then projects onto the node's PCA hyperplane to
+    find terms most aligned with each child's side of the split.
+
+    Drop-in replacement for compute_split_keywords() — same output format.
+
+    Args:
+        titles: List of title strings, indexed by item index.
+        embeddings: (n, dim) float32 array of full embeddings.
+        tree: Tree structure from idx.get_tree_structure().
+        leaf_batches: {node_id: item_indices} for leaf nodes.
+        children_map: {parent_id: [child_ids]} for internal nodes.
+        hyperplanes: {node_id: (num_bits, dim)} from idx.get_split_hyperplanes().
+        max_depth_from_root: Maximum tree depth to process.
+        min_child_items: Skip children with fewer items than this.
+        top_k: Number of top keywords to return per child.
+        domain_stopwords: Additional stop words to filter.
+        min_term_count: Minimum number of items containing a term to include it.
+
+    Returns:
+        dict with keys:
+            "domain_stopwords": list of domain stop words used
+            "splits": {node_id: {
+                "depth": int,
+                "children": {child_id: {
+                    "count": int,
+                    "unigrams": [("word", score), ...],
+                }},
+            }}
+    """
+    all_stopwords = _ENGLISH_STOP | (domain_stopwords or set())
+
+    # Find root and compute depth_from_root via BFS
+    root_id = next(n['node_id'] for n in tree if n['parent_id'] is None)
+    depth_from_root: dict[int, int] = {root_id: 0}
+    queue = [root_id]
+    while queue:
+        nid = queue.pop(0)
+        for child_id in children_map.get(nid, []):
+            depth_from_root[child_id] = depth_from_root[nid] + 1
+            queue.append(child_id)
+
+    # Find internal nodes within depth range that have hyperplanes
+    internal_nodes = [
+        n for n in tree
+        if depth_from_root.get(n['node_id'], 999) < max_depth_from_root
+        and children_map.get(n['node_id'])
+        and n['node_id'] in hyperplanes
+    ]
+
+    splits = {}
+
+    for node in internal_nodes:
+        nid = node['node_id']
+        child_ids = children_map[nid]
+
+        # Get first PCA direction (highest variance), normalized
+        hp = hyperplanes[nid][0].astype(np.float64)
+        hp_norm = np.linalg.norm(hp)
+        if hp_norm < 1e-12:
+            continue
+        hp = hp / hp_norm
+
+        # Collect all descendant item indices for this node
+        all_indices = collect_descendant_indices(nid, children_map, leaf_batches)
+        if len(all_indices) == 0:
+            continue
+
+        # Build term → item indices mapping from titles under this node
+        term_items: dict[str, list[int]] = defaultdict(list)
+        for idx in all_indices:
+            if idx < len(titles):
+                words = tokenize(titles[idx])
+                for w in words:
+                    if w not in all_stopwords:
+                        term_items[w].append(idx)
+
+        # Filter by min_term_count
+        term_items = {w: idxs for w, idxs in term_items.items()
+                      if len(idxs) >= min_term_count}
+
+        if not term_items:
+            continue
+
+        # Compute term embeddings (centroid of item embeddings containing each term)
+        # and project onto hyperplane
+        term_scores: dict[str, float] = {}
+        for word, idxs in term_items.items():
+            idx_arr = np.array(idxs)
+            term_centroid = embeddings[idx_arr].mean(axis=0).astype(np.float64)
+            term_scores[word] = float(term_centroid @ hp)
+
+        # Compute child centroid projections onto hyperplane
+        child_data: dict[int, dict] = {}
+        for cid in child_ids:
+            child_indices = collect_descendant_indices(cid, children_map, leaf_batches)
+            if len(child_indices) < min_child_items:
+                continue
+            child_centroid = embeddings[child_indices].mean(axis=0).astype(np.float64)
+            child_proj = float(child_centroid @ hp)
+            child_data[cid] = {
+                'count': int(len(child_indices)),
+                'proj': child_proj,
+                'indices': child_indices,
+            }
+
+        if len(child_data) < 2:
+            continue
+
+        # Assign terms to the child whose centroid projection is closest
+        child_projs = {cid: cd['proj'] for cid, cd in child_data.items()}
+
+        children_result = {}
+        for cid, cd in child_data.items():
+            children_result[cid] = {
+                'count': cd['count'],
+                'unigrams': [],
+            }
+
+        # For each term, assign to nearest child by projection
+        for word, score in term_scores.items():
+            best_cid = min(child_projs, key=lambda c: abs(score - child_projs[c]))
+            # Score = distance from midpoint of other children's projections
+            magnitude = abs(score - child_projs[best_cid])
+            children_result[best_cid]['unigrams'].append((word, magnitude))
+
+        # Sort by score descending and keep top_k per child
+        for cid in children_result:
+            unigrams = children_result[cid]['unigrams']
+            unigrams.sort(key=lambda x: -x[1])
+            children_result[cid]['unigrams'] = [
+                (w, round(s, 6)) for w, s in unigrams[:top_k]
+            ]
+
+        splits[nid] = {
+            'depth': depth_from_root.get(nid, 0),
+            'children': children_result,
+        }
 
     return {
         'domain_stopwords': sorted(domain_stopwords or []),

@@ -17,7 +17,7 @@ from collections import Counter, defaultdict
 import numpy as np
 
 from dyf.categorical import CategoryGraph
-from dyf.splits import _tokenize, collect_descendant_indices
+from dyf.splits import tokenize, collect_descendant_indices
 
 
 # ── DAG construction ──────────────────────────────────────────────────
@@ -383,7 +383,7 @@ def _sibling_group_tfidf(
         wc: Counter = Counter()
         for idx in cluster_items[cid]:
             if idx < len(titles):
-                words = _tokenize(titles[idx])
+                words = tokenize(titles[idx])
                 wc.update(words)
         cluster_word_counts[cid] = wc
         cluster_total_words[cid] = sum(wc.values())
@@ -430,7 +430,7 @@ def _corpus_tfidf(
     cluster_wc: Counter = Counter()
     for idx in cluster_indices:
         if idx < len(titles):
-            words = _tokenize(titles[idx])
+            words = tokenize(titles[idx])
             cluster_wc.update(words)
     cluster_total = sum(cluster_wc.values())
     if cluster_total == 0:
@@ -439,7 +439,7 @@ def _corpus_tfidf(
     # Corpus word counts (all items)
     corpus_wc: Counter = Counter()
     for title in titles:
-        corpus_wc.update(_tokenize(title))
+        corpus_wc.update(tokenize(title))
     corpus_total = sum(corpus_wc.values())
     if corpus_total == 0:
         return []

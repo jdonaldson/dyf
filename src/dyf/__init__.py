@@ -131,8 +131,10 @@ from .splits import (
     build_tree_maps,
     collect_descendant_indices,
     compute_domain_stopwords,
+    compute_embedding_keywords,
     compute_split_keywords,
     format_split_path,
+    tokenize,
 )
 
 # Cluster-tree DAG
@@ -282,8 +284,10 @@ __all__ = [
     "build_tree_maps",
     "collect_descendant_indices",
     "compute_domain_stopwords",
+    "compute_embedding_keywords",
     "compute_split_keywords",
     "format_split_path",
+    "tokenize",
     # Cluster-tree DAG
     "build_cluster_tree_dag",
     "compute_sibling_keywords",
