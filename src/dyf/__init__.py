@@ -117,6 +117,15 @@ from .categorical import (
     load_category_graphs,
 )
 
+# CatalogSpace (multi-catalog matching)
+from .catalog import (
+    CatalogConfig,
+    CatalogMatch,
+    CatalogSpace,
+    CrossMapping,
+    JointMatchResult,
+)
+
 # Spatial cluster coloring
 from .colors import spatial_rgb_map, spatial_color_map
 
@@ -246,6 +255,12 @@ __all__ = [
     "multi_level_fisher_weights",
     "store_category_graph",
     "load_category_graphs",
+    # CatalogSpace
+    "CatalogConfig",
+    "CatalogMatch",
+    "CatalogSpace",
+    "CrossMapping",
+    "JointMatchResult",
     # Spatial cluster coloring
     "spatial_rgb_map",
     "spatial_color_map",

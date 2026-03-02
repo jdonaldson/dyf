@@ -1,0 +1,1167 @@
+"""CatalogSpace: Multi-catalog matching with cross-catalog coherence.
+
+Generalizes ANCHOR's single-ontology matching to N catalogs with
+joint coherence scoring. Uses CategoryGraph for hierarchy navigation
+instead of code-prefix logic.
+
+Key concepts:
+- ontological_z: Does the query belong in this catalog at all?
+- node_z: How distinctive is each matched node within its catalog?
+- path_alignment: Does the matched node's path to root reflect semantics?
+- coherence_score: Do matches across catalogs agree via cross-mappings?
+"""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass, field
+from itertools import product as itertools_product
+from typing import Optional
+
+import numpy as np
+
+from .categorical import CategoryGraph
+
+
+# ── Dataclasses ──────────────────────────────────────────────────────────
+
+
+@dataclass
+class CatalogConfig:
+    """Configuration for a single catalog in CatalogSpace.
+
+    Parameters
+    ----------
+    name : str
+        Catalog identifier (e.g., "unspsc", "broadjump", "curvo").
+    graph : CategoryGraph
+        Hierarchy structure. Use ``CategoryGraph.from_single_level()``
+        for flat catalogs.
+    embeddings : np.ndarray
+        (n_nodes, d) pre-computed embeddings for catalog nodes.
+    node_ids : np.ndarray
+        (n_nodes,) string identifiers for each node.
+    node_names : np.ndarray
+        (n_nodes,) human-readable names for each node.
+    """
+
+    name: str
+    graph: CategoryGraph
+    embeddings: np.ndarray
+    node_ids: np.ndarray
+    node_names: np.ndarray
+
+    def __post_init__(self):
+        self.embeddings = np.asarray(self.embeddings, dtype=np.float32)
+        self.node_ids = np.asarray(self.node_ids, dtype=str)
+        self.node_names = np.asarray(self.node_names, dtype=str)
+        n = len(self.node_ids)
+        if self.embeddings.shape[0] != n:
+            raise ValueError(
+                f"embeddings rows ({self.embeddings.shape[0]}) != "
+                f"node_ids length ({n})"
+            )
+        if len(self.node_names) != n:
+            raise ValueError(
+                f"node_names length ({len(self.node_names)}) != "
+                f"node_ids length ({n})"
+            )
+
+
+@dataclass
+class CrossMapping:
+    """Mapping between two catalogs for coherence scoring.
+
+    Parameters
+    ----------
+    source_catalog : str
+        Name of the source catalog.
+    target_catalog : str
+        Name of the target catalog.
+    source_ids : np.ndarray
+        (n_mappings,) source node IDs.
+    target_ids : np.ndarray
+        (n_mappings,) target node IDs.
+    weights : np.ndarray
+        (n_mappings,) confidence weights 0-1.
+    """
+
+    source_catalog: str
+    target_catalog: str
+    source_ids: np.ndarray
+    target_ids: np.ndarray
+    weights: np.ndarray
+
+    def __post_init__(self):
+        self.source_ids = np.asarray(self.source_ids, dtype=str)
+        self.target_ids = np.asarray(self.target_ids, dtype=str)
+        self.weights = np.asarray(self.weights, dtype=np.float32)
+        n = len(self.source_ids)
+        if len(self.target_ids) != n or len(self.weights) != n:
+            raise ValueError("source_ids, target_ids, weights must have same length")
+
+
+@dataclass
+class CatalogMatch:
+    """Match result for a single catalog.
+
+    Attributes
+    ----------
+    catalog_name : str
+        Which catalog this match is from.
+    node_id : str
+        Matched node identifier.
+    node_name : str
+        Human-readable name.
+    similarity : float
+        Cosine similarity to query (0-1).
+    node_z : float
+        Within-catalog distinctiveness z-score.
+    ontological_z : float
+        Does the query belong in this catalog?
+    depth : int
+        Depth of matched node in hierarchy.
+    fit : str
+        VERY_HIGH / HIGH / MODERATE / LOW / OUT_OF_DOMAIN.
+    entropy : float
+        Normalized entropy of match distribution.
+    path_alignment : float
+        Semantic alignment along path to root (0-1).
+    alternatives : list[tuple[str, str, float]]
+        [(id, name, similarity), ...] diverse alternatives.
+    gap_detected : bool
+        Whether a catalog gap was detected.
+    gap_score : float
+        Gap signal strength (0-1).
+    """
+
+    catalog_name: str
+    node_id: str
+    node_name: str
+    similarity: float
+    node_z: float
+    ontological_z: float
+    depth: int
+    fit: str
+    entropy: float
+    path_alignment: float
+    alternatives: list[tuple[str, str, float]] = field(default_factory=list)
+    gap_detected: bool = False
+    gap_score: float = 0.0
+
+
+@dataclass
+class JointMatchResult:
+    """Result of matching a query across multiple catalogs.
+
+    Attributes
+    ----------
+    query : str
+        Query identifier (caller-assigned).
+    matches : dict[str, CatalogMatch]
+        catalog_name -> best match per catalog.
+    coherence_score : float
+        Cross-catalog consistency 0-1.
+    coherence_detail : dict[str, float]
+        Per-pair coherence scores.
+    reranked : bool
+        Whether coherence changed the result.
+    reason : str
+        Explanation of match decisions.
+    """
+
+    query: str
+    matches: dict[str, CatalogMatch] = field(default_factory=dict)
+    coherence_score: float = 1.0
+    coherence_detail: dict[str, float] = field(default_factory=dict)
+    reranked: bool = False
+    reason: str = ""
+
+
+# ── Internal fitted state ────────────────────────────────────────────────
+
+
+@dataclass
+class _FittedCatalog:
+    """Pre-computed stats for a single catalog after fit()."""
+
+    config: CatalogConfig
+    # Ontology-wide statistics
+    centroid: np.ndarray          # (d,) mean embedding
+    centroid_norm: np.ndarray     # (d,) L2-normalized centroid
+    tax_mean: float               # mean specificity
+    tax_std: float                # std specificity
+    node_z_scores: np.ndarray     # (n,) per-node z-scores
+    path_alignments: np.ndarray   # (n,) per-node path alignment
+
+    # Depth-indexed structures
+    node_depths: np.ndarray       # (n,) depth of each node
+    depth_masks: dict[int, np.ndarray]   # depth -> boolean mask
+    id_to_idx: dict[str, int]     # node_id -> index
+
+
+# ── Utility functions ────────────────────────────────────────────────────
+
+
+def _node_z_to_fit(z: float) -> str:
+    """Convert node_z to fit level string."""
+    if z > 1.0:
+        return "VERY_HIGH"
+    elif z > 0.0:
+        return "HIGH"
+    elif z > -1.0:
+        return "MODERATE"
+    elif z > -2.0:
+        return "LOW"
+    else:
+        return "OUT_OF_DOMAIN"
+
+
+def _compute_entropy(
+    similarities: np.ndarray,
+    temperature: float = 0.05,
+    top_k: int = 10,
+) -> float:
+    """Normalized entropy of similarity distribution among top candidates.
+
+    Uses softmax to convert similarities to probabilities, focusing on
+    top-K candidates to capture the actual decision space.
+
+    Returns 0 for one dominant match, 1 for uniform spread.
+    """
+    if len(similarities) < 2:
+        return 0.0
+
+    k = min(top_k, len(similarities))
+    top_idx = np.argsort(similarities)[::-1][:k]
+    top_sims = similarities[top_idx]
+
+    shifted = top_sims - top_sims.max()
+    exp_sims = np.exp(shifted / temperature)
+    probs = exp_sims / exp_sims.sum()
+
+    entropy = -np.sum(probs * np.log(probs + 1e-10))
+    max_entropy = np.log(k)
+    return float(entropy / max_entropy) if max_entropy > 0 else 0.0
+
+
+def _compute_path_alignment(
+    node_idx: int,
+    fc: _FittedCatalog,
+) -> float:
+    """Path alignment for a single node.
+
+    Measures cosine similarity between (parent - centroid) and
+    (child - centroid) vectors, averaged along the path to root.
+    """
+    graph = fc.config.graph
+    node_id = fc.config.node_ids[node_idx]
+    embeddings = fc.config.embeddings
+    centroid = fc.centroid
+
+    alignments = []
+    current_id = node_id
+    visited = {current_id}
+
+    while True:
+        parents = graph.get_parents(current_id)
+        if not parents:
+            break
+        parent_id = parents[0]
+        if parent_id in visited:
+            break
+        visited.add(parent_id)
+
+        if parent_id not in fc.id_to_idx:
+            break
+
+        parent_idx = fc.id_to_idx[parent_id]
+        child_idx = fc.id_to_idx.get(current_id)
+        if child_idx is None:
+            break
+
+        parent_vec = embeddings[parent_idx] - centroid
+        child_vec = embeddings[child_idx] - centroid
+
+        parent_mag = np.linalg.norm(parent_vec)
+        child_mag = np.linalg.norm(child_vec)
+
+        if parent_mag > 0 and child_mag > 0:
+            cosine = float(np.dot(parent_vec, child_vec) / (parent_mag * child_mag))
+            alignments.append(cosine)
+
+        current_id = parent_id
+
+    return float(np.mean(alignments)) if alignments else 1.0
+
+
+# ── CatalogSpace ─────────────────────────────────────────────────────────
+
+
+class CatalogSpace:
+    """Multi-catalog matching engine with cross-catalog coherence.
+
+    Usage::
+
+        space = CatalogSpace()
+        space.add_catalog(unspsc_config)
+        space.add_catalog(broadjump_config)
+        space.add_mapping(unspsc_to_broadjump)
+        space.fit()
+
+        # Single catalog
+        match = space.match_single("unspsc", query_emb)
+
+        # Joint across all catalogs
+        results = space.match(query_embs, top_k=5)
+    """
+
+    def __init__(self) -> None:
+        self._configs: dict[str, CatalogConfig] = {}
+        self._mappings: list[CrossMapping] = []
+        self._fitted: dict[str, _FittedCatalog] = {}
+        self._is_fitted: bool = False
+
+    # ── Builder methods ───────────────────────────────────────────────
+
+    def add_catalog(self, config: CatalogConfig) -> CatalogSpace:
+        """Add a catalog configuration. Returns self for chaining."""
+        if self._is_fitted:
+            raise RuntimeError("Cannot add catalogs after fit()")
+        self._configs[config.name] = config
+        return self
+
+    def add_mapping(self, mapping: CrossMapping) -> CatalogSpace:
+        """Add a cross-catalog mapping. Returns self for chaining."""
+        if self._is_fitted:
+            raise RuntimeError("Cannot add mappings after fit()")
+        self._mappings.append(mapping)
+        return self
+
+    def fit(self) -> CatalogSpace:
+        """Pre-compute statistics for all catalogs. Returns self."""
+        if not self._configs:
+            raise ValueError("No catalogs added")
+
+        # Validate embedding dimensions match
+        dims = {c.name: c.embeddings.shape[1] for c in self._configs.values()}
+        unique_dims = set(dims.values())
+        if len(unique_dims) > 1:
+            raise ValueError(f"Embedding dimensions must match across catalogs: {dims}")
+
+        for name, config in self._configs.items():
+            self._fitted[name] = self._fit_single(config)
+
+        # Build mapping lookup for coherence scoring
+        self._mapping_lookup: dict[tuple[str, str], CrossMapping] = {}
+        for m in self._mappings:
+            self._mapping_lookup[(m.source_catalog, m.target_catalog)] = m
+            # Also store reverse for bidirectional lookup
+            reverse = CrossMapping(
+                source_catalog=m.target_catalog,
+                target_catalog=m.source_catalog,
+                source_ids=m.target_ids,
+                target_ids=m.source_ids,
+                weights=m.weights,
+            )
+            self._mapping_lookup[(m.target_catalog, m.source_catalog)] = reverse
+
+        self._is_fitted = True
+        return self
+
+    def _fit_single(self, config: CatalogConfig) -> _FittedCatalog:
+        """Compute per-catalog statistics."""
+        embs = config.embeddings
+        n = embs.shape[0]
+        graph = config.graph
+
+        # ID -> index lookup
+        id_to_idx = {str(nid): i for i, nid in enumerate(config.node_ids)}
+
+        # Centroid
+        centroid = embs.mean(axis=0)
+        centroid_norm_val = np.linalg.norm(centroid)
+        centroid_norm = centroid / centroid_norm_val if centroid_norm_val > 0 else centroid
+
+        # Centroid similarities
+        centroid_sims = embs @ centroid_norm
+
+        # Best similarity to other nodes (for specificity/z-scores)
+        # Use dot product against all nodes, mask self
+        sim_matrix = embs @ embs.T
+        np.fill_diagonal(sim_matrix, -np.inf)
+        best_other = sim_matrix.max(axis=1)
+
+        # Specificity = best_other - centroid_sim
+        specificity = best_other - centroid_sims
+        tax_mean = float(specificity.mean())
+        tax_std = float(specificity.std())
+        if tax_std == 0:
+            tax_std = 1.0  # avoid division by zero
+
+        node_z_scores = (specificity - tax_mean) / tax_std
+
+        # Node depths
+        node_depths = np.array(
+            [graph.get_depth(str(nid)) for nid in config.node_ids],
+            dtype=np.int32,
+        )
+
+        # Depth masks
+        unique_depths = np.unique(node_depths)
+        depth_masks = {int(d): node_depths == d for d in unique_depths}
+
+        # Create partially-filled _FittedCatalog for path alignment calc
+        fc = _FittedCatalog(
+            config=config,
+            centroid=centroid,
+            centroid_norm=centroid_norm,
+            tax_mean=tax_mean,
+            tax_std=tax_std,
+            node_z_scores=node_z_scores,
+            path_alignments=np.ones(n, dtype=np.float32),  # placeholder
+            node_depths=node_depths,
+            depth_masks=depth_masks,
+            id_to_idx=id_to_idx,
+        )
+
+        # Path alignment for each node
+        path_alignments = np.array(
+            [_compute_path_alignment(i, fc) for i in range(n)],
+            dtype=np.float32,
+        )
+        fc.path_alignments = path_alignments
+
+        return fc
+
+    # ── Single-catalog matching ───────────────────────────────────────
+
+    def match_single(
+        self,
+        catalog_name: str,
+        query_emb: np.ndarray,
+        top_k: int = 5,
+    ) -> CatalogMatch:
+        """Match a single query embedding against one catalog.
+
+        Parameters
+        ----------
+        catalog_name : str
+            Which catalog to match against.
+        query_emb : np.ndarray
+            (d,) query embedding vector.
+        top_k : int
+            Number of top candidates for entropy/alternatives.
+
+        Returns
+        -------
+        CatalogMatch
+            Best match result with diagnostics.
+        """
+        if not self._is_fitted:
+            raise RuntimeError("Call fit() before matching")
+        if catalog_name not in self._fitted:
+            raise KeyError(f"Unknown catalog: {catalog_name!r}")
+
+        fc = self._fitted[catalog_name]
+        query_emb = np.asarray(query_emb, dtype=np.float32)
+
+        # Compute ontological z
+        ontological_z = self._compute_ontological_z(fc, query_emb)
+
+        # Match with two-stage + within-z level selection
+        result = self._match_with_levels(fc, query_emb, top_k)
+        return _replace_ontological_z(result, ontological_z)
+
+    def _compute_ontological_z(
+        self,
+        fc: _FittedCatalog,
+        query_emb: np.ndarray,
+    ) -> float:
+        """Compute ontological z-score for a query against a catalog."""
+        all_sims = fc.config.embeddings @ query_emb
+        query_centroid_sim = float(np.dot(query_emb, fc.centroid_norm))
+        query_best_sim = float(all_sims.max())
+        query_specificity = query_best_sim - query_centroid_sim
+        return (query_specificity - fc.tax_mean) / fc.tax_std
+
+    def _match_with_levels(
+        self,
+        fc: _FittedCatalog,
+        query_emb: np.ndarray,
+        top_k: int = 5,
+    ) -> CatalogMatch:
+        """Two-stage matching with within-z level selection.
+
+        Iterates depths, computes within-z at each depth, selects
+        the depth with sharpest discrimination, then optionally
+        constrains via parent-level match (two-stage).
+        """
+        config = fc.config
+        graph = config.graph
+        embs = config.embeddings
+        max_d = graph.max_depth()
+
+        # If flat catalog (max_depth <= 1), match all nodes directly
+        if max_d <= 1:
+            return self._match_flat(fc, query_emb, top_k)
+
+        # Similarities to all nodes
+        all_sims = embs @ query_emb
+
+        # Per-depth analysis: within-z and entropy
+        within_z: dict[int, float] = {}
+        depth_entropy: dict[int, float] = {}
+        depth_best_sim: dict[int, float] = {}
+
+        for depth in range(1, max_d + 1):
+            mask = fc.depth_masks.get(depth)
+            if mask is None or mask.sum() < 2:
+                continue
+
+            depth_sims = all_sims[mask]
+            std = float(depth_sims.std())
+            if std > 0:
+                within_z[depth] = float((depth_sims.max() - depth_sims.mean()) / std)
+            else:
+                within_z[depth] = 0.0
+
+            depth_entropy[depth] = _compute_entropy(depth_sims)
+            depth_best_sim[depth] = float(depth_sims.max())
+
+        if not within_z:
+            return self._match_flat(fc, query_emb, top_k)
+
+        # Select depth with highest within-z (sharpest discrimination)
+        best_depth = max(within_z, key=lambda d: within_z[d])
+
+        # Two-stage: if there's a parent level, constrain by parent match
+        parent_depth = best_depth - 1
+        constrained_result = None
+
+        if parent_depth >= 1 and parent_depth in fc.depth_masks:
+            parent_mask = fc.depth_masks[parent_depth]
+            if parent_mask.sum() > 0:
+                parent_sims = all_sims[parent_mask]
+                parent_indices = np.where(parent_mask)[0]
+                parent_best_local = np.argmax(parent_sims)
+                parent_best_idx = parent_indices[parent_best_local]
+                parent_best_id = str(config.node_ids[parent_best_idx])
+
+                # Get descendants of the parent's best match at the target depth
+                descendants = graph.get_descendants(parent_best_id)
+                target_mask = fc.depth_masks.get(best_depth)
+                if target_mask is not None:
+                    target_indices = np.where(target_mask)[0]
+
+                    # Filter to descendants of the parent match
+                    constrained_indices = [
+                        idx for idx in target_indices
+                        if str(config.node_ids[idx]) in descendants
+                    ]
+
+                    if constrained_indices:
+                        constrained_sims = all_sims[constrained_indices]
+                        local_best = np.argmax(constrained_sims)
+                        best_idx = constrained_indices[local_best]
+                        constrained_result = (best_idx, float(constrained_sims[local_best]))
+
+        # Determine final match
+        target_mask = fc.depth_masks.get(best_depth)
+        if target_mask is not None and target_mask.sum() > 0:
+            target_indices = np.where(target_mask)[0]
+            target_sims = all_sims[target_indices]
+            unconstrained_best_local = np.argmax(target_sims)
+            unconstrained_best_idx = target_indices[unconstrained_best_local]
+            unconstrained_best_sim = float(target_sims[unconstrained_best_local])
+        else:
+            # Fallback to global best
+            unconstrained_best_idx = int(np.argmax(all_sims))
+            unconstrained_best_sim = float(all_sims[unconstrained_best_idx])
+
+        # Prefer constrained (two-stage) result at deepest level
+        deepest = max(fc.depth_masks.keys())
+        if best_depth == deepest and constrained_result is not None:
+            best_idx, best_sim = constrained_result
+        else:
+            best_idx = unconstrained_best_idx
+            best_sim = unconstrained_best_sim
+
+        # Entropy at the selected depth
+        entropy_val = depth_entropy.get(best_depth, 0.0)
+
+        # Gap detection
+        gap_detected, gap_score = self._detect_gap(
+            depth_entropy, depth_best_sim,
+        )
+
+        # Diverse alternatives
+        alternatives = self._get_diverse_alternatives(
+            fc, query_emb, best_depth, best_idx, top_k
+        )
+
+        node_z = float(fc.node_z_scores[best_idx])
+        pa = float(fc.path_alignments[best_idx])
+
+        return CatalogMatch(
+            catalog_name=config.name,
+            node_id=str(config.node_ids[best_idx]),
+            node_name=str(config.node_names[best_idx]),
+            similarity=round(best_sim, 4),
+            node_z=round(node_z, 3),
+            ontological_z=0.0,  # filled in by caller
+            depth=int(fc.node_depths[best_idx]),
+            fit=_node_z_to_fit(node_z),
+            entropy=round(entropy_val, 4),
+            path_alignment=round(pa, 4),
+            alternatives=alternatives,
+            gap_detected=gap_detected,
+            gap_score=round(gap_score, 4),
+        )
+
+    def _match_flat(
+        self,
+        fc: _FittedCatalog,
+        query_emb: np.ndarray,
+        top_k: int = 5,
+    ) -> CatalogMatch:
+        """Match against a flat (single-level) catalog."""
+        config = fc.config
+        all_sims = config.embeddings @ query_emb
+
+        best_idx = int(np.argmax(all_sims))
+        best_sim = float(all_sims[best_idx])
+
+        entropy_val = _compute_entropy(all_sims)
+        node_z = float(fc.node_z_scores[best_idx])
+
+        # Alternatives: top-k excluding best
+        k = min(top_k, len(all_sims) - 1)
+        sorted_idx = np.argsort(all_sims)[::-1]
+        alternatives = [
+            (str(config.node_ids[i]), str(config.node_names[i]), round(float(all_sims[i]), 4))
+            for i in sorted_idx[1:k + 1]
+        ]
+
+        return CatalogMatch(
+            catalog_name=config.name,
+            node_id=str(config.node_ids[best_idx]),
+            node_name=str(config.node_names[best_idx]),
+            similarity=round(best_sim, 4),
+            node_z=round(node_z, 3),
+            ontological_z=0.0,
+            depth=int(fc.node_depths[best_idx]),
+            fit=_node_z_to_fit(node_z),
+            entropy=round(entropy_val, 4),
+            path_alignment=float(fc.path_alignments[best_idx]),
+            alternatives=alternatives,
+            gap_detected=False,
+            gap_score=0.0,
+        )
+
+    def _detect_gap(
+        self,
+        depth_entropy: dict[int, float],
+        depth_best_sim: dict[int, float],
+    ) -> tuple[bool, float]:
+        """Detect catalog gap using entropy + similarity drop between depths.
+
+        A gap occurs when parent depth has low entropy (clear match) but
+        child depth has high entropy AND worse match quality.
+        """
+        sorted_depths = sorted(depth_entropy.keys())
+        if len(sorted_depths) < 2:
+            return False, 0.0
+
+        for i in range(len(sorted_depths) - 1):
+            child_depth = sorted_depths[i + 1]
+            parent_depth = sorted_depths[i]
+
+            child_entropy = depth_entropy.get(child_depth, 0.0)
+            parent_entropy = depth_entropy.get(parent_depth, 0.0)
+            child_sim = depth_best_sim.get(child_depth, 0.0)
+            parent_sim = depth_best_sim.get(parent_depth, 0.0)
+
+            entropy_increase = child_entropy - parent_entropy
+            similarity_drop = parent_sim - child_sim
+
+            if (
+                parent_entropy < 0.5
+                and child_entropy > 0.7
+                and entropy_increase > 0.3
+                and similarity_drop > 0.1
+                and child_sim < 0.8
+            ):
+                gap_score = min(
+                    (0.5 - parent_entropy) * 0.3
+                    + (child_entropy - 0.7) * 0.3
+                    + entropy_increase * 0.2
+                    + similarity_drop * 1.5
+                    + (0.8 - child_sim) * 0.5,
+                    1.0,
+                )
+                return True, max(gap_score, 0.1)
+
+        return False, 0.0
+
+    def _get_diverse_alternatives(
+        self,
+        fc: _FittedCatalog,
+        query_emb: np.ndarray,
+        target_depth: int,
+        primary_idx: int,
+        n: int = 5,
+    ) -> list[tuple[str, str, float]]:
+        """Best match from each distinct parent group, excluding primary's parent."""
+        config = fc.config
+        graph = config.graph
+        mask = fc.depth_masks.get(target_depth)
+        if mask is None:
+            return []
+
+        target_indices = np.where(mask)[0]
+        if len(target_indices) < 2:
+            return []
+
+        all_sims = config.embeddings @ query_emb
+
+        # Find primary's parent
+        primary_id = str(config.node_ids[primary_idx])
+        primary_parents = graph.get_parents(primary_id)
+        primary_parent = primary_parents[0] if primary_parents else None
+
+        # Take top ~50 candidates at this depth
+        target_sims = all_sims[target_indices]
+        k = min(50, len(target_indices))
+        top_local = np.argsort(target_sims)[::-1][:k]
+
+        best_per_parent: dict[str, tuple[str, str, float]] = {}
+        for local_idx in top_local:
+            idx = target_indices[local_idx]
+            node_id = str(config.node_ids[idx])
+            sim = float(all_sims[idx])
+
+            parents = graph.get_parents(node_id)
+            parent_id = parents[0] if parents else "_no_parent_"
+
+            # Skip primary's parent group
+            if parent_id == primary_parent:
+                continue
+
+            if parent_id not in best_per_parent or sim > best_per_parent[parent_id][2]:
+                best_per_parent[parent_id] = (
+                    node_id,
+                    str(config.node_names[idx]),
+                    round(sim, 4),
+                )
+
+        sorted_alts = sorted(best_per_parent.values(), key=lambda x: -x[2])
+        return sorted_alts[:n]
+
+    def _get_cross_domain_affinity(
+        self,
+        fc: _FittedCatalog,
+        query_emb: np.ndarray,
+        n: int = 5,
+    ) -> dict[str, float]:
+        """Get affinity scores at shallowest non-root depth."""
+        graph = fc.config.graph
+        config = fc.config
+
+        # Find shallowest non-root depth with nodes
+        shallow_depth = 1
+        nodes_at_shallow = graph.nodes_at_depth(shallow_depth)
+        if not nodes_at_shallow:
+            return {}
+
+        mask = fc.depth_masks.get(shallow_depth)
+        if mask is None or mask.sum() == 0:
+            return {}
+
+        indices = np.where(mask)[0]
+        sims = config.embeddings[indices] @ query_emb
+
+        top_k = min(n, len(sims))
+        top_local = np.argsort(sims)[::-1][:top_k]
+
+        affinity = {}
+        for local_idx in top_local:
+            idx = indices[local_idx]
+            name = str(config.node_names[idx])
+            affinity[name] = round(float(sims[local_idx]), 3)
+
+        return affinity
+
+    # ── Joint matching (Phase 2) ──────────────────────────────────────
+
+    def match(
+        self,
+        query_embs: np.ndarray,
+        top_k: int = 5,
+        coherence_weight: float = 0.3,
+        query_labels: Optional[list[str]] = None,
+    ) -> list[JointMatchResult]:
+        """Match query embeddings across all catalogs with coherence.
+
+        Parameters
+        ----------
+        query_embs : np.ndarray
+            (n_queries, d) query embeddings.
+        top_k : int
+            Number of candidates per catalog for reranking.
+        coherence_weight : float
+            0 = independent matching, 1 = coherence dominates.
+        query_labels : list[str], optional
+            Human-readable labels for each query.
+
+        Returns
+        -------
+        list[JointMatchResult]
+            One result per query.
+        """
+        if not self._is_fitted:
+            raise RuntimeError("Call fit() before matching")
+
+        query_embs = np.asarray(query_embs, dtype=np.float32)
+        if query_embs.ndim == 1:
+            query_embs = query_embs.reshape(1, -1)
+
+        n_queries = query_embs.shape[0]
+        if query_labels is None:
+            query_labels = [f"query_{i}" for i in range(n_queries)]
+
+        results = []
+        catalog_names = list(self._fitted.keys())
+
+        for qi in range(n_queries):
+            q_emb = query_embs[qi]
+
+            if not self._mappings or coherence_weight == 0:
+                # Independent matching — no coherence reranking
+                matches = {}
+                for cname in catalog_names:
+                    matches[cname] = self.match_single(cname, q_emb, top_k)
+
+                results.append(JointMatchResult(
+                    query=query_labels[qi],
+                    matches=matches,
+                    coherence_score=1.0,
+                    coherence_detail={},
+                    reranked=False,
+                    reason="independent (no mappings or weight=0)",
+                ))
+            else:
+                result = self._match_joint(
+                    q_emb, query_labels[qi], catalog_names, top_k, coherence_weight
+                )
+                results.append(result)
+
+        return results
+
+    def _match_joint(
+        self,
+        query_emb: np.ndarray,
+        query_label: str,
+        catalog_names: list[str],
+        top_k: int,
+        coherence_weight: float,
+    ) -> JointMatchResult:
+        """Match with cross-catalog coherence reranking."""
+        # Step 1: Get top-k candidates per catalog
+        candidates: dict[str, list[tuple[int, float]]] = {}
+        for cname in catalog_names:
+            fc = self._fitted[cname]
+            all_sims = fc.config.embeddings @ query_emb
+            k = min(top_k, len(all_sims))
+            top_idx = np.argsort(all_sims)[::-1][:k]
+            candidates[cname] = [(int(idx), float(all_sims[idx])) for idx in top_idx]
+
+        # Step 2: Check if independent top-1 choices are already coherent
+        independent_top1 = {
+            cname: cands[0] for cname, cands in candidates.items() if cands
+        }
+
+        # Score all catalog pairs
+        pair_coherence: dict[str, float] = {}
+        all_coherent = True
+
+        for (ca, cb), mapping in self._mapping_lookup.items():
+            if ca not in independent_top1 or cb not in independent_top1:
+                continue
+            if ca >= cb:  # avoid double-counting
+                continue
+
+            idx_a = independent_top1[ca][0]
+            idx_b = independent_top1[cb][0]
+            id_a = str(self._fitted[ca].config.node_ids[idx_a])
+            id_b = str(self._fitted[cb].config.node_ids[idx_b])
+
+            # Check if (id_a, id_b) exists in the mapping
+            score = self._mapping_score(mapping, id_a, id_b)
+            pair_key = f"{ca}-{cb}"
+            pair_coherence[pair_key] = score
+            if score < 0.5:
+                all_coherent = False
+
+        if all_coherent or not pair_coherence:
+            # Top-1 independent choices are coherent
+            matches = {}
+            for cname in catalog_names:
+                matches[cname] = self.match_single(cname, query_emb, top_k)
+
+            overall = (
+                float(np.mean(list(pair_coherence.values())))
+                if pair_coherence else 1.0
+            )
+            return JointMatchResult(
+                query=query_label,
+                matches=matches,
+                coherence_score=round(overall, 4),
+                coherence_detail=pair_coherence,
+                reranked=False,
+                reason="top-1 independent choices are coherent",
+            )
+
+        # Step 3: Exhaustive search over top_k^N combinations
+        best_combo, _score, reason = self._rerank_joint(
+            candidates, catalog_names, coherence_weight
+        )
+
+        # Build matches from best combo
+        matches = {}
+        for cname in catalog_names:
+            idx, sim = best_combo[cname]
+            fc = self._fitted[cname]
+            ontological_z = self._compute_ontological_z(fc, query_emb)
+            node_z = float(fc.node_z_scores[idx])
+            pa = float(fc.path_alignments[idx])
+
+            # Alternatives from match_single
+            single_match = self.match_single(cname, query_emb, top_k)
+
+            matches[cname] = CatalogMatch(
+                catalog_name=cname,
+                node_id=str(fc.config.node_ids[idx]),
+                node_name=str(fc.config.node_names[idx]),
+                similarity=round(sim, 4),
+                node_z=round(node_z, 3),
+                ontological_z=round(ontological_z, 3),
+                depth=int(fc.node_depths[idx]),
+                fit=_node_z_to_fit(node_z),
+                entropy=single_match.entropy,
+                path_alignment=round(pa, 4),
+                alternatives=single_match.alternatives,
+                gap_detected=single_match.gap_detected,
+                gap_score=single_match.gap_score,
+            )
+
+        # Recompute coherence for final combo
+        final_coherence: dict[str, float] = {}
+        for (ca, cb), mapping in self._mapping_lookup.items():
+            if ca not in best_combo or cb not in best_combo:
+                continue
+            if ca >= cb:
+                continue
+            idx_a = best_combo[ca][0]
+            idx_b = best_combo[cb][0]
+            id_a = str(self._fitted[ca].config.node_ids[idx_a])
+            id_b = str(self._fitted[cb].config.node_ids[idx_b])
+            final_coherence[f"{ca}-{cb}"] = self._mapping_score(mapping, id_a, id_b)
+
+        overall = (
+            float(np.mean(list(final_coherence.values())))
+            if final_coherence else 1.0
+        )
+
+        return JointMatchResult(
+            query=query_label,
+            matches=matches,
+            coherence_score=round(overall, 4),
+            coherence_detail=final_coherence,
+            reranked=True,
+            reason=reason,
+        )
+
+    def _rerank_joint(
+        self,
+        candidates: dict[str, list[tuple[int, float]]],
+        catalog_names: list[str],
+        coherence_weight: float,
+    ) -> tuple[dict[str, tuple[int, float]], float, str]:
+        """Exhaustive search over candidate combinations.
+
+        Maximizes: product(similarity_i) * coherence_bonus^coherence_weight
+        """
+        # Build candidate lists per catalog
+        cand_lists = [candidates[cname] for cname in catalog_names]
+
+        best_score = -np.inf
+        best_combo: dict[str, tuple[int, float]] = {}
+
+        for combo in itertools_product(*cand_lists):
+            # combo is a tuple of (idx, sim) per catalog
+            sim_product = 1.0
+            for _idx, sim in combo:
+                sim_product *= max(sim, 1e-6)
+
+            # Coherence bonus: for each mapped pair, check membership
+            coherence_bonus = 1.0
+            n_pairs = 0
+            for i, ca in enumerate(catalog_names):
+                for j, cb in enumerate(catalog_names):
+                    if i >= j:
+                        continue
+                    key = (ca, cb)
+                    if key not in self._mapping_lookup:
+                        continue
+                    mapping = self._mapping_lookup[key]
+                    id_a = str(self._fitted[ca].config.node_ids[combo[i][0]])
+                    id_b = str(self._fitted[cb].config.node_ids[combo[j][0]])
+                    score = self._mapping_score(mapping, id_a, id_b)
+                    coherence_bonus *= (1.0 + score)
+                    n_pairs += 1
+
+            total = sim_product * (coherence_bonus ** coherence_weight)
+
+            if total > best_score:
+                best_score = total
+                best_combo = {
+                    cname: combo[i]
+                    for i, cname in enumerate(catalog_names)
+                }
+
+        n_combos = 1
+        for cl in cand_lists:
+            n_combos *= len(cl)
+        reason = f"reranked {n_combos} combinations, coherence_weight={coherence_weight}"
+
+        return best_combo, best_score, reason
+
+    def _mapping_score(
+        self,
+        mapping: CrossMapping,
+        source_id: str,
+        target_id: str,
+    ) -> float:
+        """Check if (source_id, target_id) exists in a mapping.
+
+        Returns the weight if found, 0.0 otherwise.
+        """
+        matches = (mapping.source_ids == source_id) & (mapping.target_ids == target_id)
+        if matches.any():
+            return float(mapping.weights[matches][0])
+        return 0.0
+
+    # ── Serialization (Phase 3) ───────────────────────────────────────
+
+    def to_dict(self) -> dict:
+        """Serialize CatalogSpace to a JSON-compatible dict.
+
+        Includes catalog configs and mappings but not fitted state
+        (call fit() after from_dict()).
+        """
+        catalogs = {}
+        for name, config in self._configs.items():
+            catalogs[name] = {
+                "name": config.name,
+                "graph": config.graph.to_dict(),
+                "embeddings": config.embeddings.tolist(),
+                "node_ids": config.node_ids.tolist(),
+                "node_names": config.node_names.tolist(),
+            }
+
+        mappings = []
+        for m in self._mappings:
+            mappings.append({
+                "source_catalog": m.source_catalog,
+                "target_catalog": m.target_catalog,
+                "source_ids": m.source_ids.tolist(),
+                "target_ids": m.target_ids.tolist(),
+                "weights": m.weights.tolist(),
+            })
+
+        return {"catalogs": catalogs, "mappings": mappings}
+
+    @classmethod
+    def from_dict(cls, data: dict) -> CatalogSpace:
+        """Reconstruct CatalogSpace from to_dict() output.
+
+        NOTE: Returns unfitted — call fit() after.
+        """
+        space = cls()
+        for _name, cdata in data["catalogs"].items():
+            config = CatalogConfig(
+                name=cdata["name"],
+                graph=CategoryGraph.from_dict(cdata["graph"]),
+                embeddings=np.array(cdata["embeddings"], dtype=np.float32),
+                node_ids=np.array(cdata["node_ids"], dtype=str),
+                node_names=np.array(cdata["node_names"], dtype=str),
+            )
+            space.add_catalog(config)
+
+        for mdata in data.get("mappings", []):
+            mapping = CrossMapping(
+                source_catalog=mdata["source_catalog"],
+                target_catalog=mdata["target_catalog"],
+                source_ids=np.array(mdata["source_ids"], dtype=str),
+                target_ids=np.array(mdata["target_ids"], dtype=str),
+                weights=np.array(mdata["weights"], dtype=np.float32),
+            )
+            space.add_mapping(mapping)
+
+        return space
+
+    def to_json(self) -> str:
+        """Serialize to JSON string."""
+        return json.dumps(self.to_dict())
+
+    @classmethod
+    def from_json(cls, s: str) -> CatalogSpace:
+        """Reconstruct from JSON string. Returns unfitted."""
+        return cls.from_dict(json.loads(s))
+
+    # ── Catalog info ──────────────────────────────────────────────────
+
+    @property
+    def catalog_names(self) -> list[str]:
+        """Names of all registered catalogs."""
+        return list(self._configs.keys())
+
+    @property
+    def is_fitted(self) -> bool:
+        """Whether fit() has been called."""
+        return self._is_fitted
+
+    def summary(self) -> str:
+        """Human-readable summary."""
+        parts = [f"CatalogSpace: {len(self._configs)} catalogs"]
+        for name, config in self._configs.items():
+            n = len(config.node_ids)
+            d = config.embeddings.shape[1] if config.embeddings.ndim == 2 else 0
+            parts.append(f"  {name}: {n} nodes, {d}d embeddings")
+        if self._mappings:
+            parts.append(f"  {len(self._mappings)} cross-mappings")
+        parts.append(f"  fitted={self._is_fitted}")
+        return "\n".join(parts)
+
+
+# ── Helper on CatalogMatch for internal use ──────────────────────────────
+
+
+def _replace_ontological_z(match: CatalogMatch, oz: float) -> CatalogMatch:
+    """Return a new CatalogMatch with updated ontological_z and fit."""
+    return CatalogMatch(
+        catalog_name=match.catalog_name,
+        node_id=match.node_id,
+        node_name=match.node_name,
+        similarity=match.similarity,
+        node_z=match.node_z,
+        ontological_z=round(oz, 3),
+        depth=match.depth,
+        fit=match.fit,
+        entropy=match.entropy,
+        path_alignment=match.path_alignment,
+        alternatives=match.alternatives,
+        gap_detected=match.gap_detected,
+        gap_score=match.gap_score,
+    )
