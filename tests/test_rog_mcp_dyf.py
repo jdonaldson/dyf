@@ -26,12 +26,13 @@ pytestmark = pytest.mark.skipif(
 try:
     import pyarrow  # noqa: F401
     import flatbuffers  # noqa: F401
+    import websockets  # noqa: F401
     _HAS_LAZY_DEPS = True
 except ImportError:
     _HAS_LAZY_DEPS = False
 
 lazy_deps = pytest.mark.skipif(
-    not _HAS_LAZY_DEPS, reason="pyarrow and flatbuffers required"
+    not _HAS_LAZY_DEPS, reason="pyarrow, flatbuffers, and websockets required"
 )
 
 
