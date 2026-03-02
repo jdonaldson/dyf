@@ -31,3 +31,49 @@ Prefer DAG (directed acyclic graph) oriented pipelines wherever possible:
   - Is a cached intermediate still valid, or have its inputs changed?
 - **Practical application**: `dyfviz.py` and `rog_preprocess.py` currently run monolithic pipelines; prefer checkpointed stages where each stage reads/writes a known artifact and can be skipped if the artifact is fresh
 - Think `make`-style: each target depends on prerequisites, only rebuild what's stale
+
+## 🔄 RESUME CONTEXT - DELETE AFTER READING
+
+**⚠️ INSTRUCTIONS FOR CLAUDE**:
+- Read this section when starting a new session
+- Complete any pending tasks listed here
+- Delete this entire section after processing
+- Continue with the conversation
+
+### Current Status
+dyfviz.py cleanup complete (4 tasks). Embedding model benchmark complete. File triage partially done.
+
+### What Was Built
+
+**dyfviz.py cleanup (3 commits: 54b920b, 3bc224a, 48bea0c):**
+1. Removed dead `golden_ratio_color_map` from dyfviz.py
+2. Extracted 2,920-line JS blob from Python f-string → `demo/pydeck_overlay.js` (dyfviz.py shrank from ~6K to ~3K lines)
+3. Fixed 4 Pyright warnings (`.group()` on None, `min()` overload)
+4. Created `src/dyf/colors.py` with spatial color functions; `dyf_enrich.py` stores color maps in .dyf metadata; `dyfviz.py` loads pre-stored maps with on-the-fly fallback
+
+**Embedding model benchmark:**
+- `embedding_model_comparison.md` — full analysis: Nomic v1.5 wins on GUDID (0.3721 avg purity), mxbai loses (-1.5%), Fisher is zero-effect at high cardinality
+- `/tmp/embed_purity_benchmark.py` — benchmark script (not committed)
+- `demo/purity_benchmark_results.json` — raw results (committed)
+- Embedding caches in demo/ (`mxbai_5k_cache.npy`, `minilm_5k_cache.npy`) — not committed, should be gitignored
+
+**Source modules and tests committed (3bc224a):**
+- `src/dyf/fisher.py`, `pipeline.py`, `provenance.py`
+- 7 test files in `tests/`
+
+**Demo scripts committed (48bea0c):**
+- `cifar_embeddings.py`, `patch_overlay.py`, `pca_tree_knn_umap.py`, `pubmed_embeddings.py`, `rog_demo.py`
+
+**Trashed:** `demo/rog_3d.py` (pickle-dependent), `demo/wiki_viz_original.py` (pre-dyfviz era)
+
+### Remaining Uncommitted/Untracked
+- **Modified but uncommitted**: `.claude/settings.local.json`, `.mcp.json`, `CLAUDE.md`, `demo/build_dyf_indexes.py`, `demo/energy_label_cache.json`, `demo/rog_mcp.py`, `demo/rog_preprocess.py`, `src/dyf/__init__.py`, `src/dyf/lazy_index.py`
+- **Untracked exploration scripts** (left intentionally): `demo/clustering_experiments.py`, `demo/dyf_tree_sankey.py`, `demo/pca_tree_multi_address.py`, `demo/wiki_umap_birch.py`, `demo/wiki_umap_birch_eval.py`
+- **Untracked infra**: `.envrc`, `pyrightconfig.json`, `uv.lock`, `docs/.gitignore`, `benchmarks/`
+- **Embedding caches** (`demo/mxbai_5k_cache.npy`, `demo/minilm_5k_cache.npy`) — should be gitignored
+
+### Context to Remember
+- `__init__.py` was modified externally to add CatalogSpace imports — do not revert
+- CatalogSpace module (commit 8c2a167) is complete; next phase would be shortorder integration at `/Users/jdonaldson/Projects/work/curvo/shortorder/`
+- Pre-commit hook rejects `Co-Authored-By:.*[Cc]laude` — omit from commit messages
+- 7 pre-existing Pyright warnings remain in dyfviz.py (not from our changes)
