@@ -421,10 +421,93 @@ def _sample_spatial(point_indices, coords, k):
     return pts[chosen].tolist()
 
 
+def _get_cluster_path_context(point_indices, split_keywords, titles,
+                              sample_size=50, top_k=3):
+    """Get the majority tree path context for a cluster's points.
+
+    Samples points from the cluster, traces each through the split tree,
+    and returns the most common path as a readable string.
+
+    Args:
+        point_indices: List of item indices in this cluster.
+        split_keywords: Parsed split_keywords metadata dict.
+        titles: Full titles list (unused but kept for API consistency).
+        sample_size: How many points to sample for majority vote.
+        top_k: Keywords per path step.
+
+    Returns:
+        String like "screw,plate,fixation → pedicle,cervical,spine" or ""
+    """
+    splits = split_keywords.get('splits', {})
+    if not splits:
+        return ""
+
+    # Sample a subset for efficiency
+    rng = np.random.default_rng(42)
+    pts = np.asarray(point_indices)
+    if len(pts) > sample_size:
+        pts = rng.choice(pts, size=sample_size, replace=False)
+
+    # For each split node, find which child each point belongs to
+    # by checking the 'count' ranges. We trace majority child per split.
+    # Build a node → child_id mapping for each point by checking membership.
+    split_votes: dict[str, Counter] = defaultdict(Counter)
+
+    for nid_str, split in splits.items():
+        children = split.get('children', {})
+        if not children:
+            continue
+
+        # Build a quick lookup: which points belong to which child
+        # We don't have the tree/leaf_batches here, so use a heuristic:
+        # count how many sample points have titles matching each child's
+        # top keywords.
+        for cid_str, cinfo in children.items():
+            unigrams = [w for w, _ in cinfo.get('unigrams', [])[:top_k]]
+            if not unigrams:
+                continue
+            # Count how many sample points match this child's keywords
+            kw_set = set(unigrams)
+            match_count = 0
+            for idx in pts:
+                if idx < len(titles):
+                    words = set(re.findall(r'[a-z]{3,}', titles[idx].lower()))
+                    if words & kw_set:
+                        match_count += 1
+            split_votes[nid_str][cid_str] = match_count
+
+    # Build path from the winning child at each depth
+    path_steps = []
+    # Sort splits by depth
+    sorted_splits = sorted(
+        splits.items(),
+        key=lambda x: x[1].get('depth', 0)
+    )
+    for nid_str, split in sorted_splits:
+        votes = split_votes.get(nid_str)
+        if not votes:
+            continue
+        # Pick the child with most keyword matches
+        winner = votes.most_common(1)[0][0]
+        children = split.get('children', {})
+        winner_info = children.get(winner, {})
+        words = [w for w, _ in winner_info.get('unigrams', [])[:top_k]]
+        if words:
+            path_steps.append(','.join(words))
+
+    if not path_steps:
+        return ""
+    return ' → '.join(path_steps)
+
+
 def label_clusters(titles, coords, labels, embeddings, model="gemma2:9b",
                    n_samples=20, cache_file=None, cache_key=None,
-                   cache_data=None):
-    """Label clusters via contrastive TF-IDF + local Ollama LLM."""
+                   cache_data=None, split_keywords=None):
+    """Label clusters via contrastive TF-IDF + local Ollama LLM.
+
+    When split_keywords is provided, replaces per-cluster contrastive TF-IDF
+    with tree path context derived from the DYF tree splits.
+    """
     from concurrent.futures import ThreadPoolExecutor, as_completed
     from collections import Counter
 
@@ -486,22 +569,35 @@ def label_clusters(titles, coords, labels, embeddings, model="gemma2:9b",
                 if len(sample_titles) >= n_samples:
                     break
 
-        nearest_idx = _find_nearest_cluster(cid_to_idx[cid], hd_centroids)
-        nearest_cid = unique_labels[nearest_idx]
-        neighbor_pts = cluster_points[nearest_cid]
-
+        # Build context string: prefer split path keywords, fallback to
+        # contrastive TF-IDF vs nearest neighbor
         kw_str = ""
-        if neighbor_pts:
-            combined = ([titles[p] for p in pts]
-                        + [titles[p] for p in neighbor_pts])
-            combined_labels = np.zeros(len(pts) + len(neighbor_pts), dtype=int)
-            combined_labels[len(pts):] = 1
-            kw = _compute_tfidf_keywords(combined, combined_labels, 2,
-                                         top_k=8, min_df=1)
-            keywords = [w for w, _ in kw.get(0, [])][:8]
-            if keywords:
-                kw_str = (f"\nDistinguishing keywords (vs neighbor): "
-                          f"{', '.join(keywords)}")
+        if split_keywords:
+            # Use tree path context from split keywords
+            path_context = _get_cluster_path_context(
+                pts, split_keywords, titles)
+            if path_context:
+                kw_str = (f"\nTree path context (root → leaf): "
+                          f"{path_context}")
+
+        if not kw_str:
+            # Fallback: contrastive TF-IDF vs nearest neighbor
+            nearest_idx = _find_nearest_cluster(cid_to_idx[cid], hd_centroids)
+            nearest_cid = unique_labels[nearest_idx]
+            neighbor_pts = cluster_points[nearest_cid]
+
+            if neighbor_pts:
+                combined = ([titles[p] for p in pts]
+                            + [titles[p] for p in neighbor_pts])
+                combined_labels = np.zeros(
+                    len(pts) + len(neighbor_pts), dtype=int)
+                combined_labels[len(pts):] = 1
+                kw = _compute_tfidf_keywords(combined, combined_labels, 2,
+                                             top_k=8, min_df=1)
+                keywords = [w for w, _ in kw.get(0, [])][:8]
+                if keywords:
+                    kw_str = (f"\nDistinguishing keywords (vs neighbor): "
+                              f"{', '.join(keywords)}")
 
         prompt = (
             f"You are labeling clusters in an embedding space. "
@@ -1014,6 +1110,14 @@ def enrich_cluster(dyf_path, n_clusters_list=None, model="gemma2:9b",
     if label_cache_data:
         print(f"  Loaded {len(label_cache_data)} label cache entries from .dyf")
 
+    # Load split keywords if available (for improved cluster labeling context)
+    split_kw_json = data['metadata'].get('split_keywords')
+    split_kw_data = None
+    if split_kw_json:
+        split_kw_data = json.loads(split_kw_json)
+        n_splits = len(split_kw_data.get('splits', {}))
+        print(f"  Using split keywords ({n_splits} splits) for label context")
+
     # Cluster at each level — dual 2D/3D clustering
     new_sf = {}
     new_meta = {}
@@ -1047,7 +1151,8 @@ def enrich_cluster(dyf_path, n_clusters_list=None, model="gemma2:9b",
         names_2d_raw = label_clusters(
             titles, coords, labels_2d, embeddings,
             model=model, cache_data=label_cache_data,
-            cache_key=f"cluster_{target_k}_2d")
+            cache_key=f"cluster_{target_k}_2d",
+            split_keywords=split_kw_data)
         label_cache_data[f"cluster_{target_k}_2d"] = {
             str(k): v for k, v in names_2d_raw.items()}
         names_2d = annotate_cluster_names(
@@ -1196,6 +1301,102 @@ def reannotate(dyf_path, output_path=None):
     print(f"\n  Writing: {out}")
     rewrite_lazy_index(dyf_path, new_metadata=new_meta, output_path=out)
     print("  Done.")
+
+
+# ── Split keyword enrichment ───────────────────────────────────────────
+
+
+def enrich_splits(dyf_path, max_depth=3, bigram_check=False, output_path=None,
+                  domain_threshold=0.10, min_child_items=50):
+    """Compute tree split keywords and store in .dyf metadata.
+
+    For each internal node (up to max_depth), computes discriminative TF-IDF
+    keywords for each child side of the split. These keywords provide
+    deterministic, LLM-free context for cluster labeling.
+
+    Args:
+        dyf_path: Path to .dyf file (needs at least titles stored).
+        max_depth: Maximum depth from root to compute keywords for.
+        bigram_check: Enable PMI-based compound meaning detection.
+        output_path: Output path (defaults to overwriting input).
+        domain_threshold: Fraction threshold for domain stop words (0.0-1.0).
+        min_child_items: Skip children with fewer items than this.
+    """
+    from dyf.splits import (
+        build_tree_maps, compute_domain_stopwords, compute_split_keywords,
+    )
+
+    print(f"\n=== Split Keywords ===")
+    print(f"  Input: {dyf_path}")
+
+    with LazyIndex(dyf_path) as idx:
+        tree, children_map, leaf_batches = build_tree_maps(idx)
+
+    # Extract titles
+    with LazyIndex(dyf_path) as idx:
+        data = idx.extract_all_fields()
+    titles = data['fields'].get('title')
+    if titles is None:
+        titles = [f"Item {i}" for i in range(len(data['embeddings']))]
+    if isinstance(titles, np.ndarray):
+        titles = titles.tolist()
+
+    n = len(titles)
+    print(f"  {n:,} items, tree has {len(tree)} nodes")
+
+    # Compute domain stop words
+    domain_sw = compute_domain_stopwords(titles, threshold=domain_threshold)
+    print(f"  {len(domain_sw)} domain stop words "
+          f"(e.g. {sorted(domain_sw)[:5]})")
+
+    # Compute split keywords
+    result = compute_split_keywords(
+        titles, tree, leaf_batches, children_map,
+        max_depth_from_root=max_depth,
+        min_child_items=min_child_items,
+        domain_stopwords=domain_sw,
+        bigram_check=bigram_check,
+    )
+
+    n_splits = len(result['splits'])
+    print(f"  Computed keywords for {n_splits} splits "
+          f"(depth 0-{max_depth - 1})")
+
+    if bigram_check:
+        needed = sum(1 for s in result['splits'].values()
+                     if s.get('bigram_needed'))
+        print(f"  Bigram needed: {needed}/{n_splits} splits")
+
+    # Serialize: convert tuple keys/values for JSON
+    serializable = {
+        'domain_stopwords': result['domain_stopwords'],
+        'splits': {},
+    }
+    for nid, split in result['splits'].items():
+        s = {
+            'depth': split['depth'],
+            'children': {},
+        }
+        if 'bigram_needed' in split:
+            s['bigram_needed'] = split['bigram_needed']
+        for cid, cinfo in split['children'].items():
+            entry = {
+                'count': cinfo['count'],
+                'unigrams': cinfo['unigrams'],
+            }
+            if 'bigrams' in cinfo:
+                entry['bigrams'] = cinfo['bigrams']
+            s['children'][str(cid)] = entry
+        serializable['splits'][str(nid)] = s
+
+    new_meta = {
+        'split_keywords': json.dumps(serializable),
+    }
+
+    out = output_path or dyf_path
+    print(f"  Writing enriched file: {out}")
+    rewrite_lazy_index(dyf_path, new_metadata=new_meta, output_path=out)
+    print(f"  Done.")
 
 
 # ── Bridge edges + narration (Level 2 → 3) ─────────────────────────────
@@ -1598,6 +1799,16 @@ def main():
                         help="Ollama model for labeling")
     p_tree.add_argument("-o", "--output", default=None)
 
+    # splits
+    p_splits = subparsers.add_parser(
+        "splits", help="Compute tree split keywords (deterministic, no LLM)")
+    p_splits.add_argument("dyf_path", help="Path to .dyf file")
+    p_splits.add_argument("--depth", type=int, default=3,
+                          help="Max depth from root (default: 3)")
+    p_splits.add_argument("--bigram-check", action="store_true",
+                          help="Enable PMI-based compound meaning detection")
+    p_splits.add_argument("-o", "--output", default=None)
+
     # reannotate
     p_reann = subparsers.add_parser(
         "reannotate", help="Re-run glyph annotations without re-clustering")
@@ -1638,6 +1849,11 @@ def main():
         enrich_viz(args.dyf_path, cluster_level=args.cluster_level,
                    model=args.model, title=args.title,
                    output_path=args.output, force=args.force)
+
+    elif args.command == "splits":
+        enrich_splits(args.dyf_path, max_depth=args.depth,
+                      bigram_check=args.bigram_check,
+                      output_path=args.output)
 
     elif args.command == "reannotate":
         reannotate(args.dyf_path, output_path=args.output)

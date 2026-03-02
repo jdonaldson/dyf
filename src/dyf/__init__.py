@@ -126,6 +126,15 @@ from .catalog import (
     JointMatchResult,
 )
 
+# Split-based tree keywords
+from .splits import (
+    build_tree_maps,
+    collect_descendant_indices,
+    compute_domain_stopwords,
+    compute_split_keywords,
+    format_split_path,
+)
+
 # Spatial cluster coloring
 from .colors import spatial_rgb_map, spatial_color_map
 
@@ -261,6 +270,12 @@ __all__ = [
     "CatalogSpace",
     "CrossMapping",
     "JointMatchResult",
+    # Split-based tree keywords
+    "build_tree_maps",
+    "collect_descendant_indices",
+    "compute_domain_stopwords",
+    "compute_split_keywords",
+    "format_split_path",
     # Spatial cluster coloring
     "spatial_rgb_map",
     "spatial_color_map",
