@@ -994,7 +994,11 @@ def enrich_tree(dyf_path, model="gemma2:9b", target_depth=3,
 
 def annotate_cluster_names(names, labels, embeddings,
                            max_sample=200, seed=42):
-    """Prepend glyph annotations to cluster names for size and purity.
+    """Compute size/purity glyphs and return clean names + separate glyph dict.
+
+    Returns (names_dict, glyphs_dict) where:
+    - names_dict: {cluster_id: "clean label"} — no glyphs in text
+    - glyphs_dict: {cluster_id: {"size": "⭑"|"⭒"|"", "purity": "≈"|""}}
 
     Size (point count, z-score based):
         ⭑ big hub   — count > 1 stdev above mean
@@ -1002,7 +1006,7 @@ def annotate_cluster_names(names, labels, embeddings,
         (no star)   — below mean
 
     Purity (intra-cluster cosine similarity, z-score based):
-        ≈ appended when purity > 1 stdev below mean (impure flag)
+        ≈ when purity > 1 stdev below mean (impure flag)
     """
     rng = np.random.RandomState(seed)
     cluster_ids = sorted(set(int(c) for c in labels))
@@ -1048,9 +1052,13 @@ def annotate_cluster_names(names, labels, embeddings,
     print(f"    Purity: mean={pur_mean:.3f}, σ={pur_std:.3f}, "
           f"threshold={pur_threshold:.3f} → {n_impure} impure")
 
-    # ── Annotate ──
-    annotated = {}
+    # ── Build clean names + separate glyphs ──
+    clean_names = {}
+    glyphs_dict = {}
     for cid in cluster_ids:
+        name = names.get(cid, names.get(str(cid), f"Cluster {cid}"))
+        clean_names[cid] = name
+
         if sizes[cid] > size_threshold:
             star = '⭑'
         elif sizes[cid] > size_mean:
@@ -1058,15 +1066,12 @@ def annotate_cluster_names(names, labels, embeddings,
         else:
             star = ''
         impure = '≈' if purities[cid] < pur_threshold else ''
-        prefix = f'{star}{impure} ' if (star or impure) else ''
+        glyphs_dict[cid] = {"size": star, "purity": impure}
 
-        name = names.get(cid, names.get(str(cid), f"Cluster {cid}"))
-        annotated[cid] = f'{prefix}{name}'
-
-    n_annotated = sum(1 for c in cluster_ids
-                      if annotated[c] != names.get(c, names.get(str(c), '')))
-    print(f"    Annotated {n_annotated}/{len(cluster_ids)} clusters")
-    return annotated
+    n_flagged = sum(1 for g in glyphs_dict.values()
+                    if g['size'] or g['purity'])
+    print(f"    Flagged {n_flagged}/{len(cluster_ids)} clusters with glyphs")
+    return clean_names, glyphs_dict
 
 
 def enrich_cluster(dyf_path, n_clusters_list=None, model="gemma2:9b",
@@ -1212,11 +1217,12 @@ def enrich_cluster(dyf_path, n_clusters_list=None, model="gemma2:9b",
             sibling_keywords=dag_sibling_kw)
         label_cache_data[f"cluster_{target_k}_2d"] = {
             str(k): v for k, v in names_2d_raw.items()}
-        names_2d = annotate_cluster_names(
-            names_2d_raw, labels_2d, embeddings,
-)
+        names_2d, glyphs_2d = annotate_cluster_names(
+            names_2d_raw, labels_2d, embeddings)
         new_meta[f'cluster_names_{target_k}_2d'] = json.dumps(
             {str(k): v for k, v in names_2d.items()})
+        new_meta[f'cluster_glyphs_{target_k}_2d'] = json.dumps(
+            {str(k): v for k, v in glyphs_2d.items()})
 
         # ── 3D clustering (secondary — labels transferred) ──
         print(f"  Clustering 3D at k={target_k}...")
@@ -1242,11 +1248,12 @@ def enrich_cluster(dyf_path, n_clusters_list=None, model="gemma2:9b",
         # Transfer 2D labels to 3D via majority vote (use raw names)
         names_3d_raw = transfer_labels_majority_vote(
             labels_2d, names_2d_raw, labels_3d)
-        names_3d = annotate_cluster_names(
-            names_3d_raw, labels_3d, embeddings,
-)
+        names_3d, glyphs_3d = annotate_cluster_names(
+            names_3d_raw, labels_3d, embeddings)
         new_meta[f'cluster_names_{target_k}_3d'] = json.dumps(
             {str(k): v for k, v in names_3d.items()})
+        new_meta[f'cluster_glyphs_{target_k}_3d'] = json.dumps(
+            {str(k): v for k, v in glyphs_3d.items()})
 
         print(f"    Transferred labels to {n_3d} 3D clusters")
 
@@ -1337,10 +1344,12 @@ def reannotate(dyf_path, output_path=None):
         if sf_2d in data['fields']:
             labels_2d = data['fields'][sf_2d].astype(np.int32)
             print(f"  Reannotating {sf_2d}...")
-            ann_2d = annotate_cluster_names(
+            ann_2d, gly_2d = annotate_cluster_names(
                 raw_2d, labels_2d, embeddings)
             new_meta[f'cluster_names_{target_k}_2d'] = json.dumps(
                 {str(k): v for k, v in ann_2d.items()})
+            new_meta[f'cluster_glyphs_{target_k}_2d'] = json.dumps(
+                {str(k): v for k, v in gly_2d.items()})
 
         # Reannotate 3D (transfer from 2D raw names, then annotate)
         sf_3d = f'cluster_{target_k}_3d'
@@ -1349,10 +1358,12 @@ def reannotate(dyf_path, output_path=None):
             raw_3d = transfer_labels_majority_vote(
                 labels_2d, raw_2d, labels_3d)
             print(f"  Reannotating {sf_3d}...")
-            ann_3d = annotate_cluster_names(
+            ann_3d, gly_3d = annotate_cluster_names(
                 raw_3d, labels_3d, embeddings)
             new_meta[f'cluster_names_{target_k}_3d'] = json.dumps(
                 {str(k): v for k, v in ann_3d.items()})
+            new_meta[f'cluster_glyphs_{target_k}_3d'] = json.dumps(
+                {str(k): v for k, v in gly_3d.items()})
 
     out = output_path or dyf_path
     print(f"\n  Writing: {out}")

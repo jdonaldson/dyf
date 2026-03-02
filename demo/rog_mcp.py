@@ -239,12 +239,26 @@ def load_cache(dyf_path: str):
         print(f"  Loaded path labels for levels: {sorted(path_labels.keys())}",
               file=sys.stderr)
 
+    # Cluster glyphs (size/purity indicators)
+    cluster_glyphs = {}
+    for mk, mv in data['metadata'].items():
+        if mk.startswith('cluster_glyphs_') and mv:
+            # e.g. cluster_glyphs_25_2d → level 25
+            parts = mk.replace('cluster_glyphs_', '').split('_')
+            if parts:
+                try:
+                    lvl = int(parts[0])
+                    cluster_glyphs[lvl] = json.loads(mv)
+                except (ValueError, json.JSONDecodeError):
+                    pass
+
     CACHE = {
         'titles': titles,
         'coords_2d': coords_2d,
         'cluster_result': cluster_result,
         'cluster_pairs': cluster_pairs,
         'path_labels': path_labels,
+        'cluster_glyphs': cluster_glyphs,
     }
 
     # Also set DYF_INDEX for semantic search
@@ -386,6 +400,11 @@ def get_cluster_info(level: int = 5) -> list[dict]:
         pl = level_path_labels.get(str(i), "")
         if pl:
             entry['path_label'] = pl
+        # Include glyphs (size/purity indicators) if available
+        level_glyphs = CACHE.get('cluster_glyphs', {}).get(level, {})
+        gly = level_glyphs.get(str(i))
+        if gly:
+            entry['glyphs'] = gly
         clusters.append(entry)
 
     return sorted(clusters, key=lambda c: -c['count'])
