@@ -533,7 +533,8 @@ class CatalogSpace:
             return self._match_flat(fc, query_emb, top_k)
 
         # Select depth with highest within-z (sharpest discrimination)
-        best_depth = max(within_z, key=lambda d: within_z[d])
+        # Tiebreaker: prefer deeper level (principle of least power)
+        best_depth = max(within_z, key=lambda d: (within_z[d], d))
 
         # Two-stage: if there's a parent level, constrain by parent match
         parent_depth = best_depth - 1
@@ -542,11 +543,26 @@ class CatalogSpace:
         if parent_depth >= 1 and parent_depth in fc.depth_masks:
             parent_mask = fc.depth_masks[parent_depth]
             if parent_mask.sum() > 0:
-                parent_sims = all_sims[parent_mask]
-                parent_indices = np.where(parent_mask)[0]
-                parent_best_local = np.argmax(parent_sims)
-                parent_best_idx = parent_indices[parent_best_local]
-                parent_best_id = str(config.node_ids[parent_best_idx])
+                # Bottom-up: pick parent whose best child scores highest
+                target_mask_bu = fc.depth_masks.get(best_depth)
+                parent_scores: dict[str, float] = {}
+                if target_mask_bu is not None:
+                    target_indices_bu = np.where(target_mask_bu)[0]
+                    for idx in target_indices_bu:
+                        child_id = str(config.node_ids[idx])
+                        child_sim = float(all_sims[idx])
+                        for pid in graph.get_parents(child_id):
+                            if pid in fc.id_to_idx and fc.node_depths[fc.id_to_idx[pid]] == parent_depth:
+                                if pid not in parent_scores or child_sim > parent_scores[pid]:
+                                    parent_scores[pid] = child_sim
+
+                if parent_scores:
+                    parent_best_id = max(parent_scores, key=lambda k: parent_scores[k])
+                else:
+                    # Fallback: class-embedding match (no children at target depth)
+                    parent_sims = all_sims[parent_mask]
+                    parent_indices = np.where(parent_mask)[0]
+                    parent_best_id = str(config.node_ids[parent_indices[np.argmax(parent_sims)]])
 
                 # Get descendants of the parent's best match at the target depth
                 descendants = graph.get_descendants(parent_best_id)

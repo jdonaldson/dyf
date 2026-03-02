@@ -677,3 +677,98 @@ class TestDimensionMismatch:
 
         with pytest.raises(ValueError, match="dimensions"):
             space.fit()
+
+
+class TestBottomUpParentSelection:
+    """Test 18: Bottom-up max selects parent by best child similarity."""
+
+    def test_bottom_up_beats_class_embedding(self):
+        """Parent B has a nearer class embedding, but Parent A's child
+        scores highest — bottom-up should pick Parent A.
+
+        Uses 3 children per parent so depth-2 within-z exceeds depth-1,
+        ensuring the two-stage parent-constrained path is exercised.
+        """
+        dim = 32
+        rng = np.random.default_rng(99)
+
+        # Query direction
+        query_dir = rng.standard_normal(dim).astype(np.float32)
+        query_dir /= np.linalg.norm(query_dir)
+
+        # Orthogonal direction for separation
+        ortho = rng.standard_normal(dim).astype(np.float32)
+        ortho -= ortho @ query_dir * query_dir
+        ortho /= np.linalg.norm(ortho)
+
+        # Parent A ("Surgical") — class embedding far from query
+        parent_a_emb = (ortho * 0.9 + query_dir * 0.1).astype(np.float32)
+        parent_a_emb /= np.linalg.norm(parent_a_emb)
+
+        # Parent B ("Writing") — class embedding near query
+        parent_b_emb = (query_dir * 0.85 + ortho * 0.15).astype(np.float32)
+        parent_b_emb /= np.linalg.norm(parent_b_emb)
+
+        # Child of A: "cautery pencil" — very near query
+        child_a1 = (query_dir * 0.95 + ortho * 0.05).astype(np.float32)
+        child_a1 /= np.linalg.norm(child_a1)
+        # Two more children of A, far from query (near parent A direction)
+        child_a2 = (ortho * 0.85 + query_dir * 0.15).astype(np.float32)
+        child_a2 /= np.linalg.norm(child_a2)
+        child_a3 = (ortho * 0.80 + query_dir * 0.20).astype(np.float32)
+        child_a3 /= np.linalg.norm(child_a3)
+
+        # Children of B: all far from query
+        child_b1 = (-query_dir * 0.6 + ortho * 0.4).astype(np.float32)
+        child_b1 /= np.linalg.norm(child_b1)
+        child_b2 = (-query_dir * 0.5 + ortho * 0.5).astype(np.float32)
+        child_b2 /= np.linalg.norm(child_b2)
+        child_b3 = (-query_dir * 0.7 + ortho * 0.3).astype(np.float32)
+        child_b3 /= np.linalg.norm(child_b3)
+
+        edges = [
+            ("_root_", "PA", 0.5),
+            ("_root_", "PB", 0.5),
+            ("PA", "CA1", 1.0 / 3),
+            ("PA", "CA2", 1.0 / 3),
+            ("PA", "CA3", 1.0 / 3),
+            ("PB", "CB1", 1.0 / 3),
+            ("PB", "CB2", 1.0 / 3),
+            ("PB", "CB3", 1.0 / 3),
+        ]
+        graph = CategoryGraph.from_edges(edges)
+
+        node_ids = np.array(
+            ["PA", "PB", "CA1", "CA2", "CA3", "CB1", "CB2", "CB3"], dtype=str
+        )
+        node_names = np.array(
+            ["Surgical", "Writing", "cautery pencil", "scalpel", "forceps",
+             "mechanical pencil", "ballpoint", "eraser"], dtype=str
+        )
+        embeddings = np.array(
+            [parent_a_emb, parent_b_emb, child_a1, child_a2, child_a3,
+             child_b1, child_b2, child_b3], dtype=np.float32
+        )
+
+        config = _make_config("test_bu", graph, embeddings, node_ids, node_names)
+        space = CatalogSpace()
+        space.add_catalog(config).fit()
+
+        query = query_dir.copy()
+        result = space.match_single("test_bu", query)
+
+        # Verify preconditions:
+        # Parent B's class embedding is closer to query than Parent A's
+        sim_pa = float(parent_a_emb @ query)
+        sim_pb = float(parent_b_emb @ query)
+        assert sim_pb > sim_pa, "Precondition: Parent B class embedding should be nearer to query"
+
+        # But child CA1 is nearest overall child
+        sim_ca1 = float(child_a1 @ query)
+        child_b_sims = [float(e @ query) for e in [child_b1, child_b2, child_b3]]
+        assert sim_ca1 > max(child_b_sims), "Precondition: CA1 should be nearer to query than any B child"
+
+        # Bottom-up should select CA1 (child of Parent A)
+        assert result.node_id == "CA1", (
+            f"Expected CA1 (child of Surgical), got {result.node_id}"
+        )
