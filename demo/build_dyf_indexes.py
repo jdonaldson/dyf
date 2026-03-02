@@ -29,6 +29,7 @@ from dyf.categorical import (
 from dyf.dyf_tree import build_dyf_tree
 from dyf.fisher import extract_fisher_labels, compute_fisher_weights, apply_fisher_weights
 from dyf.lazy_index import write_lazy_index
+from dyf.provenance import create_provenance, provenance_to_dict
 
 DEMO_DIR = Path(__file__).resolve().parent
 
@@ -137,6 +138,25 @@ def build_index(cfg: dict):
     t0 = time.time()
     meta = {"embedding_model": cfg["embedding_model"]}
     meta.update(extra_meta)
+
+    # Stamp provenance for Level 0
+    build_params = {
+        "max_depth": MAX_DEPTH,
+        "num_bits": NUM_BITS,
+        "min_leaf_size": MIN_LEAF_SIZE,
+        "seed": SEED,
+        "embedding_model": cfg["embedding_model"],
+        "quantization": QUANTIZATION,
+    }
+    meta["_provenance"] = json.dumps(provenance_to_dict(
+        create_provenance(
+            artifact_type="dyf",
+            n_items=len(embeddings),
+            source_paths=[str(cfg["parquet"])],
+            params=build_params,
+        )
+    ))
+
     write_lazy_index(
         tree,
         embeddings,

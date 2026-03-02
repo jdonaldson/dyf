@@ -1893,7 +1893,8 @@ def rewrite_lazy_index(path, new_stored_fields=None, new_metadata=None,
         path: Path to existing .dyf file.
         new_stored_fields: Optional dict mapping field name to array-like
             of length total_items. Values are indexed by item_index.
-        new_metadata: Optional dict of string key-value pairs to add.
+        new_metadata: Optional dict of string key-value pairs to add/update.
+            Values of None delete the key from existing metadata.
         output_path: Output file path. If None, overwrites the input file.
 
     Raises:
@@ -1927,12 +1928,16 @@ def rewrite_lazy_index(path, new_stored_fields=None, new_metadata=None,
     if new_stored_fields:
         merged_sf.update(new_stored_fields)
 
-    # Merge metadata (existing + new)
+    # Merge metadata (existing + new; None values delete keys)
     merged_meta = dict(data['metadata'])
     # Remove keys that write_lazy_index will regenerate
     merged_meta.pop('stored_fields', None)
     if new_metadata:
-        merged_meta.update(new_metadata)
+        for k, v in new_metadata.items():
+            if v is None:
+                merged_meta.pop(k, None)
+            else:
+                merged_meta[k] = v
 
     write_lazy_index(
         tree, data['embeddings'], out_path,

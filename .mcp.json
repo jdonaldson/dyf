@@ -4,7 +4,7 @@
       "command": "python",
       "args": [
         "/Users/jdonaldson/Projects/dyf/demo/rog_mcp.py",
-        "/Users/jdonaldson/Projects/dyf/demo/gudid_energy_devices_rog_cache.pkl",
+        "/Users/jdonaldson/Projects/dyf/demo/gudid_50k_titled.dyf",
         "--ws-url",
         "ws://localhost:8766/ws"
       ]

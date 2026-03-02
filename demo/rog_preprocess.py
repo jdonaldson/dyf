@@ -1,8 +1,11 @@
 """
-Preprocess wiki data for ROG (Recursive Ontological Graph) Browser.
-Generates UMAP coords, clusters, LLM labels, and bundled edges.
+Preprocess data for ROG (Recursive Ontological Graph) Browser.
+Generates clusters, LLM labels, and bundled edges.
+
+Accepts .parquet (runs UMAP from raw embeddings) or .dyf (uses stored coords).
 
 Run: python demo/rog_preprocess.py demo/wiki_simple_50k.parquet --sample 50000
+     python demo/rog_preprocess.py demo/gudid_energy_devices.dyf --bridge-level 100
 """
 
 import argparse
@@ -20,6 +23,7 @@ import subprocess
 
 # Import dyf for bridge detection via ROG ontology
 import dyf
+from dyf.provenance import create_provenance, provenance_to_dict
 
 CLUSTER_LEVELS = (12, 25, 50, 100)
 BUNDLE_ITERATIONS = 4
@@ -180,6 +184,35 @@ def load_data(path: str, sample: int | None = None,
           f"y=[{coords_2d[:,1].min():.1f}, {coords_2d[:,1].max():.1f}]")
 
     return coords_2d, titles, embeddings
+
+
+def load_dyf(path: str):
+    """Load coords, titles, embeddings from an enriched .dyf file (Level 1+)."""
+    import sys
+    from dyf.lazy_index import LazyIndex
+
+    print(f"Loading .dyf: {path}...")
+    with LazyIndex(path) as idx:
+        level = idx.detect_enrichment_level()
+        if level < 1:
+            print(f"ERROR: {path} is Level 0 (no UMAP coords).")
+            print(f"  Run: python demo/dyf_enrich.py project {path}")
+            sys.exit(1)
+        data = idx.extract_all_fields()
+
+    embeddings = data['embeddings']
+    titles = data['fields'].get('title', [f"Item {i}" for i in range(len(embeddings))])
+    umap_x = np.array(data['fields']['umap_x'])
+    umap_y = np.array(data['fields']['umap_y'])
+    umap_z = np.array(data['fields']['umap_z'])
+    coords_2d = np.column_stack([umap_x, umap_y])
+    coords_3d = np.column_stack([umap_x, umap_y, umap_z])
+
+    print(f"  Loaded {len(embeddings)} items from .dyf (Level {level})")
+    print(f"  Coords range: x=[{umap_x.min():.1f}, {umap_x.max():.1f}] "
+          f"y=[{umap_y.min():.1f}, {umap_y.max():.1f}] "
+          f"z=[{umap_z.min():.1f}, {umap_z.max():.1f}]")
+    return coords_2d, coords_3d, titles, embeddings
 
 
 def _fit_birch(data: np.ndarray, target_k: int, max_iters: int = 10) -> 'Birch':
@@ -2677,7 +2710,8 @@ def cut_dendrogram(dendrogram: dict, n_clusters: int) -> tuple[np.ndarray, np.nd
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("data_path", default="demo/wiki_simple_50k.parquet")
+    parser.add_argument("data_path", default="demo/wiki_simple_50k.parquet",
+                        help="Input .parquet or .dyf file (.dyf skips UMAP, uses stored coords)")
     parser.add_argument("--sample", type=int, default=None)
     parser.add_argument("--output", type=str, default=None)
     parser.add_argument("--bridge-level", type=int, default=100,
@@ -2699,26 +2733,37 @@ def main():
 
     print(f"Will save to: {output_path}")
 
-    # Process
-    coords_2d, titles, embeddings = load_data(
-        args.data_path, args.sample,
-        n_neighbors=args.umap_neighbors, densmap=args.densmap,
-        dedup=not args.no_dedup)
+    # Dispatch on file extension
+    input_path = Path(args.data_path)
+
+    if input_path.suffix == '.dyf':
+        # .dyf: coords already computed, skip UMAP
+        coords_2d, coords_3d, titles, embeddings = load_dyf(args.data_path)
+        if args.sample:
+            print(f"  WARNING: --sample ignored for .dyf input (fixed at {len(titles)} items)")
+        if args.umap_neighbors or args.densmap or args.no_dedup:
+            print(f"  WARNING: --umap-neighbors/--densmap/--no-dedup ignored for .dyf input")
+    else:
+        # Legacy parquet path
+        coords_2d, titles, embeddings = load_data(
+            args.data_path, args.sample,
+            n_neighbors=args.umap_neighbors, densmap=args.densmap,
+            dedup=not args.no_dedup)
+
+        # 3D UMAP for hierarchy (captures filaments and manifold topology better than 2D)
+        print("\n=== Running 3D UMAP for hierarchy ===")
+        reducer_3d = umap.UMAP(
+            n_components=3,
+            n_neighbors=15,
+            min_dist=0.1,
+            n_jobs=-1,
+            random_state=42,
+            verbose=True,
+        )
+        coords_3d = reducer_3d.fit_transform(embeddings)
 
     # Compute LSH visualization data first (needed for LSH-based hierarchy)
     lsh_data = compute_lsh_visualization(coords_2d, embeddings, titles, num_bits=12)
-
-    # 3D UMAP for hierarchy (captures filaments and manifold topology better than 2D)
-    print("\n=== Running 3D UMAP for hierarchy ===")
-    reducer_3d = umap.UMAP(
-        n_components=3,
-        n_neighbors=15,
-        min_dist=0.1,
-        n_jobs=-1,
-        random_state=42,
-        verbose=True,
-    )
-    coords_3d = reducer_3d.fit_transform(embeddings)
 
     # BIRCH/Ward hierarchy on 3D coords
     print("\n=== Building BIRCH/Ward 3D hierarchy ===")
@@ -2860,6 +2905,17 @@ def main():
         'unified_edge_types': unified_edge_types,  # {level: list[str]} per-edge type
         'unified_edge_mutual': unified_edge_mutual,  # {level: list[bool]} mutual flag
     }
+
+    # Stamp provenance
+    cache['_provenance'] = provenance_to_dict(create_provenance(
+        artifact_type="rog_cache",
+        n_items=len(coords_2d),
+        source_paths=[args.data_path],
+        params={"sample": args.sample, "bridge_level": args.bridge_level,
+                "densmap": args.densmap, "umap_neighbors": args.umap_neighbors},
+        sample_seed=42,
+        sample_n=args.sample,
+    ))
 
     with open(output_path, 'wb') as f:
         pickle.dump(cache, f)

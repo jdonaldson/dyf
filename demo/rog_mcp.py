@@ -4,14 +4,12 @@ MCP Server for ROG (Recursive Ontological Graph) Browser.
 Provides tools to search, explore clusters, and control the deck.gl
 visualization via WebSocket commands to viz_server.py.
 
-Run: python demo/rog_mcp.py demo/wiki_simple_50k_rog_cache.pkl
-     python demo/rog_mcp.py demo/gudid_50k_titled.dyf   # enriched .dyf
+Run: python demo/rog_mcp.py demo/gudid_50k_titled.dyf
 """
 
 import argparse
 import json
 import math
-import pickle
 import sys
 from pathlib import Path
 
@@ -30,23 +28,12 @@ from mcp.types import Tool, TextContent
 CACHE = None
 WS_URL = "ws://localhost:8766/ws"
 WS_CONN = None         # Persistent WebSocket connection to viz_server
-DYF_INDEX = None       # LazyIndex instance (None if --dyf-index not provided)
+DYF_INDEX = None       # LazyIndex instance for semantic search
 EMBED_MODEL = None     # Lazy-loaded embedding model for semantic_search
 
 
-def load_cache(cache_path: str):
-    """Load preprocessed cache from .pkl or enriched .dyf file."""
-    if cache_path.endswith('.dyf'):
-        _load_cache_from_dyf(cache_path)
-        return
-    global CACHE
-    with open(cache_path, 'rb') as f:
-        CACHE = pickle.load(f)
-    print(f"Loaded cache: {len(CACHE['titles'])} points", file=sys.stderr)
-
-
-def _load_cache_from_dyf(dyf_path: str):
-    """Populate CACHE from an enriched .dyf file (Level 1+)."""
+def load_cache(dyf_path: str):
+    """Load CACHE from an enriched .dyf file (Level 1+)."""
     global CACHE, DYF_INDEX
     src_dir = str(Path(__file__).resolve().parent.parent / "src")
     if src_dir not in sys.path:
@@ -250,20 +237,6 @@ def _load_cache_from_dyf(dyf_path: str):
           f"cluster levels: {sorted(cluster_result['labels'].keys())}",
           file=sys.stderr)
 
-
-def load_dyf_index(index_path: str):
-    """Load a .dyf lazy index for semantic search."""
-    global DYF_INDEX
-    # Add src to path for local dyf import
-    src_dir = str(Path(__file__).resolve().parent.parent / "src")
-    if src_dir not in sys.path:
-        sys.path.insert(0, src_dir)
-    from dyf.lazy_index import LazyIndex
-    DYF_INDEX = LazyIndex(index_path)
-    summary = DYF_INDEX.tree_summary
-    print(f"Loaded DYF index: {summary['total_items']} items, "
-          f"dim={summary['embedding_dim']}, "
-          f"{summary['num_leaves']} leaves", file=sys.stderr)
 
 
 def _get_embed_model():
@@ -1093,21 +1066,15 @@ async def call_tool(name: str, arguments: dict):
 
 async def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("cache_path", default="demo/wiki_simple_50k_rog_cache.pkl", nargs="?",
-                        help="Path to .pkl cache or enriched .dyf file")
+    parser.add_argument("dyf_path", help="Path to enriched .dyf file (Level 1+)")
     parser.add_argument("--ws-url", default="ws://localhost:8766/ws",
                         help="WebSocket URL for viz_server.py")
-    parser.add_argument("--dyf-index", default=None,
-                        help="Path to .dyf index for semantic search (optional)")
     args = parser.parse_args()
 
     global WS_URL
     WS_URL = args.ws_url
 
-    load_cache(args.cache_path)
-
-    if args.dyf_index:
-        load_dyf_index(args.dyf_index)
+    load_cache(args.dyf_path)
 
     async with stdio_server() as (read_stream, write_stream):
         await app.run(read_stream, write_stream, app.create_initialization_options())
