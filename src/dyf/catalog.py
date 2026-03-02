@@ -18,9 +18,13 @@ from dataclasses import dataclass, field
 from itertools import product as itertools_product
 from typing import Optional
 
+import math
+from collections import Counter
+
 import numpy as np
 
 from .categorical import CategoryGraph
+from .splits import tokenize
 
 
 # ── Dataclasses ──────────────────────────────────────────────────────────
@@ -199,6 +203,10 @@ class _FittedCatalog:
     depth_masks: dict[int, np.ndarray]   # depth -> boolean mask
     id_to_idx: dict[str, int]     # node_id -> index
 
+    # Term disambiguation
+    branch_terms: dict[str, set[str]] = field(default_factory=dict)  # node_id → discriminating terms
+    term_boost: float = 0.04      # additive boost alpha
+
 
 # ── Utility functions ────────────────────────────────────────────────────
 
@@ -293,6 +301,104 @@ def _compute_path_alignment(
         current_id = parent_id
 
     return float(np.mean(alignments)) if alignments else 1.0
+
+
+# ── Term disambiguation ──────────────────────────────────────────────────
+
+
+def _compute_branch_terms(
+    config: CatalogConfig,
+    graph: CategoryGraph,
+    top_k: int = 15,
+) -> dict[str, set[str]]:
+    """Compute TF-IDF discriminating terms per CategoryGraph branch.
+
+    For each internal node, treats its children as "document classes",
+    tokenizes node_names of all leaf descendants per child, and finds
+    top-k discriminating unigrams via TF-IDF. Results are flattened
+    into {node_id: set(discriminating terms in subtree)}.
+    """
+    node_id_to_name: dict[str, str] = {
+        str(nid): str(name)
+        for nid, name in zip(config.node_ids, config.node_names)
+    }
+
+    # For each internal node, compute discriminating terms per child
+    child_terms: dict[str, set[str]] = {}
+
+    all_nodes = graph.all_nodes()
+    for node_id in all_nodes:
+        children = graph.get_children(node_id)
+        if len(children) < 2:
+            continue
+
+        # Collect tokenized names for each child's leaf descendants
+        child_docs: dict[str, list[str]] = {}
+        for cid in children:
+            # Get all descendants (including the child itself)
+            desc = graph.get_descendants(cid)
+            desc.add(cid)
+            # Collect tokens from all node names in this subtree
+            tokens: list[str] = []
+            for d in desc:
+                name = node_id_to_name.get(d, "")
+                if name:
+                    tokens.extend(tokenize(name))
+            if tokens:
+                child_docs[cid] = tokens
+
+        if len(child_docs) < 2:
+            continue
+
+        n_children = len(child_docs)
+
+        # Term frequency per child
+        child_tf: dict[str, Counter] = {}
+        for cid, tokens in child_docs.items():
+            child_tf[cid] = Counter(tokens)
+
+        # Document frequency across children
+        word_df: Counter = Counter()
+        for tf in child_tf.values():
+            for word in tf:
+                word_df[word] += 1
+
+        # IDF: only keep terms that discriminate (not in ALL children)
+        idf = {
+            w: math.log(n_children / (1 + df))
+            for w, df in word_df.items()
+            if df < n_children
+        }
+
+        # TF-IDF per child, store top-k terms
+        for cid, tf in child_tf.items():
+            total = sum(tf.values())
+            if total == 0:
+                continue
+            scores = []
+            for word, count in tf.items():
+                if word in idf:
+                    scores.append((word, (count / total) * idf[word]))
+            scores.sort(key=lambda x: -x[1])
+            terms = {w for w, _ in scores[:top_k]}
+            if terms:
+                # Accumulate: a node can appear as child of multiple internal nodes
+                if cid in child_terms:
+                    child_terms[cid] |= terms
+                else:
+                    child_terms[cid] = terms
+
+    # Propagate terms upward: each node's terms include all descendant terms
+    result: dict[str, set[str]] = {}
+    for node_id in all_nodes:
+        desc = graph.get_descendants(node_id)
+        accumulated = set(child_terms.get(node_id, set()))
+        for d in desc:
+            accumulated |= child_terms.get(d, set())
+        if accumulated:
+            result[node_id] = accumulated
+
+    return result
 
 
 # ── CatalogSpace ─────────────────────────────────────────────────────────
@@ -411,6 +517,9 @@ class CatalogSpace:
         unique_depths = np.unique(node_depths)
         depth_masks = {int(d): node_depths == d for d in unique_depths}
 
+        # Term disambiguation
+        branch_terms = _compute_branch_terms(config, graph)
+
         # Create partially-filled _FittedCatalog for path alignment calc
         fc = _FittedCatalog(
             config=config,
@@ -423,6 +532,7 @@ class CatalogSpace:
             node_depths=node_depths,
             depth_masks=depth_masks,
             id_to_idx=id_to_idx,
+            branch_terms=branch_terms,
         )
 
         # Path alignment for each node
@@ -441,6 +551,7 @@ class CatalogSpace:
         catalog_name: str,
         query_emb: np.ndarray,
         top_k: int = 5,
+        query_text: str | None = None,
     ) -> CatalogMatch:
         """Match a single query embedding against one catalog.
 
@@ -452,6 +563,9 @@ class CatalogSpace:
             (d,) query embedding vector.
         top_k : int
             Number of top candidates for entropy/alternatives.
+        query_text : str, optional
+            Free-text description of the query. When provided, tokenized
+            and used for term-affinity boosting in parent selection.
 
         Returns
         -------
@@ -466,11 +580,14 @@ class CatalogSpace:
         fc = self._fitted[catalog_name]
         query_emb = np.asarray(query_emb, dtype=np.float32)
 
+        # Tokenize query text for term disambiguation
+        query_tokens = set(tokenize(query_text)) if query_text else None
+
         # Compute ontological z
         ontological_z = self._compute_ontological_z(fc, query_emb)
 
         # Match with two-stage + within-z level selection
-        result = self._match_with_levels(fc, query_emb, top_k)
+        result = self._match_with_levels(fc, query_emb, top_k, query_tokens=query_tokens)
         return _replace_ontological_z(result, ontological_z)
 
     def _compute_ontological_z(
@@ -490,12 +607,16 @@ class CatalogSpace:
         fc: _FittedCatalog,
         query_emb: np.ndarray,
         top_k: int = 5,
+        query_tokens: set[str] | None = None,
     ) -> CatalogMatch:
         """Two-stage matching with within-z level selection.
 
         Iterates depths, computes within-z at each depth, selects
         the depth with sharpest discrimination, then optionally
         constrains via parent-level match (two-stage).
+
+        When query_tokens is provided and branch_terms are available,
+        an additive term-affinity boost is applied to parent scores.
         """
         config = fc.config
         graph = config.graph
@@ -555,6 +676,14 @@ class CatalogSpace:
                             if pid in fc.id_to_idx and fc.node_depths[fc.id_to_idx[pid]] == parent_depth:
                                 if pid not in parent_scores or child_sim > parent_scores[pid]:
                                     parent_scores[pid] = child_sim
+
+                # Term-affinity boost: when query text is provided,
+                # boost parents whose branch terms overlap with query tokens
+                if parent_scores and query_tokens and fc.branch_terms:
+                    for pid in parent_scores:
+                        hits = len(query_tokens & fc.branch_terms.get(pid, set()))
+                        if hits > 0:
+                            parent_scores[pid] += fc.term_boost * (hits / len(query_tokens))
 
                 if parent_scores:
                     parent_best_id = max(parent_scores, key=lambda k: parent_scores[k])
@@ -816,6 +945,7 @@ class CatalogSpace:
         top_k: int = 5,
         coherence_weight: float = 0.3,
         query_labels: Optional[list[str]] = None,
+        query_texts: list[str] | None = None,
     ) -> list[JointMatchResult]:
         """Match query embeddings across all catalogs with coherence.
 
@@ -829,6 +959,8 @@ class CatalogSpace:
             0 = independent matching, 1 = coherence dominates.
         query_labels : list[str], optional
             Human-readable labels for each query.
+        query_texts : list[str], optional
+            Free-text descriptions per query for term disambiguation.
 
         Returns
         -------
@@ -851,12 +983,15 @@ class CatalogSpace:
 
         for qi in range(n_queries):
             q_emb = query_embs[qi]
+            q_text = query_texts[qi] if query_texts is not None else None
 
             if not self._mappings or coherence_weight == 0:
                 # Independent matching — no coherence reranking
                 matches = {}
                 for cname in catalog_names:
-                    matches[cname] = self.match_single(cname, q_emb, top_k)
+                    matches[cname] = self.match_single(
+                        cname, q_emb, top_k, query_text=q_text
+                    )
 
                 results.append(JointMatchResult(
                     query=query_labels[qi],
@@ -868,7 +1003,8 @@ class CatalogSpace:
                 ))
             else:
                 result = self._match_joint(
-                    q_emb, query_labels[qi], catalog_names, top_k, coherence_weight
+                    q_emb, query_labels[qi], catalog_names, top_k,
+                    coherence_weight, query_text=q_text,
                 )
                 results.append(result)
 
@@ -881,6 +1017,7 @@ class CatalogSpace:
         catalog_names: list[str],
         top_k: int,
         coherence_weight: float,
+        query_text: str | None = None,
     ) -> JointMatchResult:
         """Match with cross-catalog coherence reranking."""
         # Step 1: Get top-k candidates per catalog
@@ -923,7 +1060,9 @@ class CatalogSpace:
             # Top-1 independent choices are coherent
             matches = {}
             for cname in catalog_names:
-                matches[cname] = self.match_single(cname, query_emb, top_k)
+                matches[cname] = self.match_single(
+                    cname, query_emb, top_k, query_text=query_text
+                )
 
             overall = (
                 float(np.mean(list(pair_coherence.values())))
@@ -953,7 +1092,9 @@ class CatalogSpace:
             pa = float(fc.path_alignments[idx])
 
             # Alternatives from match_single
-            single_match = self.match_single(cname, query_emb, top_k)
+            single_match = self.match_single(
+                cname, query_emb, top_k, query_text=query_text
+            )
 
             matches[cname] = CatalogMatch(
                 catalog_name=cname,

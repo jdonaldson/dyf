@@ -772,3 +772,129 @@ class TestBottomUpParentSelection:
         assert result.node_id == "CA1", (
             f"Expected CA1 (child of Surgical), got {result.node_id}"
         )
+
+
+class TestTermDisambiguation:
+    """Test 19: Term-affinity boost flips thin-margin parent selection."""
+
+    def test_term_boost_flips_parent(self):
+        """Parent B (Hardware) has slightly higher best-child similarity,
+        but query text "bone drill high speed" discriminates toward
+        Parent A (Medical) via branch_terms overlap.
+
+        Without query_text: Hardware wins (embedding margin).
+        With query_text: Medical wins (term boost).
+        """
+        dim = 32
+        rng = np.random.default_rng(77)
+
+        # Query direction
+        query_dir = rng.standard_normal(dim).astype(np.float32)
+        query_dir /= np.linalg.norm(query_dir)
+
+        # Orthogonal direction
+        ortho = rng.standard_normal(dim).astype(np.float32)
+        ortho -= ortho @ query_dir * query_dir
+        ortho /= np.linalg.norm(ortho)
+
+        # Parent A (Medical) — class embedding away from query
+        parent_a_emb = (ortho * 0.8 + query_dir * 0.2).astype(np.float32)
+        parent_a_emb /= np.linalg.norm(parent_a_emb)
+
+        # Parent B (Hardware) — class embedding nearer to query
+        parent_b_emb = (query_dir * 0.7 + ortho * 0.3).astype(np.float32)
+        parent_b_emb /= np.linalg.norm(parent_b_emb)
+
+        # Children of A: "bone drill surgical", "bone saw", "bone screw"
+        # Best child of A is close to query but slightly less than best of B
+        child_a1 = (query_dir * 0.88 + ortho * 0.12).astype(np.float32)
+        child_a1 /= np.linalg.norm(child_a1)
+        child_a2 = (ortho * 0.85 + query_dir * 0.15).astype(np.float32)
+        child_a2 /= np.linalg.norm(child_a2)
+        child_a3 = (ortho * 0.80 + query_dir * 0.20).astype(np.float32)
+        child_a3 /= np.linalg.norm(child_a3)
+
+        # Children of B: "power drill cordless", "power saw", "impact driver"
+        # Best child of B is slightly closer to query than best of A
+        child_b1 = (query_dir * 0.90 + ortho * 0.10).astype(np.float32)
+        child_b1 /= np.linalg.norm(child_b1)
+        child_b2 = (-query_dir * 0.5 + ortho * 0.5).astype(np.float32)
+        child_b2 /= np.linalg.norm(child_b2)
+        child_b3 = (-query_dir * 0.6 + ortho * 0.4).astype(np.float32)
+        child_b3 /= np.linalg.norm(child_b3)
+
+        edges = [
+            ("_root_", "PA", 0.5),
+            ("_root_", "PB", 0.5),
+            ("PA", "CA1", 1.0 / 3),
+            ("PA", "CA2", 1.0 / 3),
+            ("PA", "CA3", 1.0 / 3),
+            ("PB", "CB1", 1.0 / 3),
+            ("PB", "CB2", 1.0 / 3),
+            ("PB", "CB3", 1.0 / 3),
+        ]
+        graph = CategoryGraph.from_edges(edges)
+
+        node_ids = np.array(
+            ["PA", "PB", "CA1", "CA2", "CA3", "CB1", "CB2", "CB3"],
+            dtype=str,
+        )
+        node_names = np.array(
+            [
+                "Medical",
+                "Hardware",
+                "bone drill surgical",
+                "bone saw",
+                "bone screw",
+                "power drill cordless",
+                "power saw",
+                "impact driver",
+            ],
+            dtype=str,
+        )
+        embeddings = np.array(
+            [parent_a_emb, parent_b_emb, child_a1, child_a2, child_a3,
+             child_b1, child_b2, child_b3],
+            dtype=np.float32,
+        )
+
+        config = _make_config("test_td", graph, embeddings, node_ids, node_names)
+        space = CatalogSpace()
+        space.add_catalog(config).fit()
+
+        query = query_dir.copy()
+
+        # Verify precondition: B's best child (CB1) is slightly nearer than A's (CA1)
+        sim_ca1 = float(child_a1 @ query)
+        sim_cb1 = float(child_b1 @ query)
+        assert sim_cb1 > sim_ca1, (
+            f"Precondition failed: CB1 sim {sim_cb1:.4f} should exceed CA1 sim {sim_ca1:.4f}"
+        )
+
+        # Without query_text: Hardware parent wins
+        result_no_text = space.match_single("test_td", query)
+        assert result_no_text.node_id.startswith("CB"), (
+            f"Without text, expected CB* (Hardware child), got {result_no_text.node_id}"
+        )
+
+        # With query_text: "bone drill high speed" should flip to Medical
+        result_with_text = space.match_single(
+            "test_td", query, query_text="bone drill high speed"
+        )
+        assert result_with_text.node_id.startswith("CA"), (
+            f"With text, expected CA* (Medical child), got {result_with_text.node_id}"
+        )
+
+    def test_no_text_unchanged(self):
+        """Without query_text, behavior is identical to before."""
+        rng = np.random.default_rng(42)
+        graph, embs, ids, names = _make_hierarchy(rng)
+        config = _make_config("test", graph, embs, ids, names)
+
+        space = CatalogSpace()
+        space.add_catalog(config).fit()
+
+        query = embs[5].copy()
+        result = space.match_single("test", query)
+        assert isinstance(result, CatalogMatch)
+        assert result.node_id in ids
