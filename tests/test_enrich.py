@@ -242,48 +242,48 @@ class TestSampleSpatial:
         assert set(result) == {5, 10, 15}
 
 
-class TestBuildSimpleNarration:
-    """Test _build_simple_narration output structure."""
+class TestGenerateNarration:
+    """Test _generate_narration output structure (no-Ollama fallback path)."""
+
+    def _narrate(self, cluster_names, titles, labels, **kwargs):
+        from dyf_enrich import _generate_narration
+
+        coords = np.zeros((len(labels), 2), dtype=np.float32)
+        return _generate_narration(
+            cluster_names, titles, labels, coords,
+            model="nonexistent_model", **kwargs)
 
     def test_has_intro_outro(self):
-        from dyf_enrich import _build_simple_narration
-
         cluster_names = {0: "Alpha", 1: "Beta", 2: "Gamma"}
         titles = [f"item {i}" for i in range(30)]
         labels = np.array([i % 3 for i in range(30)])
-        narration = _build_simple_narration(cluster_names, titles, labels)
+        narration = self._narrate(cluster_names, titles, labels)
 
         assert "intro" in narration
         assert "outro" in narration
 
     def test_cluster_count_in_intro(self):
-        from dyf_enrich import _build_simple_narration
-
         cluster_names = {0: "Alpha", 1: "Beta", 2: "Gamma"}
         titles = [f"item {i}" for i in range(30)]
         labels = np.array([i % 3 for i in range(30)])
-        narration = _build_simple_narration(cluster_names, titles, labels)
+        narration = self._narrate(cluster_names, titles, labels)
 
-        assert "3 clusters" in narration["intro"]
+        assert "three clusters" in narration["intro"]
 
     def test_custom_title(self):
-        from dyf_enrich import _build_simple_narration
-
         cluster_names = {0: "Alpha"}
         titles = ["item 0"]
         labels = np.array([0])
-        narration = _build_simple_narration(
+        narration = self._narrate(
             cluster_names, titles, labels, title="My Landscape")
 
         assert "My Landscape" in narration["intro"]
 
     def test_per_cluster_narration(self):
-        from dyf_enrich import _build_simple_narration
-
         cluster_names = {0: "Alpha", 1: "Beta"}
         titles = ["a", "b", "c", "d"]
         labels = np.array([0, 0, 1, 1])
-        narration = _build_simple_narration(cluster_names, titles, labels)
+        narration = self._narrate(cluster_names, titles, labels)
 
         assert 0 in narration
         assert 1 in narration

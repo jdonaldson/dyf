@@ -141,7 +141,7 @@ class TestLoadCacheFromDyf:
             try:
                 rog_mcp.CACHE = None
                 rog_mcp.DYF_INDEX = None
-                rog_mcp._load_cache_from_dyf(path)
+                rog_mcp.load_cache(path)
 
                 assert rog_mcp.CACHE is not None
                 assert len(rog_mcp.CACHE['titles']) == n
@@ -163,7 +163,7 @@ class TestLoadCacheFromDyf:
             try:
                 rog_mcp.CACHE = None
                 rog_mcp.DYF_INDEX = None
-                rog_mcp._load_cache_from_dyf(path)
+                rog_mcp.load_cache(path)
 
                 cr = rog_mcp.CACHE['cluster_result']
                 assert 25 in cr['labels']
@@ -187,7 +187,7 @@ class TestLoadCacheFromDyf:
             try:
                 rog_mcp.CACHE = None
                 rog_mcp.DYF_INDEX = None
-                rog_mcp._load_cache_from_dyf(path)
+                rog_mcp.load_cache(path)
 
                 titles = rog_mcp.CACHE['titles']
                 assert isinstance(titles, list)
@@ -215,7 +215,7 @@ class TestQueryFunctions:
         self._old_dyf = rog_mcp.DYF_INDEX
         rog_mcp.CACHE = None
         rog_mcp.DYF_INDEX = None
-        rog_mcp._load_cache_from_dyf(self.path)
+        rog_mcp.load_cache(self.path)
         yield
         rog_mcp.CACHE = self._old_cache
         rog_mcp.DYF_INDEX = self._old_dyf
@@ -314,7 +314,7 @@ class TestDualClusterLoading:
             try:
                 rog_mcp.CACHE = None
                 rog_mcp.DYF_INDEX = None
-                rog_mcp._load_cache_from_dyf(path)
+                rog_mcp.load_cache(path)
 
                 cr = rog_mcp.CACHE['cluster_result']
                 # Default labels should be populated (from 2D)
@@ -348,7 +348,7 @@ class TestBackwardCompatBareClusters:
             try:
                 rog_mcp.CACHE = None
                 rog_mcp.DYF_INDEX = None
-                rog_mcp._load_cache_from_dyf(path)
+                rog_mcp.load_cache(path)
 
                 cr = rog_mcp.CACHE['cluster_result']
                 # All three should be populated from bare cluster_25
@@ -378,7 +378,7 @@ class TestBackwardCompatBareClusters:
             try:
                 rog_mcp.CACHE = None
                 rog_mcp.DYF_INDEX = None
-                rog_mcp._load_cache_from_dyf(path)
+                rog_mcp.load_cache(path)
 
                 results = rog_mcp.search_points("Test Item 0", limit=5)
                 assert len(results) > 0
@@ -485,7 +485,7 @@ class TestTreeLabelFallback:
                 try:
                     rog_mcp.CACHE = None
                     rog_mcp.DYF_INDEX = None
-                    rog_mcp._load_cache_from_dyf(path)
+                    rog_mcp.load_cache(path)
 
                     cr = rog_mcp.CACHE['cluster_result']
                     # Should have built cluster labels from tree
