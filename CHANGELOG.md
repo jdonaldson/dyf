@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.2
+
+### Added
+
+- **`CategoryGraph.lca_depth()`** — returns the depth of the lowest common ancestor between two taxonomy nodes. Enables distinguishing wrong-domain errors (LCA at root) from imprecise matches (LCA within same segment).
+
 ## 0.6.1
 
 Term disambiguation for thin-margin catalog matching, plus public API cleanup.
