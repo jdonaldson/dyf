@@ -23,6 +23,7 @@ from pathlib import Path
 
 import numpy as np
 
+from dyf.colors import spatial_rgb_map
 from dyf.lazy_index import LazyIndex, rewrite_lazy_index
 from dyf.provenance import create_provenance, provenance_to_dict
 
@@ -1086,6 +1087,16 @@ def enrich_cluster(dyf_path, n_clusters_list=None, model="gemma2:9b",
             {str(k): v for k, v in names_3d.items()})
 
         print(f"    Transferred labels to {n_3d} 3D clusters")
+
+        # Spatial color maps (embedding-derived hue ordering)
+        rgb_2d = spatial_rgb_map(labels_2d.tolist(), embeddings)
+        new_meta[f'cluster_colors_{target_k}_2d'] = json.dumps(
+            {str(k): v for k, v in rgb_2d.items()})
+        rgb_3d = spatial_rgb_map(labels_3d.tolist(), embeddings)
+        new_meta[f'cluster_colors_{target_k}_3d'] = json.dumps(
+            {str(k): v for k, v in rgb_3d.items()})
+        print(f"    Stored color maps for 2D ({len(rgb_2d)}) "
+              f"and 3D ({len(rgb_3d)}) clusters")
 
     # Strip stale level 3 metadata when re-clustering (None = delete key)
     if force and level >= 3:

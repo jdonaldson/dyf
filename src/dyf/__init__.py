@@ -117,6 +117,23 @@ from .categorical import (
     load_category_graphs,
 )
 
+# Spatial cluster coloring
+from .colors import spatial_rgb_map, spatial_color_map
+
+# Pipeline DAG runner
+from .pipeline import Pipeline, Stage
+
+# Provenance tracking
+from .provenance import (
+    Provenance,
+    file_hash,
+    params_hash,
+    create_provenance,
+    check_compatible,
+    provenance_to_dict,
+    provenance_from_dict,
+)
+
 # Re-ranking
 from .rerank import (
     rerank_standard,
@@ -229,6 +246,20 @@ __all__ = [
     "multi_level_fisher_weights",
     "store_category_graph",
     "load_category_graphs",
+    # Spatial cluster coloring
+    "spatial_rgb_map",
+    "spatial_color_map",
+    # Pipeline DAG runner
+    "Pipeline",
+    "Stage",
+    # Provenance tracking
+    "Provenance",
+    "file_hash",
+    "params_hash",
+    "create_provenance",
+    "check_compatible",
+    "provenance_to_dict",
+    "provenance_from_dict",
     # Re-ranking
     "rerank_standard",
     "rerank_mmr",
