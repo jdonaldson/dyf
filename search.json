@@ -1004,62 +1004,6 @@
     "text": "Next Steps\nSee the API Reference for complete documentation of all classes and functions."
   },
   {
-    "objectID": "index.html",
-    "href": "index.html",
-    "title": "DYF - Density Yields Features",
-    "section": "",
-    "text": "Discover structure in embedding spaces. DYF uses density-based LSH to reveal the natural organization of your data:"
-  },
-  {
-    "objectID": "index.html#what-it-does",
-    "href": "index.html#what-it-does",
-    "title": "DYF - Density Yields Features",
-    "section": "What it does",
-    "text": "What it does\nDYF transforms raw embeddings into navigable semantic maps. Instead of just clustering, it reveals the topology — which regions are dense, which items bridge between concepts, and which are truly unique.\nUse cases:\n\nSemantic navigation: Find paths between concepts\nStructure discovery: Understand how your data organizes itself\nAnomaly detection: Identify orphans and bridges\nIndex building: Pre-compute structure for fast queries"
-  },
-  {
-    "objectID": "index.html#installation",
-    "href": "index.html#installation",
-    "title": "DYF - Density Yields Features",
-    "section": "Installation",
-    "text": "Installation\npip install dyf\nFor serialization (save/load indexes):\npip install dyf[io]\nFor full features (embedding generation, LLM labeling):\npip install dyf[full]"
-  },
-  {
-    "objectID": "index.html#quick-start",
-    "href": "index.html#quick-start",
-    "title": "DYF - Density Yields Features",
-    "section": "Quick Start",
-    "text": "Quick Start\nimport numpy as np\nfrom dyf import DensityClassifier\n\n# Your embeddings (e.g., from sentence-transformers)\nembeddings = np.random.randn(10000, 384).astype(np.float32)\n\n# Find structure\nclassifier = DensityClassifier(embedding_dim=384)\nclassifier.fit(embeddings)\n\n# What did we find?\nprint(classifier.report())\n# Corpus: 10000 items\n#   Dense: 9500 (95.0%)\n#   Bridge: 450 (4.5%)\n#   Orphan: 50 (0.5%)\n\n# Get indices\nbridges = classifier.get_bridge()   # Transitional items\norphans = classifier.get_orphans()  # Unique items"
-  },
-  {
-    "objectID": "index.html#how-it-works",
-    "href": "index.html#how-it-works",
-    "title": "DYF - Density Yields Features",
-    "section": "How It Works",
-    "text": "How It Works\nTwo-stage PCA-based LSH:\n\nInitial bucketing: PCA projections create semantic buckets\nDensity check: Items in sparse buckets are candidates for reclassification\nRecovery stage: Coarser PCA finds structure among sparse items\nClassification: Dense (core), Bridge (recovered), Orphan (truly unique)\n\nThe key insight: items that appear as outliers globally often share structure at coarser resolution. Bridges are these “misplaced” items — they connect different semantic regions."
-  },
-  {
-    "objectID": "index.html#performance",
-    "href": "index.html#performance",
-    "title": "DYF - Density Yields Features",
-    "section": "Performance",
-    "text": "Performance\n\n\n\nDataset\nTime\nPer item\n\n\n\n\n60K embeddings (384d)\n~60ms\n1.0 us\n\n\n\nRust-accelerated via PyO3. ~4x faster than pure Python."
-  },
-  {
-    "objectID": "index.html#see-it-in-action",
-    "href": "index.html#see-it-in-action",
-    "title": "DYF - Density Yields Features",
-    "section": "See It in Action",
-    "text": "See It in Action\n\n\n\nGUDID Energy Device Landscape\n\n\nGUDID Energy Device Landscape — Interactive 3D visualization of ~34,000 FDA electrosurgical devices, built with DYF. Explore dense clusters, bridge devices, and orphan outliers in the embedding space."
-  },
-  {
-    "objectID": "index.html#next-steps",
-    "href": "index.html#next-steps",
-    "title": "DYF - Density Yields Features",
-    "section": "Next Steps",
-    "text": "Next Steps\n\nGetting Started — Walkthrough of the core workflow\nAPI Reference — Full API documentation"
-  },
-  {
     "objectID": "reference/EmbedderConfig.html",
     "href": "reference/EmbedderConfig.html",
     "title": "EmbedderConfig",
