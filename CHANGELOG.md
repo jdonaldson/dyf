@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.1
+
+Term disambiguation for thin-margin catalog matching, plus public API cleanup.
+
+### Added
+
+- **Term disambiguation in CatalogSpace** — `_compute_branch_terms()` computes TF-IDF discriminating terms per CategoryGraph branch at `fit()` time. Optional `query_text` parameter on `match_single()` and `match()` applies an additive term-affinity boost during bottom-up parent scoring. Fixes thin-margin mismatches like "bone drill" routing to Hardware instead of Medical. No `query_text` = no boost = identical to previous behavior.
+- **`tokenize()` public API** — renamed from `_tokenize` and exported from `dyf.splits`. Used internally by splits, cluster_tree, and catalog modules.
+- **`compute_embedding_keywords()` export** — previously defined but not reachable from `dyf` package; now exported.
+
 ## 0.6.0
 
 Cluster labeling is now deterministic and hierarchy-aware.
