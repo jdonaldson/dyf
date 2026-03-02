@@ -517,6 +517,244 @@ class TestEnrichSplits:
                     os.unlink(p)
 
 
+# ── Embedding keyword tests ──────────────────────────────────────
+
+
+class TestComputeEmbeddingKeywords:
+    """Test embedding-space keyword projection."""
+
+    def _make_synthetic_data(self):
+        """Create synthetic embeddings with known split direction.
+
+        200 items, 32-dim embeddings. Two clusters separated along dim 0.
+        Cluster A (indices 0-99): positive dim 0, titles contain "cardiac", "pacemaker"
+        Cluster B (indices 100-199): negative dim 0, titles contain "orthopedic", "hip"
+        Hyperplane = unit vector along dim 0.
+        """
+        rng = np.random.default_rng(42)
+        dim = 32
+
+        # Cluster A: positive along dim 0
+        emb_a = rng.standard_normal((100, dim)).astype(np.float32) * 0.1
+        emb_a[:, 0] += 2.0  # strong positive signal on dim 0
+
+        # Cluster B: negative along dim 0
+        emb_b = rng.standard_normal((100, dim)).astype(np.float32) * 0.1
+        emb_b[:, 0] -= 2.0  # strong negative signal on dim 0
+
+        embeddings = np.concatenate([emb_a, emb_b])
+
+        tree = [
+            {'node_id': 0, 'parent_id': None, 'depth': 0,
+             'num_items': 200, 'is_leaf': False, 'batch_index': -1},
+            {'node_id': 1, 'parent_id': 0, 'depth': 1,
+             'num_items': 100, 'is_leaf': True, 'batch_index': 0},
+            {'node_id': 2, 'parent_id': 0, 'depth': 1,
+             'num_items': 100, 'is_leaf': True, 'batch_index': 1},
+        ]
+        children_map = {0: [1, 2]}
+        leaf_batches = {
+            1: np.arange(0, 100),
+            2: np.arange(100, 200),
+        }
+
+        # Hyperplane along dim 0
+        hp = np.zeros((1, dim), dtype=np.float32)
+        hp[0, 0] = 1.0
+        hyperplanes = {0: hp}
+
+        titles = []
+        for i in range(100):
+            titles.append(f"cardiac pacemaker implant device model {i}")
+        for i in range(100):
+            titles.append(f"orthopedic hip screw titanium plate {i}")
+
+        return embeddings, tree, children_map, leaf_batches, hyperplanes, titles
+
+    def test_embedding_keywords_basic(self):
+        """Known split direction → correct keywords per side."""
+        from dyf.splits import compute_embedding_keywords
+
+        emb, tree, cmap, lbatch, hp, titles = self._make_synthetic_data()
+        result = compute_embedding_keywords(
+            titles, emb, tree, lbatch, cmap, hp,
+            max_depth_from_root=2, min_child_items=10, min_term_count=3)
+
+        assert 0 in result['splits']
+        root_split = result['splits'][0]
+
+        # Collect words per child
+        child_words = {}
+        for cid, cinfo in root_split['children'].items():
+            child_words[cid] = {w for w, _ in cinfo['unigrams']}
+
+        all_words = set()
+        for ws in child_words.values():
+            all_words.update(ws)
+
+        # Cardiac terms should be on one side, orthopedic on the other
+        cardiac_terms = {'cardiac', 'pacemaker', 'implant'}
+        ortho_terms = {'orthopedic', 'hip', 'screw', 'titanium', 'plate'}
+
+        # At least one child should have cardiac terms, other should have ortho
+        child_list = list(child_words.values())
+        assert (child_list[0] & cardiac_terms and child_list[1] & ortho_terms) or \
+               (child_list[1] & cardiac_terms and child_list[0] & ortho_terms)
+
+    def test_embedding_keywords_format(self):
+        """Output matches compute_split_keywords format."""
+        from dyf.splits import compute_embedding_keywords
+
+        emb, tree, cmap, lbatch, hp, titles = self._make_synthetic_data()
+        result = compute_embedding_keywords(
+            titles, emb, tree, lbatch, cmap, hp,
+            max_depth_from_root=2, min_child_items=10, min_term_count=3)
+
+        # Top-level keys
+        assert 'domain_stopwords' in result
+        assert 'splits' in result
+        assert isinstance(result['domain_stopwords'], list)
+
+        for nid, split in result['splits'].items():
+            assert 'depth' in split
+            assert 'children' in split
+            for cid, cinfo in split['children'].items():
+                assert 'count' in cinfo
+                assert 'unigrams' in cinfo
+                assert isinstance(cinfo['unigrams'], list)
+                for item in cinfo['unigrams']:
+                    assert len(item) == 2
+                    assert isinstance(item[0], str)
+                    assert isinstance(item[1], float)
+
+    def test_embedding_keywords_min_term_count(self):
+        """Rare terms filtered out by min_term_count."""
+        from dyf.splits import compute_embedding_keywords
+
+        emb, tree, cmap, lbatch, hp, titles = self._make_synthetic_data()
+
+        # Set very high min_term_count → should filter most terms
+        result = compute_embedding_keywords(
+            titles, emb, tree, lbatch, cmap, hp,
+            max_depth_from_root=2, min_child_items=10, min_term_count=500)
+
+        # With min_term_count=500 and only 100 items per cluster,
+        # no terms can meet the threshold → no splits
+        assert len(result['splits']) == 0
+
+    def test_embedding_keywords_domain_stopwords(self):
+        """Domain stopwords excluded from results."""
+        from dyf.splits import compute_embedding_keywords
+
+        emb, tree, cmap, lbatch, hp, titles = self._make_synthetic_data()
+
+        result = compute_embedding_keywords(
+            titles, emb, tree, lbatch, cmap, hp,
+            max_depth_from_root=2, min_child_items=10, min_term_count=3,
+            domain_stopwords={'cardiac', 'orthopedic'})
+
+        for split in result['splits'].values():
+            for cinfo in split['children'].values():
+                words = {w for w, _ in cinfo['unigrams']}
+                assert 'cardiac' not in words
+                assert 'orthopedic' not in words
+
+
+def _inject_hyperplanes(tree_node, dim, num_bits, rng):
+    """Inject synthetic PCA hyperplanes into internal tree nodes.
+
+    The Rust DensityClassifier doesn't expose get_hyperplanes(), so
+    build_dyf_tree stores None. This helper injects synthetic hyperplanes
+    for testing the FlatBuffers round-trip.
+    """
+    if tree_node['children']:
+        hp = rng.standard_normal((num_bits, dim)).astype(np.float32)
+        hp /= np.linalg.norm(hp, axis=1, keepdims=True)
+        tree_node['hyperplanes'] = hp
+        for child in tree_node['children']:
+            _inject_hyperplanes(child, dim, num_bits, rng)
+
+
+@lazy_deps
+class TestGetSplitHyperplanes:
+    """Test LazyIndex.get_split_hyperplanes()."""
+
+    def test_returns_correct_shapes(self):
+        from dyf import build_dyf_tree
+        from dyf.lazy_index import write_lazy_index, LazyIndex
+
+        n = 200
+        dim = 32
+        num_bits = 3
+        rng = np.random.default_rng(42)
+        embeddings = rng.standard_normal((n, dim)).astype(np.float32)
+        embeddings /= np.linalg.norm(embeddings, axis=1, keepdims=True)
+
+        tree = build_dyf_tree(
+            embeddings, max_depth=3, num_bits=num_bits,
+            min_leaf_size=4, seed=42)
+
+        # Inject synthetic hyperplanes into internal nodes
+        _inject_hyperplanes(tree, dim, num_bits, np.random.default_rng(99))
+
+        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+            path = f.name
+
+        try:
+            write_lazy_index(tree, embeddings, path, quantization='float32')
+
+            with LazyIndex(path) as idx:
+                hp = idx.get_split_hyperplanes()
+
+            assert isinstance(hp, dict)
+            assert len(hp) > 0  # should have internal nodes
+
+            for nid, arr in hp.items():
+                assert isinstance(arr, np.ndarray)
+                assert arr.ndim == 2
+                assert arr.shape[1] == dim  # (num_bits, dim)
+        finally:
+            if os.path.exists(path):
+                os.unlink(path)
+
+    def test_leaves_excluded(self):
+        from dyf import build_dyf_tree
+        from dyf.lazy_index import write_lazy_index, LazyIndex
+        from dyf.splits import build_tree_maps
+
+        n = 200
+        dim = 32
+        num_bits = 3
+        rng = np.random.default_rng(42)
+        embeddings = rng.standard_normal((n, dim)).astype(np.float32)
+        embeddings /= np.linalg.norm(embeddings, axis=1, keepdims=True)
+
+        tree = build_dyf_tree(
+            embeddings, max_depth=3, num_bits=num_bits,
+            min_leaf_size=4, seed=42)
+
+        # Inject synthetic hyperplanes into internal nodes
+        _inject_hyperplanes(tree, dim, num_bits, np.random.default_rng(99))
+
+        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+            path = f.name
+
+        try:
+            write_lazy_index(tree, embeddings, path, quantization='float32')
+
+            with LazyIndex(path) as idx:
+                hp = idx.get_split_hyperplanes()
+                tree_list = idx.get_tree_structure()
+
+            # No leaf nodes should be in hyperplanes dict
+            leaf_ids = {n['node_id'] for n in tree_list if n['is_leaf']}
+            for nid in hp:
+                assert nid not in leaf_ids
+        finally:
+            if os.path.exists(path):
+                os.unlink(path)
+
+
 @lazy_deps
 class TestLabelClustersWithSplitContext:
     """Test that label_clusters uses split keywords when provided."""

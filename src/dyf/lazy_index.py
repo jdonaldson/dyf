@@ -788,6 +788,23 @@ class LazyIndex:
         self._tree_structure_cache = result
         return result
 
+    def get_split_hyperplanes(self) -> dict[int, np.ndarray]:
+        """Return the PCA hyperplane(s) for each internal node.
+
+        Returns:
+            {node_id: (num_bits, dim) float32 array} for internal nodes only.
+        """
+        n_nodes = self._index.NodesLength()
+        result = {}
+        for nid in range(n_nodes):
+            node = self._index.Nodes(nid)
+            if node is None:
+                continue
+            hp = self._get_node_hyperplanes(node)
+            if hp is not None:
+                result[nid] = hp
+        return result
+
     def _get_metadata(self):
         """Parse FlatBuffers KeyValue pairs into dict (cached)."""
         if hasattr(self, '_metadata_cache'):

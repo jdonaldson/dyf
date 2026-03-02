@@ -1375,32 +1375,39 @@ def reannotate(dyf_path, output_path=None):
 
 
 def enrich_splits(dyf_path, max_depth=3, bigram_check=False, output_path=None,
-                  domain_threshold=0.10, min_child_items=50):
+                  domain_threshold=0.10, min_child_items=50,
+                  use_embeddings=True):
     """Compute tree split keywords and store in .dyf metadata.
 
-    For each internal node (up to max_depth), computes discriminative TF-IDF
-    keywords for each child side of the split. These keywords provide
-    deterministic, LLM-free context for cluster labeling.
+    For each internal node (up to max_depth), computes discriminative keywords
+    for each child side of the split. When use_embeddings=True (default),
+    projects term embeddings onto PCA hyperplanes for semantic keyword selection.
+    Falls back to text TF-IDF when hyperplanes are unavailable.
 
     Args:
         dyf_path: Path to .dyf file (needs at least titles stored).
         max_depth: Maximum depth from root to compute keywords for.
-        bigram_check: Enable PMI-based compound meaning detection.
+        bigram_check: Enable PMI-based compound meaning detection (TF-IDF only).
         output_path: Output path (defaults to overwriting input).
         domain_threshold: Fraction threshold for domain stop words (0.0-1.0).
         min_child_items: Skip children with fewer items than this.
+        use_embeddings: Use embedding-space projection instead of TF-IDF.
     """
     from dyf.splits import (
-        build_tree_maps, compute_domain_stopwords, compute_split_keywords,
+        build_tree_maps, compute_domain_stopwords, compute_embedding_keywords,
+        compute_split_keywords,
     )
 
     print(f"\n=== Split Keywords ===")
     print(f"  Input: {dyf_path}")
 
+    hyperplanes = None
     with LazyIndex(dyf_path) as idx:
         tree, children_map, leaf_batches = build_tree_maps(idx)
+        if use_embeddings:
+            hyperplanes = idx.get_split_hyperplanes()
 
-    # Extract titles
+    # Extract titles and embeddings
     with LazyIndex(dyf_path) as idx:
         data = idx.extract_all_fields()
     titles = data['fields'].get('title')
@@ -1408,6 +1415,7 @@ def enrich_splits(dyf_path, max_depth=3, bigram_check=False, output_path=None,
         titles = [f"Item {i}" for i in range(len(data['embeddings']))]
     if isinstance(titles, np.ndarray):
         titles = titles.tolist()
+    embeddings = data['embeddings']
 
     n = len(titles)
     print(f"  {n:,} items, tree has {len(tree)} nodes")
@@ -1417,14 +1425,27 @@ def enrich_splits(dyf_path, max_depth=3, bigram_check=False, output_path=None,
     print(f"  {len(domain_sw)} domain stop words "
           f"(e.g. {sorted(domain_sw)[:5]})")
 
-    # Compute split keywords
-    result = compute_split_keywords(
-        titles, tree, leaf_batches, children_map,
-        max_depth_from_root=max_depth,
-        min_child_items=min_child_items,
-        domain_stopwords=domain_sw,
-        bigram_check=bigram_check,
-    )
+    # Compute split keywords — embedding-space or TF-IDF fallback
+    if use_embeddings and hyperplanes:
+        print(f"  Using embedding-space projection ({len(hyperplanes)} nodes with hyperplanes)")
+        result = compute_embedding_keywords(
+            titles, embeddings, tree, leaf_batches, children_map,
+            hyperplanes,
+            max_depth_from_root=max_depth,
+            min_child_items=min_child_items,
+            domain_stopwords=domain_sw,
+        )
+    else:
+        if use_embeddings:
+            print(f"  No hyperplanes found, falling back to TF-IDF")
+        print(f"  Using TF-IDF keyword extraction")
+        result = compute_split_keywords(
+            titles, tree, leaf_batches, children_map,
+            max_depth_from_root=max_depth,
+            min_child_items=min_child_items,
+            domain_stopwords=domain_sw,
+            bigram_check=bigram_check,
+        )
 
     n_splits = len(result['splits'])
     print(f"  Computed keywords for {n_splits} splits "
