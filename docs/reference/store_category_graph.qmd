@@ -1,0 +1,28 @@
+# store_category_graph { #dyf.store_category_graph }
+
+```python
+store_category_graph(graph, name, field_mapping=None, existing_metadata=None)
+```
+
+Serialize a CategoryGraph for .dyf metadata.
+
+
+
+## Parameters {.doc-section .doc-section-parameters}
+
+graph : CategoryGraph
+name : str
+    Identifier for this graph (e.g. ``"gmdn"``).
+field_mapping : dict, optional
+    Maps depth → stored field name (e.g. ``{0: "gmdn_family", 1: "gmdn_term"}``).
+existing_metadata : dict, optional
+    When provided and contains ``category_graphs``, the new graph is
+    merged into the existing dict rather than replacing it.
+
+
+
+## Returns {.doc-section .doc-section-returns}
+
+metadata : dict[str, str]
+    Suitable for passing to ``write_lazy_index`` or ``rewrite_lazy_index``
+    as metadata entries.

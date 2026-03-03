@@ -105,6 +105,18 @@ Memory-mapped tree index with FlatBuffers + Arrow IPC.
 | [from_faiss](from_faiss.qmd#dyf.from_faiss) | Build a dyf lazy index file from a FAISS IVF index. |
 | [SearchResult](SearchResult.qmd#dyf.SearchResult) | Search result with indices, scores, and optional stored fields. |
 
+## Categorical
+
+Hierarchical taxonomy graphs, label coarsening, and multi-level Fisher weighting.
+
+| | |
+| --- | --- |
+| [CategoryGraph](CategoryGraph.qmd#dyf.CategoryGraph) | DAG of string-labeled category nodes with weighted edges. |
+| [coarsen](coarsen.qmd#dyf.coarsen) | General label extraction / coarsening. |
+| [multi_level_fisher_weights](multi_level_fisher_weights.qmd#dyf.multi_level_fisher_weights) | Compute Fisher weights averaged across multiple DAG depths. |
+| [store_category_graph](store_category_graph.qmd#dyf.store_category_graph) | Serialize a CategoryGraph for .dyf metadata. |
+| [load_category_graphs](load_category_graphs.qmd#dyf.load_category_graphs) | Deserialize CategoryGraphs from .dyf metadata. |
+
 ## Configuration
 
 Pre-built configurations for embedding models and LLM labelers.

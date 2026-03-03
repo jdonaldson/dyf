@@ -1,0 +1,229 @@
+# CategoryGraph { #dyf.CategoryGraph }
+
+```python
+CategoryGraph(children=dict(), parents=dict(), roots=list(), leaves=list())
+```
+
+DAG of string-labeled category nodes with weighted edges.
+
+A hierarchy is a DAG where each node has at most one parent (a tree).
+This structure supports general DAGs (multiple parents) but most
+domain taxonomies will be trees.
+
+
+
+## Attributes {.doc-section .doc-section-attributes}
+
+children : dict mapping parent → list of (child, weight)
+parents  : dict mapping child → list of (parent, weight)
+roots    : nodes with no parents
+leaves   : nodes with no children
+
+## Methods
+
+| Name | Description |
+| --- | --- |
+| [all_nodes](#dyf.CategoryGraph.all_nodes) | Return all nodes in the graph. |
+| [from_dict](#dyf.CategoryGraph.from_dict) | Reconstruct from ``to_dict()`` output. |
+| [from_edges](#dyf.CategoryGraph.from_edges) | Build from explicit edge list [(parent, child, weight)]. |
+| [from_json](#dyf.CategoryGraph.from_json) | Reconstruct from JSON string. |
+| [from_levels](#dyf.CategoryGraph.from_levels) | Build DAG from co-occurring level arrays [L0, L1, L2, ...]. |
+| [from_single_level](#dyf.CategoryGraph.from_single_level) | Depth-1 graph: ``_root_`` → unique labels. |
+| [get_ancestors](#dyf.CategoryGraph.get_ancestors) | All ancestors via BFS upward. |
+| [get_children](#dyf.CategoryGraph.get_children) | Direct children of *node*. |
+| [get_depth](#dyf.CategoryGraph.get_depth) | Shortest path length from any root to *node* (0 for roots). |
+| [get_descendants](#dyf.CategoryGraph.get_descendants) | All descendants via BFS downward. |
+| [get_parents](#dyf.CategoryGraph.get_parents) | Direct parents of *node*. |
+| [is_tree](#dyf.CategoryGraph.is_tree) | True if every node has at most one parent. |
+| [items_at_depth](#dyf.CategoryGraph.items_at_depth) | Resolve each item's label to the requested depth. |
+| [lca_depth](#dyf.CategoryGraph.lca_depth) | Depth of the lowest common ancestor of two nodes. |
+| [max_depth](#dyf.CategoryGraph.max_depth) | Maximum depth across all nodes. |
+| [nodes_at_depth](#dyf.CategoryGraph.nodes_at_depth) | All nodes whose shortest root distance equals *depth*. |
+| [summary](#dyf.CategoryGraph.summary) | Human-readable stats. |
+| [to_dict](#dyf.CategoryGraph.to_dict) | JSON-serializable dict (edge list format). |
+| [to_json](#dyf.CategoryGraph.to_json) | Serialize to JSON string. |
+
+### all_nodes { #dyf.CategoryGraph.all_nodes }
+
+```python
+CategoryGraph.all_nodes()
+```
+
+Return all nodes in the graph.
+
+### from_dict { #dyf.CategoryGraph.from_dict }
+
+```python
+CategoryGraph.from_dict(data)
+```
+
+Reconstruct from ``to_dict()`` output.
+
+### from_edges { #dyf.CategoryGraph.from_edges }
+
+```python
+CategoryGraph.from_edges(edges)
+```
+
+Build from explicit edge list [(parent, child, weight)].
+
+If tuples have 2 elements, weight defaults to 1.0.
+
+### from_json { #dyf.CategoryGraph.from_json }
+
+```python
+CategoryGraph.from_json(s)
+```
+
+Reconstruct from JSON string.
+
+### from_levels { #dyf.CategoryGraph.from_levels }
+
+```python
+CategoryGraph.from_levels(level_columns)
+```
+
+Build DAG from co-occurring level arrays [L0, L1, L2, ...].
+
+L0 is the coarsest (root-adjacent) level, L_last is finest.
+Edges are created between adjacent levels based on co-occurrence.
+Edge weights reflect the fraction of items in the parent that
+belong to each child.
+
+### from_single_level { #dyf.CategoryGraph.from_single_level }
+
+```python
+CategoryGraph.from_single_level(labels)
+```
+
+Depth-1 graph: ``_root_`` → unique labels.
+
+This is the degenerate case for flat categorical columns.
+
+### get_ancestors { #dyf.CategoryGraph.get_ancestors }
+
+```python
+CategoryGraph.get_ancestors(node, max_depth=100)
+```
+
+All ancestors via BFS upward.
+
+### get_children { #dyf.CategoryGraph.get_children }
+
+```python
+CategoryGraph.get_children(node)
+```
+
+Direct children of *node*.
+
+### get_depth { #dyf.CategoryGraph.get_depth }
+
+```python
+CategoryGraph.get_depth(node)
+```
+
+Shortest path length from any root to *node* (0 for roots).
+
+### get_descendants { #dyf.CategoryGraph.get_descendants }
+
+```python
+CategoryGraph.get_descendants(node, max_depth=100)
+```
+
+All descendants via BFS downward.
+
+### get_parents { #dyf.CategoryGraph.get_parents }
+
+```python
+CategoryGraph.get_parents(node)
+```
+
+Direct parents of *node*.
+
+### is_tree { #dyf.CategoryGraph.is_tree }
+
+```python
+CategoryGraph.is_tree()
+```
+
+True if every node has at most one parent.
+
+### items_at_depth { #dyf.CategoryGraph.items_at_depth }
+
+```python
+CategoryGraph.items_at_depth(depth, item_labels)
+```
+
+Resolve each item's label to the requested depth.
+
+For items whose finest label is deeper than *depth*, walk parents
+until a node at the target depth is found.  For items already at
+or above *depth*, use their label as-is.
+
+
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+depth : int
+    Target depth (0 = roots).
+item_labels : (n,) str array
+    Per-item labels (typically the finest/leaf labels).
+
+
+
+#### Returns {.doc-section .doc-section-returns}
+
+resolved : (n,) str array
+
+### lca_depth { #dyf.CategoryGraph.lca_depth }
+
+```python
+CategoryGraph.lca_depth(node_a, node_b)
+```
+
+Depth of the lowest common ancestor of two nodes.
+
+Returns the depth of the deepest node that is an ancestor of both
+*node_a* and *node_b* (or one of them, if one is an ancestor of the
+other).  Returns -1 if either node is absent or they share no
+common ancestor.
+
+### max_depth { #dyf.CategoryGraph.max_depth }
+
+```python
+CategoryGraph.max_depth()
+```
+
+Maximum depth across all nodes.
+
+### nodes_at_depth { #dyf.CategoryGraph.nodes_at_depth }
+
+```python
+CategoryGraph.nodes_at_depth(depth)
+```
+
+All nodes whose shortest root distance equals *depth*.
+
+### summary { #dyf.CategoryGraph.summary }
+
+```python
+CategoryGraph.summary()
+```
+
+Human-readable stats.
+
+### to_dict { #dyf.CategoryGraph.to_dict }
+
+```python
+CategoryGraph.to_dict()
+```
+
+JSON-serializable dict (edge list format).
+
+### to_json { #dyf.CategoryGraph.to_json }
+
+```python
+CategoryGraph.to_json()
+```
+
+Serialize to JSON string.

@@ -67,6 +67,13 @@ website:
       - reference/SearchResult.qmd
       section: Lazy Index
     - contents:
+      - reference/CategoryGraph.qmd
+      - reference/coarsen.qmd
+      - reference/multi_level_fisher_weights.qmd
+      - reference/store_category_graph.qmd
+      - reference/load_category_graphs.qmd
+      section: Categorical
+    - contents:
       - reference/EmbedderConfig.qmd
       - reference/LabelerConfig.qmd
       - reference/list_configs.qmd

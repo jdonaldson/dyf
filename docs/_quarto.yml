@@ -130,6 +130,15 @@ quartodoc:
         - from_faiss
         - SearchResult
 
+    - title: Categorical
+      desc: Hierarchical taxonomy graphs, label coarsening, and multi-level Fisher weighting.
+      contents:
+        - CategoryGraph
+        - coarsen
+        - multi_level_fisher_weights
+        - store_category_graph
+        - load_category_graphs
+
     - title: Configuration
       desc: Pre-built configurations for embedding models and LLM labelers.
       contents:

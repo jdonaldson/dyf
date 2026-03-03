@@ -31,8 +31,11 @@ print(idx.tree_summary)
 | Name | Description |
 | --- | --- |
 | [close](#dyf.LazyIndex.close) | Release mmap and file handle. |
+| [detect_enrichment_level](#dyf.LazyIndex.detect_enrichment_level) | Detect enrichment level based on stored fields and metadata. |
+| [extract_all_fields](#dyf.LazyIndex.extract_all_fields) | Bulk-read all leaf batches, concatenate, sort by item_index. |
 | [get_item_vector](#dyf.LazyIndex.get_item_vector) | Extract a single item's embedding vector from the index. |
 | [get_leaf](#dyf.LazyIndex.get_leaf) | Decompress and return a leaf's Arrow RecordBatch. |
+| [get_split_hyperplanes](#dyf.LazyIndex.get_split_hyperplanes) | Return the PCA hyperplane(s) for each internal node. |
 | [get_stored_fields](#dyf.LazyIndex.get_stored_fields) | Look up stored fields for given item indices without re-searching. |
 | [get_tree_structure](#dyf.LazyIndex.get_tree_structure) | Export tree hierarchy for visualization (FlatBuffers only, no Arrow). |
 | [search](#dyf.LazyIndex.search) | Search the index for nearest neighbors. |
@@ -46,6 +49,35 @@ LazyIndex.close()
 ```
 
 Release mmap and file handle.
+
+### detect_enrichment_level { #dyf.LazyIndex.detect_enrichment_level }
+
+```python
+LazyIndex.detect_enrichment_level()
+```
+
+Detect enrichment level based on stored fields and metadata.
+
+#### Returns 0-3 {.doc-section .doc-section-returns-0-3}
+
+0: Base (embeddings + tree only)
+1: Projected (has umap_x, umap_y, umap_z stored fields)
+2: Clustered (has cluster_* stored fields)
+3: Viz-ready (has edge_pairs or tour_narration in metadata)
+
+### extract_all_fields { #dyf.LazyIndex.extract_all_fields }
+
+```python
+LazyIndex.extract_all_fields()
+```
+
+Bulk-read all leaf batches, concatenate, sort by item_index.
+
+#### Returns {.doc-section .doc-section-returns}
+
+| Name   | Type   | Description                                                                                                                                                                                             |
+|--------|--------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+|        |        | dict with keys: 'embeddings': (n, d) float32 array (PQ indexes return     approximate reconstructions) 'fields': {field_name: array} for all stored fields 'metadata': dict of metadata key-value pairs |
 
 ### get_item_vector { #dyf.LazyIndex.get_item_vector }
 
@@ -95,6 +127,20 @@ Decompress and return a leaf's Arrow RecordBatch.
 | Name   | Type   | Description                                              |
 |--------|--------|----------------------------------------------------------|
 |        |        | pyarrow.RecordBatch with columns: item_index, embedding. |
+
+### get_split_hyperplanes { #dyf.LazyIndex.get_split_hyperplanes }
+
+```python
+LazyIndex.get_split_hyperplanes()
+```
+
+Return the PCA hyperplane(s) for each internal node.
+
+#### Returns {.doc-section .doc-section-returns}
+
+| Name   | Type                                                                     | Description                                                       |
+|--------|--------------------------------------------------------------------------|-------------------------------------------------------------------|
+|        | [dict](`dict`)\[[int](`int`), [np](`numpy`).[ndarray](`numpy.ndarray`)\] | {node_id: (num_bits, dim) float32 array} for internal nodes only. |
 
 ### get_stored_fields { #dyf.LazyIndex.get_stored_fields }
 

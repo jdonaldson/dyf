@@ -1,0 +1,26 @@
+# coarsen { #dyf.coarsen }
+
+```python
+coarsen(values, strategy='first_term')
+```
+
+General label extraction / coarsening.
+
+
+
+## Parameters {.doc-section .doc-section-parameters}
+
+values : list or array
+    Raw column values.  Elements may be strings, lists of strings,
+    None, or NaN floats.
+strategy : str or callable
+    ``"first_term"`` — split on comma, take first token, lowercase.
+    ``"raw"`` — convert to str as-is.
+    ``"prefix_N"`` (e.g. ``"prefix_3"``) — first N characters.
+    A callable ``f(str) -> str`` — applied after unwrapping.
+
+
+
+## Returns {.doc-section .doc-section-returns}
+
+labels : (n,) str array

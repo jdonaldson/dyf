@@ -1,0 +1,20 @@
+# load_category_graphs { #dyf.load_category_graphs }
+
+```python
+load_category_graphs(metadata)
+```
+
+Deserialize CategoryGraphs from .dyf metadata.
+
+
+
+## Parameters {.doc-section .doc-section-parameters}
+
+metadata : dict[str, str]
+    Metadata dict from a .dyf file.
+
+
+
+## Returns {.doc-section .doc-section-returns}
+
+graphs : dict mapping name → (CategoryGraph, field_mapping)
