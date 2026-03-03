@@ -693,12 +693,53 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
         <li class="sidebar-item sidebar-item-section">
       <div class="sidebar-item-container"> 
             <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-9" role="navigation" aria-expanded="true">
- <span class="menu-text">Configuration</span></a>
+ <span class="menu-text">Categorical</span></a>
           <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-9" role="navigation" aria-expanded="true" aria-label="Toggle section">
             <i class="bi bi-chevron-right ms-2"></i>
           </a> 
       </div>
       <ul id="quarto-sidebar-section-9" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/CategoryGraph.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">CategoryGraph</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/coarsen.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">coarsen</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/multi_level_fisher_weights.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">multi_level_fisher_weights</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/store_category_graph.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">store_category_graph</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/load_category_graphs.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">load_category_graphs</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-10" role="navigation" aria-expanded="true">
+ <span class="menu-text">Configuration</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-10" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-10" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="../reference/EmbedderConfig.html" class="sidebar-item-text sidebar-link">
@@ -739,6 +780,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
   <li><a href="#chunk-analysis" id="toc-chunk-analysis" class="nav-link" data-scroll-target="#chunk-analysis">Chunk Analysis</a></li>
   <li><a href="#io" id="toc-io" class="nav-link" data-scroll-target="#io">I/O</a></li>
   <li><a href="#lazy-index" id="toc-lazy-index" class="nav-link" data-scroll-target="#lazy-index">Lazy Index</a></li>
+  <li><a href="#categorical" id="toc-categorical" class="nav-link" data-scroll-target="#categorical">Categorical</a></li>
   <li><a href="#configuration" id="toc-configuration" class="nav-link" data-scroll-target="#configuration">Configuration</a></li>
   </ul></li>
   </ul>
@@ -1005,6 +1047,34 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 <tr class="even">
 <td><a href="../reference/SearchResult.html#dyf.SearchResult">SearchResult</a></td>
 <td>Search result with indices, scores, and optional stored fields.</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="categorical" class="level2">
+<h2 class="anchored" data-anchor-id="categorical">Categorical</h2>
+<p>Hierarchical taxonomy graphs, label coarsening, and multi-level Fisher weighting.</p>
+<table class="caption-top table">
+<tbody>
+<tr class="odd">
+<td><a href="../reference/CategoryGraph.html#dyf.CategoryGraph">CategoryGraph</a></td>
+<td>DAG of string-labeled category nodes with weighted edges.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/coarsen.html#dyf.coarsen">coarsen</a></td>
+<td>General label extraction / coarsening.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/multi_level_fisher_weights.html#dyf.multi_level_fisher_weights">multi_level_fisher_weights</a></td>
+<td>Compute Fisher weights averaged across multiple DAG depths.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/store_category_graph.html#dyf.store_category_graph">store_category_graph</a></td>
+<td>Serialize a CategoryGraph for .dyf metadata.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/load_category_graphs.html#dyf.load_category_graphs">load_category_graphs</a></td>
+<td>Deserialize CategoryGraphs from .dyf metadata.</td>
 </tr>
 </tbody>
 </table>

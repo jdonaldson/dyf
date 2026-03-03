@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>cut_dyf_tree_to_labels</title>
+<title>coarsen</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -331,7 +331,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
       <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
         <i class="bi bi-layout-text-sidebar-reverse"></i>
       </button>
-        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../reference/build_pca_tree.html">Tree Methods</a></li><li class="breadcrumb-item"><a href="../reference/cut_dyf_tree_to_labels.html">cut_dyf_tree_to_labels</a></li></ol></nav>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../reference/CategoryGraph.html">Categorical</a></li><li class="breadcrumb-item"><a href="../reference/coarsen.html">coarsen</a></li></ol></nav>
         <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
         </a>
     </div>
@@ -419,7 +419,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../reference/cut_dyf_tree_to_labels.html" class="sidebar-item-text sidebar-link active">
+  <a href="../reference/cut_dyf_tree_to_labels.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">cut_dyf_tree_to_labels</span></a>
   </div>
 </li>
@@ -742,7 +742,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../reference/coarsen.html" class="sidebar-item-text sidebar-link">
+  <a href="../reference/coarsen.html" class="sidebar-item-text sidebar-link active">
  <span class="menu-text">coarsen</span></a>
   </div>
 </li>
@@ -805,7 +805,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#dyf.cut_dyf_tree_to_labels" id="toc-dyf.cut_dyf_tree_to_labels" class="nav-link active" data-scroll-target="#dyf.cut_dyf_tree_to_labels">cut_dyf_tree_to_labels</a>
+  <li><a href="#dyf.coarsen" id="toc-dyf.coarsen" class="nav-link active" data-scroll-target="#dyf.coarsen">coarsen</a>
   <ul class="collapse">
   <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
   <li><a href="#returns" id="toc-returns" class="nav-link" data-scroll-target="#returns">Returns</a></li>
@@ -814,85 +814,23 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 </nav>
     </div>
 <!-- main -->
-<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../reference/build_pca_tree.html">Tree Methods</a></li><li class="breadcrumb-item"><a href="../reference/cut_dyf_tree_to_labels.html">cut_dyf_tree_to_labels</a></li></ol></nav></header>
+<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../reference/CategoryGraph.html">Categorical</a></li><li class="breadcrumb-item"><a href="../reference/coarsen.html">coarsen</a></li></ol></nav></header>
 
 
 
 
 
-<section id="dyf.cut_dyf_tree_to_labels" class="level1">
-<h1>cut_dyf_tree_to_labels</h1>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>cut_dyf_tree_to_labels(tree, n_points, n_clusters, embeddings)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Cut DYF tree into flat cluster labels using agglomerative merge.</p>
-<p>Collects leaf nodes, computes their cosine centroids, then merges leaves to n_clusters using agglomerative clustering with cosine distance and average linkage.</p>
+<section id="dyf.coarsen" class="level1">
+<h1>coarsen</h1>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>coarsen(values, strategy<span class="op">=</span><span class="st">'first_term'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>General label extraction / coarsening.</p>
 <section id="parameters" class="level2 doc-section doc-section-parameters">
 <h2 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters">Parameters</h2>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 15%">
-<col style="width: 10%">
-<col style="width: 58%">
-<col style="width: 15%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Name</th>
-<th>Type</th>
-<th>Description</th>
-<th>Default</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>tree</td>
-<td></td>
-<td>DYF tree dict from build_dyf_tree().</td>
-<td><em>required</em></td>
-</tr>
-<tr class="even">
-<td>n_points</td>
-<td></td>
-<td>Total number of points.</td>
-<td><em>required</em></td>
-</tr>
-<tr class="odd">
-<td>n_clusters</td>
-<td></td>
-<td>Desired number of clusters.</td>
-<td><em>required</em></td>
-</tr>
-<tr class="even">
-<td>embeddings</td>
-<td></td>
-<td>(n, d) array used for centroid computation.</td>
-<td><em>required</em></td>
-</tr>
-</tbody>
-</table>
+<p>values : list or array Raw column values. Elements may be strings, lists of strings, None, or NaN floats. strategy : str or callable <code>"first_term"</code> — split on comma, take first token, lowercase. <code>"raw"</code> — convert to str as-is. <code>"prefix_N"</code> (e.g.&nbsp;<code>"prefix_3"</code>) — first N characters. A callable <code>f(str) -&gt; str</code> — applied after unwrapping.</p>
 </section>
 <section id="returns" class="level2 doc-section doc-section-returns">
 <h2 class="doc-section doc-section-returns anchored" data-anchor-id="returns">Returns</h2>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 11%">
-<col style="width: 11%">
-<col style="width: 77%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Name</th>
-<th>Type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td></td>
-<td></td>
-<td>np.ndarray of shape (n_points,) with cluster labels.</td>
-</tr>
-</tbody>
-</table>
+<p>labels : (n,) str array</p>
 
 
 </section>
