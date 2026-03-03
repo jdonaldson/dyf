@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>rerank_mmr</title>
+<title>load_category_graphs</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -333,7 +333,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
       <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
         <i class="bi bi-layout-text-sidebar-reverse"></i>
       </button>
-        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../reference/rerank_standard.html">Re-ranking</a></li><li class="breadcrumb-item"><a href="../reference/rerank_mmr.html">rerank_mmr</a></li></ol></nav>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../reference/CategoryGraph.html">Categorical</a></li><li class="breadcrumb-item"><a href="../reference/load_category_graphs.html">load_category_graphs</a></li></ol></nav>
         <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
         </a>
     </div>
@@ -598,7 +598,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../reference/rerank_mmr.html" class="sidebar-item-text sidebar-link active">
+  <a href="../reference/rerank_mmr.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">rerank_mmr</span></a>
   </div>
 </li>
@@ -762,7 +762,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../reference/load_category_graphs.html" class="sidebar-item-text sidebar-link">
+  <a href="../reference/load_category_graphs.html" class="sidebar-item-text sidebar-link active">
  <span class="menu-text">load_category_graphs</span></a>
   </div>
 </li>
@@ -807,9 +807,8 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#dyf.rerank_mmr" id="toc-dyf.rerank_mmr" class="nav-link active" data-scroll-target="#dyf.rerank_mmr">rerank_mmr</a>
+  <li><a href="#dyf.load_category_graphs" id="toc-dyf.load_category_graphs" class="nav-link active" data-scroll-target="#dyf.load_category_graphs">load_category_graphs</a>
   <ul class="collapse">
-  <li><a href="#iteratively-selects-candidates-that-maximize" id="toc-iteratively-selects-candidates-that-maximize" class="nav-link" data-scroll-target="#iteratively-selects-candidates-that-maximize">Iteratively selects candidates that maximize</a></li>
   <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
   <li><a href="#returns" id="toc-returns" class="nav-link" data-scroll-target="#returns">Returns</a></li>
   </ul></li>
@@ -817,89 +816,23 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 </nav>
     </div>
 <!-- main -->
-<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../reference/rerank_standard.html">Re-ranking</a></li><li class="breadcrumb-item"><a href="../reference/rerank_mmr.html">rerank_mmr</a></li></ol></nav></header>
+<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../reference/CategoryGraph.html">Categorical</a></li><li class="breadcrumb-item"><a href="../reference/load_category_graphs.html">load_category_graphs</a></li></ol></nav></header>
 
 
 
 
 
-<section id="dyf.rerank_mmr" class="level1">
-<h1>rerank_mmr</h1>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>rerank_mmr(query_emb, candidate_indices, embeddings_normed, top_k, lam<span class="op">=</span><span class="fl">0.5</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Maximal Marginal Relevance re-ranking.</p>
-<section id="iteratively-selects-candidates-that-maximize" class="level2 doc-section doc-section-iteratively-selects-candidates-that-maximize">
-<h2 class="doc-section doc-section-iteratively-selects-candidates-that-maximize anchored" data-anchor-id="iteratively-selects-candidates-that-maximize">Iteratively selects candidates that maximize</h2>
-<p>lam * sim(query, doc) - (1-lam) * max_sim(doc, already_selected)</p>
-</section>
+<section id="dyf.load_category_graphs" class="level1">
+<h1>load_category_graphs</h1>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>load_category_graphs(metadata)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Deserialize CategoryGraphs from .dyf metadata.</p>
 <section id="parameters" class="level2 doc-section doc-section-parameters">
 <h2 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters">Parameters</h2>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 20%">
-<col style="width: 8%">
-<col style="width: 57%">
-<col style="width: 13%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Name</th>
-<th>Type</th>
-<th>Description</th>
-<th>Default</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>query_emb</td>
-<td></td>
-<td>(d,) normalized query embedding.</td>
-<td><em>required</em></td>
-</tr>
-<tr class="even">
-<td>candidate_indices</td>
-<td></td>
-<td>1-D array of candidate point indices.</td>
-<td><em>required</em></td>
-</tr>
-<tr class="odd">
-<td>embeddings_normed</td>
-<td></td>
-<td>(n, d) L2-normalized embedding matrix.</td>
-<td><em>required</em></td>
-</tr>
-<tr class="even">
-<td>top_k</td>
-<td></td>
-<td>Number of results to return.</td>
-<td><em>required</em></td>
-</tr>
-<tr class="odd">
-<td>lam</td>
-<td></td>
-<td>Relevance-diversity tradeoff (1 = pure relevance).</td>
-<td><code>0.5</code></td>
-</tr>
-</tbody>
-</table>
+<p>metadata : dict[str, str] Metadata dict from a .dyf file.</p>
 </section>
 <section id="returns" class="level2 doc-section doc-section-returns">
 <h2 class="doc-section doc-section-returns anchored" data-anchor-id="returns">Returns</h2>
-<table class="caption-top table">
-<thead>
-<tr class="header">
-<th>Name</th>
-<th>Type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td></td>
-<td></td>
-<td>np.ndarray of selected point indices.</td>
-</tr>
-</tbody>
-</table>
+<p>graphs : dict mapping name → (CategoryGraph, field_mapping)</p>
 
 
 </section>

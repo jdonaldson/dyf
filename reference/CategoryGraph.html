@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>rerank_mmr</title>
+<title>categorygraph</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -333,7 +333,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
       <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
         <i class="bi bi-layout-text-sidebar-reverse"></i>
       </button>
-        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../reference/rerank_standard.html">Re-ranking</a></li><li class="breadcrumb-item"><a href="../reference/rerank_mmr.html">rerank_mmr</a></li></ol></nav>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../reference/CategoryGraph.html">Categorical</a></li><li class="breadcrumb-item"><a href="../reference/CategoryGraph.html">CategoryGraph</a></li></ol></nav>
         <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
         </a>
     </div>
@@ -598,7 +598,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../reference/rerank_mmr.html" class="sidebar-item-text sidebar-link active">
+  <a href="../reference/rerank_mmr.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">rerank_mmr</span></a>
   </div>
 </li>
@@ -738,7 +738,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
       <ul id="quarto-sidebar-section-9" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../reference/CategoryGraph.html" class="sidebar-item-text sidebar-link">
+  <a href="../reference/CategoryGraph.html" class="sidebar-item-text sidebar-link active">
  <span class="menu-text">CategoryGraph</span></a>
   </div>
 </li>
@@ -807,101 +807,249 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#dyf.rerank_mmr" id="toc-dyf.rerank_mmr" class="nav-link active" data-scroll-target="#dyf.rerank_mmr">rerank_mmr</a>
+  <li><a href="#dyf.CategoryGraph" id="toc-dyf.CategoryGraph" class="nav-link active" data-scroll-target="#dyf.CategoryGraph">CategoryGraph</a>
   <ul class="collapse">
-  <li><a href="#iteratively-selects-candidates-that-maximize" id="toc-iteratively-selects-candidates-that-maximize" class="nav-link" data-scroll-target="#iteratively-selects-candidates-that-maximize">Iteratively selects candidates that maximize</a></li>
-  <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
-  <li><a href="#returns" id="toc-returns" class="nav-link" data-scroll-target="#returns">Returns</a></li>
+  <li><a href="#attributes" id="toc-attributes" class="nav-link" data-scroll-target="#attributes">Attributes</a></li>
+  <li><a href="#methods" id="toc-methods" class="nav-link" data-scroll-target="#methods">Methods</a>
+  <ul class="collapse">
+  <li><a href="#dyf.CategoryGraph.all_nodes" id="toc-dyf.CategoryGraph.all_nodes" class="nav-link" data-scroll-target="#dyf.CategoryGraph.all_nodes">all_nodes</a></li>
+  <li><a href="#dyf.CategoryGraph.from_dict" id="toc-dyf.CategoryGraph.from_dict" class="nav-link" data-scroll-target="#dyf.CategoryGraph.from_dict">from_dict</a></li>
+  <li><a href="#dyf.CategoryGraph.from_edges" id="toc-dyf.CategoryGraph.from_edges" class="nav-link" data-scroll-target="#dyf.CategoryGraph.from_edges">from_edges</a></li>
+  <li><a href="#dyf.CategoryGraph.from_json" id="toc-dyf.CategoryGraph.from_json" class="nav-link" data-scroll-target="#dyf.CategoryGraph.from_json">from_json</a></li>
+  <li><a href="#dyf.CategoryGraph.from_levels" id="toc-dyf.CategoryGraph.from_levels" class="nav-link" data-scroll-target="#dyf.CategoryGraph.from_levels">from_levels</a></li>
+  <li><a href="#dyf.CategoryGraph.from_single_level" id="toc-dyf.CategoryGraph.from_single_level" class="nav-link" data-scroll-target="#dyf.CategoryGraph.from_single_level">from_single_level</a></li>
+  <li><a href="#dyf.CategoryGraph.get_ancestors" id="toc-dyf.CategoryGraph.get_ancestors" class="nav-link" data-scroll-target="#dyf.CategoryGraph.get_ancestors">get_ancestors</a></li>
+  <li><a href="#dyf.CategoryGraph.get_children" id="toc-dyf.CategoryGraph.get_children" class="nav-link" data-scroll-target="#dyf.CategoryGraph.get_children">get_children</a></li>
+  <li><a href="#dyf.CategoryGraph.get_depth" id="toc-dyf.CategoryGraph.get_depth" class="nav-link" data-scroll-target="#dyf.CategoryGraph.get_depth">get_depth</a></li>
+  <li><a href="#dyf.CategoryGraph.get_descendants" id="toc-dyf.CategoryGraph.get_descendants" class="nav-link" data-scroll-target="#dyf.CategoryGraph.get_descendants">get_descendants</a></li>
+  <li><a href="#dyf.CategoryGraph.get_parents" id="toc-dyf.CategoryGraph.get_parents" class="nav-link" data-scroll-target="#dyf.CategoryGraph.get_parents">get_parents</a></li>
+  <li><a href="#dyf.CategoryGraph.is_tree" id="toc-dyf.CategoryGraph.is_tree" class="nav-link" data-scroll-target="#dyf.CategoryGraph.is_tree">is_tree</a></li>
+  <li><a href="#dyf.CategoryGraph.items_at_depth" id="toc-dyf.CategoryGraph.items_at_depth" class="nav-link" data-scroll-target="#dyf.CategoryGraph.items_at_depth">items_at_depth</a></li>
+  <li><a href="#dyf.CategoryGraph.lca_depth" id="toc-dyf.CategoryGraph.lca_depth" class="nav-link" data-scroll-target="#dyf.CategoryGraph.lca_depth">lca_depth</a></li>
+  <li><a href="#dyf.CategoryGraph.max_depth" id="toc-dyf.CategoryGraph.max_depth" class="nav-link" data-scroll-target="#dyf.CategoryGraph.max_depth">max_depth</a></li>
+  <li><a href="#dyf.CategoryGraph.nodes_at_depth" id="toc-dyf.CategoryGraph.nodes_at_depth" class="nav-link" data-scroll-target="#dyf.CategoryGraph.nodes_at_depth">nodes_at_depth</a></li>
+  <li><a href="#dyf.CategoryGraph.summary" id="toc-dyf.CategoryGraph.summary" class="nav-link" data-scroll-target="#dyf.CategoryGraph.summary">summary</a></li>
+  <li><a href="#dyf.CategoryGraph.to_dict" id="toc-dyf.CategoryGraph.to_dict" class="nav-link" data-scroll-target="#dyf.CategoryGraph.to_dict">to_dict</a></li>
+  <li><a href="#dyf.CategoryGraph.to_json" id="toc-dyf.CategoryGraph.to_json" class="nav-link" data-scroll-target="#dyf.CategoryGraph.to_json">to_json</a></li>
+  </ul></li>
   </ul></li>
   </ul>
 </nav>
     </div>
 <!-- main -->
-<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../reference/rerank_standard.html">Re-ranking</a></li><li class="breadcrumb-item"><a href="../reference/rerank_mmr.html">rerank_mmr</a></li></ol></nav></header>
+<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../reference/CategoryGraph.html">Categorical</a></li><li class="breadcrumb-item"><a href="../reference/CategoryGraph.html">CategoryGraph</a></li></ol></nav></header>
 
 
 
 
 
-<section id="dyf.rerank_mmr" class="level1">
-<h1>rerank_mmr</h1>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>rerank_mmr(query_emb, candidate_indices, embeddings_normed, top_k, lam<span class="op">=</span><span class="fl">0.5</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Maximal Marginal Relevance re-ranking.</p>
-<section id="iteratively-selects-candidates-that-maximize" class="level2 doc-section doc-section-iteratively-selects-candidates-that-maximize">
-<h2 class="doc-section doc-section-iteratively-selects-candidates-that-maximize anchored" data-anchor-id="iteratively-selects-candidates-that-maximize">Iteratively selects candidates that maximize</h2>
-<p>lam * sim(query, doc) - (1-lam) * max_sim(doc, already_selected)</p>
+<section id="dyf.CategoryGraph" class="level1">
+<h1>CategoryGraph</h1>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>CategoryGraph(children<span class="op">=</span><span class="bu">dict</span>(), parents<span class="op">=</span><span class="bu">dict</span>(), roots<span class="op">=</span><span class="bu">list</span>(), leaves<span class="op">=</span><span class="bu">list</span>())</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>DAG of string-labeled category nodes with weighted edges.</p>
+<p>A hierarchy is a DAG where each node has at most one parent (a tree). This structure supports general DAGs (multiple parents) but most domain taxonomies will be trees.</p>
+<section id="attributes" class="level2 doc-section doc-section-attributes">
+<h2 class="doc-section doc-section-attributes anchored" data-anchor-id="attributes">Attributes</h2>
+<p>children : dict mapping parent → list of (child, weight) parents : dict mapping child → list of (parent, weight) roots : nodes with no parents leaves : nodes with no children</p>
 </section>
-<section id="parameters" class="level2 doc-section doc-section-parameters">
-<h2 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters">Parameters</h2>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 20%">
-<col style="width: 8%">
-<col style="width: 57%">
-<col style="width: 13%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Name</th>
-<th>Type</th>
-<th>Description</th>
-<th>Default</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>query_emb</td>
-<td></td>
-<td>(d,) normalized query embedding.</td>
-<td><em>required</em></td>
-</tr>
-<tr class="even">
-<td>candidate_indices</td>
-<td></td>
-<td>1-D array of candidate point indices.</td>
-<td><em>required</em></td>
-</tr>
-<tr class="odd">
-<td>embeddings_normed</td>
-<td></td>
-<td>(n, d) L2-normalized embedding matrix.</td>
-<td><em>required</em></td>
-</tr>
-<tr class="even">
-<td>top_k</td>
-<td></td>
-<td>Number of results to return.</td>
-<td><em>required</em></td>
-</tr>
-<tr class="odd">
-<td>lam</td>
-<td></td>
-<td>Relevance-diversity tradeoff (1 = pure relevance).</td>
-<td><code>0.5</code></td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="returns" class="level2 doc-section doc-section-returns">
-<h2 class="doc-section doc-section-returns anchored" data-anchor-id="returns">Returns</h2>
+<section id="methods" class="level2">
+<h2 class="anchored" data-anchor-id="methods">Methods</h2>
 <table class="caption-top table">
 <thead>
 <tr class="header">
 <th>Name</th>
-<th>Type</th>
 <th>Description</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td></td>
-<td></td>
-<td>np.ndarray of selected point indices.</td>
+<td><a href="#dyf.CategoryGraph.all_nodes">all_nodes</a></td>
+<td>Return all nodes in the graph.</td>
+</tr>
+<tr class="even">
+<td><a href="#dyf.CategoryGraph.from_dict">from_dict</a></td>
+<td>Reconstruct from <code>to_dict()</code> output.</td>
+</tr>
+<tr class="odd">
+<td><a href="#dyf.CategoryGraph.from_edges">from_edges</a></td>
+<td>Build from explicit edge list [(parent, child, weight)].</td>
+</tr>
+<tr class="even">
+<td><a href="#dyf.CategoryGraph.from_json">from_json</a></td>
+<td>Reconstruct from JSON string.</td>
+</tr>
+<tr class="odd">
+<td><a href="#dyf.CategoryGraph.from_levels">from_levels</a></td>
+<td>Build DAG from co-occurring level arrays [L0, L1, L2, …].</td>
+</tr>
+<tr class="even">
+<td><a href="#dyf.CategoryGraph.from_single_level">from_single_level</a></td>
+<td>Depth-1 graph: <code>_root_</code> → unique labels.</td>
+</tr>
+<tr class="odd">
+<td><a href="#dyf.CategoryGraph.get_ancestors">get_ancestors</a></td>
+<td>All ancestors via BFS upward.</td>
+</tr>
+<tr class="even">
+<td><a href="#dyf.CategoryGraph.get_children">get_children</a></td>
+<td>Direct children of <em>node</em>.</td>
+</tr>
+<tr class="odd">
+<td><a href="#dyf.CategoryGraph.get_depth">get_depth</a></td>
+<td>Shortest path length from any root to <em>node</em> (0 for roots).</td>
+</tr>
+<tr class="even">
+<td><a href="#dyf.CategoryGraph.get_descendants">get_descendants</a></td>
+<td>All descendants via BFS downward.</td>
+</tr>
+<tr class="odd">
+<td><a href="#dyf.CategoryGraph.get_parents">get_parents</a></td>
+<td>Direct parents of <em>node</em>.</td>
+</tr>
+<tr class="even">
+<td><a href="#dyf.CategoryGraph.is_tree">is_tree</a></td>
+<td>True if every node has at most one parent.</td>
+</tr>
+<tr class="odd">
+<td><a href="#dyf.CategoryGraph.items_at_depth">items_at_depth</a></td>
+<td>Resolve each item’s label to the requested depth.</td>
+</tr>
+<tr class="even">
+<td><a href="#dyf.CategoryGraph.lca_depth">lca_depth</a></td>
+<td>Depth of the lowest common ancestor of two nodes.</td>
+</tr>
+<tr class="odd">
+<td><a href="#dyf.CategoryGraph.max_depth">max_depth</a></td>
+<td>Maximum depth across all nodes.</td>
+</tr>
+<tr class="even">
+<td><a href="#dyf.CategoryGraph.nodes_at_depth">nodes_at_depth</a></td>
+<td>All nodes whose shortest root distance equals <em>depth</em>.</td>
+</tr>
+<tr class="odd">
+<td><a href="#dyf.CategoryGraph.summary">summary</a></td>
+<td>Human-readable stats.</td>
+</tr>
+<tr class="even">
+<td><a href="#dyf.CategoryGraph.to_dict">to_dict</a></td>
+<td>JSON-serializable dict (edge list format).</td>
+</tr>
+<tr class="odd">
+<td><a href="#dyf.CategoryGraph.to_json">to_json</a></td>
+<td>Serialize to JSON string.</td>
 </tr>
 </tbody>
 </table>
+<section id="dyf.CategoryGraph.all_nodes" class="level3">
+<h3 class="anchored" data-anchor-id="dyf.CategoryGraph.all_nodes">all_nodes</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>CategoryGraph.all_nodes()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Return all nodes in the graph.</p>
+</section>
+<section id="dyf.CategoryGraph.from_dict" class="level3">
+<h3 class="anchored" data-anchor-id="dyf.CategoryGraph.from_dict">from_dict</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>CategoryGraph.from_dict(data)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Reconstruct from <code>to_dict()</code> output.</p>
+</section>
+<section id="dyf.CategoryGraph.from_edges" class="level3">
+<h3 class="anchored" data-anchor-id="dyf.CategoryGraph.from_edges">from_edges</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>CategoryGraph.from_edges(edges)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Build from explicit edge list [(parent, child, weight)].</p>
+<p>If tuples have 2 elements, weight defaults to 1.0.</p>
+</section>
+<section id="dyf.CategoryGraph.from_json" class="level3">
+<h3 class="anchored" data-anchor-id="dyf.CategoryGraph.from_json">from_json</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>CategoryGraph.from_json(s)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Reconstruct from JSON string.</p>
+</section>
+<section id="dyf.CategoryGraph.from_levels" class="level3">
+<h3 class="anchored" data-anchor-id="dyf.CategoryGraph.from_levels">from_levels</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>CategoryGraph.from_levels(level_columns)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Build DAG from co-occurring level arrays [L0, L1, L2, …].</p>
+<p>L0 is the coarsest (root-adjacent) level, L_last is finest. Edges are created between adjacent levels based on co-occurrence. Edge weights reflect the fraction of items in the parent that belong to each child.</p>
+</section>
+<section id="dyf.CategoryGraph.from_single_level" class="level3">
+<h3 class="anchored" data-anchor-id="dyf.CategoryGraph.from_single_level">from_single_level</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>CategoryGraph.from_single_level(labels)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Depth-1 graph: <code>_root_</code> → unique labels.</p>
+<p>This is the degenerate case for flat categorical columns.</p>
+</section>
+<section id="dyf.CategoryGraph.get_ancestors" class="level3">
+<h3 class="anchored" data-anchor-id="dyf.CategoryGraph.get_ancestors">get_ancestors</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>CategoryGraph.get_ancestors(node, max_depth<span class="op">=</span><span class="dv">100</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>All ancestors via BFS upward.</p>
+</section>
+<section id="dyf.CategoryGraph.get_children" class="level3">
+<h3 class="anchored" data-anchor-id="dyf.CategoryGraph.get_children">get_children</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>CategoryGraph.get_children(node)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Direct children of <em>node</em>.</p>
+</section>
+<section id="dyf.CategoryGraph.get_depth" class="level3">
+<h3 class="anchored" data-anchor-id="dyf.CategoryGraph.get_depth">get_depth</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>CategoryGraph.get_depth(node)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Shortest path length from any root to <em>node</em> (0 for roots).</p>
+</section>
+<section id="dyf.CategoryGraph.get_descendants" class="level3">
+<h3 class="anchored" data-anchor-id="dyf.CategoryGraph.get_descendants">get_descendants</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>CategoryGraph.get_descendants(node, max_depth<span class="op">=</span><span class="dv">100</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>All descendants via BFS downward.</p>
+</section>
+<section id="dyf.CategoryGraph.get_parents" class="level3">
+<h3 class="anchored" data-anchor-id="dyf.CategoryGraph.get_parents">get_parents</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>CategoryGraph.get_parents(node)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Direct parents of <em>node</em>.</p>
+</section>
+<section id="dyf.CategoryGraph.is_tree" class="level3">
+<h3 class="anchored" data-anchor-id="dyf.CategoryGraph.is_tree">is_tree</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>CategoryGraph.is_tree()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>True if every node has at most one parent.</p>
+</section>
+<section id="dyf.CategoryGraph.items_at_depth" class="level3">
+<h3 class="anchored" data-anchor-id="dyf.CategoryGraph.items_at_depth">items_at_depth</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>CategoryGraph.items_at_depth(depth, item_labels)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Resolve each item’s label to the requested depth.</p>
+<p>For items whose finest label is deeper than <em>depth</em>, walk parents until a node at the target depth is found. For items already at or above <em>depth</em>, use their label as-is.</p>
+<section id="parameters" class="level4 doc-section doc-section-parameters">
+<h4 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters">Parameters</h4>
+<p>depth : int Target depth (0 = roots). item_labels : (n,) str array Per-item labels (typically the finest/leaf labels).</p>
+</section>
+<section id="returns" class="level4 doc-section doc-section-returns">
+<h4 class="doc-section doc-section-returns anchored" data-anchor-id="returns">Returns</h4>
+<p>resolved : (n,) str array</p>
+</section>
+</section>
+<section id="dyf.CategoryGraph.lca_depth" class="level3">
+<h3 class="anchored" data-anchor-id="dyf.CategoryGraph.lca_depth">lca_depth</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>CategoryGraph.lca_depth(node_a, node_b)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Depth of the lowest common ancestor of two nodes.</p>
+<p>Returns the depth of the deepest node that is an ancestor of both <em>node_a</em> and <em>node_b</em> (or one of them, if one is an ancestor of the other). Returns -1 if either node is absent or they share no common ancestor.</p>
+</section>
+<section id="dyf.CategoryGraph.max_depth" class="level3">
+<h3 class="anchored" data-anchor-id="dyf.CategoryGraph.max_depth">max_depth</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>CategoryGraph.max_depth()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Maximum depth across all nodes.</p>
+</section>
+<section id="dyf.CategoryGraph.nodes_at_depth" class="level3">
+<h3 class="anchored" data-anchor-id="dyf.CategoryGraph.nodes_at_depth">nodes_at_depth</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>CategoryGraph.nodes_at_depth(depth)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>All nodes whose shortest root distance equals <em>depth</em>.</p>
+</section>
+<section id="dyf.CategoryGraph.summary" class="level3">
+<h3 class="anchored" data-anchor-id="dyf.CategoryGraph.summary">summary</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>CategoryGraph.summary()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Human-readable stats.</p>
+</section>
+<section id="dyf.CategoryGraph.to_dict" class="level3">
+<h3 class="anchored" data-anchor-id="dyf.CategoryGraph.to_dict">to_dict</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>CategoryGraph.to_dict()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>JSON-serializable dict (edge list format).</p>
+</section>
+<section id="dyf.CategoryGraph.to_json" class="level3">
+<h3 class="anchored" data-anchor-id="dyf.CategoryGraph.to_json">to_json</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>CategoryGraph.to_json()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Serialize to JSON string.</p>
 
 
+</section>
 </section>
 </section>
 
