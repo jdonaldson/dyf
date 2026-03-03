@@ -32,6 +32,11 @@ jobs:
       - name: Install package
         run: pip install -e ".[dev,full,io,lazy]"
 
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
       - name: Set up Quarto
         uses: quarto-dev/quarto-actions/setup@v2
 
