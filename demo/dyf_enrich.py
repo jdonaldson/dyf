@@ -1288,6 +1288,57 @@ def enrich_cluster(dyf_path, n_clusters_list=None, model="gpt-oss:20b",
         print(f"    Stored color maps for 2D ({len(rgb_2d)}) "
               f"and 3D ({len(rgb_3d)}) clusters")
 
+    # ── LSH tree-leaf agglomeration (50 buckets) ──
+    print("\n  Computing agglomerated DYF tree buckets...")
+    from dyf.agglomerate import agglomerate_tree_leaves
+    from dyf.colors import tree_rgb_map
+
+    with LazyIndex(dyf_path) as idx_agg:
+        lsh_labels, lsh_names, lsh_label_data, item_leaf_map, tree_struct = \
+            agglomerate_tree_leaves(idx_agg, coords, embeddings, n_groups=50)
+
+    if lsh_labels is not None:
+        n_lsh = len(set(lsh_labels.tolist()))
+        print(f"    {n_lsh} agglomerated buckets")
+
+        # Label buckets via contrastive TF-IDF + LLM
+        print("  Labeling agglomerated buckets...")
+        bucket_names = label_clusters(
+            titles, coords, lsh_labels, embeddings,
+            model=model, cache_data=label_cache_data,
+            cache_key="lsh_buckets", domain=domain)
+        label_cache_data["lsh_buckets"] = {
+            str(k): v for k, v in bucket_names.items()}
+
+        # Update label_data text with LLM names
+        for entry in lsh_label_data:
+            cid = entry["cid"]
+            if cid in bucket_names:
+                entry["text"] = bucket_names[cid][:50]
+
+        # Store bucket IDs as a stored field
+        new_sf['lsh_bucket_ids'] = lsh_labels.astype(np.int32)
+
+        # Store names and centroids in metadata
+        new_meta['lsh_bucket_names'] = json.dumps(
+            {str(k): v for k, v in bucket_names.items()})
+        centroids_lsh = {}
+        for entry in lsh_label_data:
+            centroids_lsh[str(entry["cid"])] = [
+                round(entry["x"], 4),
+                round(entry["y"], 4),
+                round(entry["z"], 4)]
+        new_meta['lsh_bucket_centroids'] = json.dumps(centroids_lsh)
+
+        # Tree-aware color map
+        lsh_colors = tree_rgb_map(lsh_labels, tree_struct, item_leaf_map)
+        new_meta['lsh_bucket_colors'] = json.dumps(
+            {str(k): v for k, v in lsh_colors.items()})
+
+        print(f"    Stored LSH bucket IDs, names, centroids, and colors")
+    else:
+        print("    Skipped: tree has fewer than 2 leaves")
+
     # Strip stale level 3 metadata when re-clustering (None = delete key)
     if force and level >= 3:
         for stale_key in ['edge_pairs', 'edge_paths_2d', 'tour_narration',

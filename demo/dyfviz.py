@@ -2086,151 +2086,9 @@ window.togglePanel = togglePanel;
 
 
 def _agglomerate_tree_leaves(idx, coords, embeddings, n_groups=50):
-    """Agglomerate DYF tree leaves into ~n_groups using embedding centroids.
-
-    Walks the tree to find leaf nodes, computes per-leaf embedding centroids,
-    then uses Ward linkage to merge leaves into n_groups agglomerated clusters.
-    After initial assignment, reassigns individual points to their nearest
-    bucket centroid to clean up impure leaves and bad merges.
-
-    Returns (lsh_labels, lsh_names, lsh_label_data, item_leaf_map, tree_structure)
-    ready for multi_level_data. item_leaf_map maps each item index to its
-    tree leaf node_id (before agglomeration). tree_structure is the raw tree.
-    """
-    from scipy.cluster.hierarchy import linkage, fcluster
-
-    tree = idx.get_tree_structure()
-    leaves = [n for n in tree if n['is_leaf'] and n['batch_index'] >= 0]
-
-    if len(leaves) < 2:
-        return None, {}, [], None, tree
-
-    dim = idx.embedding_dim
-    is_pq = idx.is_pq
-    if is_pq:
-        idx._load_pq_codebook()
-
-    # Collect per-leaf centroids and point mappings
-    leaf_centroids = []
-    leaf_point_indices = []  # list of arrays, one per leaf
-
-    for leaf in leaves:
-        batch = idx.get_leaf(leaf['batch_index'])
-        item_ids = batch.column('item_index').to_numpy()
-        emb_col = batch.column('embedding')
-        flat = emb_col.values.to_numpy()
-        n_rows = len(emb_col)
-
-        if is_pq:
-            meta = idx._get_metadata()
-            m = int(meta['pq_n_subquantizers'])
-            codes = flat.reshape(n_rows, m)
-            leaf_emb = idx._pq_reconstruct(codes)
-        else:
-            leaf_emb = flat.reshape(n_rows, dim).astype(np.float32)
-
-        centroid = leaf_emb.mean(axis=0)
-        leaf_centroids.append(centroid)
-        leaf_point_indices.append(item_ids)
-
-    # Build item → leaf node_id map (before agglomeration)
-    n_points = coords.shape[0]
-    item_leaf_map = np.full(n_points, -1, dtype=np.int32)
-    for leaf, item_ids in zip(leaves, leaf_point_indices):
-        valid = item_ids < n_points
-        item_leaf_map[item_ids[valid]] = leaf['node_id']
-
-    centroids = np.vstack(leaf_centroids).astype(np.float32)
-
-    # L2-normalize centroids for cosine-distance complete linkage
-    norms = np.linalg.norm(centroids, axis=1, keepdims=True)
-    norms[norms == 0] = 1.0
-    centroids_normed = centroids / norms
-
-    # Agglomerate — complete linkage refuses merges where the most
-    # dissimilar pair across two groups exceeds the threshold, which
-    # prevents merging semantically distinct subgroups (e.g. catheters
-    # with irrigation forceps) that Ward would combine.
-    actual_groups = min(n_groups, len(centroids_normed))
-    Z = linkage(centroids_normed, method='complete')
-    agg_labels = fcluster(Z, actual_groups, criterion='maxclust')  # 1-based
-
-    # Map points → leaf → agglomerated group (initial assignment)
-    n_points = coords.shape[0]
-    point_labels = np.full(n_points, -1, dtype=np.int32)
-    for leaf_idx, item_ids in enumerate(leaf_point_indices):
-        group_id = int(agg_labels[leaf_idx]) - 1  # 0-based
-        valid = item_ids < n_points
-        point_labels[item_ids[valid]] = group_id
-
-    # Handle any unassigned points
-    unassigned = point_labels == -1
-    if unassigned.any():
-        max_id = point_labels.max() + 1
-        point_labels[unassigned] = max_id
-
-    # ── Point-level reassignment pass ─────────────────────────────────
-    # Compute bucket centroids, then reassign each point to nearest bucket.
-    unique_groups = sorted(set(point_labels.tolist()))
-    n_buckets = len(unique_groups)
-    gid_to_idx = {gid: i for i, gid in enumerate(unique_groups)}
-
-    # Normalize all point embeddings once
-    emb_norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
-    emb_normed = embeddings / np.maximum(emb_norms, 1e-10)
-
-    # Iterative reassignment (converges in 2-3 rounds)
-    for _iter in range(5):
-        # Compute bucket centroids from current assignments
-        bucket_centroids = np.zeros((n_buckets, embeddings.shape[1]),
-                                    dtype=np.float32)
-        for gid in unique_groups:
-            mask = point_labels == gid
-            pts = np.where(mask)[0]
-            if len(pts) > 0:
-                cent = emb_normed[pts].mean(axis=0)
-                norm = np.linalg.norm(cent)
-                if norm > 1e-10:
-                    cent /= norm
-                bucket_centroids[gid_to_idx[gid]] = cent
-
-        # Similarity of every point to every bucket centroid: (N, n_buckets)
-        all_sims = emb_normed @ bucket_centroids.T
-
-        # Best bucket for each point
-        best_bucket_idx = np.argmax(all_sims, axis=1)
-        new_labels = np.array([unique_groups[bi] for bi in best_bucket_idx],
-                              dtype=np.int32)
-
-        changed = int((new_labels != point_labels).sum())
-        point_labels = new_labels
-        if changed == 0:
-            break
-    print(f"    Point reassignment: {_iter + 1} iterations, "
-          f"{changed} changed in last round")
-
-    # Rebuild unique_groups after reassignment (some buckets may have emptied)
-    unique_groups = sorted(set(point_labels.tolist()))
-
-    # Build names and label_data
-    lsh_names = {gid: f"Bucket {gid}" for gid in unique_groups}
-    ndim = coords.shape[1]
-    lsh_label_data = []
-    for gid in unique_groups:
-        mask = point_labels == gid
-        pts = np.where(mask)[0]
-        centroid = coords[pts].mean(axis=0)
-        lsh_label_data.append({
-            "x": float(centroid[0]),
-            "y": float(centroid[1]),
-            "z": float(centroid[2]) if ndim >= 3 else 0.0,
-            "text": f"Bucket {gid}",
-            "size": int(mask.sum()),
-            "cid": int(gid),
-            "leaf_cids": [int(gid)],
-        })
-
-    return point_labels, lsh_names, lsh_label_data, item_leaf_map, tree
+    """Thin wrapper — delegates to ``dyf.agglomerate.agglomerate_tree_leaves``."""
+    from dyf.agglomerate import agglomerate_tree_leaves
+    return agglomerate_tree_leaves(idx, coords, embeddings, n_groups=n_groups)
 
 
 # ── Main ─────────────────────────────────────────────────────────────────
@@ -2479,31 +2337,64 @@ def _render_from_dyf(dyf_path, args):
             "default": n_birch,
         }
 
-        # Agglomerate DYF tree leaves into ~50 semantic buckets
-        print("  Computing agglomerated DYF tree buckets...")
-        with LazyIndex(dyf_path) as idx_agg:
-            lsh_labels, lsh_names, lsh_label_data, item_leaf_map, tree_struct = \
-                _agglomerate_tree_leaves(
-                    idx_agg, coords, data['embeddings'], n_groups=50)
-        if lsh_labels is not None:
-            # Label buckets via contrastive TF-IDF + LLM
-            model = getattr(args, 'model', 'gpt-oss:20b')
-            cache_file = getattr(args, 'label_cache', None)
-            print("  Labeling agglomerated buckets...")
-            bucket_names = label_clusters(
-                titles_arr, coords, lsh_labels, data['embeddings'],
-                model=model, cache_file=cache_file, cache_key="lsh_buckets")
-            lsh_names = bucket_names
-            for entry in lsh_label_data:
-                cid = entry["cid"]
-                if cid in bucket_names:
-                    entry["text"] = bucket_names[cid][:50]
+        # Load pre-baked LSH buckets, or compute on the fly
+        if 'lsh_bucket_ids' in data['fields']:
+            lsh_labels = np.asarray(data['fields']['lsh_bucket_ids'],
+                                    dtype=np.int32)
+            lsh_names_json = data['metadata'].get('lsh_bucket_names', '{}')
+            lsh_names = {int(k): v
+                         for k, v in json.loads(lsh_names_json).items()}
+            ndim_lsh = coords.shape[1]
+            lsh_label_data = []
+            for cid in sorted(set(lsh_labels.tolist())):
+                mask = lsh_labels == cid
+                pts = np.where(mask)[0]
+                centroid = coords[pts].mean(axis=0)
+                name = lsh_names.get(cid, f"Bucket {cid}")
+                lsh_label_data.append({
+                    "x": float(centroid[0]),
+                    "y": float(centroid[1]),
+                    "z": float(centroid[2]) if ndim_lsh >= 3 else 0.0,
+                    "text": str(name)[:50],
+                    "size": int(mask.sum()),
+                    "cid": int(cid),
+                    "leaf_cids": [int(cid)],
+                })
             multi_level_data["lsh_labels"] = lsh_labels
             multi_level_data["lsh_names"] = lsh_names
             multi_level_data["lsh_label_data"] = lsh_label_data
-            multi_level_data["item_leaf_map"] = item_leaf_map
-            multi_level_data["tree_structure"] = tree_struct
-            print(f"    {len(set(lsh_labels.tolist()))} agglomerated buckets")
+            # Load pre-baked colors
+            lsh_colors_json = data['metadata'].get('lsh_bucket_colors')
+            if lsh_colors_json:
+                multi_level_data.setdefault("color_maps", {})["lsh"] = {
+                    str(k): v
+                    for k, v in json.loads(lsh_colors_json).items()}
+            print(f"  LSH: {len(set(lsh_labels.tolist()))} pre-baked buckets")
+        else:
+            print("  Computing agglomerated DYF tree buckets...")
+            with LazyIndex(dyf_path) as idx_agg:
+                lsh_labels, lsh_names, lsh_label_data, item_leaf_map, tree_struct = \
+                    _agglomerate_tree_leaves(
+                        idx_agg, coords, data['embeddings'], n_groups=50)
+            if lsh_labels is not None:
+                model = getattr(args, 'model', 'gpt-oss:20b')
+                cache_file = getattr(args, 'label_cache', None)
+                print("  Labeling agglomerated buckets...")
+                bucket_names = label_clusters(
+                    titles_arr, coords, lsh_labels, data['embeddings'],
+                    model=model, cache_file=cache_file,
+                    cache_key="lsh_buckets")
+                lsh_names = bucket_names
+                for entry in lsh_label_data:
+                    cid = entry["cid"]
+                    if cid in bucket_names:
+                        entry["text"] = bucket_names[cid][:50]
+                multi_level_data["lsh_labels"] = lsh_labels
+                multi_level_data["lsh_names"] = lsh_names
+                multi_level_data["lsh_label_data"] = lsh_label_data
+                multi_level_data["item_leaf_map"] = item_leaf_map
+                multi_level_data["tree_structure"] = tree_struct
+                print(f"    {len(set(lsh_labels.tolist()))} agglomerated buckets")
 
     elif len(cluster_fields) > 1:
         ndim = coords.shape[1]
@@ -2555,31 +2446,64 @@ def _render_from_dyf(dyf_path, args):
             "default": target_k,
         }
 
-        # Agglomerate DYF tree leaves into ~50 semantic buckets
-        print("  Computing agglomerated DYF tree buckets...")
-        with LazyIndex(dyf_path) as idx_agg:
-            lsh_labels, lsh_names_agg, lsh_label_data, item_leaf_map, tree_struct = \
-                _agglomerate_tree_leaves(idx_agg, coords, data['embeddings'],
-                                         n_groups=50)
-        if lsh_labels is not None:
-            # Label buckets via contrastive TF-IDF + LLM
-            model = getattr(args, 'model', 'gpt-oss:20b')
-            cache_file = getattr(args, 'label_cache', None)
-            print("  Labeling agglomerated buckets...")
-            bucket_names = label_clusters(
-                titles_arr, coords, lsh_labels, data['embeddings'],
-                model=model, cache_file=cache_file, cache_key="lsh_buckets")
-            lsh_names_agg = bucket_names
-            for entry in lsh_label_data:
-                cid = entry["cid"]
-                if cid in bucket_names:
-                    entry["text"] = bucket_names[cid][:50]
+        # Load pre-baked LSH buckets, or compute on the fly
+        if 'lsh_bucket_ids' in data['fields']:
+            lsh_labels = np.asarray(data['fields']['lsh_bucket_ids'],
+                                    dtype=np.int32)
+            lsh_names_json = data['metadata'].get('lsh_bucket_names', '{}')
+            lsh_names_agg = {int(k): v
+                             for k, v in json.loads(lsh_names_json).items()}
+            ndim_lsh = coords.shape[1]
+            lsh_label_data = []
+            for cid in sorted(set(lsh_labels.tolist())):
+                mask = lsh_labels == cid
+                pts = np.where(mask)[0]
+                centroid = coords[pts].mean(axis=0)
+                name = lsh_names_agg.get(cid, f"Bucket {cid}")
+                lsh_label_data.append({
+                    "x": float(centroid[0]),
+                    "y": float(centroid[1]),
+                    "z": float(centroid[2]) if ndim_lsh >= 3 else 0.0,
+                    "text": str(name)[:50],
+                    "size": int(mask.sum()),
+                    "cid": int(cid),
+                    "leaf_cids": [int(cid)],
+                })
             multi_level_data["lsh_labels"] = lsh_labels
             multi_level_data["lsh_names"] = lsh_names_agg
             multi_level_data["lsh_label_data"] = lsh_label_data
-            multi_level_data["item_leaf_map"] = item_leaf_map
-            multi_level_data["tree_structure"] = tree_struct
-            print(f"    {len(set(lsh_labels.tolist()))} agglomerated buckets")
+            # Load pre-baked colors
+            lsh_colors_json = data['metadata'].get('lsh_bucket_colors')
+            if lsh_colors_json:
+                multi_level_data.setdefault("color_maps", {})["lsh"] = {
+                    str(k): v
+                    for k, v in json.loads(lsh_colors_json).items()}
+            print(f"  LSH: {len(set(lsh_labels.tolist()))} pre-baked buckets")
+        else:
+            print("  Computing agglomerated DYF tree buckets...")
+            with LazyIndex(dyf_path) as idx_agg:
+                lsh_labels, lsh_names_agg, lsh_label_data, item_leaf_map, tree_struct = \
+                    _agglomerate_tree_leaves(idx_agg, coords, data['embeddings'],
+                                             n_groups=50)
+            if lsh_labels is not None:
+                model = getattr(args, 'model', 'gpt-oss:20b')
+                cache_file = getattr(args, 'label_cache', None)
+                print("  Labeling agglomerated buckets...")
+                bucket_names = label_clusters(
+                    titles_arr, coords, lsh_labels, data['embeddings'],
+                    model=model, cache_file=cache_file,
+                    cache_key="lsh_buckets")
+                lsh_names_agg = bucket_names
+                for entry in lsh_label_data:
+                    cid = entry["cid"]
+                    if cid in bucket_names:
+                        entry["text"] = bucket_names[cid][:50]
+                multi_level_data["lsh_labels"] = lsh_labels
+                multi_level_data["lsh_names"] = lsh_names_agg
+                multi_level_data["lsh_label_data"] = lsh_label_data
+                multi_level_data["item_leaf_map"] = item_leaf_map
+                multi_level_data["tree_structure"] = tree_struct
+                print(f"    {len(set(lsh_labels.tolist()))} agglomerated buckets")
 
         # Build 3D cluster data if dual clusters exist
         if has_dual_clusters and cluster_fields_3d:
@@ -2599,7 +2523,9 @@ def _render_from_dyf(dyf_path, args):
                 pre_color_maps[str(lvl)] = {
                     k: v for k, v in json.loads(cjson).items()}
         if pre_color_maps:
-            multi_level_data["color_maps"] = pre_color_maps
+            existing = multi_level_data.get("color_maps", {})
+            existing.update(pre_color_maps)
+            multi_level_data["color_maps"] = existing
 
     # Edge data from metadata
     bundled_birch_2d = None
