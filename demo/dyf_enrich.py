@@ -1167,6 +1167,18 @@ def enrich_cluster(dyf_path, n_clusters_list=None, model="gpt-oss:20b",
         except Exception as e:
             print(f"  WARNING: Could not load tree structure: {e}")
 
+    # Check text diversity — skip LLM labeling if too low
+    from dyf.splits import assess_text_diversity, label_clusters_frequency
+    title_list = titles if isinstance(titles, list) else list(titles)
+    diversity = assess_text_diversity(title_list)
+    use_frequency_labels = not diversity.is_diverse
+    if use_frequency_labels:
+        print(f"  LOW TEXT DIVERSITY: {diversity.reason}")
+        print(f"    ({diversity.unique_token_count} unique tokens, "
+              f"token/item={diversity.token_item_ratio:.6f}, "
+              f"title ratio={diversity.unique_title_ratio:.4f})")
+        print(f"    Using frequency-based labeling (no LLM)")
+
     # Cluster at each level — dual 2D/3D clustering
     new_sf = {}
     new_meta = {}
@@ -1226,16 +1238,19 @@ def enrich_cluster(dyf_path, n_clusters_list=None, model="gpt-oss:20b",
             except Exception as e:
                 print(f"    WARNING: cluster-tree DAG failed: {e}")
 
-        # LLM-label 2D clusters
+        # Label 2D clusters
         print(f"  Labeling 2D k={target_k} clusters...")
-        names_2d_raw = label_clusters(
-            titles, coords, labels_2d, embeddings,
-            model=model, cache_data=label_cache_data,
-            cache_key=f"cluster_{target_k}_2d",
-            split_keywords=split_kw_data,
-            path_labels=dag_path_labels,
-            sibling_keywords=dag_sibling_kw,
-            domain=domain)
+        if use_frequency_labels:
+            names_2d_raw = label_clusters_frequency(title_list, labels_2d)
+        else:
+            names_2d_raw = label_clusters(
+                titles, coords, labels_2d, embeddings,
+                model=model, cache_data=label_cache_data,
+                cache_key=f"cluster_{target_k}_2d",
+                split_keywords=split_kw_data,
+                path_labels=dag_path_labels,
+                sibling_keywords=dag_sibling_kw,
+                domain=domain)
         label_cache_data[f"cluster_{target_k}_2d"] = {
             str(k): v for k, v in names_2d_raw.items()}
         names_2d, glyphs_2d = annotate_cluster_names(
@@ -1301,12 +1316,15 @@ def enrich_cluster(dyf_path, n_clusters_list=None, model="gpt-oss:20b",
         n_lsh = len(set(lsh_labels.tolist()))
         print(f"    {n_lsh} agglomerated buckets")
 
-        # Label buckets via contrastive TF-IDF + LLM
+        # Label buckets via contrastive TF-IDF + LLM (or frequency fallback)
         print("  Labeling agglomerated buckets...")
-        bucket_names = label_clusters(
-            titles, coords, lsh_labels, embeddings,
-            model=model, cache_data=label_cache_data,
-            cache_key="lsh_buckets", domain=domain)
+        if use_frequency_labels:
+            bucket_names = label_clusters_frequency(title_list, lsh_labels)
+        else:
+            bucket_names = label_clusters(
+                titles, coords, lsh_labels, embeddings,
+                model=model, cache_data=label_cache_data,
+                cache_key="lsh_buckets", domain=domain)
         label_cache_data["lsh_buckets"] = {
             str(k): v for k, v in bucket_names.items()}
 

@@ -652,6 +652,15 @@ def label_clusters(titles, coords, labels, embeddings, model="gpt-oss:20b",
                     n_pts = int(np.sum(np.asarray(labels) == cid))
                     print(f"    [{cid:2d}] {cluster_names[cid]:<35s} ({n_pts} pts)")
                 return cluster_names
+
+    # Diversity gate: skip LLM if text has insufficient variety
+    from dyf.splits import assess_text_diversity, label_clusters_frequency
+    diversity = assess_text_diversity(titles)
+    if not diversity.is_diverse:
+        print(f"  LOW TEXT DIVERSITY: {diversity.reason}")
+        print(f"    Using frequency-based labeling (no LLM)")
+        return label_clusters_frequency(titles, labels)
+
     n_clusters = len(unique_labels)
     label_arr = np.asarray(labels)
 
