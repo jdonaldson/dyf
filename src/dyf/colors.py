@@ -77,6 +77,64 @@ def spatial_color_map(labels, embeddings):
     return cmap
 
 
+def tree_rgb_map(labels, tree_structure, item_leaf_map):
+    """Assign colors by DFS leaf order of the DYF tree.
+
+    Leaves adjacent in DFS share subtree ancestry, so they get similar hues.
+    This produces smooth color gradients within tree subtrees and natural
+    discontinuities at subtree boundaries.
+
+    Args:
+        labels: per-item cluster/bucket labels (array-like of ints)
+        tree_structure: list of node dicts from idx.get_tree_structure()
+        item_leaf_map: array of length N mapping item index → leaf node_id
+    """
+    # Build children map
+    children_map = {}
+    for node in tree_structure:
+        pid = node['parent_id']
+        if pid is not None:
+            children_map.setdefault(pid, []).append(node['node_id'])
+
+    # DFS from root (node 0) — collect leaf node IDs in visit order
+    dfs_leaf_order = []
+    stack = [0]
+    while stack:
+        nid = stack.pop()
+        kids = children_map.get(nid, [])
+        if not kids:
+            dfs_leaf_order.append(nid)
+        else:
+            # reversed so left child is visited first (stack is LIFO)
+            stack.extend(reversed(kids))
+
+    leaf_rank = {nid: rank for rank, nid in enumerate(dfs_leaf_order)}
+
+    labels_arr = np.asarray(labels)
+    unique = sorted(set(int(l) for l in labels_arr))
+    item_leaf_arr = np.asarray(item_leaf_map)
+
+    # Compute mean DFS rank per bucket (weighted by item count per leaf)
+    bucket_ranks = {}
+    for cid in unique:
+        mask = labels_arr == cid
+        leaf_ids = item_leaf_arr[mask]
+        # Average the DFS rank of all items' leaves in this bucket
+        ranks = np.array([leaf_rank.get(int(lid), 0) for lid in leaf_ids],
+                         dtype=np.float64)
+        bucket_ranks[cid] = ranks.mean() if len(ranks) > 0 else 0.0
+
+    # Sort buckets by their mean DFS rank, assign evenly-spaced hues
+    ordered = sorted(unique, key=lambda c: bucket_ranks[c])
+    n = len(ordered)
+    cmap = {}
+    for rank, cid in enumerate(ordered):
+        hue = rank / max(n, 1)
+        r, g, b = colorsys.hls_to_rgb(hue, 0.45, 0.6)
+        cmap[int(cid)] = [int(r * 255), int(g * 255), int(b * 255)]
+    return cmap
+
+
 def golden_ratio_color_map(labels):
     """Return dict mapping label -> hex color (label-order, not spatial)."""
     unique = sorted(set(labels))

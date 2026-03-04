@@ -39,18 +39,21 @@ DATASETS = [
         "output": DEMO_DIR / "wiki_simple_50k.dyf",
         "embedding_model": "BAAI/bge-large-en-v1.5",
         "title_col": "title",
+        "domain": "Wikipedia articles",
     },
     {
         "parquet": DEMO_DIR / "gudid_50k_titled.parquet",
         "output": DEMO_DIR / "gudid_50k_titled.dyf",
         "embedding_model": "all-MiniLM-L6-v2",
         "title_col": "title",
+        "domain": "FDA medical devices",
     },
     {
         "parquet": DEMO_DIR / "cifar100_embeddings.parquet",
         "output": DEMO_DIR / "cifar100_embeddings.dyf",
         "embedding_model": "openai/clip-vit-base-patch32",
         "title_col": "title",
+        "domain": "CIFAR-100 images",
     },
 ]
 
@@ -137,6 +140,8 @@ def build_index(cfg: dict):
     # Write .dyf
     t0 = time.time()
     meta = {"embedding_model": cfg["embedding_model"]}
+    if cfg.get("domain"):
+        meta["domain"] = cfg["domain"]
     meta.update(extra_meta)
 
     # Stamp provenance for Level 0

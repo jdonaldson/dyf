@@ -500,10 +500,22 @@ def _get_cluster_path_context(point_indices, split_keywords, titles,
     return ' → '.join(path_steps)
 
 
-def label_clusters(titles, coords, labels, embeddings, model="gemma2:9b",
+def _make_domain_context(domain):
+    """Build prompt template variables from a domain string."""
+    if not domain:
+        domain = "items"
+    return {
+        "domain": domain,
+        "items": domain,
+        "landscape": f"{domain} landscape",
+    }
+
+
+def label_clusters(titles, coords, labels, embeddings, model="gpt-oss:20b",
                    n_samples=20, cache_file=None, cache_key=None,
                    cache_data=None, split_keywords=None,
-                   path_labels=None, sibling_keywords=None):
+                   path_labels=None, sibling_keywords=None,
+                   domain=None):
     """Label clusters via contrastive TF-IDF + local Ollama LLM.
 
     Label context priority (highest first):
@@ -612,21 +624,20 @@ def label_clusters(titles, coords, labels, embeddings, model="gemma2:9b",
                     kw_str = (f"\nDistinguishing keywords (vs neighbor): "
                               f"{', '.join(keywords)}")
 
+        dc = _make_domain_context(domain)
         prompt = (
-            f"You are labeling clusters in an embedding space. "
-            f"This cluster has {len(pts)} items.\n"
+            f"You are labeling clusters of {dc['domain']} in an embedding "
+            f"space. This cluster has {len(pts)} {dc['items']}.\n"
             f"{kw_str}\n"
-            f"Sample items from across this cluster:\n"
+            f"Sample {dc['items']} from across this cluster:\n"
             + "\n".join(f"- {t}" for t in sample_titles)
             + "\n\n"
             "Give a short (2-5 word) label that DISTINGUISHES this cluster "
             "from similar ones. Use the distinguishing keywords and specific "
-            "product/item names to find what makes this group unique.\n\n"
-            "BAD labels (too vague): \"Medical Devices\", "
-            "\"Surgical Instruments\", \"General Products\"\n"
-            "GOOD labels: \"Spinal Fixation Screws\", "
-            "\"Dental Crowns & Bridges\", "
-            "\"Compression Stockings\", \"Hearing Aid Components\"\n\n"
+            "names to find what makes this group unique.\n\n"
+            f"BAD labels (too vague): \"{dc['domain'].title()}\", "
+            "\"General Items\", \"Miscellaneous\"\n"
+            "GOOD labels: specific, distinguishing sub-category names\n\n"
             "Reply with ONLY the label, nothing else."
         )
         tasks.append((cid, prompt))
@@ -746,7 +757,7 @@ def _call_ollama(model, prompt, timeout=300):
         return ""
 
 
-def label_tree_bottomup(idx, titles, model="gemma2:9b", target_depth=3,
+def label_tree_bottomup(idx, titles, model="gpt-oss:20b", target_depth=3,
                         samples_per_child=8, min_child_size=20,
                         cache_file=None, cache_data=None):
     """Label tree nodes bottom-up using the DYF tree hierarchy.
@@ -938,7 +949,7 @@ def label_tree_bottomup(idx, titles, model="gemma2:9b", target_depth=3,
     return result
 
 
-def enrich_tree(dyf_path, model="gemma2:9b", target_depth=3,
+def enrich_tree(dyf_path, model="gpt-oss:20b", target_depth=3,
                 samples_per_child=8, output_path=None):
     """Add tree-based hierarchical labels to a .dyf file.
 
@@ -1074,8 +1085,8 @@ def annotate_cluster_names(names, labels, embeddings,
     return clean_names, glyphs_dict
 
 
-def enrich_cluster(dyf_path, n_clusters_list=None, model="gemma2:9b",
-                   output_path=None, force=False):
+def enrich_cluster(dyf_path, n_clusters_list=None, model="gpt-oss:20b",
+                   output_path=None, force=False, domain=None):
     """Add BIRCH cluster labels to a .dyf file (Level 1 → 2).
 
     Label cache is stored in .dyf metadata under '_label_cache'.
@@ -1088,6 +1099,9 @@ def enrich_cluster(dyf_path, n_clusters_list=None, model="gemma2:9b",
         output_path: Output path (defaults to overwriting input).
         force: Re-run even if already at level 2+.
             Strips stale level 3 metadata (edges, narration).
+        domain: Domain description for LLM prompts (e.g.
+            "handwritten digit images"). Falls back to .dyf metadata
+            'domain' key, then generic "items".
     """
     if n_clusters_list is None:
         n_clusters_list = [12, 25, 50]
@@ -1122,6 +1136,12 @@ def enrich_cluster(dyf_path, n_clusters_list=None, model="gemma2:9b",
     if titles is None:
         titles = [f"Item {i}" for i in range(n)]
     embeddings = data['embeddings']
+
+    # Resolve domain: CLI override > .dyf metadata > None
+    if domain is None:
+        domain = data['metadata'].get('domain')
+    if domain:
+        print(f"  Domain: {domain}")
 
     # Load label cache from .dyf metadata
     label_cache_data = json.loads(data['metadata'].get('_label_cache', '{}'))
@@ -1214,7 +1234,8 @@ def enrich_cluster(dyf_path, n_clusters_list=None, model="gemma2:9b",
             cache_key=f"cluster_{target_k}_2d",
             split_keywords=split_kw_data,
             path_labels=dag_path_labels,
-            sibling_keywords=dag_sibling_kw)
+            sibling_keywords=dag_sibling_kw,
+            domain=domain)
         label_cache_data[f"cluster_{target_k}_2d"] = {
             str(k): v for k, v in names_2d_raw.items()}
         names_2d, glyphs_2d = annotate_cluster_names(
@@ -1559,7 +1580,7 @@ def compute_bridge_edges(coords, embeddings, labels, n_clusters):
 
 
 def enrich_viz(dyf_path, cluster_level=25, model="gpt-oss:20b",
-               title=None, output_path=None, force=False):
+               title=None, output_path=None, force=False, domain=None):
     """Add bridge edges and tour narration (Level 2 → 3).
 
     Args:
@@ -1569,6 +1590,8 @@ def enrich_viz(dyf_path, cluster_level=25, model="gpt-oss:20b",
         title: Title for intro narration.
         output_path: Output path (defaults to overwriting input).
         force: Re-run even if already at level 3.
+        domain: Domain description for narration prompts. Falls back
+            to .dyf metadata 'domain' key, then generic "items".
     """
     print(f"\n=== Level 3: Viz Enrichment ===")
     print(f"  Input: {dyf_path}")
@@ -1595,6 +1618,12 @@ def enrich_viz(dyf_path, cluster_level=25, model="gpt-oss:20b",
         data['fields']['umap_z'],
     ])
     embeddings = data['embeddings']
+
+    # Resolve domain: CLI override > .dyf metadata > None
+    if domain is None:
+        domain = data['metadata'].get('domain')
+    if domain:
+        print(f"  Domain: {domain}")
 
     # Try dual-cluster naming first (cluster_{k}_2d), fallback to bare
     cluster_field_2d = f'cluster_{cluster_level}_2d'
@@ -1627,7 +1656,8 @@ def enrich_viz(dyf_path, cluster_level=25, model="gpt-oss:20b",
     if titles is None:
         titles = [f"Item {i}" for i in range(n)]
     narration = _generate_narration(
-        cluster_names, titles, labels, coords, model=model, title=title)
+        cluster_names, titles, labels, coords, model=model, title=title,
+        domain=domain)
 
     new_meta = {
         'edge_pairs': json.dumps(edge_pairs),
@@ -1702,7 +1732,7 @@ def _call_ollama_chat(prompt, model="gpt-oss:20b", timeout=30):
 
 
 def _generate_narration(cluster_names, titles, labels, coords,
-                        model="gpt-oss:20b", title=None):
+                        model="gpt-oss:20b", title=None, domain=None):
     """Generate tour narration using Ollama, with sample-title fallback."""
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -1745,31 +1775,31 @@ def _generate_narration(cluster_names, titles, labels, coords,
                     break
 
         if ollama_ok:
+            dc = _make_domain_context(domain)
             items_str = "\n".join(f"  - {t}" for t in sample_titles)
             prompt = (
-                f'You are narrating a guided tour of an FDA medical '
-                f'device landscape for a general audience.\n\n'
+                f'You are narrating a guided tour of a '
+                f'{dc["landscape"]} for a general audience.\n\n'
                 f'Cluster name: "{name}"\n'
-                f'Size: {n_approx} devices\n\n'
-                f'Sample FDA product listings (these are raw registry '
-                f'entries — do NOT recite product codes or model '
-                f'numbers):\n{items_str}\n\n'
+                f'Size: {n_approx} {dc["items"]}\n\n'
+                f'Sample {dc["items"]}:\n{items_str}\n\n'
                 f'Write 2-3 sentences that:\n'
                 f'1. Start with "{name}."\n'
                 f'2. Explain in plain language what this category of '
-                f'medical device does and why it matters clinically\n'
-                f'3. Say roughly how many devices are in this group '
-                f'(use "{n_approx}")\n\n'
+                f'{dc["items"]} represents\n'
+                f'3. Say roughly how many {dc["items"]} are in this '
+                f'group (use "{n_approx}")\n\n'
                 f'Style: calm British documentary narrator. '
                 f'Written for text-to-speech — spell out all numbers, '
                 f'no abbreviations, no special characters, no quotes. '
-                f'Do NOT list product names or model numbers.\n'
+                f'Do NOT list raw codes or model numbers.\n'
             )
             tasks.append((cid, prompt, sample_titles))
         else:
             # Fallback without LLM
+            dc = _make_domain_context(domain)
             narration[cid] = (
-                f"{name}. {n_approx} devices in this category.")
+                f"{name}. {n_approx} {dc['items']} in this category.")
 
     if ollama_ok and tasks:
         completed = 0
@@ -1783,9 +1813,10 @@ def _generate_narration(cluster_names, titles, labels, coords,
                 return cid, text
             # Fallback for this cluster
             name = cluster_names[cid]
+            dc = _make_domain_context(domain)
             n_approx = _approx_number_words(
                 len(cluster_points.get(cid, [])))
-            return cid, f"{name}. {n_approx} devices in this category."
+            return cid, f"{name}. {n_approx} {dc['items']} in this category."
 
         n_workers = min(2, len(tasks))
         with ThreadPoolExecutor(max_workers=n_workers) as executor:
@@ -1857,10 +1888,13 @@ def main():
     p_clust.add_argument("dyf_path", help="Path to .dyf file")
     p_clust.add_argument("--n-clusters", default="12,25,50",
                          help="Comma-separated cluster counts (default: 12,25,50)")
-    p_clust.add_argument("--model", default="gemma2:9b",
+    p_clust.add_argument("--model", default="gpt-oss:20b",
                          help="Ollama model for labeling")
     p_clust.add_argument("--force", action="store_true",
                          help="Re-run even if already at level 2+")
+    p_clust.add_argument("--domain", default=None,
+                         help="Domain description for LLM prompts "
+                              "(overrides .dyf metadata)")
     p_clust.add_argument("-o", "--output", default=None)
 
     # viz
@@ -1874,6 +1908,9 @@ def main():
                        help="Title for intro narration")
     p_viz.add_argument("--force", action="store_true",
                        help="Re-run even if already at level 3")
+    p_viz.add_argument("--domain", default=None,
+                       help="Domain description for narration prompts "
+                            "(overrides .dyf metadata)")
     p_viz.add_argument("-o", "--output", default=None)
 
     # tree
@@ -1884,7 +1921,7 @@ def main():
                         help="Tree depth for branches (default: 3)")
     p_tree.add_argument("--samples", type=int, default=8,
                         help="Titles to sample per child (default: 8)")
-    p_tree.add_argument("--model", default="gemma2:9b",
+    p_tree.add_argument("--model", default="gpt-oss:20b",
                         help="Ollama model for labeling")
     p_tree.add_argument("-o", "--output", default=None)
 
@@ -1909,8 +1946,11 @@ def main():
         "all", help="Run all enrichment levels in sequence")
     p_all.add_argument("dyf_path", help="Path to .dyf file")
     p_all.add_argument("--n-clusters", default="12,25,50")
-    p_all.add_argument("--model", default="gemma2:9b")
+    p_all.add_argument("--model", default="gpt-oss:20b")
     p_all.add_argument("--title", default=None)
+    p_all.add_argument("--domain", default=None,
+                       help="Domain description for LLM prompts "
+                            "(overrides .dyf metadata)")
     p_all.add_argument("--fisher-col", default=None,
                        help="Column name for Fisher dimension weighting")
     p_all.add_argument("--fisher-parquet", default=None,
@@ -1932,12 +1972,14 @@ def main():
         levels = [int(x) for x in args.n_clusters.split(",")]
         enrich_cluster(args.dyf_path, n_clusters_list=levels,
                        model=args.model,
-                       output_path=args.output, force=args.force)
+                       output_path=args.output, force=args.force,
+                       domain=args.domain)
 
     elif args.command == "viz":
         enrich_viz(args.dyf_path, cluster_level=args.cluster_level,
                    model=args.model, title=args.title,
-                   output_path=args.output, force=args.force)
+                   output_path=args.output, force=args.force,
+                   domain=args.domain)
 
     elif args.command == "splits":
         enrich_splits(args.dyf_path, max_depth=args.depth,
@@ -1962,10 +2004,11 @@ def main():
                        diagnose_parquet=getattr(args, 'diagnose_parquet', None))
         enrich_cluster(out, n_clusters_list=levels,
                        model=args.model,
-                       output_path=out)
+                       output_path=out, domain=args.domain)
         enrich_viz(out, cluster_level=levels[1] if len(levels) > 1
                    else levels[0],
-                   model=args.model, title=args.title, output_path=out)
+                   model=args.model, title=args.title, output_path=out,
+                   domain=args.domain)
 
 
 if __name__ == "__main__":

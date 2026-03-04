@@ -29,7 +29,7 @@ from scipy.ndimage import gaussian_filter
 from sklearn.cluster import Birch
 from sklearn.neighbors import NearestNeighbors
 
-from dyf.colors import spatial_rgb_map, spatial_color_map
+from dyf.colors import spatial_rgb_map, spatial_color_map, tree_rgb_map
 from dyf.provenance import provenance_from_dict, check_compatible
 from dyf.dyf_tree import (
     build_dyf_tree,
@@ -621,7 +621,7 @@ def _sample_spatial(point_indices, coords, k):
     return pts[chosen].tolist()
 
 
-def label_clusters(titles, coords, labels, embeddings, model="gemma2:9b",
+def label_clusters(titles, coords, labels, embeddings, model="gpt-oss:20b",
                    n_samples=20, cache_file=None, cache_key=None):
     """Label clusters via contrastive TF-IDF + local Ollama LLM.
 
@@ -734,17 +734,27 @@ def label_clusters(titles, coords, labels, embeddings, model="gemma2:9b",
     def _call_ollama(task):
         cid, prompt = task
         try:
-            result = subprocess.run(
-                ["ollama", "run", model, prompt],
-                capture_output=True, text=True, timeout=30,
+            import urllib.request
+            payload = json.dumps({
+                "model": model,
+                "prompt": prompt,
+                "stream": False,
+            }).encode()
+            req = urllib.request.Request(
+                "http://localhost:11434/api/generate",
+                data=payload,
+                headers={"Content-Type": "application/json"},
             )
-            label = result.stdout.strip().split('\n')[0][:50]
-            label = label.strip('"\'').strip()
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                data = json.loads(resp.read().decode())
+                label = data.get("response", "").strip()
+            label = label.split('\n')[0][:50].strip('"\'').strip()
             return cid, label if label else f"Cluster {cid}"
-        except Exception:
+        except Exception as e:
+            print(f"    WARNING: Ollama failed for cluster {cid}: {e}")
             return cid, f"Cluster {cid}"
 
-    n_workers = min(4, len(tasks))
+    n_workers = min(2, len(tasks))
     completed = 0
     with ThreadPoolExecutor(max_workers=n_workers) as executor:
         futures = {executor.submit(_call_ollama, t): t for t in tasks}
@@ -822,7 +832,7 @@ def label_clusters(titles, coords, labels, embeddings, model="gemma2:9b",
             )
             dup_tasks.append((cid, prompt))
 
-        n_workers = min(4, len(dup_tasks))
+        n_workers = min(2, len(dup_tasks))
         with ThreadPoolExecutor(max_workers=n_workers) as executor:
             futures = {executor.submit(_call_ollama, t): t for t in dup_tasks}
             for future in as_completed(futures):
@@ -1133,7 +1143,7 @@ def generate_tour_narration(cluster_names, titles, labels, edge_pairs=None,
 
 
 def _generate_narration_ollama(cluster_names, titles, labels, coords,
-                                model="gemma2:9b", title=None):
+                                model="gpt-oss:20b", title=None):
     """Generate tour narration inline via Ollama (no pre-written file needed).
 
     For each cluster, samples ~10 titles using spatial sampling, asks Ollama
@@ -1526,6 +1536,13 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
         if multi_level_data.get("lsh_labels") is not None:
             if "lsh" in pre_colors:
                 color_maps["lsh"] = pre_colors["lsh"]
+            elif (multi_level_data.get("item_leaf_map") is not None
+                  and multi_level_data.get("tree_structure") is not None):
+                smap = tree_rgb_map(
+                    multi_level_data["lsh_labels"],
+                    multi_level_data["tree_structure"],
+                    multi_level_data["item_leaf_map"])
+                color_maps["lsh"] = {str(k): v for k, v in smap.items()}
             elif embeddings is not None:
                 smap = spatial_rgb_map(multi_level_data["lsh_labels"], embeddings)
                 color_maps["lsh"] = {str(k): v for k, v in smap.items()}
@@ -2076,7 +2093,9 @@ def _agglomerate_tree_leaves(idx, coords, embeddings, n_groups=50):
     After initial assignment, reassigns individual points to their nearest
     bucket centroid to clean up impure leaves and bad merges.
 
-    Returns (lsh_labels, lsh_names, lsh_label_data) ready for multi_level_data.
+    Returns (lsh_labels, lsh_names, lsh_label_data, item_leaf_map, tree_structure)
+    ready for multi_level_data. item_leaf_map maps each item index to its
+    tree leaf node_id (before agglomeration). tree_structure is the raw tree.
     """
     from scipy.cluster.hierarchy import linkage, fcluster
 
@@ -2084,7 +2103,7 @@ def _agglomerate_tree_leaves(idx, coords, embeddings, n_groups=50):
     leaves = [n for n in tree if n['is_leaf'] and n['batch_index'] >= 0]
 
     if len(leaves) < 2:
-        return None, {}, []
+        return None, {}, [], None, tree
 
     dim = idx.embedding_dim
     is_pq = idx.is_pq
@@ -2113,6 +2132,13 @@ def _agglomerate_tree_leaves(idx, coords, embeddings, n_groups=50):
         centroid = leaf_emb.mean(axis=0)
         leaf_centroids.append(centroid)
         leaf_point_indices.append(item_ids)
+
+    # Build item → leaf node_id map (before agglomeration)
+    n_points = coords.shape[0]
+    item_leaf_map = np.full(n_points, -1, dtype=np.int32)
+    for leaf, item_ids in zip(leaves, leaf_point_indices):
+        valid = item_ids < n_points
+        item_leaf_map[item_ids[valid]] = leaf['node_id']
 
     centroids = np.vstack(leaf_centroids).astype(np.float32)
 
@@ -2204,7 +2230,7 @@ def _agglomerate_tree_leaves(idx, coords, embeddings, n_groups=50):
             "leaf_cids": [int(gid)],
         })
 
-    return point_labels, lsh_names, lsh_label_data
+    return point_labels, lsh_names, lsh_label_data, item_leaf_map, tree
 
 
 # ── Main ─────────────────────────────────────────────────────────────────
@@ -2456,11 +2482,12 @@ def _render_from_dyf(dyf_path, args):
         # Agglomerate DYF tree leaves into ~50 semantic buckets
         print("  Computing agglomerated DYF tree buckets...")
         with LazyIndex(dyf_path) as idx_agg:
-            lsh_labels, lsh_names, lsh_label_data = _agglomerate_tree_leaves(
-                idx_agg, coords, data['embeddings'], n_groups=50)
+            lsh_labels, lsh_names, lsh_label_data, item_leaf_map, tree_struct = \
+                _agglomerate_tree_leaves(
+                    idx_agg, coords, data['embeddings'], n_groups=50)
         if lsh_labels is not None:
             # Label buckets via contrastive TF-IDF + LLM
-            model = getattr(args, 'model', 'gemma2:9b')
+            model = getattr(args, 'model', 'gpt-oss:20b')
             cache_file = getattr(args, 'label_cache', None)
             print("  Labeling agglomerated buckets...")
             bucket_names = label_clusters(
@@ -2474,6 +2501,8 @@ def _render_from_dyf(dyf_path, args):
             multi_level_data["lsh_labels"] = lsh_labels
             multi_level_data["lsh_names"] = lsh_names
             multi_level_data["lsh_label_data"] = lsh_label_data
+            multi_level_data["item_leaf_map"] = item_leaf_map
+            multi_level_data["tree_structure"] = tree_struct
             print(f"    {len(set(lsh_labels.tolist()))} agglomerated buckets")
 
     elif len(cluster_fields) > 1:
@@ -2529,12 +2558,12 @@ def _render_from_dyf(dyf_path, args):
         # Agglomerate DYF tree leaves into ~50 semantic buckets
         print("  Computing agglomerated DYF tree buckets...")
         with LazyIndex(dyf_path) as idx_agg:
-            lsh_labels, lsh_names_agg, lsh_label_data = \
+            lsh_labels, lsh_names_agg, lsh_label_data, item_leaf_map, tree_struct = \
                 _agglomerate_tree_leaves(idx_agg, coords, data['embeddings'],
                                          n_groups=50)
         if lsh_labels is not None:
             # Label buckets via contrastive TF-IDF + LLM
-            model = getattr(args, 'model', 'gemma2:9b')
+            model = getattr(args, 'model', 'gpt-oss:20b')
             cache_file = getattr(args, 'label_cache', None)
             print("  Labeling agglomerated buckets...")
             bucket_names = label_clusters(
@@ -2548,6 +2577,8 @@ def _render_from_dyf(dyf_path, args):
             multi_level_data["lsh_labels"] = lsh_labels
             multi_level_data["lsh_names"] = lsh_names_agg
             multi_level_data["lsh_label_data"] = lsh_label_data
+            multi_level_data["item_leaf_map"] = item_leaf_map
+            multi_level_data["tree_structure"] = tree_struct
             print(f"    {len(set(lsh_labels.tolist()))} agglomerated buckets")
 
         # Build 3D cluster data if dual clusters exist
@@ -2680,8 +2711,8 @@ def main():
     parser.add_argument("--refine", action=argparse.BooleanOptionalAction,
                         default=True,
                         help="Refine incoherent clusters (default: on)")
-    parser.add_argument("--model", default="gemma2:9b",
-                        help="Ollama model for cluster labeling (default: gemma2:9b)")
+    parser.add_argument("--model", default="gpt-oss:20b",
+                        help="Ollama model for cluster labeling (default: gpt-oss:20b)")
     parser.add_argument("--densmap", action="store_true",
                         help="Use densMAP for density-preserving projection")
     parser.add_argument("--no-edges", action="store_true",

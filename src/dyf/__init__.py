@@ -146,7 +146,7 @@ from .cluster_tree import (
 )
 
 # Spatial cluster coloring
-from .colors import spatial_rgb_map, spatial_color_map
+from .colors import spatial_rgb_map, spatial_color_map, tree_rgb_map
 
 # Pipeline DAG runner
 from .pipeline import Pipeline, Stage
