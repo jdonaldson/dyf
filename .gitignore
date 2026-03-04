@@ -25,6 +25,9 @@ ENV/
 *.swo
 *~
 
+# Claude Code
+.claude/settings.local.json
+
 # macOS
 .DS_Store
 
