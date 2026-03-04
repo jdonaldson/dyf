@@ -14,6 +14,7 @@ from __future__ import annotations
 import math
 import re
 from collections import Counter, defaultdict
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -118,6 +119,172 @@ def compute_domain_stopwords(
 
     cutoff = n * threshold
     return {w for w, count in doc_freq.items() if count > cutoff}
+
+
+# ── Text diversity assessment ─────────────────────────────────────
+
+
+@dataclass
+class TextDiversityReport:
+    """Result of text diversity assessment for a collection of titles."""
+
+    unique_token_count: int
+    token_item_ratio: float
+    unique_title_ratio: float
+    n_items: int
+    is_diverse: bool
+    reason: str
+
+
+def assess_text_diversity(
+    titles: list[str],
+    *,
+    min_unique_tokens: int = 50,
+    min_token_ratio: float = 0.01,
+    min_unique_title_ratio: float = 0.05,
+) -> TextDiversityReport:
+    """Cheaply assess whether a title collection has enough diversity for LLM labeling.
+
+    Single O(n) pass: collects unique tokens (via tokenize()) and unique title strings.
+    Returns a report with three signals and a boolean gate.
+
+    Args:
+        titles: List of title strings.
+        min_unique_tokens: Minimum unique token count to be considered diverse.
+        min_token_ratio: Minimum ratio of unique tokens to total items.
+        min_unique_title_ratio: Minimum ratio of unique titles to total titles.
+
+    Returns:
+        TextDiversityReport with is_diverse=True if all thresholds pass.
+    """
+    n = len(titles)
+    if n == 0:
+        return TextDiversityReport(
+            unique_token_count=0, token_item_ratio=0.0,
+            unique_title_ratio=0.0, n_items=0,
+            is_diverse=False, reason="empty title list",
+        )
+
+    unique_tokens: set[str] = set()
+    unique_titles: set[str] = set()
+    for title in titles:
+        unique_titles.add(title)
+        unique_tokens.update(tokenize(title))
+
+    utc = len(unique_tokens)
+    token_ratio = utc / n
+    title_ratio = len(unique_titles) / n
+
+    reasons = []
+    if utc < min_unique_tokens:
+        reasons.append(f"only {utc} unique tokens (need {min_unique_tokens})")
+    if token_ratio < min_token_ratio:
+        reasons.append(
+            f"token/item ratio {token_ratio:.6f} < {min_token_ratio}")
+    if title_ratio < min_unique_title_ratio:
+        reasons.append(
+            f"unique title ratio {title_ratio:.4f} < {min_unique_title_ratio}")
+
+    is_diverse = len(reasons) == 0
+    reason = "OK" if is_diverse else "; ".join(reasons)
+
+    return TextDiversityReport(
+        unique_token_count=utc,
+        token_item_ratio=token_ratio,
+        unique_title_ratio=title_ratio,
+        n_items=n,
+        is_diverse=is_diverse,
+        reason=reason,
+    )
+
+
+# ── Frequency-based cluster labeling ─────────────────────────────
+
+
+def label_clusters_frequency(
+    titles: list[str],
+    labels: np.ndarray,
+) -> dict[int, str]:
+    """Label clusters using TF-IDF token frequency (no LLM).
+
+    Per-cluster TF-IDF: tokens frequent in one cluster but rare globally win.
+    Falls back to raw title frequency if tokenization yields nothing
+    (e.g. numeric-only titles like "Digit 7"). Disambiguates identical
+    labels across clusters with ``(2)``, ``(3)`` suffixes.
+
+    Args:
+        titles: List of title strings, one per item.
+        labels: Integer cluster assignments, same length as titles.
+
+    Returns:
+        dict mapping cluster_id -> label string.
+    """
+    label_arr = np.asarray(labels)
+    unique_labels = sorted(set(int(l) for l in label_arr))
+    n_items = len(titles)
+
+    # Gather per-cluster data
+    cluster_titles: dict[int, list[str]] = defaultdict(list)
+    cluster_tokens: dict[int, Counter] = defaultdict(Counter)
+    for i, cid in enumerate(label_arr):
+        cid = int(cid)
+        cluster_titles[cid].append(titles[i])
+        cluster_tokens[cid].update(tokenize(titles[i]))
+
+    # Global document frequency (fraction of items containing each token)
+    global_df: Counter = Counter()
+    for i in range(n_items):
+        global_df.update(set(tokenize(titles[i])))
+
+    n_clusters = len(unique_labels)
+    cluster_names: dict[int, str] = {}
+
+    for cid in unique_labels:
+        tokens = cluster_tokens[cid]
+        n_cluster = len(cluster_titles[cid])
+
+        if tokens:
+            # TF-IDF: tf = count / cluster_size, idf = log(n_clusters / df_across_clusters)
+            # Use cluster-level DF: how many clusters contain this token
+            token_cluster_df: Counter = Counter()
+            for tok in tokens:
+                for other_cid in unique_labels:
+                    if tok in cluster_tokens[other_cid]:
+                        token_cluster_df[tok] += 1
+
+            scores = []
+            for tok, count in tokens.items():
+                tf = count / n_cluster
+                idf = math.log(n_clusters / (1 + token_cluster_df[tok]))
+                if idf > 0:  # skip tokens in all clusters
+                    scores.append((tok, tf * idf))
+
+            if scores:
+                scores.sort(key=lambda x: -x[1])
+                # Take top 2-3 tokens as label
+                top = [w for w, _ in scores[:3]]
+                cluster_names[cid] = " ".join(w.capitalize() for w in top)
+                continue
+
+        # Fallback: most common raw title
+        title_counts = Counter(cluster_titles[cid])
+        most_common_title = title_counts.most_common(1)[0][0]
+        # Truncate to 50 chars
+        cluster_names[cid] = most_common_title[:50]
+
+    # Disambiguate identical labels
+    label_counts = Counter(cluster_names.values())
+    dups = {lbl for lbl, cnt in label_counts.items() if cnt > 1}
+    if dups:
+        seen: dict[str, int] = {}
+        for cid in unique_labels:
+            name = cluster_names[cid]
+            if name in dups:
+                seen[name] = seen.get(name, 0) + 1
+                if seen[name] > 1:
+                    cluster_names[cid] = f"{name} ({seen[name]})"
+
+    return cluster_names
 
 
 # ── Split keyword computation ─────────────────────────────────────────

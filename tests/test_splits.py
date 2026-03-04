@@ -660,6 +660,154 @@ class TestComputeEmbeddingKeywords:
                 assert 'orthopedic' not in words
 
 
+# ── Text diversity assessment tests ────────────────────────────────
+
+
+class TestAssessTextDiversity:
+    """Test the text diversity gate."""
+
+    def test_mnist_like_low_diversity(self):
+        """MNIST-style titles: 10 unique strings over 70K items → low diversity."""
+        from dyf.splits import assess_text_diversity
+
+        titles = [f"Digit {i % 10}" for i in range(70_000)]
+        report = assess_text_diversity(titles)
+        assert not report.is_diverse
+        assert report.unique_token_count <= 10
+        assert report.unique_title_ratio < 0.05
+
+    def test_gudid_like_high_diversity(self):
+        """Diverse product titles with many unique words → passes gate."""
+        from dyf.splits import assess_text_diversity
+
+        # Generate titles with enough unique vocabulary words
+        words = [
+            "cardiac", "pacemaker", "implant", "defibrillator", "stent",
+            "catheter", "orthopedic", "titanium", "screw", "plate",
+            "dental", "crown", "bridge", "ceramic", "porcelain",
+            "surgical", "forceps", "clamp", "retractor", "scissors",
+            "endoscope", "laparoscope", "arthroscope", "colonoscope",
+            "electrode", "monitor", "sensor", "transducer", "amplifier",
+            "prosthetic", "knee", "hip", "shoulder", "ankle",
+            "bandage", "gauze", "dressing", "adhesive", "suture",
+            "syringe", "needle", "cannula", "infusion", "tubing",
+            "ventilator", "respirator", "oxygen", "humidifier",
+            "wheelchair", "walker", "crutch", "brace", "splint",
+        ]
+        rng = np.random.default_rng(42)
+        titles = []
+        for i in range(2000):
+            picked = rng.choice(words, size=4, replace=False)
+            titles.append(" ".join(picked))
+        report = assess_text_diversity(titles)
+        assert report.is_diverse
+        assert report.unique_token_count >= 50
+
+    def test_empty_titles(self):
+        from dyf.splits import assess_text_diversity
+
+        report = assess_text_diversity([])
+        assert not report.is_diverse
+        assert report.reason == "empty title list"
+
+    def test_single_repeated_title(self):
+        from dyf.splits import assess_text_diversity
+
+        titles = ["Hello World"] * 1000
+        report = assess_text_diversity(titles)
+        assert not report.is_diverse
+        assert report.unique_title_ratio < 0.05
+
+    def test_custom_thresholds(self):
+        """Very permissive thresholds → everything passes."""
+        from dyf.splits import assess_text_diversity
+
+        titles = [f"Digit {i % 10}" for i in range(100)]
+        report = assess_text_diversity(
+            titles,
+            min_unique_tokens=1,
+            min_token_ratio=0.0,
+            min_unique_title_ratio=0.0,
+        )
+        assert report.is_diverse
+
+    def test_report_fields(self):
+        from dyf.splits import assess_text_diversity
+
+        titles = ["Alpha Beta Gamma"] * 50
+        report = assess_text_diversity(titles)
+        assert report.n_items == 50
+        assert isinstance(report.unique_token_count, int)
+        assert isinstance(report.token_item_ratio, float)
+        assert isinstance(report.unique_title_ratio, float)
+        assert isinstance(report.is_diverse, bool)
+        assert isinstance(report.reason, str)
+
+
+class TestLabelClustersFrequency:
+    """Test frequency-based cluster labeling fallback."""
+
+    def test_basic_labeling(self):
+        from dyf.splits import label_clusters_frequency
+
+        titles = (
+            ["cardiac pacemaker device"] * 50
+            + ["orthopedic hip screw"] * 50
+        )
+        labels = np.array([0] * 50 + [1] * 50)
+        result = label_clusters_frequency(titles, labels)
+
+        assert isinstance(result, dict)
+        assert len(result) == 2
+        assert 0 in result
+        assert 1 in result
+        # Labels should be non-empty strings
+        for cid, name in result.items():
+            assert len(name) > 0
+
+    def test_numeric_only_titles_fallback(self):
+        """Titles with only numbers → falls back to raw title frequency."""
+        from dyf.splits import label_clusters_frequency
+
+        titles = [str(i % 10) for i in range(100)]
+        labels = np.array([0] * 50 + [1] * 50)
+        result = label_clusters_frequency(titles, labels)
+
+        assert len(result) == 2
+        # Should still produce labels (from raw titles)
+        for name in result.values():
+            assert len(name) > 0
+
+    def test_dedup_suffixes(self):
+        """Identical cluster vocabularies → disambiguated with (2), (3)."""
+        from dyf.splits import label_clusters_frequency
+
+        # All clusters have identical titles → same TF-IDF → same label
+        titles = ["alpha beta gamma"] * 300
+        labels = np.array([0] * 100 + [1] * 100 + [2] * 100)
+        result = label_clusters_frequency(titles, labels)
+
+        # At least one should have a suffix
+        names = list(result.values())
+        assert len(set(names)) > 1 or len(names) == 1  # either deduped or single
+        # If there are duplicates, they should be disambiguated
+        if len(set(names)) < len(names):
+            suffixed = [n for n in names if '(' in n]
+            assert len(suffixed) > 0
+
+    def test_mnist_style(self):
+        """MNIST-like: 10 digit labels, each repeated many times."""
+        from dyf.splits import label_clusters_frequency
+
+        titles = [f"Digit {i}" for i in range(10)] * 100
+        labels = np.array([i // 100 for i in range(1000)])
+        result = label_clusters_frequency(titles, labels)
+
+        assert len(result) == 10
+        for name in result.values():
+            assert len(name) > 0
+
+
 def _inject_hyperplanes(tree_node, dim, num_bits, rng):
     """Inject synthetic PCA hyperplanes into internal tree nodes.
 
@@ -782,7 +930,26 @@ class TestLabelClustersWithSplitContext:
             out_path = f.name
 
         try:
-            titles = [f"Item {i}" for i in range(n)]
+            # Use diverse titles so diversity gate doesn't skip LLM
+            words = [
+                "cardiac", "pacemaker", "implant", "defibrillator",
+                "stent", "catheter", "orthopedic", "titanium",
+                "screw", "plate", "dental", "crown", "bridge",
+                "ceramic", "surgical", "forceps", "clamp", "retractor",
+                "scissors", "endoscope", "laparoscope", "arthroscope",
+                "electrode", "monitor", "sensor", "transducer",
+                "prosthetic", "knee", "shoulder", "ankle",
+                "bandage", "gauze", "dressing", "adhesive", "suture",
+                "syringe", "needle", "cannula", "infusion", "tubing",
+                "ventilator", "respirator", "oxygen", "humidifier",
+                "wheelchair", "walker", "crutch", "brace", "splint",
+                "microscope", "spectrometer", "centrifuge", "pipette",
+            ]
+            title_rng = np.random.default_rng(99)
+            titles = []
+            for _ in range(n):
+                picked = title_rng.choice(words, size=4, replace=False)
+                titles.append(" ".join(picked))
             sf = {
                 'title': titles,
                 'umap_x': rng.standard_normal(n).astype(np.float32),
