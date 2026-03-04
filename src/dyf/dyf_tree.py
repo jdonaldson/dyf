@@ -45,6 +45,7 @@ def _build_dyf_tree(embeddings, point_indices, depth, num_bits, min_leaf_size,
             'point_margin_map': None,
             'hyperplanes': None,
             'bucket_id_to_child': None,
+            'eigenvalues': None,
         }
 
     subset = embeddings[point_indices]
@@ -72,6 +73,7 @@ def _build_dyf_tree(embeddings, point_indices, depth, num_bits, min_leaf_size,
             'point_margin_map': None,
             'hyperplanes': None,
             'bucket_id_to_child': None,
+            'eigenvalues': None,
         }
 
     # Use centroid_similarity as margin: low = far from center = boundary
@@ -86,6 +88,13 @@ def _build_dyf_tree(embeddings, point_indices, depth, num_bits, min_leaf_size,
     except Exception:
         node_hyperplanes = None
 
+    # Capture eigenvalues
+    try:
+        ev = clf.get_eigenvalues()
+        node_eigenvalues = np.array(ev, dtype=np.float32) if ev else None
+    except Exception:
+        node_eigenvalues = None
+
     # Group by bucket
     unique_buckets = sorted(set(bucket_ids.tolist()))
 
@@ -98,6 +107,7 @@ def _build_dyf_tree(embeddings, point_indices, depth, num_bits, min_leaf_size,
             'point_margin_map': point_margin_map,
             'hyperplanes': None,
             'bucket_id_to_child': None,
+            'eigenvalues': None,
         }
 
     children = []
@@ -115,6 +125,7 @@ def _build_dyf_tree(embeddings, point_indices, depth, num_bits, min_leaf_size,
                 'point_margin_map': None,
                 'hyperplanes': None,
                 'bucket_id_to_child': None,
+                'eigenvalues': None,
             })
         else:
             child = _build_dyf_tree(
@@ -129,6 +140,7 @@ def _build_dyf_tree(embeddings, point_indices, depth, num_bits, min_leaf_size,
         'point_margin_map': point_margin_map,
         'hyperplanes': node_hyperplanes,
         'bucket_id_to_child': bucket_id_to_child,
+        'eigenvalues': node_eigenvalues,
     }
 
 
@@ -419,6 +431,7 @@ def _refine_recursive(node, embeddings, emb_normed, threshold, num_bits,
             'point_margin_map': None,
             'hyperplanes': None,
             'bucket_id_to_child': None,
+            'eigenvalues': None,
         })
     return 1
 

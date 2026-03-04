@@ -110,6 +110,10 @@ def _flatten_tree_bfs(tree, embeddings):
             num_bits = 0
             hyperplanes_flat = None
 
+        # Eigenvalues
+        ev = node.get('eigenvalues')
+        eigenvalues_flat = ev.astype(np.float32) if ev is not None else None
+
         # Build bucket_ids_to_children parallel array
         # For each child (in order), store the bucket_id that maps to it
         bucket_ids_to_children = []
@@ -139,6 +143,7 @@ def _flatten_tree_bfs(tree, embeddings):
             'depth': node['depth'],
             'is_leaf': is_leaf,
             'indices': indices,
+            'eigenvalues': eigenvalues_flat,
         })
 
     return result, leaf_batch_map
@@ -511,6 +516,16 @@ def write_lazy_index(tree, embeddings, path, compression='zstd',
             builder.PrependFloat32(float(val))
         cent_vec = builder.EndVector()
 
+        # Eigenvalues vector
+        if fnode.get('eigenvalues') is not None:
+            ev = fnode['eigenvalues']
+            FBNode.NodeStartEigenvaluesVector(builder, len(ev))
+            for val in reversed(ev):
+                builder.PrependFloat32(float(val))
+            ev_vec = builder.EndVector()
+        else:
+            ev_vec = None
+
         # Build node
         FBNode.NodeStart(builder)
         if children_vec is not None:
@@ -524,6 +539,8 @@ def write_lazy_index(tree, embeddings, path, compression='zstd',
         FBNode.NodeAddNumItems(builder, fnode['num_items'])
         FBNode.NodeAddBatchIndex(builder, fnode['batch_index'])
         FBNode.NodeAddDepth(builder, fnode['depth'])
+        if ev_vec is not None:
+            FBNode.NodeAddEigenvalues(builder, ev_vec)
         node_offsets.append(FBNode.NodeEnd(builder))
 
     # Nodes vector
@@ -776,6 +793,9 @@ class LazyIndex:
             if node is None:
                 continue
             is_leaf = node.ChildrenLength() == 0
+            ev = None
+            if not node.EigenvaluesIsNone() and node.EigenvaluesLength() > 0:
+                ev = node.EigenvaluesAsNumpy().copy()
             result.append({
                 'node_id': nid,
                 'parent_id': parent_map.get(nid),  # None for root
@@ -783,6 +803,7 @@ class LazyIndex:
                 'num_items': node.NumItems(),
                 'is_leaf': is_leaf,
                 'batch_index': node.BatchIndex() if is_leaf else -1,
+                'eigenvalues': ev,
             })
 
         self._tree_structure_cache = result
@@ -803,6 +824,24 @@ class LazyIndex:
             hp = self._get_node_hyperplanes(node)
             if hp is not None:
                 result[nid] = hp
+        return result
+
+    def get_split_eigenvalues(self) -> dict[int, np.ndarray]:
+        """Return PCA eigenvalues for each internal node.
+
+        Returns:
+            {node_id: (num_bits,) float32 array} for internal nodes that
+            have eigenvalues stored. Empty dict for old .dyf files.
+        """
+        n_nodes = self._index.NodesLength()
+        result = {}
+        for nid in range(n_nodes):
+            node = self._index.Nodes(nid)
+            if node is None:
+                continue
+            if not node.EigenvaluesIsNone() and node.EigenvaluesLength() > 0:
+                result[nid] = np.array(
+                    node.EigenvaluesAsNumpy(), dtype=np.float32)
         return result
 
     def _get_metadata(self):
@@ -1852,6 +1891,11 @@ def _reconstruct_tree(idx):
                 bid = int(fb_node.BucketIdsToChildren(ci))
                 bid_to_child[bid] = ci
 
+        # Eigenvalues
+        ev = None
+        if not fb_node.EigenvaluesIsNone() and fb_node.EigenvaluesLength() > 0:
+            ev = np.array(fb_node.EigenvaluesAsNumpy(), dtype=np.float32)
+
         is_leaf = len(children_ids) == 0
         batch_index = fb_node.BatchIndex()
 
@@ -1865,6 +1909,7 @@ def _reconstruct_tree(idx):
             'children_ids': children_ids,
             'hyperplanes': hp,
             'bucket_id_to_child': bid_to_child,
+            'eigenvalues': ev,
             'depth': int(fb_node.Depth()),
             'is_leaf': is_leaf,
             'indices': indices,
@@ -1893,6 +1938,7 @@ def _reconstruct_tree(idx):
             'depth': nd['depth'],
             'hyperplanes': nd['hyperplanes'],
             'bucket_id_to_child': nd['bucket_id_to_child'],
+            'eigenvalues': nd['eigenvalues'],
         }
 
     root_id = idx._index.Root()

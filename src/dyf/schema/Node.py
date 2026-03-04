@@ -160,8 +160,35 @@ class Node(object):
             return self._tab.Get(flatbuffers.number_types.Uint8Flags, o + self._tab.Pos)
         return 0
 
+    # Node
+    def Eigenvalues(self, j):
+        o = flatbuffers.number_types.UOffsetTFlags.py_type(self._tab.Offset(20))
+        if o != 0:
+            a = self._tab.Vector(o)
+            return self._tab.Get(flatbuffers.number_types.Float32Flags, a + flatbuffers.number_types.UOffsetTFlags.py_type(j * 4))
+        return 0
+
+    # Node
+    def EigenvaluesAsNumpy(self):
+        o = flatbuffers.number_types.UOffsetTFlags.py_type(self._tab.Offset(20))
+        if o != 0:
+            return self._tab.GetVectorAsNumpy(flatbuffers.number_types.Float32Flags, o)
+        return 0
+
+    # Node
+    def EigenvaluesLength(self):
+        o = flatbuffers.number_types.UOffsetTFlags.py_type(self._tab.Offset(20))
+        if o != 0:
+            return self._tab.VectorLen(o)
+        return 0
+
+    # Node
+    def EigenvaluesIsNone(self):
+        o = flatbuffers.number_types.UOffsetTFlags.py_type(self._tab.Offset(20))
+        return o == 0
+
 def NodeStart(builder):
-    builder.StartObject(8)
+    builder.StartObject(9)
 
 def Start(builder):
     NodeStart(builder)
@@ -237,6 +264,18 @@ def NodeAddDepth(builder, depth):
 
 def AddDepth(builder, depth):
     NodeAddDepth(builder, depth)
+
+def NodeAddEigenvalues(builder, eigenvalues):
+    builder.PrependUOffsetTRelativeSlot(8, flatbuffers.number_types.UOffsetTFlags.py_type(eigenvalues), 0)
+
+def AddEigenvalues(builder, eigenvalues):
+    NodeAddEigenvalues(builder, eigenvalues)
+
+def NodeStartEigenvaluesVector(builder, numElems):
+    return builder.StartVector(4, numElems, 4)
+
+def StartEigenvaluesVector(builder, numElems):
+    return NodeStartEigenvaluesVector(builder, numElems)
 
 def NodeEnd(builder):
     return builder.EndObject()

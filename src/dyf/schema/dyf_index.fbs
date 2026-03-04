@@ -9,6 +9,7 @@ table Node {
   num_items: uint32;               // items in subtree
   batch_index: int32 = -1;         // Arrow batch index (leaves only, -1 for internal)
   depth: uint8;
+  eigenvalues: [float32];          // per-component PCA eigenvalues
 }
 
 table BatchDescriptor {
