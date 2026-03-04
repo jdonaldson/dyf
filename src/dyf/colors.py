@@ -135,12 +135,3 @@ def tree_rgb_map(labels, tree_structure, item_leaf_map):
     return cmap
 
 
-def golden_ratio_color_map(labels):
-    """Return dict mapping label -> hex color (label-order, not spatial)."""
-    unique = sorted(set(labels))
-    hues = [(i * 0.618033988749895) % 1.0 for i in range(len(unique))]
-    cmap = {}
-    for i, lbl in enumerate(unique):
-        r, g, b = colorsys.hls_to_rgb(hues[i], 0.45, 0.6)
-        cmap[int(lbl)] = f"#{int(r*255):02x}{int(g*255):02x}{int(b*255):02x}"
-    return cmap

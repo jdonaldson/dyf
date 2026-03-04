@@ -29,8 +29,6 @@ try:
         DensityClassifier,
         DensityReport,
         BridgeAnalysis,
-        BridgePersistence,
-        MultiResolutionAnalysis,
     )
     _HAS_RUST = True
 except ImportError:
@@ -38,20 +36,18 @@ except ImportError:
     DensityClassifier = None
     DensityReport = None
     BridgeAnalysis = None
-    BridgePersistence = None
-    MultiResolutionAnalysis = None
 
-# Python wrapper with full features (embedder configs, labeling, etc.)
-from .classifier import (
-    DensityClassifier as DensityClassifierFull,
-    DensityReport as DensityReportFull,
+# Embedding and labeling configs
+from .configs import (
     EmbedderConfig,
     LabelerConfig,
     list_configs,
 )
 
-# Index serialization
-from .io import save_index, load_index, PrecomputedIndex
+# Python wrapper with full features
+from .classifier import (
+    DensityClassifier as DensityClassifierFull,
+)
 
 # Chunk analysis
 from .chunks import (
@@ -128,12 +124,15 @@ from .catalog import (
 
 # Split-based tree keywords
 from .splits import (
+    TextDiversityReport,
+    assess_text_diversity,
     build_tree_maps,
     collect_descendant_indices,
     compute_domain_stopwords,
     compute_embedding_keywords,
     compute_split_keywords,
     format_split_path,
+    label_clusters_frequency,
     tokenize,
 )
 
@@ -193,6 +192,14 @@ from .rag import (
     SuperConnectorResult,
     OrthogonalAnchorResult,
     FacetDiverseResult,
+    find_super_connectors,
+    select_orthogonal_anchors,
+    diversify_by_facet,
+    get_kmeans_init,
+)
+
+# Ontology (DAG taxonomy extraction)
+from .ontology import (
     DAGChain,
     DAGMiningResult,
     DAGTaxonomy,
@@ -200,10 +207,6 @@ from .rag import (
     ROGLayer,
     ROGResult,
     HubScoreResult,
-    find_super_connectors,
-    select_orthogonal_anchors,
-    diversify_by_facet,
-    get_kmeans_init,
     compute_neighbor_diversity,
     compute_hub_score,
     mine_dag_chains,
@@ -219,39 +222,33 @@ __all__ = [
     "DensityClassifier",
     "DensityReport",
     "BridgeAnalysis",
-    "BridgePersistence",
-    "MultiResolutionAnalysis",
     # Full Python wrapper
     "DensityClassifierFull",
-    "DensityReportFull",
     "EmbedderConfig",
     "LabelerConfig",
     "list_configs",
-    # Serialization
-    "save_index",
-    "load_index",
-    "PrecomputedIndex",
     # RAG index
     "BridgeIndex",
     "SuperConnectorResult",
     "OrthogonalAnchorResult",
     "FacetDiverseResult",
-    "DAGChain",
-    "DAGMiningResult",
     "find_super_connectors",
     "select_orthogonal_anchors",
     "diversify_by_facet",
     "get_kmeans_init",
-    "compute_neighbor_diversity",
-    "compute_hub_score",
-    "HubScoreResult",
-    "mine_dag_chains",
+    # Ontology
+    "DAGChain",
+    "DAGMiningResult",
     "DAGTaxonomy",
-    "build_dag_taxonomy",
     "UnifiedOntologyResult",
-    "build_unified_ontology",
     "ROGLayer",
     "ROGResult",
+    "HubScoreResult",
+    "compute_neighbor_diversity",
+    "compute_hub_score",
+    "mine_dag_chains",
+    "build_dag_taxonomy",
+    "build_unified_ontology",
     "build_rog_ontology",
     # Chunk analysis
     "DocSpread",
@@ -298,12 +295,15 @@ __all__ = [
     "CrossMapping",
     "JointMatchResult",
     # Split-based tree keywords
+    "TextDiversityReport",
+    "assess_text_diversity",
     "build_tree_maps",
     "collect_descendant_indices",
     "compute_domain_stopwords",
     "compute_embedding_keywords",
     "compute_split_keywords",
     "format_split_path",
+    "label_clusters_frequency",
     "tokenize",
     # Cluster-tree DAG
     "build_cluster_tree_dag",
