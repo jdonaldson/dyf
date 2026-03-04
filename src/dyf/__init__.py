@@ -145,6 +145,9 @@ from .cluster_tree import (
     format_cluster_context,
 )
 
+# Tree-leaf agglomeration
+from .agglomerate import agglomerate_tree_leaves
+
 # Spatial cluster coloring
 from .colors import spatial_rgb_map, spatial_color_map, tree_rgb_map
 
@@ -160,6 +163,20 @@ from .provenance import (
     check_compatible,
     provenance_to_dict,
     provenance_from_dict,
+)
+
+# Concept graph
+from .concept_graph import (
+    ConceptGraphConfig,
+    ConceptNode,
+    MarkdownChunk,
+    build_concept_graph,
+    chunk_markdown,
+    fuzzy_match,
+    load_graph,
+    save_graph,
+    semantic_search,
+    check_staleness,
 )
 
 # Re-ranking
@@ -293,6 +310,8 @@ __all__ = [
     "compute_sibling_keywords",
     "derive_path_labels",
     "format_cluster_context",
+    # Tree-leaf agglomeration
+    "agglomerate_tree_leaves",
     # Spatial cluster coloring
     "spatial_rgb_map",
     "spatial_color_map",
@@ -312,6 +331,17 @@ __all__ = [
     "rerank_mmr",
     "rerank_bridge_boost",
     "rerank_bridge_mmr",
+    # Concept graph
+    "ConceptGraphConfig",
+    "ConceptNode",
+    "MarkdownChunk",
+    "build_concept_graph",
+    "chunk_markdown",
+    "fuzzy_match",
+    "load_graph",
+    "save_graph",
+    "semantic_search",
+    "check_staleness",
 ]
 
 def check_rust_available():

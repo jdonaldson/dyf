@@ -63,6 +63,13 @@ viz = [
 mcp = [
     "mcp>=1.0",
 ]
+concepts = [
+    "scikit-learn>=1.0",
+    "sentence-transformers>=2.2",
+]
+
+[project.scripts]
+dyf = "dyf.cli:main"
 
 [project.urls]
 Homepage = "https://dyf.io"
