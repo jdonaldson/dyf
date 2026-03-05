@@ -1946,7 +1946,7 @@ def _reconstruct_tree(idx):
 
 
 def rewrite_lazy_index(path, new_stored_fields=None, new_metadata=None,
-                       output_path=None):
+                       output_path=None, compression=None):
     """Rewrite a .dyf file with additional stored fields and/or metadata.
 
     Preserves the tree structure, embeddings, and existing stored fields.
@@ -1959,6 +1959,8 @@ def rewrite_lazy_index(path, new_stored_fields=None, new_metadata=None,
         new_metadata: Optional dict of string key-value pairs to add/update.
             Values of None delete the key from existing metadata.
         output_path: Output file path. If None, overwrites the input file.
+        compression: Override compression codec ('none', 'zstd', 'lz4').
+            If None, preserves the original file's compression.
 
     Raises:
         ValueError: If the index uses PQ quantization (lossy round-trip).
@@ -1983,8 +1985,10 @@ def rewrite_lazy_index(path, new_stored_fields=None, new_metadata=None,
             'seed': bp.Seed() if bp else 42,
         }
         quantization = idx.quantization
-        compression = (bp.Compression().decode()
-                       if bp and bp.Compression() else 'none')
+        src_compression = (bp.Compression().decode()
+                           if bp and bp.Compression() else 'none')
+        if compression is None:
+            compression = src_compression
 
     # Merge stored fields (existing + new)
     merged_sf = dict(data['fields'])

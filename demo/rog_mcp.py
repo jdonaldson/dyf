@@ -345,7 +345,23 @@ def _format_search_results(result, include_coords=True) -> list[dict]:
 # Query Functions
 # -----------------------------------------------------------------------------
 
-CLUSTER_LEVELS = (5, 12, 25, 50)
+def _cluster_levels():
+    """Return available cluster levels from loaded cache, sorted ascending."""
+    if CACHE is None:
+        return (5, 12, 25, 50)  # fallback before load
+    return tuple(sorted(CACHE['cluster_result']['labels'].keys()))
+
+
+def _default_level():
+    """Smallest available cluster level."""
+    levels = _cluster_levels()
+    return levels[0] if levels else 12
+
+
+def _max_level():
+    """Largest available cluster level (finest granularity)."""
+    levels = _cluster_levels()
+    return levels[-1] if levels else 50
 
 
 def search_points(query: str, limit: int = 20) -> list[dict]:
@@ -360,19 +376,20 @@ def search_points(query: str, limit: int = 20) -> list[dict]:
                 'x': float(CACHE['coords_2d'][i, 0]),
                 'y': float(CACHE['coords_2d'][i, 1]),
             }
-            for level in CLUSTER_LEVELS:
-                if level in CACHE['cluster_result']['labels']:
-                    result[f'cluster_{level}'] = int(CACHE['cluster_result']['labels'][level][i])
+            for level in _cluster_levels():
+                result[f'cluster_{level}'] = int(CACHE['cluster_result']['labels'][level][i])
             results.append(result)
             if len(results) >= limit:
                 break
     return results
 
 
-def get_cluster_info(level: int = 5) -> list[dict]:
+def get_cluster_info(level: int = None) -> list[dict]:
     """Get cluster information for a given level."""
-    if level not in CLUSTER_LEVELS:
-        return [{'error': f'Invalid level {level}. Must be one of {CLUSTER_LEVELS}.'}]
+    if level is None:
+        level = _default_level()
+    if level not in _cluster_levels():
+        return [{'error': f'Invalid level {level}. Must be one of {_cluster_levels()}.'}]
 
     labels = CACHE['cluster_result']['labels'][level]
     names = CACHE['cluster_result']['names'][level]
@@ -410,10 +427,12 @@ def get_cluster_info(level: int = 5) -> list[dict]:
     return sorted(clusters, key=lambda c: -c['count'])
 
 
-def get_cluster_members(cluster_id: int, level: int = 5, limit: int = 50) -> list[dict]:
+def get_cluster_members(cluster_id: int, level: int = None, limit: int = 50) -> list[dict]:
     """Get members of a specific cluster."""
-    if level not in CLUSTER_LEVELS:
-        return [{'error': f'Invalid level {level}. Must be one of {CLUSTER_LEVELS}.'}]
+    if level is None:
+        level = _default_level()
+    if level not in _cluster_levels():
+        return [{'error': f'Invalid level {level}. Must be one of {_cluster_levels()}.'}]
 
     labels = CACHE['cluster_result']['labels'][level]
     mask = labels == cluster_id
@@ -463,16 +482,17 @@ def get_points_in_region(x_min: float, x_max: float, y_min: float, y_max: float,
 
 
 def get_bucket_connections(bucket_id: int) -> dict:
-    """Get bridge connections for a bucket (at 50-cluster level)."""
+    """Get bridge connections for a bucket (at finest cluster level)."""
     cluster_pairs = CACHE.get('cluster_pairs', {})
     if not cluster_pairs:
         return {'error': 'No cluster_pairs data in cache. Re-run preprocessing.'}
 
+    ml = _max_level()
     connections = []
     for (c1, c2), count in cluster_pairs.items():
         if int(c1) == bucket_id or int(c2) == bucket_id:
             other = int(c2) if int(c1) == bucket_id else int(c1)
-            names = CACHE['cluster_result'].get('names', {}).get(50, [])
+            names = CACHE['cluster_result'].get('names', {}).get(ml, [])
             other_name = names[other] if other < len(names) else f"Bucket {other}"
             connections.append({
                 'bucket_id': other,
@@ -480,7 +500,7 @@ def get_bucket_connections(bucket_id: int) -> dict:
                 'connection_count': int(count),
             })
 
-    names = CACHE['cluster_result'].get('names', {}).get(50, [])
+    names = CACHE['cluster_result'].get('names', {}).get(ml, [])
     bucket_name = names[bucket_id] if bucket_id < len(names) else f"Bucket {bucket_id}"
 
     return {
@@ -492,10 +512,11 @@ def get_bucket_connections(bucket_id: int) -> dict:
 
 
 def get_bucket_members(bucket_id: int, limit: int = 20) -> list[dict]:
-    """Get sample members of a bucket (at 50-cluster level)."""
-    labels = CACHE['cluster_result']['labels'].get(50)
+    """Get sample members of a bucket (at finest cluster level)."""
+    ml = _max_level()
+    labels = CACHE['cluster_result']['labels'].get(ml)
     if labels is None:
-        return [{'error': 'No 50-cluster labels in cache.'}]
+        return [{'error': f'No {ml}-cluster labels in cache.'}]
 
     mask = labels == bucket_id
     indices = np.where(mask)[0][:limit]
@@ -575,11 +596,11 @@ async def list_tools():
         ),
         Tool(
             name="get_cluster_info",
-            description="Get information about clusters at a given level (5, 12, 25, or 50 clusters)",
+            description=f"Get information about clusters at a given level ({', '.join(map(str, _cluster_levels()))} clusters)",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "level": {"type": "integer", "enum": [5, 12, 25, 50], "description": "Cluster level", "default": 5},
+                    "level": {"type": "integer", "enum": list(_cluster_levels()), "description": "Cluster level", "default": _default_level()},
                 },
             },
         ),
@@ -590,7 +611,7 @@ async def list_tools():
                 "type": "object",
                 "properties": {
                     "cluster_id": {"type": "integer", "description": "Cluster ID"},
-                    "level": {"type": "integer", "enum": [5, 12, 25, 50], "description": "Cluster level", "default": 5},
+                    "level": {"type": "integer", "enum": list(_cluster_levels()), "description": "Cluster level", "default": _default_level()},
                     "limit": {"type": "integer", "description": "Max results (default 50)", "default": 50},
                 },
                 "required": ["cluster_id"],
@@ -598,22 +619,22 @@ async def list_tools():
         ),
         Tool(
             name="get_bucket_connections",
-            description="Get bridge connections for a bucket showing which other buckets it connects to (at 50-cluster level)",
+            description=f"Get bridge connections for a bucket showing which other buckets it connects to (at {_max_level()}-cluster level)",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "bucket_id": {"type": "integer", "description": "Bucket ID (0-49)"},
+                    "bucket_id": {"type": "integer", "description": f"Bucket ID (0-{_max_level()-1})"},
                 },
                 "required": ["bucket_id"],
             },
         ),
         Tool(
             name="get_bucket_members",
-            description="Get sample members of a bucket (at 50-cluster level)",
+            description=f"Get sample members of a bucket (at {_max_level()}-cluster level)",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "bucket_id": {"type": "integer", "description": "Bucket ID (0-49)"},
+                    "bucket_id": {"type": "integer", "description": f"Bucket ID (0-{_max_level()-1})"},
                     "limit": {"type": "integer", "description": "Max results (default 20)", "default": 20},
                 },
                 "required": ["bucket_id"],
@@ -654,7 +675,7 @@ async def list_tools():
                 "type": "object",
                 "properties": {
                     "cluster_id": {"type": "integer", "description": "Cluster ID to zoom to"},
-                    "level": {"type": "integer", "enum": [5, 12, 25, 50], "description": "Cluster level", "default": 5},
+                    "level": {"type": "integer", "enum": list(_cluster_levels()), "description": "Cluster level", "default": _default_level()},
                 },
                 "required": ["cluster_id"],
             },
@@ -912,11 +933,11 @@ async def call_tool(name: str, arguments: dict):
     if name == "search_points":
         result = search_points(arguments["query"], arguments.get("limit", 20))
     elif name == "get_cluster_info":
-        result = get_cluster_info(arguments.get("level", 5))
+        result = get_cluster_info(arguments.get("level"))
     elif name == "get_cluster_members":
         result = get_cluster_members(
             arguments["cluster_id"],
-            arguments.get("level", 5),
+            arguments.get("level"),
             arguments.get("limit", 50),
         )
     elif name == "get_bucket_connections":
@@ -935,7 +956,7 @@ async def call_tool(name: str, arguments: dict):
     # --- Camera/view tools ---
     elif name == "zoom_to_cluster":
         cluster_id = arguments["cluster_id"]
-        level = arguments.get("level", 5)
+        level = arguments.get("level") or _default_level()
         params = _cluster_zoom_params(cluster_id, level)
         if params:
             result = await send_ws({"cmd": "zoom_to", **params})
@@ -966,7 +987,7 @@ async def call_tool(name: str, arguments: dict):
             indices = [m['index'] for m in members]
             result = await send_ws({"cmd": "highlight", "indices": indices})
             if arguments.get("zoom", True):
-                params = _cluster_zoom_params(bucket_id, 50)
+                params = _cluster_zoom_params(bucket_id, _max_level())
                 if params:
                     await send_ws({"cmd": "zoom_to", **params})
             connections = get_bucket_connections(bucket_id)
