@@ -299,7 +299,7 @@ def _infer_arrow_type(values):
         raise ValueError(f"Unsupported stored field dtype: {values.dtype}")
 
 
-def write_lazy_index(tree, embeddings, path, compression='zstd',
+def write_lazy_index(tree, embeddings, path, compression='none',
                      quantization='float16', metadata=None,
                      build_params=None, stored_fields=None):
     """Write a DYF lazy index file (FlatBuffers tree + Arrow IPC leaf data).
@@ -309,7 +309,7 @@ def write_lazy_index(tree, embeddings, path, compression='zstd',
             mapping from updated _build_dyf_tree).
         embeddings: (n, d) array of embedding vectors.
         path: Output file path (e.g. "index.dyf").
-        compression: "none", "zstd", or "lz4" (default: "zstd").
+        compression: "none", "zstd", or "lz4" (default: "none").
         quantization: "float32", "float16", "int8", or "pq-M" where M is the
             number of sub-quantizers (default: "float16"). For PQ, dim must
             be divisible by M. Example: "pq-8" for 8 sub-quantizers.
@@ -1738,7 +1738,7 @@ def from_faiss(faiss_index, path, compression='zstd', quantization='float16',
     Args:
         faiss_index: A trained faiss.IndexIVFFlat or faiss.IndexIVFPQ.
         path: Output file path (e.g., "index.dyf").
-        compression: "none", "zstd", or "lz4" (default: "zstd").
+        compression: "none", "zstd", or "lz4" (default: "none").
         quantization: "float32", "float16", or "int8" (default: "float16").
         metadata: Optional dict of string key-value pairs.
         stored_fields: Optional dict mapping field name to array-like of
@@ -1984,7 +1984,7 @@ def rewrite_lazy_index(path, new_stored_fields=None, new_metadata=None,
         }
         quantization = idx.quantization
         compression = (bp.Compression().decode()
-                       if bp and bp.Compression() else 'zstd')
+                       if bp and bp.Compression() else 'none')
 
     # Merge stored fields (existing + new)
     merged_sf = dict(data['fields'])

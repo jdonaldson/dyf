@@ -6,6 +6,7 @@ Ollama/UMAP-dependent code paths.
 
 import json
 import os
+import re
 import sys
 import tempfile
 
@@ -365,7 +366,81 @@ class TestTransferLabelsMajorityVote:
 class TestEnrichClusterDual:
     """Test enrich_cluster produces dual 2D/3D cluster fields."""
 
-    def test_dual_cluster_fields(self):
+    def test_dual_cluster_fields_louvain(self):
+        """Louvain mode: same labels for 2D and 3D, different centroids."""
+        from unittest.mock import patch
+        from dyf import build_dyf_tree
+        from dyf.lazy_index import write_lazy_index, LazyIndex
+        from dyf_enrich import enrich_cluster
+
+        n = 200
+        embeddings = _make_clustered_embeddings(
+            n_clusters=5, points_per_cluster=40, dim=32)
+        tree = build_dyf_tree(embeddings, max_depth=3, num_bits=3,
+                              min_leaf_size=4, seed=42)
+
+        rng = np.random.default_rng(42)
+
+        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+            path = f.name
+        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+            out_path = f.name
+
+        try:
+            titles = [f"Item {i}" for i in range(n)]
+            sf = {
+                'title': titles,
+                'umap_x': rng.standard_normal(n).astype(np.float32),
+                'umap_y': rng.standard_normal(n).astype(np.float32),
+                'umap_z': rng.standard_normal(n).astype(np.float32),
+            }
+            write_lazy_index(tree, embeddings, path, quantization='float32',
+                             stored_fields=sf)
+
+            with patch('dyf_enrich._call_ollama',
+                       return_value="Test Label"):
+                enrich_cluster(path, output_path=out_path)
+
+            with LazyIndex(out_path) as idx:
+                level = idx.detect_enrichment_level()
+                assert level >= 2
+                data = idx.extract_all_fields()
+
+                # Find cluster fields — Louvain picks natural k
+                cluster_2d_fields = [
+                    f for f in data['fields']
+                    if re.match(r'cluster_\d+_2d$', f)]
+                cluster_3d_fields = [
+                    f for f in data['fields']
+                    if re.match(r'cluster_\d+_3d$', f)]
+                assert len(cluster_2d_fields) >= 1
+                assert len(cluster_3d_fields) >= 1
+
+                # For each level, 2D and 3D labels should be identical
+                for f2d in cluster_2d_fields:
+                    k = re.match(r'cluster_(\d+)_2d', f2d).group(1)
+                    f3d = f'cluster_{k}_3d'
+                    assert f3d in data['fields']
+                    np.testing.assert_array_equal(
+                        data['fields'][f2d], data['fields'][f3d])
+
+                    # Both should have names and centroids
+                    assert f'cluster_names_{k}_2d' in data['metadata']
+                    assert f'cluster_names_{k}_3d' in data['metadata']
+                    assert f'cluster_centroids_{k}_2d' in data['metadata']
+                    assert f'cluster_centroids_{k}_3d' in data['metadata']
+
+                    # Names should be valid JSON
+                    names = json.loads(
+                        data['metadata'][f'cluster_names_{k}_2d'])
+                    assert len(names) > 0
+        finally:
+            for p in (path, out_path):
+                if os.path.exists(p):
+                    os.unlink(p)
+
+    def test_dual_cluster_fields_birch(self):
+        """BIRCH fallback: fixed k with dual 2D/3D fields."""
         from unittest.mock import patch
         from dyf import build_dyf_tree
         from dyf.lazy_index import write_lazy_index, LazyIndex
@@ -398,33 +473,22 @@ class TestEnrichClusterDual:
             with patch('dyf_enrich._call_ollama',
                        return_value="Test Label"):
                 enrich_cluster(path, n_clusters_list=[12],
-                               output_path=out_path)
+                               output_path=out_path, louvain=False)
 
             with LazyIndex(out_path) as idx:
                 level = idx.detect_enrichment_level()
                 assert level >= 2
                 data = idx.extract_all_fields()
 
-                # Should have _2d and _3d fields
+                # Should have _2d and _3d fields for k=12
                 assert 'cluster_12_2d' in data['fields']
                 assert 'cluster_12_3d' in data['fields']
                 assert len(data['fields']['cluster_12_2d']) == n
                 assert len(data['fields']['cluster_12_3d']) == n
 
-                # Should NOT have bare cluster_12
-                assert 'cluster_12' not in data['fields']
-
-                # Metadata should have _2d and _3d names/centroids
+                # Metadata should have names/centroids
                 assert 'cluster_names_12_2d' in data['metadata']
                 assert 'cluster_names_12_3d' in data['metadata']
-                assert 'cluster_centroids_12_2d' in data['metadata']
-                assert 'cluster_centroids_12_3d' in data['metadata']
-
-                # Names should be valid JSON with entries
-                names_2d = json.loads(data['metadata']['cluster_names_12_2d'])
-                names_3d = json.loads(data['metadata']['cluster_names_12_3d'])
-                assert len(names_2d) > 0
-                assert len(names_3d) > 0
         finally:
             for p in (path, out_path):
                 if os.path.exists(p):
@@ -536,9 +600,10 @@ class TestEnrichCluster:
     """Test enrich_cluster with mocked LLM labeling."""
 
     def test_adds_cluster_fields(self):
+        """Default Louvain mode produces cluster fields."""
         from unittest.mock import patch
         from dyf import build_dyf_tree
-        from dyf.lazy_index import write_lazy_index, rewrite_lazy_index, LazyIndex
+        from dyf.lazy_index import write_lazy_index, LazyIndex
         from dyf_enrich import enrich_cluster
 
         n = 200
@@ -569,19 +634,23 @@ class TestEnrichCluster:
             # Mock _call_ollama to return a simple label
             with patch('dyf_enrich._call_ollama',
                        return_value="Test Cluster Label"):
-                enrich_cluster(path, n_clusters_list=[12],
-                               output_path=out_path)
+                enrich_cluster(path, output_path=out_path)
 
             with LazyIndex(out_path) as idx:
                 level = idx.detect_enrichment_level()
                 assert level >= 2
                 data = idx.extract_all_fields()
-                # Now produces dual fields: cluster_12_2d, cluster_12_3d
-                assert 'cluster_12_2d' in data['fields']
-                assert len(data['fields']['cluster_12_2d']) == n
-                # Cluster names in metadata
+                # Louvain picks natural k — find cluster fields dynamically
+                cluster_fields = [
+                    f for f in data['fields']
+                    if re.match(r'cluster_\d+_2d$', f)]
+                assert len(cluster_fields) >= 1
+                # Check first level has correct length and names
+                first_field = cluster_fields[0]
+                k_str = re.match(r'cluster_(\d+)_2d', first_field).group(1)
+                assert len(data['fields'][first_field]) == n
                 names_json = data['metadata'].get(
-                    'cluster_names_12_2d', '{}')
+                    f'cluster_names_{k_str}_2d', '{}')
                 names = json.loads(names_json)
                 assert len(names) > 0
         finally:

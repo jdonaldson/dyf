@@ -808,6 +808,127 @@ class TestLabelClustersFrequency:
             assert len(name) > 0
 
 
+@lazy_deps
+class TestLouvainClusterLeaves:
+    """Test Louvain community detection on tree leaves."""
+
+    def test_louvain_returns_correct_structure(self):
+        from dyf import build_dyf_tree
+        from dyf.lazy_index import write_lazy_index, LazyIndex
+        from dyf.agglomerate import louvain_cluster_leaves
+
+        n = 200
+        dim = 32
+        rng = np.random.default_rng(42)
+
+        # Create 5 well-separated clusters
+        centers = rng.standard_normal((5, dim)).astype(np.float32) * 3.0
+        embeddings = []
+        for i in range(5):
+            pts = centers[i] + rng.standard_normal(
+                (40, dim)).astype(np.float32) * 0.1
+            embeddings.append(pts)
+        embeddings = np.concatenate(embeddings).astype(np.float32)
+        embeddings /= np.linalg.norm(embeddings, axis=1, keepdims=True)
+
+        tree = build_dyf_tree(
+            embeddings, max_depth=4, num_bits=3,
+            min_leaf_size=4, seed=42)
+
+        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+            path = f.name
+
+        try:
+            write_lazy_index(tree, embeddings, path, quantization='float32')
+
+            # Fake UMAP coords
+            coords = rng.standard_normal((n, 3)).astype(np.float32)
+
+            with LazyIndex(path) as idx:
+                result = louvain_cluster_leaves(
+                    idx, coords, embeddings)
+
+            point_labels, lsh_names, lsh_label_data, item_leaf_map, tree_struct = result
+
+            # Labels array shape
+            assert point_labels.shape == (n,)
+            assert point_labels.dtype == np.int32
+
+            # All points assigned (no -1 labels)
+            assert (point_labels >= 0).all()
+
+            # Multiple communities found
+            n_communities = len(set(point_labels.tolist()))
+            assert n_communities > 1
+
+            # Names dict matches unique labels
+            assert isinstance(lsh_names, dict)
+            assert len(lsh_names) == n_communities
+
+            # Label data is a list of dicts with required keys
+            assert isinstance(lsh_label_data, list)
+            assert len(lsh_label_data) == n_communities
+            for entry in lsh_label_data:
+                assert 'x' in entry
+                assert 'y' in entry
+                assert 'z' in entry
+                assert 'size' in entry
+                assert 'cid' in entry
+
+            # item_leaf_map
+            assert item_leaf_map.shape == (n,)
+            assert item_leaf_map.dtype == np.int32
+
+            # tree_struct is a list
+            assert isinstance(tree_struct, list)
+            assert len(tree_struct) > 0
+        finally:
+            if os.path.exists(path):
+                os.unlink(path)
+
+    def test_louvain_degenerate_tree(self):
+        """Tree with < 2 leaves returns None tuple."""
+        from dyf import build_dyf_tree
+        from dyf.lazy_index import write_lazy_index, LazyIndex
+        from dyf.agglomerate import louvain_cluster_leaves
+
+        # Very small dataset → might produce single leaf
+        n = 5
+        dim = 8
+        rng = np.random.default_rng(42)
+        embeddings = rng.standard_normal((n, dim)).astype(np.float32)
+        embeddings /= np.linalg.norm(embeddings, axis=1, keepdims=True)
+
+        tree = build_dyf_tree(
+            embeddings, max_depth=1, num_bits=1,
+            min_leaf_size=10, seed=42)
+
+        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+            path = f.name
+
+        try:
+            write_lazy_index(tree, embeddings, path, quantization='float32')
+            coords = rng.standard_normal((n, 3)).astype(np.float32)
+
+            with LazyIndex(path) as idx:
+                tree_struct = idx.get_tree_structure()
+                n_leaves = sum(1 for nd in tree_struct
+                               if nd['is_leaf'] and nd['batch_index'] >= 0)
+
+                result = louvain_cluster_leaves(idx, coords, embeddings)
+
+            if n_leaves < 2:
+                assert result[0] is None
+                assert result[1] == {}
+                assert result[2] == []
+            else:
+                # If tree happened to have 2+ leaves, just verify structure
+                assert result[0] is not None
+        finally:
+            if os.path.exists(path):
+                os.unlink(path)
+
+
 def _inject_hyperplanes(tree_node, dim, num_bits, rng):
     """Inject synthetic PCA hyperplanes into internal tree nodes.
 
@@ -970,7 +1091,7 @@ class TestLabelClustersWithSplitContext:
                 return "Test Label"
 
             with patch('dyf_enrich._call_ollama', side_effect=mock_ollama):
-                enrich_cluster(out_path, n_clusters_list=[12])
+                enrich_cluster(out_path)
 
             # Verify that at least some prompts were generated
             # (if split keywords are available, they may appear in prompts)
@@ -1013,11 +1134,10 @@ class TestLabelClustersWithSplitContext:
             write_lazy_index(tree, embeddings, path, quantization='float32',
                              stored_fields=sf)
 
-            # Cluster WITHOUT splits — should still work
+            # Cluster WITHOUT splits — should still work (Louvain default)
             with patch('dyf_enrich._call_ollama',
                        return_value="Test Label"):
-                enrich_cluster(path, n_clusters_list=[12],
-                               output_path=out_path)
+                enrich_cluster(path, output_path=out_path)
 
             with LazyIndex(out_path) as idx:
                 level = idx.detect_enrichment_level()

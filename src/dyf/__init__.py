@@ -145,7 +145,7 @@ from .cluster_tree import (
 )
 
 # Tree-leaf agglomeration
-from .agglomerate import agglomerate_tree_leaves
+from .agglomerate import agglomerate_tree_leaves, louvain_cluster_leaves, merge_to_max_k
 
 # Spatial cluster coloring
 from .colors import spatial_rgb_map, spatial_color_map, tree_rgb_map
@@ -312,6 +312,8 @@ __all__ = [
     "format_cluster_context",
     # Tree-leaf agglomeration
     "agglomerate_tree_leaves",
+    "louvain_cluster_leaves",
+    "merge_to_max_k",
     # Spatial cluster coloring
     "spatial_rgb_map",
     "spatial_color_map",
