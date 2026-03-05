@@ -15,13 +15,41 @@ Reader:
     LazyIndex(path) — mmap, zero startup cost, LRU-cached leaf access
 """
 
+from __future__ import annotations
+
 import json
 import mmap
 import struct
 from collections import deque
 from dataclasses import dataclass, field
+from collections.abc import Mapping, Sequence, Set
+from typing import TypedDict
 
 import numpy as np
+
+# Stored field value types:
+# - Output (from extract_all_fields): specific list type
+StoredFieldValue = np.ndarray | list[str | bytes | None]
+# - Input (to write_lazy_index, rewrite_lazy_index): accepts list[str], list[bytes], etc.
+StoredFieldInput = np.ndarray | Sequence[str | bytes | None]
+
+
+class TreeNode(TypedDict):
+    """Single node from LazyIndex.get_tree_structure()."""
+    node_id: int
+    parent_id: int | None
+    depth: int
+    num_items: int
+    is_leaf: bool
+    batch_index: int           # -1 for internal nodes
+    eigenvalues: np.ndarray | None  # (num_bits,) float32 or None
+
+
+class ExtractedData(TypedDict):
+    """Return type for LazyIndex.extract_all_fields()."""
+    embeddings: np.ndarray     # (N, D) float32
+    fields: dict[str, StoredFieldValue]
+    metadata: dict[str, str]
 
 MAGIC = b"DYF1"
 HEADER_SIZE = 16  # 4 magic + 8 fb_size + 4 reserved
@@ -299,9 +327,16 @@ def _infer_arrow_type(values):
         raise ValueError(f"Unsupported stored field dtype: {values.dtype}")
 
 
-def write_lazy_index(tree, embeddings, path, compression='none',
-                     quantization='float16', metadata=None,
-                     build_params=None, stored_fields=None):
+def write_lazy_index(
+    tree: dict,
+    embeddings: np.ndarray,
+    path: str,
+    compression: str = 'none',
+    quantization: str = 'float16',
+    metadata: dict[str, str] | None = None,
+    build_params: dict[str, int] | None = None,
+    stored_fields: Mapping[str, StoredFieldInput] | None = None,
+) -> None:
     """Write a DYF lazy index file (FlatBuffers tree + Arrow IPC leaf data).
 
     Args:
@@ -766,7 +801,7 @@ class LazyIndex:
             ]
         return summary
 
-    def get_tree_structure(self):
+    def get_tree_structure(self) -> list[TreeNode]:
         """Export tree hierarchy for visualization (FlatBuffers only, no Arrow).
 
         Returns:
@@ -1440,7 +1475,7 @@ class LazyIndex:
 
         return result
 
-    def extract_all_fields(self):
+    def extract_all_fields(self) -> ExtractedData:
         """Bulk-read all leaf batches, concatenate, sort by item_index.
 
         Returns:
@@ -1512,20 +1547,25 @@ class LazyIndex:
             'metadata': dict(self._get_metadata()),
         }
 
-    def detect_enrichment_level(self):
+    def detect_enrichment_level(self) -> int:
         """Detect enrichment level based on stored fields and metadata.
 
         Returns 0-3:
             0: Base (embeddings + tree only)
             1: Projected (has umap_x, umap_y, umap_z stored fields)
-            2: Clustered (has cluster_* stored fields)
+            2: Clustered (has community_id or cluster_* stored fields)
             3: Viz-ready (has edge_pairs or tour_narration in metadata)
         """
         sf = set(self.stored_field_names)
         meta = self._get_metadata()
 
         has_umap = {'umap_x', 'umap_y', 'umap_z'}.issubset(sf)
-        has_clusters = any(f.startswith('cluster_') for f in sf)
+        has_clusters = (
+            any(f.startswith('cluster_') for f in sf)
+            or 'community_id' in sf
+            or 'lsh_bucket_ids' in sf
+            or 'louvain_dendrogram' in meta
+        )
         has_viz = 'edge_pairs' in meta or 'tour_narration' in meta
 
         if has_viz:
@@ -1728,8 +1768,14 @@ class LazyIndex:
         return index
 
 
-def from_faiss(faiss_index, path, compression='zstd', quantization='float16',
-               metadata=None, stored_fields=None):
+def from_faiss(
+    faiss_index,
+    path: str,
+    compression: str = 'zstd',
+    quantization: str = 'float16',
+    metadata: dict[str, str] | None = None,
+    stored_fields: Mapping[str, StoredFieldInput] | None = None,
+) -> LazyIndex:
     """Build a dyf lazy index file from a FAISS IVF index.
 
     Extracts FAISS's inverted lists and centroids, builds a single-level
@@ -1945,8 +1991,14 @@ def _reconstruct_tree(idx):
     return _build(root_id)
 
 
-def rewrite_lazy_index(path, new_stored_fields=None, new_metadata=None,
-                       output_path=None, compression=None):
+def rewrite_lazy_index(
+    path: str,
+    new_stored_fields: Mapping[str, StoredFieldInput] | None = None,
+    new_metadata: Mapping[str, str | None] | None = None,
+    output_path: str | None = None,
+    compression: str | None = None,
+    drop_fields: Set[str] | list[str] | None = None,
+) -> None:
     """Rewrite a .dyf file with additional stored fields and/or metadata.
 
     Preserves the tree structure, embeddings, and existing stored fields.
@@ -1961,6 +2013,8 @@ def rewrite_lazy_index(path, new_stored_fields=None, new_metadata=None,
         output_path: Output file path. If None, overwrites the input file.
         compression: Override compression codec ('none', 'zstd', 'lz4').
             If None, preserves the original file's compression.
+        drop_fields: Optional set/list of stored field names to remove.
+            Applied after merging existing and new fields (exact names only).
 
     Raises:
         ValueError: If the index uses PQ quantization (lossy round-trip).
@@ -1991,9 +2045,12 @@ def rewrite_lazy_index(path, new_stored_fields=None, new_metadata=None,
             compression = src_compression
 
     # Merge stored fields (existing + new)
-    merged_sf = dict(data['fields'])
+    merged_sf: dict[str, StoredFieldInput] = dict(data['fields'])
     if new_stored_fields:
         merged_sf.update(new_stored_fields)
+    if drop_fields:
+        for fname in drop_fields:
+            merged_sf.pop(fname, None)
 
     # Merge metadata (existing + new; None values delete keys)
     merged_meta = dict(data['metadata'])

@@ -54,18 +54,13 @@ def _make_clustered_embeddings(n_clusters=5, points_per_cluster=40, dim=32,
     return np.concatenate(points, axis=0)
 
 
-def _build_level2_dyf(n_clusters=5, points_per_cluster=40, dim=32,
-                      dual_clusters=True):
-    """Build a Level 2 .dyf file with UMAP coords + cluster labels.
+def _build_level2_dyf(n_clusters=5, points_per_cluster=40, dim=32):
+    """Build a Level 2 .dyf file with UMAP coords + Louvain cluster metadata.
 
-    Args:
-        dual_clusters: If True, use cluster_25_2d/cluster_25_3d naming.
-            If False, use bare cluster_25 naming (backward compat).
-
-    Returns (path, n_total) — caller must clean up the file.
+    Returns (path, n_total, n_clusters) — caller must clean up the file.
     """
     from dyf import build_dyf_tree
-    from dyf.lazy_index import write_lazy_index, rewrite_lazy_index
+    from dyf.lazy_index import write_lazy_index
 
     n = n_clusters * points_per_cluster
     embeddings = _make_clustered_embeddings(
@@ -85,38 +80,54 @@ def _build_level2_dyf(n_clusters=5, points_per_cluster=40, dim=32,
     cluster_labels = np.array(
         [i // points_per_cluster for i in range(n)], dtype=np.int32)
 
-    # Build cluster names and centroids
-    cluster_names = {str(i): f"Cluster {i}" for i in range(n_clusters)}
-    cluster_centroids = {}
+    # Build Louvain-format metadata
+    community_names = {str(i): f"Cluster {i}" for i in range(n_clusters)}
+    community_centroids = {}
+    community_sizes = {}
     for cid in range(n_clusters):
         mask = cluster_labels == cid
-        cluster_centroids[str(cid)] = [
+        community_centroids[str(cid)] = [
             round(float(umap_x[mask].mean()), 4),
             round(float(umap_y[mask].mean()), 4),
-            round(float(umap_z[mask].mean()), 4),
         ]
+        community_sizes[str(cid)] = int(mask.sum())
+
+    # Fake linkage matrix: n_clusters-1 merges
+    Z = []
+    for i in range(n_clusters - 1):
+        Z.append([float(i), float(i + 1), float(i + 1) * 0.1,
+                  float((i + 2) * points_per_cluster)])
+
+    # Leaf-to-community: use identity (1 leaf per community for simplicity)
+    leaf_to_community = {str(i): i for i in range(n_clusters)}
+    leaf_item_map = {}
+    for cid in range(n_clusters):
+        start = cid * points_per_cluster
+        leaf_item_map[str(cid)] = list(range(start, start + points_per_cluster))
+
+    dendro_data = {
+        'Z': Z,
+        'community_names': community_names,
+        'community_centroids': community_centroids,
+        'community_sizes': community_sizes,
+    }
+    leaf_comm_data = {
+        'natural_k': n_clusters,
+        'leaf_to_community': leaf_to_community,
+    }
 
     sf = {
         'title': titles,
         'umap_x': umap_x,
         'umap_y': umap_y,
         'umap_z': umap_z,
+        'community_id': cluster_labels,
     }
-    meta = {}
-
-    if dual_clusters:
-        # New dual naming: cluster_25_2d and cluster_25_3d
-        sf['cluster_25_2d'] = cluster_labels
-        sf['cluster_25_3d'] = cluster_labels  # same for test simplicity
-        meta['cluster_names_25_2d'] = json.dumps(cluster_names)
-        meta['cluster_centroids_25_2d'] = json.dumps(cluster_centroids)
-        meta['cluster_names_25_3d'] = json.dumps(cluster_names)
-        meta['cluster_centroids_25_3d'] = json.dumps(cluster_centroids)
-    else:
-        # Bare naming (backward compat)
-        sf['cluster_25'] = cluster_labels
-        meta['cluster_names_25'] = json.dumps(cluster_names)
-        meta['cluster_centroids_25'] = json.dumps(cluster_centroids)
+    meta = {
+        'louvain_dendrogram': json.dumps(dendro_data),
+        'louvain_leaf_communities': json.dumps(leaf_comm_data),
+        'leaf_item_map': json.dumps(leaf_item_map),
+    }
 
     with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
         path = f.name
@@ -124,7 +135,7 @@ def _build_level2_dyf(n_clusters=5, points_per_cluster=40, dim=32,
     write_lazy_index(tree, embeddings, path, quantization='float32',
                      stored_fields=sf, metadata=meta)
 
-    return path, n
+    return path, n, n_clusters
 
 
 @lazy_deps
@@ -134,7 +145,7 @@ class TestLoadCacheFromDyf:
     def test_cache_populated(self):
         import rog_mcp
 
-        path, n = _build_level2_dyf()
+        path, n, _k = _build_level2_dyf()
         try:
             # Save and restore module globals
             old_cache = rog_mcp.CACHE
@@ -157,7 +168,7 @@ class TestLoadCacheFromDyf:
     def test_cluster_result_loaded(self):
         import rog_mcp
 
-        path, n = _build_level2_dyf()
+        path, n, n_clusters = _build_level2_dyf()
         try:
             old_cache = rog_mcp.CACHE
             old_dyf = rog_mcp.DYF_INDEX
@@ -167,10 +178,11 @@ class TestLoadCacheFromDyf:
                 rog_mcp.load_cache(path)
 
                 cr = rog_mcp.CACHE['cluster_result']
-                assert 25 in cr['labels']
-                assert 25 in cr['names']
-                assert 25 in cr['centroids']
-                assert len(cr['labels'][25]) == n
+                # natural_k is n_clusters
+                assert n_clusters in cr['labels']
+                assert n_clusters in cr['names']
+                assert n_clusters in cr['centroids']
+                assert len(cr['labels'][n_clusters]) == n
             finally:
                 rog_mcp.CACHE = old_cache
                 rog_mcp.DYF_INDEX = old_dyf
@@ -181,7 +193,7 @@ class TestLoadCacheFromDyf:
     def test_titles_are_strings(self):
         import rog_mcp
 
-        path, n = _build_level2_dyf()
+        path, n, _k = _build_level2_dyf()
         try:
             old_cache = rog_mcp.CACHE
             old_dyf = rog_mcp.DYF_INDEX
@@ -211,7 +223,7 @@ class TestQueryFunctions:
         """Load a Level 2 .dyf into rog_mcp.CACHE for all tests."""
         import rog_mcp
 
-        self.path, self.n = _build_level2_dyf()
+        self.path, self.n, self.n_clusters = _build_level2_dyf()
         self._old_cache = rog_mcp.CACHE
         self._old_dyf = rog_mcp.DYF_INDEX
         rog_mcp.CACHE = None
@@ -248,7 +260,7 @@ class TestQueryFunctions:
     def test_get_cluster_info(self):
         import rog_mcp
 
-        clusters = rog_mcp.get_cluster_info(level=25)
+        clusters = rog_mcp.get_cluster_info(level=self.n_clusters)
         assert len(clusters) > 0
         assert all('cluster_id' in c for c in clusters)
         assert all('name' in c for c in clusters)
@@ -285,7 +297,8 @@ class TestQueryFunctions:
     def test_get_cluster_members(self):
         import rog_mcp
 
-        members = rog_mcp.get_cluster_members(cluster_id=0, level=25, limit=10)
+        members = rog_mcp.get_cluster_members(
+            cluster_id=0, level=self.n_clusters, limit=10)
         assert len(members) > 0
         assert len(members) <= 10
         assert all('title' in m for m in members)
@@ -301,14 +314,14 @@ class TestQueryFunctions:
 
 
 @lazy_deps
-class TestDualClusterLoading:
-    """Test loading dual 2D/3D cluster fields from .dyf."""
+class TestLouvainClusterLoading:
+    """Test loading Louvain cluster data from .dyf."""
 
-    def test_dual_clusters_loaded(self):
-        """cluster_25_2d + cluster_25_3d → labels, labels_2d, labels_3d."""
+    def test_community_id_used(self):
+        """community_id stored field is preferred for point labels."""
         import rog_mcp
 
-        path, n = _build_level2_dyf(dual_clusters=True)
+        path, n, n_clusters = _build_level2_dyf()
         try:
             old_cache = rog_mcp.CACHE
             old_dyf = rog_mcp.DYF_INDEX
@@ -318,14 +331,33 @@ class TestDualClusterLoading:
                 rog_mcp.load_cache(path)
 
                 cr = rog_mcp.CACHE['cluster_result']
-                # Default labels should be populated (from 2D)
-                assert 25 in cr['labels']
-                assert len(cr['labels'][25]) == n
-                # 2D and 3D should both be populated
-                assert 25 in cr['labels_2d']
-                assert 25 in cr['labels_3d']
-                assert 25 in cr['names_2d']
-                assert 25 in cr['names_3d']
+                assert n_clusters in cr['labels']
+                assert len(cr['labels'][n_clusters]) == n
+                assert n_clusters in cr['names']
+                assert n_clusters in cr['centroids']
+            finally:
+                rog_mcp.CACHE = old_cache
+                rog_mcp.DYF_INDEX = old_dyf
+        finally:
+            if os.path.exists(path):
+                os.unlink(path)
+
+    def test_dendro_data_loaded(self):
+        """Dendrogram data is loaded for slider control."""
+        import rog_mcp
+
+        path, _n, _k = _build_level2_dyf()
+        try:
+            old_cache = rog_mcp.CACHE
+            old_dyf = rog_mcp.DYF_INDEX
+            try:
+                rog_mcp.CACHE = None
+                rog_mcp.DYF_INDEX = None
+                rog_mcp.load_cache(path)
+
+                assert rog_mcp.CACHE['dendro_data'] is not None
+                assert 'Z' in rog_mcp.CACHE['dendro_data']
+                assert 'community_names' in rog_mcp.CACHE['dendro_data']
             finally:
                 rog_mcp.CACHE = old_cache
                 rog_mcp.DYF_INDEX = old_dyf
@@ -335,73 +367,11 @@ class TestDualClusterLoading:
 
 
 @lazy_deps
-class TestBackwardCompatBareClusters:
-    """Test backward compat with bare cluster_25 (no _2d/_3d suffix)."""
+class TestNoClustersLoading:
+    """Test loading a Level 1 .dyf with no cluster metadata."""
 
-    def test_bare_cluster_populates_both(self):
-        """Bare cluster_25 → labels, labels_2d, labels_3d all populated."""
-        import rog_mcp
-
-        path, n = _build_level2_dyf(dual_clusters=False)
-        try:
-            old_cache = rog_mcp.CACHE
-            old_dyf = rog_mcp.DYF_INDEX
-            try:
-                rog_mcp.CACHE = None
-                rog_mcp.DYF_INDEX = None
-                rog_mcp.load_cache(path)
-
-                cr = rog_mcp.CACHE['cluster_result']
-                # All three should be populated from bare cluster_25
-                assert 25 in cr['labels']
-                assert 25 in cr['labels_2d']
-                assert 25 in cr['labels_3d']
-                assert len(cr['labels'][25]) == n
-
-                # Names should be identical across all three
-                assert cr['names'][25] == cr['names_2d'][25]
-                assert cr['names'][25] == cr['names_3d'][25]
-            finally:
-                rog_mcp.CACHE = old_cache
-                rog_mcp.DYF_INDEX = old_dyf
-        finally:
-            if os.path.exists(path):
-                os.unlink(path)
-
-    def test_query_functions_work_with_bare(self):
-        """search_points and get_cluster_info work with bare cluster naming."""
-        import rog_mcp
-
-        path, n = _build_level2_dyf(dual_clusters=False)
-        try:
-            old_cache = rog_mcp.CACHE
-            old_dyf = rog_mcp.DYF_INDEX
-            try:
-                rog_mcp.CACHE = None
-                rog_mcp.DYF_INDEX = None
-                rog_mcp.load_cache(path)
-
-                results = rog_mcp.search_points("Test Item 0", limit=5)
-                assert len(results) > 0
-
-                clusters = rog_mcp.get_cluster_info(level=25)
-                assert len(clusters) > 0
-                total = sum(c['count'] for c in clusters)
-                assert total == n
-            finally:
-                rog_mcp.CACHE = old_cache
-                rog_mcp.DYF_INDEX = old_dyf
-        finally:
-            if os.path.exists(path):
-                os.unlink(path)
-
-
-@lazy_deps
-class TestTreeLabelFallback:
-    """Test tree-label fallback when no BIRCH clusters exist."""
-
-    def test_tree_labels_create_clusters(self):
-        """Level 0 + tree_labels metadata → cluster assignments."""
+    def test_level1_loads_empty_clusters(self):
+        """Level 1 file (UMAP only, no Louvain) loads with empty cluster_result."""
         import rog_mcp
         from dyf import build_dyf_tree
         from dyf.lazy_index import write_lazy_index
@@ -414,17 +384,12 @@ class TestTreeLabelFallback:
 
         rng = np.random.default_rng(42)
 
-        # Build Level 1 .dyf (UMAP coords but NO cluster fields)
         sf = {
             'title': [f"Item {i}" for i in range(n)],
             'umap_x': rng.standard_normal(n).astype(np.float32),
             'umap_y': rng.standard_normal(n).astype(np.float32),
             'umap_z': rng.standard_normal(n).astype(np.float32),
         }
-
-        # Build fake tree labels metadata
-        # We need node IDs from the actual tree structure
-        from dyf.lazy_index import LazyIndex
 
         with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
             path = f.name
@@ -433,73 +398,22 @@ class TestTreeLabelFallback:
             write_lazy_index(tree, embeddings, path, quantization='float32',
                              stored_fields=sf)
 
-            # Get actual tree structure to build valid tree labels
-            with LazyIndex(path) as idx:
-                tree_struct = idx.get_tree_structure()
+            old_cache = rog_mcp.CACHE
+            old_dyf = rog_mcp.DYF_INDEX
+            try:
+                rog_mcp.CACHE = None
+                rog_mcp.DYF_INDEX = None
+                rog_mcp.load_cache(path)
 
-            # Find nodes at depth 3
-            depth3_nodes = [nd for nd in tree_struct
-                           if nd['depth'] == 3 and nd['num_items'] > 0]
-
-            if not depth3_nodes:
-                # Try depth 2 if tree isn't deep enough
-                depth3_nodes = [nd for nd in tree_struct
-                               if nd['depth'] == 2 and nd['num_items'] > 0]
-
-            if depth3_nodes:
-                # Build tree labels from actual children
-                children_of = {}
-                for nd in tree_struct:
-                    if nd['parent_id'] is not None:
-                        children_of.setdefault(
-                            nd['parent_id'], []).append(nd['node_id'])
-
-                branch_labels = {}
-                child_labels = {}
-                hierarchy = {}
-
-                for node in depth3_nodes[:3]:  # just use first 3
-                    nid = node['node_id']
-                    branch_labels[str(nid)] = f"Branch {nid}"
-                    kids = children_of.get(nid, [])
-                    hierarchy[str(nid)] = kids
-                    for kid in kids:
-                        child_labels[str(kid)] = f"Child {kid}"
-
-                tree_label_data = {
-                    'branch_labels': branch_labels,
-                    'child_labels': child_labels,
-                    'hierarchy': hierarchy,
-                }
-
-                # Rewrite with tree labels metadata (no cluster fields)
-                from dyf.lazy_index import rewrite_lazy_index
-                rewrite_lazy_index(
-                    path,
-                    new_metadata={
-                        'tree_labels_depth_3': json.dumps(tree_label_data)
-                    })
-
-                # Now load via rog_mcp
-                old_cache = rog_mcp.CACHE
-                old_dyf = rog_mcp.DYF_INDEX
-                try:
-                    rog_mcp.CACHE = None
-                    rog_mcp.DYF_INDEX = None
-                    rog_mcp.load_cache(path)
-
-                    cr = rog_mcp.CACHE['cluster_result']
-                    # Should have built cluster labels from tree
-                    assert len(cr['labels']) > 0
-                    # All standard levels should be populated
-                    for lvl in cr['labels']:
-                        labels_arr = cr['labels'][lvl]
-                        assert len(labels_arr) == n
-                        # No -1 labels (all assigned)
-                        assert (labels_arr >= 0).all()
-                finally:
-                    rog_mcp.CACHE = old_cache
-                    rog_mcp.DYF_INDEX = old_dyf
+                cr = rog_mcp.CACHE['cluster_result']
+                # No Louvain metadata → empty labels
+                assert len(cr['labels']) == 0
+                # But coords and titles should be loaded
+                assert len(rog_mcp.CACHE['titles']) == n
+                assert rog_mcp.CACHE['coords_2d'].shape == (n, 2)
+            finally:
+                rog_mcp.CACHE = old_cache
+                rog_mcp.DYF_INDEX = old_dyf
         finally:
             if os.path.exists(path):
                 os.unlink(path)

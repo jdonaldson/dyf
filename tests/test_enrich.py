@@ -6,7 +6,6 @@ Ollama/UMAP-dependent code paths.
 
 import json
 import os
-import re
 import sys
 import tempfile
 
@@ -406,41 +405,25 @@ class TestEnrichClusterDual:
                 assert level >= 2
                 data = idx.extract_all_fields()
 
-                # Find cluster fields — Louvain picks natural k
-                cluster_2d_fields = [
-                    f for f in data['fields']
-                    if re.match(r'cluster_\d+_2d$', f)]
-                cluster_3d_fields = [
-                    f for f in data['fields']
-                    if re.match(r'cluster_\d+_3d$', f)]
-                assert len(cluster_2d_fields) >= 1
-                assert len(cluster_3d_fields) >= 1
+                # Louvain writes community_id + per-point metrics
+                assert 'community_id' in data['fields']
+                assert 'centroid_dist' in data['fields']
+                assert 'nearest_other_dist' in data['fields']
+                assert len(data['fields']['community_id']) == n
 
-                # For each level, 2D and 3D labels should be identical
-                for f2d in cluster_2d_fields:
-                    k = re.match(r'cluster_(\d+)_2d', f2d).group(1)
-                    f3d = f'cluster_{k}_3d'
-                    assert f3d in data['fields']
-                    np.testing.assert_array_equal(
-                        data['fields'][f2d], data['fields'][f3d])
-
-                    # Both should have names and centroids
-                    assert f'cluster_names_{k}_2d' in data['metadata']
-                    assert f'cluster_names_{k}_3d' in data['metadata']
-                    assert f'cluster_centroids_{k}_2d' in data['metadata']
-                    assert f'cluster_centroids_{k}_3d' in data['metadata']
-
-                    # Names should be valid JSON
-                    names = json.loads(
-                        data['metadata'][f'cluster_names_{k}_2d'])
-                    assert len(names) > 0
+                # Should have dendrogram metadata
+                assert 'louvain_dendrogram' in data['metadata']
+                dendro = json.loads(data['metadata']['louvain_dendrogram'])
+                assert 'Z' in dendro
+                assert 'community_names' in dendro
+                assert len(dendro['community_names']) > 0
         finally:
             for p in (path, out_path):
                 if os.path.exists(p):
                     os.unlink(p)
 
-    def test_dual_cluster_fields_birch(self):
-        """BIRCH fallback: fixed k with dual 2D/3D fields."""
+    def test_louvain_force_rerun(self):
+        """Force re-run on already-clustered file overwrites cleanly."""
         from unittest.mock import patch
         from dyf import build_dyf_tree
         from dyf.lazy_index import write_lazy_index, LazyIndex
@@ -472,23 +455,16 @@ class TestEnrichClusterDual:
 
             with patch('dyf_enrich._call_ollama',
                        return_value="Test Label"):
-                enrich_cluster(path, n_clusters_list=[12],
-                               output_path=out_path, louvain=False)
+                enrich_cluster(path, output_path=out_path)
+                # Force re-run on already-clustered file
+                enrich_cluster(out_path, force=True)
 
             with LazyIndex(out_path) as idx:
                 level = idx.detect_enrichment_level()
                 assert level >= 2
                 data = idx.extract_all_fields()
-
-                # Should have _2d and _3d fields for k=12
-                assert 'cluster_12_2d' in data['fields']
-                assert 'cluster_12_3d' in data['fields']
-                assert len(data['fields']['cluster_12_2d']) == n
-                assert len(data['fields']['cluster_12_3d']) == n
-
-                # Metadata should have names/centroids
-                assert 'cluster_names_12_2d' in data['metadata']
-                assert 'cluster_names_12_3d' in data['metadata']
+                assert 'community_id' in data['fields']
+                assert 'louvain_dendrogram' in data['metadata']
         finally:
             for p in (path, out_path):
                 if os.path.exists(p):
@@ -640,19 +616,16 @@ class TestEnrichCluster:
                 level = idx.detect_enrichment_level()
                 assert level >= 2
                 data = idx.extract_all_fields()
-                # Louvain picks natural k — find cluster fields dynamically
-                cluster_fields = [
-                    f for f in data['fields']
-                    if re.match(r'cluster_\d+_2d$', f)]
-                assert len(cluster_fields) >= 1
-                # Check first level has correct length and names
-                first_field = cluster_fields[0]
-                k_str = re.match(r'cluster_(\d+)_2d', first_field).group(1)
-                assert len(data['fields'][first_field]) == n
-                names_json = data['metadata'].get(
-                    f'cluster_names_{k_str}_2d', '{}')
-                names = json.loads(names_json)
-                assert len(names) > 0
+                # Louvain writes community_id + per-point metrics
+                assert 'community_id' in data['fields']
+                assert 'centroid_dist' in data['fields']
+                assert 'nearest_other_dist' in data['fields']
+                assert len(data['fields']['community_id']) == n
+
+                # Should have dendrogram metadata with community names
+                assert 'louvain_dendrogram' in data['metadata']
+                dendro = json.loads(data['metadata']['louvain_dendrogram'])
+                assert len(dendro['community_names']) > 0
         finally:
             for p in (path, out_path):
                 if os.path.exists(p):

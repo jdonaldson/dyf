@@ -353,37 +353,34 @@ export async function loadDyf(url, onProgress) {
 
   if (onProgress) onProgress("Processing metadata...");
 
-  // Extract cluster info from metadata (handles _2d/_3d suffixes)
-  const clusterLevelSet = new Set();
-  const clusterNames = {};    // {level: {dim: {cid: name}}}
-  const clusterCentroids = {}; // {level: {dim: {cid: [x,y,z]}}}
-  const clusterColors = {};    // {level: {dim: {cid: [r,g,b]}}}
+  // ── Parse dendrogram metadata (new format) ──────────────────────────────
+  let dendrogram = null;
+  const dendroJson = index.metadata.get("louvain_dendrogram");
+  const leafCommJson = index.metadata.get("louvain_leaf_communities");
+  const leafItemJson = index.metadata.get("leaf_item_map");
 
-  for (const [key, value] of index.metadata) {
-    const nameMatch = key.match(/^cluster_names_(\d+)(?:_(2d|3d))?$/);
-    if (nameMatch) {
-      const level = parseInt(nameMatch[1]);
-      const dim = nameMatch[2] || '2d';
-      clusterLevelSet.add(level);
-      if (!clusterNames[level]) clusterNames[level] = {};
-      try { clusterNames[level][dim] = JSON.parse(value); } catch (e) { /* skip */ }
-    }
-    const centroidMatch = key.match(/^cluster_centroids_(\d+)(?:_(2d|3d))?$/);
-    if (centroidMatch) {
-      const level = parseInt(centroidMatch[1]);
-      const dim = centroidMatch[2] || '2d';
-      if (!clusterCentroids[level]) clusterCentroids[level] = {};
-      try { clusterCentroids[level][dim] = JSON.parse(value); } catch (e) { /* skip */ }
-    }
-    const colorMatch = key.match(/^cluster_colors_(\d+)(?:_(2d|3d))?$/);
-    if (colorMatch) {
-      const level = parseInt(colorMatch[1]);
-      const dim = colorMatch[2] || '2d';
-      if (!clusterColors[level]) clusterColors[level] = {};
-      try { clusterColors[level][dim] = JSON.parse(value); } catch (e) { /* skip */ }
+  if (dendroJson && leafCommJson && leafItemJson) {
+    try {
+      const dendroData = JSON.parse(dendroJson);
+      const leafCommData = JSON.parse(leafCommJson);
+      const leafItemData = JSON.parse(leafItemJson);
+      dendrogram = {
+        Z: dendroData.Z,                          // linkage matrix rows
+        communityNames: dendroData.community_names,
+        communityColors: dendroData.community_colors,
+        communityCentroids: dendroData.community_centroids,
+        communitySizes: dendroData.community_sizes,
+        communityCohesion: dendroData.community_cohesion || null,
+        leafToCommunity: leafCommData.leaf_to_community,
+        naturalK: leafCommData.natural_k,
+        resolution: leafCommData.resolution,
+        leafItemMap: leafItemData,                 // {leaf_idx: [item_idx, ...]}
+        communityIds: fields.community_id || null, // per-point stored field (post-reassignment)
+      };
+    } catch (e) {
+      console.warn("[dyf_reader] Error parsing dendrogram metadata:", e);
     }
   }
-  const clusterLevels = Array.from(clusterLevelSet).sort((a, b) => a - b);
 
   if (onProgress) onProgress("Done");
 
@@ -391,10 +388,7 @@ export async function loadDyf(url, onProgress) {
     totalItems: index.totalItems,
     fields,
     metadata: index.metadata,
-    clusterLevels,
-    clusterNames,
-    clusterCentroids,
-    clusterColors,
+    dendrogram,
     buildParams: index.buildParams,
   };
 }

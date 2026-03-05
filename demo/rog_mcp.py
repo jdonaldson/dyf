@@ -66,155 +66,63 @@ def load_cache(dyf_path: str):
         data['fields']['umap_y'],
     ])
 
-    # Cluster data — parse cluster_{k}, cluster_{k}_2d, cluster_{k}_3d
-    import re as _re
-    _cluster_re = _re.compile(r'^cluster_(\d+)(?:_(2d|3d))?$')
+    # Cluster data — parse dendrogram metadata
+    dendro_json = data['metadata'].get('louvain_dendrogram')
+    leaf_comm_json = data['metadata'].get('louvain_leaf_communities')
+    leaf_item_json = data['metadata'].get('leaf_item_map')
+
     cluster_result = {
         'labels': {}, 'names': {}, 'centroids': {},
-        'labels_2d': {}, 'names_2d': {}, 'centroids_2d': {},
-        'labels_3d': {}, 'names_3d': {}, 'centroids_3d': {},
     }
-    cluster_fields = sorted(
-        [f for f in data['fields'] if _cluster_re.match(f)],
-        key=lambda f: (int(_cluster_re.match(f).group(1)),
-                       _cluster_re.match(f).group(2) or ''))
+    dendro_data = None
 
-    def _load_cluster_level(field_name, lvl, suffix):
-        """Load labels/names/centroids for a cluster field into result."""
-        labels_arr = np.asarray(data['fields'][field_name])
+    if dendro_json and leaf_comm_json and leaf_item_json:
+        dendro_data = json.loads(dendro_json)
+        leaf_comm_data = json.loads(leaf_comm_json)
+        leaf_item_data = json.loads(leaf_item_json)
+        Z = np.array(dendro_data['Z'])
+        community_names = dendro_data['community_names']
+        community_centroids = dendro_data.get('community_centroids', {})
+        community_sizes = dendro_data.get('community_sizes', {})
+        natural_k = leaf_comm_data['natural_k']
+        leaf_to_comm = leaf_comm_data['leaf_to_community']
 
-        # Names from metadata
-        names_key = f'cluster_names_{lvl}' + (f'_{suffix}' if suffix else '')
-        names_json = data['metadata'].get(names_key, '{}')
-        parsed = json.loads(names_json)
-        if parsed:
-            max_id = max(int(k) for k in parsed)
-            names_list = [parsed.get(str(i), f"Cluster {i}")
-                          for i in range(max_id + 1)]
+        # Use community_id stored field if available (correct post-reassignment
+        # labels), otherwise reconstruct from leaf mappings (pre-reassignment)
+        if 'community_id' in data['fields']:
+            point_labels = np.asarray(
+                data['fields']['community_id'], dtype=np.int32)
         else:
-            unique = sorted(set(labels_arr.tolist()))
-            names_list = [f"Cluster {i}" for i in range(max(unique) + 1)]
+            point_labels = np.full(n, -1, dtype=np.int32)
+            for leaf_idx, items in leaf_item_data.items():
+                comm_id = leaf_to_comm.get(str(leaf_idx))
+                if comm_id is None:
+                    continue
+                for item_idx in items:
+                    if item_idx < n:
+                        point_labels[item_idx] = int(comm_id)
+            # Handle unassigned
+            unassigned = point_labels == -1
+            if unassigned.any():
+                point_labels[unassigned] = 0
 
-        # Centroids from metadata or computed
-        cent_key = f'cluster_centroids_{lvl}' + (f'_{suffix}' if suffix
-                                                  else '')
-        cent_json = data['metadata'].get(cent_key, '{}')
-        cent_parsed = json.loads(cent_json)
-        if cent_parsed:
-            max_cid = max(int(k) for k in cent_parsed)
-            centroids = np.zeros((max_cid + 1, 2), dtype=np.float32)
-            for k, v in cent_parsed.items():
-                centroids[int(k)] = [v[0], v[1]]
-        else:
-            unique = sorted(set(labels_arr.tolist()))
-            centroids = np.zeros((max(unique) + 1, 2), dtype=np.float32)
-            for cid in unique:
-                mask = labels_arr == cid
-                centroids[cid] = coords_2d[mask].mean(axis=0)
+        # Build names and centroids arrays
+        max_cid = max(int(k) for k in community_names)
+        names_list = [community_names.get(str(i), f"Cluster {i}")
+                      for i in range(max_cid + 1)]
+        centroids = np.zeros((max_cid + 1, 2), dtype=np.float32)
+        for cid_str, cent in community_centroids.items():
+            cid = int(cid_str)
+            if cid <= max_cid:
+                centroids[cid] = [cent[0], cent[1]]
 
-        return labels_arr, names_list, centroids
+        # Store natural level as the single cluster level
+        cluster_result['labels'][natural_k] = point_labels
+        cluster_result['names'][natural_k] = names_list
+        cluster_result['centroids'][natural_k] = centroids
 
-    has_dual = False
-    for cf in cluster_fields:
-        m = _cluster_re.match(cf)
-        lvl = int(m.group(1))
-        suffix = m.group(2)  # None, '2d', or '3d'
-
-        labels_arr, names_list, centroids = _load_cluster_level(
-            cf, lvl, suffix)
-
-        if suffix == '2d':
-            has_dual = True
-            cluster_result['labels_2d'][lvl] = labels_arr
-            cluster_result['names_2d'][lvl] = names_list
-            cluster_result['centroids_2d'][lvl] = centroids
-            # 2D is the default view
-            cluster_result['labels'][lvl] = labels_arr
-            cluster_result['names'][lvl] = names_list
-            cluster_result['centroids'][lvl] = centroids
-        elif suffix == '3d':
-            has_dual = True
-            cluster_result['labels_3d'][lvl] = labels_arr
-            cluster_result['names_3d'][lvl] = names_list
-            cluster_result['centroids_3d'][lvl] = centroids
-        else:
-            # Bare cluster_{k} — backward compat: populate both 2d and 3d
-            cluster_result['labels'][lvl] = labels_arr
-            cluster_result['names'][lvl] = names_list
-            cluster_result['centroids'][lvl] = centroids
-            cluster_result['labels_2d'][lvl] = labels_arr
-            cluster_result['names_2d'][lvl] = names_list
-            cluster_result['centroids_2d'][lvl] = centroids
-            cluster_result['labels_3d'][lvl] = labels_arr
-            cluster_result['names_3d'][lvl] = names_list
-            cluster_result['centroids_3d'][lvl] = centroids
-
-    # If no BIRCH clusters but tree labels exist, build from tree
-    if not cluster_fields:
-        for mk in sorted(data['metadata'].keys()):
-            if mk.startswith('tree_labels_depth_'):
-                tree_data = json.loads(data['metadata'][mk])
-                child_labels_map = tree_data.get('child_labels', {})
-                branch_labels_map = tree_data.get('branch_labels', {})
-
-                # Assign points to tree children
-                tree_struct = idx.get_tree_structure()
-                parent_of = {nd['node_id']: nd['parent_id']
-                             for nd in tree_struct}
-                leaf_nodes = [nd for nd in tree_struct if nd['is_leaf']]
-                labeled_nids = sorted(child_labels_map.keys(), key=int)
-                nid_to_cid = {int(nid): i
-                              for i, nid in enumerate(labeled_nids)}
-
-                labels_arr = np.full(n, -1, dtype=np.int32)
-                for ln in leaf_nodes:
-                    if ln['batch_index'] < 0:
-                        continue
-                    batch = idx.get_leaf(ln['batch_index'])
-                    item_idx = batch.column('item_index').to_numpy()
-                    nid = ln['node_id']
-                    while nid is not None:
-                        if str(nid) in child_labels_map:
-                            labels_arr[item_idx] = nid_to_cid[nid]
-                            break
-                        if str(nid) in branch_labels_map:
-                            if nid not in nid_to_cid:
-                                nid_to_cid[nid] = len(nid_to_cid)
-                                child_labels_map[str(nid)] = \
-                                    branch_labels_map[str(nid)]
-                            labels_arr[item_idx] = nid_to_cid[nid]
-                            break
-                        nid = parent_of.get(nid)
-
-                unassigned = labels_arr == -1
-                if unassigned.any():
-                    fb = max(nid_to_cid.values()) + 1
-                    labels_arr[unassigned] = fb
-                    child_labels_map[str(fb)] = "Other"
-                    nid_to_cid[-1] = fb
-
-                n_cls = len(set(labels_arr.tolist()))
-                names_list = [""] * (max(labels_arr) + 1)
-                for str_nid, cid in nid_to_cid.items():
-                    if cid < len(names_list):
-                        names_list[cid] = child_labels_map.get(
-                            str(str_nid), f"Cluster {cid}")
-
-                centroids = np.zeros((len(names_list), 2), dtype=np.float32)
-                for cid in range(len(names_list)):
-                    mask = labels_arr == cid
-                    if mask.any():
-                        centroids[cid] = coords_2d[mask].mean(axis=0)
-
-                # Store as the default cluster level
-                for lvl in [5, 12, 25, 50]:
-                    cluster_result['labels'][lvl] = labels_arr
-                    cluster_result['names'][lvl] = names_list
-                    cluster_result['centroids'][lvl] = centroids
-
-                print(f"  Built {n_cls} clusters from tree labels",
-                      file=sys.stderr)
-                break
+        print(f"  Loaded dendrogram: {natural_k} communities, "
+              f"Z={Z.shape[0]} merges", file=sys.stderr)
 
     # Edge pairs from metadata
     cluster_pairs = {}
@@ -223,42 +131,12 @@ def load_cache(dyf_path: str):
         for src, dst, weight in json.loads(edge_json):
             cluster_pairs[(src, dst)] = weight
 
-    # Path labels from cluster-tree DAG
-    path_labels = {}
-    for mk, mv in data['metadata'].items():
-        if mk.startswith('cluster_path_labels_') and mv:
-            # e.g. cluster_path_labels_25_2d → level 25
-            parts = mk.replace('cluster_path_labels_', '').split('_')
-            if parts:
-                try:
-                    lvl = int(parts[0])
-                    path_labels[lvl] = json.loads(mv)
-                except (ValueError, json.JSONDecodeError):
-                    pass
-    if path_labels:
-        print(f"  Loaded path labels for levels: {sorted(path_labels.keys())}",
-              file=sys.stderr)
-
-    # Cluster glyphs (size/purity indicators)
-    cluster_glyphs = {}
-    for mk, mv in data['metadata'].items():
-        if mk.startswith('cluster_glyphs_') and mv:
-            # e.g. cluster_glyphs_25_2d → level 25
-            parts = mk.replace('cluster_glyphs_', '').split('_')
-            if parts:
-                try:
-                    lvl = int(parts[0])
-                    cluster_glyphs[lvl] = json.loads(mv)
-                except (ValueError, json.JSONDecodeError):
-                    pass
-
     CACHE = {
         'titles': titles,
         'coords_2d': coords_2d,
         'cluster_result': cluster_result,
         'cluster_pairs': cluster_pairs,
-        'path_labels': path_labels,
-        'cluster_glyphs': cluster_glyphs,
+        'dendro_data': dendro_data,
     }
 
     # Also set DYF_INDEX for semantic search
@@ -376,8 +254,10 @@ def search_points(query: str, limit: int = 20) -> list[dict]:
                 'x': float(CACHE['coords_2d'][i, 0]),
                 'y': float(CACHE['coords_2d'][i, 1]),
             }
-            for level in _cluster_levels():
-                result[f'cluster_{level}'] = int(CACHE['cluster_result']['labels'][level][i])
+            # Add community ID from the natural level
+            levels = _cluster_levels()
+            if levels:
+                result['community_id'] = int(CACHE['cluster_result']['labels'][levels[0]][i])
             results.append(result)
             if len(results) >= limit:
                 break
@@ -394,7 +274,6 @@ def get_cluster_info(level: int = None) -> list[dict]:
     labels = CACHE['cluster_result']['labels'][level]
     names = CACHE['cluster_result']['names'][level]
     centroids = CACHE['cluster_result']['centroids'][level]
-    level_path_labels = CACHE.get('path_labels', {}).get(level, {})
 
     clusters = []
     unique_ids = sorted(set(int(x) for x in labels))
@@ -413,15 +292,6 @@ def get_cluster_info(level: int = None) -> list[dict]:
             'centroid_x': cx,
             'centroid_y': cy,
         }
-        # Include path label from cluster-tree DAG if available
-        pl = level_path_labels.get(str(i), "")
-        if pl:
-            entry['path_label'] = pl
-        # Include glyphs (size/purity indicators) if available
-        level_glyphs = CACHE.get('cluster_glyphs', {}).get(level, {})
-        gly = level_glyphs.get(str(i))
-        if gly:
-            entry['glyphs'] = gly
         clusters.append(entry)
 
     return sorted(clusters, key=lambda c: -c['count'])
@@ -1144,5 +1014,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    import asyncio
     asyncio.run(main())

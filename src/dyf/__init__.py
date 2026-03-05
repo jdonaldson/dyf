@@ -82,6 +82,7 @@ try:
     from .lazy_index import (
         LazyIndex, write_lazy_index, rewrite_lazy_index,
         from_faiss, SearchResult,
+        ExtractedData, StoredFieldValue, StoredFieldInput, TreeNode,
     )
     _HAS_LAZY = True
 except ImportError:
@@ -91,6 +92,10 @@ except ImportError:
     rewrite_lazy_index = None
     from_faiss = None
     SearchResult = None
+    ExtractedData = None
+    StoredFieldValue = None
+    StoredFieldInput = None
+    TreeNode = None
 
 # Fisher dimension weighting
 from .fisher import (
@@ -145,7 +150,7 @@ from .cluster_tree import (
 )
 
 # Tree-leaf agglomeration
-from .agglomerate import agglomerate_tree_leaves, louvain_cluster_leaves, merge_to_max_k
+from .agglomerate import agglomerate_tree_leaves, louvain_cluster_leaves, merge_to_max_k, LouvainHierarchy
 
 # Spatial cluster coloring
 from .colors import spatial_rgb_map, spatial_color_map, tree_rgb_map
@@ -273,6 +278,10 @@ __all__ = [
     "rewrite_lazy_index",
     "from_faiss",
     "SearchResult",
+    "ExtractedData",
+    "StoredFieldValue",
+    "StoredFieldInput",
+    "TreeNode",
     # Fisher dimension weighting
     "compute_fisher_weights",
     "apply_fisher_weights",
@@ -314,6 +323,7 @@ __all__ = [
     "agglomerate_tree_leaves",
     "louvain_cluster_leaves",
     "merge_to_max_k",
+    "LouvainHierarchy",
     # Spatial cluster coloring
     "spatial_rgb_map",
     "spatial_color_map",

@@ -18,6 +18,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from dyf.lazy_index import TreeNode
+
 # English stop words (compact set covering common function words)
 _ENGLISH_STOP = frozenset({
     'the', 'a', 'an', 'of', 'in', 'on', 'at', 'to', 'for', 'and', 'or',
@@ -292,7 +294,7 @@ def label_clusters_frequency(
 
 def compute_split_keywords(
     titles: list[str],
-    tree: list[dict],
+    tree: list[TreeNode],
     leaf_batches: dict[int, np.ndarray],
     children_map: dict[int, list[int]],
     *,
@@ -487,7 +489,7 @@ def compute_split_keywords(
 def compute_embedding_keywords(
     titles: list[str],
     embeddings: np.ndarray,
-    tree: list[dict],
+    tree: list[TreeNode],
     leaf_batches: dict[int, np.ndarray],
     children_map: dict[int, list[int]],
     hyperplanes: dict[int, np.ndarray],
@@ -701,7 +703,7 @@ def _check_bigram_needed(
 def format_split_path(
     item_index: int,
     split_keywords: dict,
-    tree: list[dict],
+    tree: list[TreeNode],
     leaf_batches: dict[int, np.ndarray],
     children_map: dict[int, list[int]],
     *,

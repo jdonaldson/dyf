@@ -8,7 +8,25 @@ individual points to their nearest bucket centroid to clean up impure leaves.
 
 from __future__ import annotations
 
+from typing import TypedDict
+
 import numpy as np
+
+
+class LouvainHierarchy(TypedDict):
+    """Return type for compute_louvain_hierarchy()."""
+    point_labels: np.ndarray                    # int32 (N,)
+    leaf_to_community: dict[int, int]
+    community_sizes: dict[int, int]
+    Z: np.ndarray                               # (k-1, 4) float64
+    unique_community_ids: list[int]
+    leaf_item_map: dict[int, list[int]]
+    natural_k: int
+    resolution: float
+    centroid_dist: np.ndarray                   # float32 (N,)
+    nearest_other_dist: np.ndarray              # float32 (N,)
+    community_cohesion: dict[int, float]
+    community_embedding_centroids: np.ndarray   # float32 (k, D)
 
 
 def _collect_leaf_data(idx):
@@ -183,6 +201,215 @@ def merge_to_max_k(point_labels, embeddings, max_k=12):
     n_merged = len(set(merged.tolist()))
     print(f"    Merged {current_k} → {n_merged} communities (max_k={max_k})")
     return merged
+
+
+def _compute_community_linkage(point_labels, embeddings):
+    """Compute linkage matrix Z over community centroids.
+
+    Returns the scipy linkage matrix Z where each row is
+    [community_a, community_b, distance, merged_size].
+    Community IDs in Z are 0-based indices into the sorted unique community list.
+
+    Args:
+        point_labels: int32 array (N,) of community IDs.
+        embeddings: (N, D) embedding matrix (float32).
+
+    Returns:
+        Tuple of (Z, unique_ids, centroids) where Z is (k-1, 4) float64
+        array, unique_ids is the sorted list of original community IDs,
+        and centroids is (k, D) float32 array of per-community mean
+        embeddings.
+    """
+    from scipy.cluster.hierarchy import linkage
+
+    unique_ids = sorted(set(point_labels.tolist()))
+    k = len(unique_ids)
+    dim = embeddings.shape[1]
+
+    centroids = np.zeros((k, dim), dtype=np.float32)
+    id_to_idx = {gid: i for i, gid in enumerate(unique_ids)}
+    for gid in unique_ids:
+        mask = point_labels == gid
+        centroids[id_to_idx[gid]] = embeddings[mask].mean(axis=0)
+
+    norms = np.linalg.norm(centroids, axis=1, keepdims=True)
+    norms[norms == 0] = 1.0
+    centroids_normed = centroids / norms
+
+    Z = linkage(centroids_normed, method='complete')
+    return Z, unique_ids, centroids
+
+
+def compute_louvain_hierarchy(idx, coords, embeddings, leaf_k=10,
+                               similarity_threshold=0.5, resolution=1.0) -> LouvainHierarchy | None:
+    """Compute Louvain communities with dendrogram for continuous cluster slider.
+
+    Returns the three artifacts needed for the dendrogram-based slider:
+    1. leaf_communities: mapping from Louvain community → leaf indices
+    2. dendrogram Z: scipy linkage matrix over community centroids
+    3. leaf_item_map: mapping from tree leaf → item indices
+
+    Args:
+        idx: An open ``LazyIndex`` handle.
+        coords: (N, 2-or-3) UMAP coordinates for every item.
+        embeddings: (N, D) embedding matrix (float32).
+        leaf_k: Number of nearest neighbors per leaf centroid (default 10).
+        similarity_threshold: Minimum cosine similarity to keep an edge
+            (default 0.5).
+        resolution: Louvain resolution parameter (default 1.0).
+
+    Returns:
+        Dict with keys:
+            ``point_labels``: int32 array (N,) of community IDs (0-based).
+            ``leaf_to_community``: dict {leaf_idx: community_id}.
+            ``community_sizes``: dict {community_id: int}.
+            ``Z``: (k-1, 4) linkage matrix.
+            ``unique_community_ids``: sorted list of community IDs.
+            ``leaf_item_map``: dict {leaf_idx: list of item indices}.
+            ``natural_k``: int, number of natural communities.
+            ``resolution``: float, Louvain resolution used.
+
+        Returns ``None`` when the tree has fewer than two leaves.
+    """
+    import networkx as nx
+    from sklearn.neighbors import NearestNeighbors
+
+    result = _collect_leaf_data(idx)
+    if result is None:
+        return None
+
+    leaves, leaf_centroids, leaf_point_indices, _tree = result
+    n_points = coords.shape[0]
+
+    centroids = np.vstack(leaf_centroids).astype(np.float32)
+
+    # L2-normalize centroids for cosine similarity
+    norms = np.linalg.norm(centroids, axis=1, keepdims=True)
+    norms[norms == 0] = 1.0
+    centroids_normed = centroids / norms
+
+    # KNN on normalized centroids
+    k = min(leaf_k, len(centroids_normed) - 1)
+    if k < 1:
+        k = 1
+    nn = NearestNeighbors(n_neighbors=k + 1, metric='cosine')
+    nn.fit(centroids_normed)
+    distances, indices = nn.kneighbors(centroids_normed)
+
+    # Build graph: edge if cosine similarity > threshold
+    G = nx.Graph()
+    G.add_nodes_from(range(len(centroids_normed)))
+    for i in range(len(centroids_normed)):
+        for j_pos in range(1, distances.shape[1]):
+            j = indices[i, j_pos]
+            sim = 1.0 - distances[i, j_pos]
+            if sim > similarity_threshold:
+                G.add_edge(i, j, weight=sim)
+
+    # Louvain community detection
+    communities = nx.community.louvain_communities(
+        G, weight='weight', resolution=resolution, seed=42)
+
+    # Map communities → leaf labels (0-based)
+    leaf_labels = np.full(len(centroids_normed), -1, dtype=np.int32)
+    for comm_id, members in enumerate(communities):
+        for leaf_idx in members:
+            leaf_labels[leaf_idx] = comm_id
+
+    # Handle isolated nodes
+    isolated = leaf_labels == -1
+    if isolated.any():
+        next_id = leaf_labels.max() + 1
+        for i in np.where(isolated)[0]:
+            leaf_labels[i] = next_id
+            next_id += 1
+
+    n_communities = len(set(leaf_labels.tolist()))
+    print(f"    Louvain found {n_communities} communities "
+          f"from {len(leaves)} leaves (k={k}, res={resolution})")
+
+    # Map points -> leaf -> community
+    point_labels = np.full(n_points, -1, dtype=np.int32)
+    for leaf_idx, item_ids in enumerate(leaf_point_indices):
+        group_id = int(leaf_labels[leaf_idx])
+        valid = item_ids < n_points
+        point_labels[item_ids[valid]] = group_id
+
+    # Handle unassigned points
+    unassigned = point_labels == -1
+    if unassigned.any():
+        max_id = point_labels.max() + 1
+        point_labels[unassigned] = max_id
+
+    # Point-level reassignment pass
+    point_labels = _reassign_points(point_labels, embeddings)
+
+    # Build leaf_to_community mapping
+    leaf_to_community = {}
+    for leaf_idx in range(len(leaf_labels)):
+        leaf_to_community[leaf_idx] = int(leaf_labels[leaf_idx])
+
+    # Build leaf_item_map: leaf_idx → list of item indices
+    leaf_item_map = {}
+    for leaf_idx, item_ids in enumerate(leaf_point_indices):
+        leaf_item_map[leaf_idx] = item_ids.tolist()
+
+    # Compute community sizes from final point labels
+    community_sizes = {}
+    for cid in sorted(set(point_labels.tolist())):
+        community_sizes[cid] = int((point_labels == cid).sum())
+
+    # Compute linkage dendrogram over community centroids
+    Z, unique_ids, community_centroids_emb = _compute_community_linkage(
+        point_labels, embeddings)
+
+    # Per-point metrics: cosine distance to own centroid and nearest other
+    # Normalize embeddings and centroids for cosine via dot product
+    emb_norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+    emb_norms[emb_norms == 0] = 1.0
+    emb_normed = embeddings / emb_norms
+
+    cen_norms = np.linalg.norm(community_centroids_emb, axis=1, keepdims=True)
+    cen_norms[cen_norms == 0] = 1.0
+    cen_normed = community_centroids_emb / cen_norms
+
+    # (N, k) cosine similarity matrix
+    sim_matrix = emb_normed @ cen_normed.T
+
+    id_to_idx = {gid: i for i, gid in enumerate(unique_ids)}
+    own_idx = np.array([id_to_idx[int(c)] for c in point_labels], dtype=np.int32)
+
+    # Cosine distance to own centroid
+    own_sim = sim_matrix[np.arange(len(point_labels)), own_idx]
+    centroid_dist = (1.0 - own_sim).astype(np.float32)
+
+    # Nearest OTHER centroid distance
+    # Mask own centroid with -inf, then take max similarity
+    masked_sim = sim_matrix.copy()
+    masked_sim[np.arange(len(point_labels)), own_idx] = -np.inf
+    nearest_other_sim = masked_sim.max(axis=1)
+    nearest_other_dist = (1.0 - nearest_other_sim).astype(np.float32)
+
+    # Community cohesion: mean centroid_dist per community
+    community_cohesion = {}
+    for cid in unique_ids:
+        mask = point_labels == cid
+        community_cohesion[cid] = float(centroid_dist[mask].mean())
+
+    return {
+        'point_labels': point_labels,
+        'leaf_to_community': leaf_to_community,
+        'community_sizes': community_sizes,
+        'Z': Z,
+        'unique_community_ids': unique_ids,
+        'leaf_item_map': leaf_item_map,
+        'natural_k': n_communities,
+        'resolution': resolution,
+        'centroid_dist': centroid_dist,
+        'nearest_other_dist': nearest_other_dist,
+        'community_cohesion': community_cohesion,
+        'community_embedding_centroids': community_centroids_emb,
+    }
 
 
 def agglomerate_tree_leaves(idx, coords, embeddings, n_groups=50):

@@ -618,6 +618,96 @@ class TestRewriteLazyIndex:
                 os.unlink(path)
 
 
+    def test_rewrite_drop_fields(self):
+        """drop_fields removes specified stored fields during rewrite."""
+        from dyf import build_dyf_tree
+        from dyf.lazy_index import write_lazy_index, rewrite_lazy_index, LazyIndex
+
+        n = 60
+        embeddings = _make_clustered_embeddings(
+            n_clusters=3, points_per_cluster=20, dim=16, seed=42)
+        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2,
+                              min_leaf_size=4, seed=42)
+
+        rng = np.random.default_rng(42)
+        sf = {
+            'field_a': rng.standard_normal(n).astype(np.float32),
+            'field_b': rng.standard_normal(n).astype(np.float32),
+            'field_c': rng.standard_normal(n).astype(np.float32),
+        }
+
+        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+            path = f.name
+        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+            out_path = f.name
+
+        try:
+            write_lazy_index(tree, embeddings, path, quantization='float32',
+                             stored_fields=sf)
+
+            rewrite_lazy_index(
+                path,
+                drop_fields={'field_b'},
+                output_path=out_path,
+            )
+
+            with LazyIndex(out_path) as idx:
+                data = idx.extract_all_fields()
+                assert 'field_a' in data['fields']
+                assert 'field_b' not in data['fields']
+                assert 'field_c' in data['fields']
+                assert np.allclose(data['fields']['field_a'],
+                                   sf['field_a'], atol=1e-6)
+                assert np.allclose(data['fields']['field_c'],
+                                   sf['field_c'], atol=1e-6)
+        finally:
+            for p in (path, out_path):
+                if os.path.exists(p):
+                    os.unlink(p)
+
+    def test_rewrite_drop_and_add_fields(self):
+        """drop_fields applies after merge so new fields can replace old."""
+        from dyf import build_dyf_tree
+        from dyf.lazy_index import write_lazy_index, rewrite_lazy_index, LazyIndex
+
+        n = 60
+        embeddings = _make_clustered_embeddings(
+            n_clusters=3, points_per_cluster=20, dim=16, seed=42)
+        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2,
+                              min_leaf_size=4, seed=42)
+
+        rng = np.random.default_rng(42)
+        sf = {
+            'old_field': rng.standard_normal(n).astype(np.float32),
+            'keep_field': rng.standard_normal(n).astype(np.float32),
+        }
+        new_field = rng.standard_normal(n).astype(np.float32)
+
+        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+            path = f.name
+
+        try:
+            write_lazy_index(tree, embeddings, path, quantization='float32',
+                             stored_fields=sf)
+
+            rewrite_lazy_index(
+                path,
+                new_stored_fields={'new_field': new_field},
+                drop_fields={'old_field'},
+            )
+
+            with LazyIndex(path) as idx:
+                data = idx.extract_all_fields()
+                assert 'old_field' not in data['fields']
+                assert 'keep_field' in data['fields']
+                assert 'new_field' in data['fields']
+                assert np.allclose(data['fields']['new_field'],
+                                   new_field, atol=1e-6)
+        finally:
+            if os.path.exists(path):
+                os.unlink(path)
+
+
 @lazy_deps
 class TestDetectEnrichmentLevel:
     """Test enrichment level detection."""
@@ -696,6 +786,67 @@ class TestDetectEnrichmentLevel:
 
         try:
             write_lazy_index(tree, embeddings, path, stored_fields=sf)
+            with LazyIndex(path) as idx:
+                assert idx.detect_enrichment_level() == 2
+        finally:
+            if os.path.exists(path):
+                os.unlink(path)
+
+    def test_level_2_community_id(self):
+        """Index with community_id stored field returns level 2."""
+        from dyf import build_dyf_tree
+        from dyf.lazy_index import write_lazy_index, LazyIndex
+
+        n = 40
+        embeddings = _make_clustered_embeddings(
+            n_clusters=2, points_per_cluster=20, dim=8, seed=42)
+        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2,
+                              min_leaf_size=4, seed=42)
+
+        rng = np.random.default_rng(42)
+        sf = {
+            'umap_x': rng.standard_normal(n).astype(np.float32),
+            'umap_y': rng.standard_normal(n).astype(np.float32),
+            'umap_z': rng.standard_normal(n).astype(np.float32),
+            'community_id': np.array([i % 5 for i in range(n)],
+                                     dtype=np.int32),
+        }
+
+        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+            path = f.name
+
+        try:
+            write_lazy_index(tree, embeddings, path, stored_fields=sf)
+            with LazyIndex(path) as idx:
+                assert idx.detect_enrichment_level() == 2
+        finally:
+            if os.path.exists(path):
+                os.unlink(path)
+
+    def test_level_2_louvain_metadata(self):
+        """Index with louvain_dendrogram metadata returns level 2."""
+        from dyf import build_dyf_tree
+        from dyf.lazy_index import write_lazy_index, LazyIndex
+
+        n = 40
+        embeddings = _make_clustered_embeddings(
+            n_clusters=2, points_per_cluster=20, dim=8, seed=42)
+        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2,
+                              min_leaf_size=4, seed=42)
+
+        rng = np.random.default_rng(42)
+        sf = {
+            'umap_x': rng.standard_normal(n).astype(np.float32),
+            'umap_y': rng.standard_normal(n).astype(np.float32),
+            'umap_z': rng.standard_normal(n).astype(np.float32),
+        }
+
+        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+            path = f.name
+
+        try:
+            write_lazy_index(tree, embeddings, path, stored_fields=sf,
+                             metadata={'louvain_dendrogram': '{}'})
             with LazyIndex(path) as idx:
                 assert idx.detect_enrichment_level() == 2
         finally:

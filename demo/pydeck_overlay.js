@@ -23,11 +23,9 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
   if (sessionEl) sessionEl.textContent = "Session: " + sessionId;
 
   // ── Multi-level cluster metadata and color functions ──────────────
-  var clusterMeta;
-  if (dd) { clusterMeta = dd.clusterMeta; }
-  else { clusterMeta = __CLUSTER_META_JSON__; }
-  var currentLevelKey = clusterMeta ? clusterMeta["default"] : null;
-  var defaultLevelKey = currentLevelKey;  // edges/tour only at this level
+  var clusterMeta = null;  // legacy: unused in dendrogram mode
+  var currentLevelKey = "dendro";
+  var defaultLevelKey = "dendro";
 
   // HLS→RGB for color map generation; precomputed spatial maps preferred,
   // golden ratio fallback when no precomputed map exists for a level
@@ -49,13 +47,12 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
     ];
   }
   function buildColorMap(uniqueCids, levelKey) {
-    // Use precomputed spatial color map if available for this level
-    if (levelKey && clusterMeta && clusterMeta.colorMaps && clusterMeta.colorMaps[levelKey]) {
-      var pre = clusterMeta.colorMaps[levelKey];
+    // Use dendrogram community colors if available
+    if (_communityColors && Object.keys(_communityColors).length > 0) {
       var map = {};
       for (var i = 0; i < uniqueCids.length; i++) {
         var cid = uniqueCids[i];
-        map[cid] = pre[String(cid)] || hlsToRgb((i * 0.618033988749895) % 1.0, 0.45, 0.6);
+        map[cid] = _communityColors[String(cid)] || hlsToRgb((i * 0.618033988749895) % 1.0, 0.45, 0.6);
       }
       return map;
     }
@@ -99,78 +96,273 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
   }
   var allPoints = new Array(_nPts);
 
-  var _mlCols = {};  // per-level cluster ID arrays (populated in multi-level mode)
+  // ── Dendrogram-based continuous cluster slider ────────────────────────
+  // The dendrogram stores ~50 leaf→community mappings + a merge linkage
+  // matrix. Cutting at any height yields any k from 1 to natural_k.
+  var _dendro = dd ? dd.dendrogram : null;
+  var _pointToCommunity = null;  // Int32Array(N): point → natural community ID
+  var _communityColors = {};     // {cid: [r,g,b]} for natural communities
+  var _communityNames = {};      // {cid: "name"} for natural communities
+  var _communityCentroids = {};  // {cid: [x,y,z]} for natural communities
+  var _communitySizes = {};      // {cid: int} for natural communities
+  var _dendroZ = null;           // linkage matrix (k-1 × 4)
+  var _naturalK = 0;
+  var _currentMergedIds = null;  // Int32Array(N): point → merged cluster ID at current cut
 
-  // Apply cluster IDs and colors from a specific level
-  var applyLevelColors = function(levelKey) {
-    var col = _mlCols[levelKey];
-    if (!col) return;
-    var uniqueCids = [];
-    var seen = {};
-    for (var i = 0; i < _nPts; i++) {
-      var c = col[i];
-      if (!(c in seen)) { seen[c] = true; uniqueCids.push(c); }
-    }
-    var cmap = buildColorMap(uniqueCids, levelKey);
-    for (var i = 0; i < _nPts; i++) {
-      var rgb = cmap[col[i]];
-      allPoints[i].r = rgb[0];
-      allPoints[i].g = rgb[1];
-      allPoints[i].b = rgb[2];
-      allPoints[i].cluster = col[i];
-    }
-  };
+  if (_dendro) {
+    _dendroZ = _dendro.Z;
+    _naturalK = _dendro.naturalK;
+    _communityColors = _dendro.communityColors || {};
+    _communityNames = _dendro.communityNames || {};
+    _communityCentroids = _dendro.communityCentroids || {};
+    _communitySizes = _dendro.communitySizes || {};
 
-  var _mlCols3d = {};  // per-level 3D cluster ID arrays (dual cluster mode)
-
-  if (clusterMeta) {
-    // Multi-level mode: decode per-level cluster IDs
-    if (dd && dd.clusterCols) {
-      // DYF mode: cluster columns provided directly
-      _mlCols = dd.clusterCols;
-      _mlCols3d = dd.clusterCols3d || {};
-    } else if (_pt) {
-      // IPC mode: extract from Arrow table
-      var _mlKeys = Object.keys(clusterMeta.levels);
-      _mlKeys.forEach(function(k) {
-        var col = _pt.getChild("cluster_" + k);
-        if (col) _mlCols[k] = col.toArray();
-      });
-      if (clusterMeta.hasDualClusters && clusterMeta.levels_3d) {
-        Object.keys(clusterMeta.levels_3d).forEach(function(k) {
-          var col3d = _pt.getChild("cluster_" + k + "_3d");
-          if (col3d) _mlCols3d[k] = col3d.toArray();
-        });
+    // Build point → community mapping: prefer community_id stored field
+    // (correct post-reassignment labels) over leaf-map reconstruction
+    if (_dendro.communityIds) {
+      _pointToCommunity = new Int32Array(_dendro.communityIds);
+    } else {
+      _pointToCommunity = new Int32Array(_nPts).fill(-1);
+      var lim = _dendro.leafItemMap;
+      var l2c = _dendro.leafToCommunity;
+      for (var leafIdx in lim) {
+        var commId = l2c[leafIdx];
+        if (commId === undefined) continue;
+        var items = lim[leafIdx];
+        for (var j = 0; j < items.length; j++) {
+          var itemIdx = items[j];
+          if (itemIdx < _nPts) _pointToCommunity[itemIdx] = commId;
+        }
       }
-      var _lshCol = _pt.getChild("cluster_lsh");
-      if (_lshCol) _mlCols["lsh"] = _lshCol.toArray();
+      // Handle unassigned (shouldn't happen but be safe)
+      for (var i = 0; i < _nPts; i++) {
+        if (_pointToCommunity[i] < 0) _pointToCommunity[i] = 0;
+      }
     }
 
-    // Store per-point cluster IDs for all levels
+    // Initialize points with natural community colors
+    var _uniqueNatural = [];
+    var _seenNat = {};
+    for (var i = 0; i < _nPts; i++) {
+      var c = _pointToCommunity[i];
+      if (!(c in _seenNat)) { _seenNat[c] = true; _uniqueNatural.push(c); }
+    }
+    for (var i = 0; i < _nPts; i++) {
+      var cid = _pointToCommunity[i];
+      var rgb = _communityColors[String(cid)] || [128, 128, 128];
+      allPoints[i] = {
+        x: _x[i], y: _y[i], z: 0,
+        r: rgb[0], g: rgb[1], b: rgb[2], a: _a[i],
+        title: _titles.get(i), cluster: cid,
+        clusters: {}
+      };
+    }
+    _currentMergedIds = new Int32Array(_pointToCommunity);  // start at natural k
+  } else {
+    // No dendrogram: grey points
     for (var _i = 0; _i < _nPts; _i++) {
-      var clusters = {};
-      for (var _mk in _mlCols) clusters[_mk] = _mlCols[_mk][_i];
       allPoints[_i] = {
         x: _x[_i], y: _y[_i], z: 0,
         r: 128, g: 128, b: 128, a: _a[_i],
         title: _titles.get(_i), cluster: 0,
-        clusters: clusters
+        clusters: {}
       };
     }
-    applyLevelColors(currentLevelKey);
-  } else {
-    // Single-level mode: colors baked in Arrow IPC
-    var _r = _pt.getChild("r").toArray();
-    var _g = _pt.getChild("g").toArray();
-    var _b = _pt.getChild("b").toArray();
-    var _clu = _pt.getChild("cluster").toArray();
-    for (var _i = 0; _i < _nPts; _i++) {
-      allPoints[_i] = {
-        x: _x[_i], y: _y[_i], z: 0,
-        r: _r[_i], g: _g[_i], b: _b[_i], a: _a[_i],
-        title: _titles.get(_i), cluster: _clu[_i]
-      };
+  }
+
+  // ── Union-Find for dendrogram cutting ──────────────────────────────────
+  function _ufFind(parent, x) {
+    while (parent[x] !== x) {
+      parent[x] = parent[parent[x]];  // path compression
+      x = parent[x];
     }
+    return x;
+  }
+
+  /**
+   * Cut the dendrogram at a given height.
+   * Returns: { mergedMap: {naturalCid → mergedGroupId}, k: numGroups }
+   */
+  function cutDendrogram(height) {
+    if (!_dendroZ || !_naturalK) return null;
+    var Z = _dendroZ;
+    var n = _naturalK;  // number of original communities
+
+    // Union-Find: nodes 0..n-1 are original communities,
+    // n..n+(n-2) are merge nodes
+    var totalNodes = n + Z.length;
+    var parent = new Int32Array(totalNodes);
+    var size = new Int32Array(totalNodes);
+    for (var i = 0; i < totalNodes; i++) { parent[i] = i; size[i] = 1; }
+
+    // Process merges up to height
+    for (var i = 0; i < Z.length; i++) {
+      if (Z[i][2] > height) continue;  // merge distance > cut height
+      var a = Math.round(Z[i][0]);
+      var b = Math.round(Z[i][1]);
+      var mergeNode = n + i;
+      var ra = _ufFind(parent, a);
+      var rb = _ufFind(parent, b);
+      parent[ra] = mergeNode;
+      parent[rb] = mergeNode;
+      size[mergeNode] = size[ra] + size[rb];
+    }
+
+    // Map each original community to its root
+    var roots = {};
+    var rootList = [];
+    var mergedMap = {};
+    for (var i = 0; i < n; i++) {
+      var root = _ufFind(parent, i);
+      if (!(root in roots)) {
+        roots[root] = rootList.length;
+        rootList.push(root);
+      }
+      mergedMap[i] = roots[root];
+    }
+    return { mergedMap: mergedMap, k: rootList.length };
+  }
+
+  /**
+   * Get merged colors: each merged group inherits the color of
+   * its largest child community.
+   */
+  function getMergedColors(mergedMap) {
+    // For each merged group, find the community with the largest size
+    var groupBest = {};  // {groupId: {cid, size}}
+    for (var cidStr in mergedMap) {
+      var cid = parseInt(cidStr);
+      var group = mergedMap[cidStr];
+      var sz = _communitySizes[String(cid)] || 0;
+      if (!(group in groupBest) || sz > groupBest[group].size) {
+        groupBest[group] = { cid: cid, size: sz };
+      }
+    }
+    var colors = {};
+    for (var gid in groupBest) {
+      colors[gid] = _communityColors[String(groupBest[gid].cid)] || [128, 128, 128];
+    }
+    return colors;
+  }
+
+  /**
+   * Get merged names: each merged group inherits the name of
+   * its largest child community.
+   */
+  function getMergedNames(mergedMap) {
+    var groupBest = {};
+    for (var cidStr in mergedMap) {
+      var cid = parseInt(cidStr);
+      var group = mergedMap[cidStr];
+      var sz = _communitySizes[String(cid)] || 0;
+      if (!(group in groupBest) || sz > groupBest[group].size) {
+        groupBest[group] = { cid: cid, size: sz };
+      }
+    }
+    var names = {};
+    for (var gid in groupBest) {
+      names[gid] = _communityNames[String(groupBest[gid].cid)] || ("Cluster " + gid);
+    }
+    return names;
+  }
+
+  /**
+   * Get merged centroids: weighted average of child community centroids.
+   */
+  function getMergedCentroids(mergedMap) {
+    var groupMembers = {};  // {groupId: [{cid, size, x, y, z}]}
+    for (var cidStr in mergedMap) {
+      var cid = parseInt(cidStr);
+      var group = mergedMap[cidStr];
+      var cent = _communityCentroids[String(cid)] || [0, 0, 0];
+      var sz = _communitySizes[String(cid)] || 0;
+      if (!groupMembers[group]) groupMembers[group] = [];
+      groupMembers[group].push({ x: cent[0], y: cent[1], z: cent[2] || 0, size: sz });
+    }
+    var centroids = {};
+    for (var gid in groupMembers) {
+      var members = groupMembers[gid];
+      var totalSize = 0, wx = 0, wy = 0, wz = 0;
+      for (var i = 0; i < members.length; i++) {
+        totalSize += members[i].size;
+        wx += members[i].x * members[i].size;
+        wy += members[i].y * members[i].size;
+        wz += members[i].z * members[i].size;
+      }
+      if (totalSize > 0) {
+        centroids[gid] = [wx / totalSize, wy / totalSize, wz / totalSize];
+      } else {
+        centroids[gid] = [0, 0, 0];
+      }
+    }
+    return centroids;
+  }
+
+  /**
+   * Apply a dendrogram cut: recolor all points and update labels.
+   * height=0 → natural k (no merging), height=maxHeight → k=1.
+   */
+  function applyDendrogramCut(height) {
+    if (!_dendro || !_pointToCommunity) return;
+
+    var cut;
+    if (height <= 0) {
+      // Natural k: identity mapping
+      cut = { mergedMap: {}, k: _naturalK };
+      // Identity: each community maps to itself
+      for (var cid in _communityNames) {
+        cut.mergedMap[cid] = parseInt(cid);
+      }
+    } else {
+      cut = cutDendrogram(height);
+      if (!cut) return;
+    }
+
+    var mergedColors = getMergedColors(cut.mergedMap);
+    var mergedNames = getMergedNames(cut.mergedMap);
+    var mergedCentroids = getMergedCentroids(cut.mergedMap);
+
+    // Compute merged sizes
+    var mergedSizes = {};
+    for (var cidStr in cut.mergedMap) {
+      var group = cut.mergedMap[cidStr];
+      var sz = _communitySizes[String(cidStr)] || 0;
+      mergedSizes[group] = (mergedSizes[group] || 0) + sz;
+    }
+
+    // Recolor points
+    for (var i = 0; i < _nPts; i++) {
+      var natCid = _pointToCommunity[i];
+      var mergedGroup = cut.mergedMap[String(natCid)];
+      if (mergedGroup === undefined) mergedGroup = natCid;
+      _currentMergedIds[i] = mergedGroup;
+      var rgb = mergedColors[mergedGroup] || [128, 128, 128];
+      allPoints[i].r = rgb[0];
+      allPoints[i].g = rgb[1];
+      allPoints[i].b = rgb[2];
+      allPoints[i].cluster = mergedGroup;
+    }
+
+    // Update labels
+    var newLabels = [];
+    for (var gid in mergedNames) {
+      var cent = mergedCentroids[gid] || [0, 0, 0];
+      newLabels.push({
+        cid: parseInt(gid),
+        text: mergedNames[gid],
+        x: cent[0], y: cent[1], z: cent[2] || 0,
+        size: mergedSizes[gid] || 0,
+        leaf_cids: [parseInt(gid)],
+      });
+    }
+    labels = newLabels;
+    labelLevels = {};
+    labelLevels["dendro"] = newLabels;
+    currentLevelKey = "dendro";
+
+    // Rebuild the cluster list and layer
+    rebuildClusterList();
+    rebuildLayer();
   }
 
   // Backup original Z for 3D toggle (points start flat in 2D)
@@ -213,11 +405,28 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
 
   var labels, labelLevels, edgePairs, tourNarration, tourCallouts;
   if (dd) {
-    labels = dd.labels || [];
-    labelLevels = dd.labelLevels || {};
     edgePairs = dd.edgePairs || [];
     tourNarration = dd.tourNarration || {};
     tourCallouts = dd.tourCallouts || {};
+    // Build initial labels from dendrogram natural communities
+    if (_dendro) {
+      var initLabels = [];
+      for (var cidStr in _communityNames) {
+        var cent = _communityCentroids[cidStr] || [0, 0, 0];
+        initLabels.push({
+          cid: parseInt(cidStr),
+          text: _communityNames[cidStr],
+          x: cent[0], y: cent[1], z: cent[2] || 0,
+          size: _communitySizes[cidStr] || 0,
+          leaf_cids: [parseInt(cidStr)],
+        });
+      }
+      labels = initLabels;
+      labelLevels = { "dendro": initLabels };
+    } else {
+      labels = [];
+      labelLevels = {};
+    }
   } else {
     labels = __LABEL_JSON__;
     labelLevels = __LEVELS_JSON__;
@@ -1581,18 +1790,14 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
   }
 
   // ── Multi-level label system ─────────────────────────────────────────
-  // When clusterMeta exists, populate labelLevels from it (the legacy
-  // levels_json may have mismatched keys like "22" instead of "25")
-  if (clusterMeta && clusterMeta.levels) {
-    labelLevels = {};
-    Object.keys(clusterMeta.levels).forEach(function(k) {
-      if (clusterMeta.levels[k].label_data) {
-        labelLevels[k] = clusterMeta.levels[k].label_data;
-      }
-    });
-  }
-  // Parse levels: keys are cluster counts (as strings), values are label arrays
-  var levelKeys = Object.keys(labelLevels).map(Number).sort(function(a,b) { return a - b; });
+  // Parse levels: keys are cluster level keys, values are label arrays
+  var levelKeys = Object.keys(labelLevels).map(function(k) {
+    return isNaN(Number(k)) ? k : Number(k);
+  }).sort(function(a,b) {
+    if (typeof a === "string") return 1;
+    if (typeof b === "string") return -1;
+    return a - b;
+  });
   // Master copy: all levels stay available for zoom-driven label display
   var allLabelLevels = {};
   var allLevelKeys = levelKeys.slice();
@@ -1803,14 +2008,7 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
     var cmap = buildColorMap(uniqueCids, currentLevelKey);
 
     // Get current label data
-    var curLabels = labels;  // fallback
-    if (clusterMeta && currentLevelKey) {
-      if (currentLevelKey === "lsh" && clusterMeta.lsh) {
-        curLabels = clusterMeta.lsh.label_data;
-      } else if (clusterMeta.levels[currentLevelKey]) {
-        curLabels = clusterMeta.levels[currentLevelKey].label_data;
-      }
-    }
+    var curLabels = labels;  // always uses the current dendrogram cut labels
 
     // Build name lookup from label_data
     var nameMap = {};
@@ -1869,118 +2067,65 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
     });
   }
 
-  // ── switchLevel: recolor all points and rebuild cluster list ──
+  // ── switchLevel: no-op for dendrogram mode (slider handles it) ──
   function switchLevel(key) {
-    if (!clusterMeta) return;
-    currentLevelKey = String(key);
-
-    // In dual cluster mode, use dimension-appropriate cluster columns
-    if (clusterMeta.hasDualClusters && currentLevelKey !== "lsh") {
-      var activeCols = (viewMode === "3d") ? _mlCols3d : _mlCols;
-      var col = activeCols[currentLevelKey];
-      if (col) {
-        var uniqueCids = [];
-        var seenC = {};
-        for (var i = 0; i < _nPts; i++) {
-          var c = col[i];
-          if (!(c in seenC)) { seenC[c] = true; uniqueCids.push(c); }
-        }
-        var cmap = buildColorMap(uniqueCids, currentLevelKey);
-        for (var i = 0; i < _nPts; i++) {
-          var rgb = cmap[col[i]];
-          allPoints[i].r = rgb[0];
-          allPoints[i].g = rgb[1];
-          allPoints[i].b = rgb[2];
-          allPoints[i].cluster = col[i];
-        }
-      }
-    } else {
-      applyLevelColors(currentLevelKey);
-    }
-
-    // Reset visibility state
-    hiddenClusters.clear();
-    isolatedCluster = null;
-
-    // Update label overlays from clusterMeta (dimension-aware)
-    if (currentLevelKey === "lsh" && clusterMeta.lsh) {
-      labels = clusterMeta.lsh.label_data;
-      labelLevels = {};
-      labelLevels[currentLevelKey] = clusterMeta.lsh.label_data;
-    } else {
-      var dimLevels = (clusterMeta.hasDualClusters && viewMode === "3d"
-                       && clusterMeta.levels_3d)
-                       ? clusterMeta.levels_3d : clusterMeta.levels;
-      if (dimLevels[currentLevelKey]) {
-        labels = dimLevels[currentLevelKey].label_data;
-        labelLevels = {};
-        labelLevels[currentLevelKey] = dimLevels[currentLevelKey].label_data;
-      }
-    }
-
-    // Re-derive levelKeys and zLevelsBackup for the new level set
-    levelKeys = Object.keys(labelLevels).map(function(k) {
-      return isNaN(Number(k)) ? k : Number(k);
-    }).sort(function(a,b) {
-      if (typeof a === "string") return 1;
-      if (typeof b === "string") return -1;
-      return a - b;
-    });
-    zLevelsBackup = {};
-    levelKeys.forEach(function(k) {
-      zLevelsBackup[k] = labelLevels[k].map(function(c) { return c.z || 0; });
-      if (viewMode === "2d") {
-        labelLevels[k].forEach(function(c) { c.z = 0; });
-      }
-    });
-
-    // Hide edges for non-default levels, restore for default
-    var isDefault = (currentLevelKey === defaultLevelKey);
-    var edgeCb = document.getElementById("toggle-edges");
-    if (!isDefault) {
-      edgesVisible = false;
-      if (edgeCb) edgeCb.checked = false;
-    } else {
-      edgesVisible = true;
-      if (edgeCb) edgeCb.checked = true;
-    }
-    var tourBtn = document.getElementById("tour-btn");
-    if (tourBtn) {
-      tourBtn.disabled = !isDefault;
-      tourBtn.style.opacity = isDefault ? "1" : "0.4";
-    }
-
-    // Update level button styles
-    var btns = document.querySelectorAll("#level-buttons .level-btn");
-    btns.forEach(function(btn) {
-      btn.classList.toggle("active", btn.dataset.level === currentLevelKey);
-    });
-
-    rebuildClusterList();
-    rebuildLayer();
+    // Dendrogram mode: no discrete level switching
+    // This function is retained for WebSocket/MCP command compatibility
+    if (_dendro) return;
   }
 
-  // ── Initialize level selector UI ──
+  // ── Initialize cluster slider UI (replaces discrete level buttons) ──
   (function() {
-    if (!clusterMeta) return;
+    if (!_dendro) return;
     var container = document.getElementById("level-selector");
     var btnContainer = document.getElementById("level-buttons");
     if (!container || !btnContainer) return;
     container.style.display = "block";
 
-    var lvlKeys = Object.keys(clusterMeta.levels).sort(function(a,b) {
-      return Number(a) - Number(b);
-    });
-    if (clusterMeta.lsh) lvlKeys.push("lsh");
+    // Clear any existing buttons
+    btnContainer.innerHTML = "";
 
-    lvlKeys.forEach(function(k) {
-      var btn = document.createElement("button");
-      btn.className = "level-btn" + (k === currentLevelKey ? " active" : "");
-      btn.dataset.level = k;
-      btn.textContent = (k === "lsh") ? "LSH" : k;
-      btn.addEventListener("click", function() { switchLevel(k); });
-      btnContainer.appendChild(btn);
+    // Compute max dendrogram height
+    var maxHeight = 0;
+    for (var i = 0; i < _dendroZ.length; i++) {
+      if (_dendroZ[i][2] > maxHeight) maxHeight = _dendroZ[i][2];
+    }
+
+    // Create slider container
+    var sliderWrap = document.createElement("div");
+    sliderWrap.style.cssText = "width:100%;";
+
+    var sliderLabel = document.createElement("div");
+    sliderLabel.style.cssText = "display:flex;justify-content:space-between;margin-bottom:4px;font-size:10px;opacity:0.6;";
+    var sliderLeft = document.createElement("span");
+    sliderLeft.textContent = _naturalK + " clusters";
+    var sliderRight = document.createElement("span");
+    sliderRight.id = "dendro-k-display";
+    sliderRight.textContent = "k=" + _naturalK;
+    sliderLabel.appendChild(sliderLeft);
+    sliderLabel.appendChild(sliderRight);
+
+    var slider = document.createElement("input");
+    slider.type = "range";
+    slider.id = "dendro-slider";
+    slider.min = "0";
+    slider.max = String(maxHeight * 1.01);  // slightly above max to allow k=1
+    slider.step = String(maxHeight / 200);
+    slider.value = "0";
+    slider.style.cssText = "width:100%;";
+
+    slider.addEventListener("input", function() {
+      var height = parseFloat(slider.value);
+      var cut = cutDendrogram(height);
+      var k = cut ? cut.k : _naturalK;
+      if (height <= 0) k = _naturalK;
+      sliderRight.textContent = "k=" + k;
+      applyDendrogramCut(height);
     });
+
+    sliderWrap.appendChild(sliderLabel);
+    sliderWrap.appendChild(slider);
+    btnContainer.appendChild(sliderWrap);
   })();
 
   rebuildClusterList();
@@ -2051,14 +2196,9 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
     if (_zoomLevelKey !== newKey) {
       _zoomLevelKey = newKey;
       currentLevelKey = String(newKey);
-      applyLevelColors(currentLevelKey);
+      // In dendrogram mode, slider controls coloring; no-op here
       rebuildLayer();
       rebuildClusterList();
-      // Update active state on level buttons if they exist
-      var btns = document.querySelectorAll(".level-btn");
-      btns.forEach(function(btn) {
-        btn.classList.toggle("active", btn.dataset.level === currentLevelKey);
-      });
     }
     return [newKey];
   }
@@ -2492,40 +2632,7 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
     if (sub) sub.textContent = (mode === "2d")
       ? "Scroll to zoom \u00b7 Drag to pan \u00b7 Hover for details"
       : "Scroll to zoom \u00b7 Drag to orbit \u00b7 Hover for details";
-    // ── Dual cluster swap FIRST (before any render) ──
-    if (clusterMeta && clusterMeta.hasDualClusters) {
-      // Re-apply cluster colors from the dimension-appropriate set
-      var swapCols = (mode === "3d") ? _mlCols3d : _mlCols;
-      var col = swapCols[currentLevelKey];
-      if (col) {
-        var uniqueCids = [];
-        var seenC = {};
-        for (var i = 0; i < _nPts; i++) {
-          var c = col[i];
-          if (!(c in seenC)) { seenC[c] = true; uniqueCids.push(c); }
-        }
-        var cmap = buildColorMap(uniqueCids, currentLevelKey);
-        for (var i = 0; i < _nPts; i++) {
-          var rgb = cmap[col[i]];
-          allPoints[i].r = rgb[0];
-          allPoints[i].g = rgb[1];
-          allPoints[i].b = rgb[2];
-          allPoints[i].cluster = col[i];
-        }
-      }
-      // Swap label overlays to dimension-appropriate clusterMeta
-      var dimLevels = (mode === "3d") ? clusterMeta.levels_3d : clusterMeta.levels;
-      if (dimLevels && dimLevels[currentLevelKey]) {
-        labels = dimLevels[currentLevelKey].label_data;
-        labelLevels = {};
-        labelLevels[currentLevelKey] = dimLevels[currentLevelKey].label_data;
-        levelKeys = [currentLevelKey];
-        zLevelsBackup = {};
-        zLevelsBackup[currentLevelKey] = labelLevels[currentLevelKey].map(
-          function(c) { return c.z || 0; });
-      }
-      rebuildClusterList();
-    }
+    // In dendrogram mode, colors are the same in 2D/3D — nothing to swap
 
     var dk = getDeck();
     if (!dk || !dk.setProps) return;
