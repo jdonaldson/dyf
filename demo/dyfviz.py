@@ -2069,24 +2069,29 @@ window.togglePanel = togglePanel;
 </script>
 """
 
-    # Read JS module from external file and inject data
+    # Inject data via window.__DYF_DATA__ then load overlay module
     _js_path = Path(__file__).parent / "pydeck_overlay.js"
     js_src = _js_path.read_text()
-    js_src = (js_src
-        .replace("__CLUSTER_META_JSON__", cluster_meta_json)
-        .replace("__POINTS_IPC_B64__", points_ipc_b64)
-        .replace("__EDGES_2D_IPC_B64__", edges_2d_ipc_b64)
-        .replace("__EDGES_3D_IPC_B64__", edges_3d_ipc_b64)
-        .replace("__LABEL_JSON__", label_json)
-        .replace("__LEVELS_JSON__", levels_json)
-        .replace("__EDGE_PAIRS_JSON__", edge_pairs_json)
-        .replace("__NARRATION_JSON__", narration_json)
-        .replace("__CALLOUTS_JSON__", callouts_json)
-        .replace("__AUDIO_JSON__", audio_json)
-        .replace("__TOUR_TITLE_JSON__",
-                 json.dumps(tour_title or "GUDID Medical Device Landscape"))
+    tour_title_json = json.dumps(tour_title or "GUDID Medical Device Landscape")
+    data_script = (
+        '<script>\n'
+        'window.__DYF_DATA__ = {\n'
+        f'  clusterMeta: {cluster_meta_json},\n'
+        f'  pointsIpcB64: "{points_ipc_b64}",\n'
+        f'  edges2dIpcB64: "{edges_2d_ipc_b64}",\n'
+        f'  edges3dIpcB64: "{edges_3d_ipc_b64}",\n'
+        f'  labels: {label_json},\n'
+        f'  labelLevels: {levels_json},\n'
+        f'  edgePairs: {edge_pairs_json},\n'
+        f'  tourNarration: {narration_json},\n'
+        f'  tourCallouts: {callouts_json},\n'
+        f'  tourAudio: {audio_json},\n'
+        f'  tourTitle: {tour_title_json},\n'
+        '};\n'
+        '</script>\n'
     )
     return (html_shell
+            + data_script
             + '<script type="module">\n' + js_src + '</script>\n'
             + '<!-- DYF_OVERLAY_END -->\n')
 

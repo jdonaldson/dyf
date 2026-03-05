@@ -18,6 +18,7 @@ Before embarking on lengthy computation (full-corpus embeddings, model retrainin
 - **Validate the problem exists first** — check a quick sample, eyeball the data, run a 5-minute smoke test
 - **Check if a simpler approach works** — structured metadata filtering (GMDN codes, product codes) often beats embeddings for thematic extraction
 - **Don't solve non-existent problems** — e.g., don't re-embed 2.7M records when a regex on category labels gets you 95% of the way there in 30 seconds
+- **Measure before optimizing** — e.g., zstd compression on .dyf files only saved 6% (float16 embeddings are near-random), but cost browser compatibility. Always check actual impact before assuming an optimization matters.
 - When in doubt, spend 10 minutes on a sanity check before spending 2 hours on a solution
 
 ## DAG-Oriented Task Flow

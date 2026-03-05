@@ -1,6 +1,8 @@
 import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+esm";
 
 (async function() {
+  var dd = window.__DYF_DATA__ || null;
+
   // ── Base64 → Uint8Array, then gzip decompress ─────────────────────
   function b64toBytes(b64) {
     var bin = atob(b64), n = bin.length, u8 = new Uint8Array(n);
@@ -21,7 +23,9 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
   if (sessionEl) sessionEl.textContent = "Session: " + sessionId;
 
   // ── Multi-level cluster metadata and color functions ──────────────
-  var clusterMeta = __CLUSTER_META_JSON__;
+  var clusterMeta;
+  if (dd) { clusterMeta = dd.clusterMeta; }
+  else { clusterMeta = __CLUSTER_META_JSON__; }
   var currentLevelKey = clusterMeta ? clusterMeta["default"] : null;
   var defaultLevelKey = currentLevelKey;  // edges/tour only at this level
 
@@ -65,14 +69,34 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
     return map;
   }
 
-  // ── Reconstruct point data from gzipped Arrow IPC ─────────────────
-  var _pt = tableFromIPC(await ungzip(b64toBytes("__POINTS_IPC_B64__")));
-  var _x = _pt.getChild("x").toArray();
-  var _y = _pt.getChild("y").toArray();
-  var _z = _pt.getChild("z").toArray();
-  var _a = _pt.getChild("a").toArray();
-  var _titles = _pt.getChild("title");
-  var _nPts = _pt.numRows;
+  // ── Reconstruct point data from DYF or gzipped Arrow IPC ──────────
+  var _pt, _x, _y, _z, _a, _titles, _nPts;
+  if (dd && dd.x) {
+    // DYF mode: typed arrays provided directly
+    _x = dd.x; _y = dd.y; _z = dd.z;
+    _nPts = dd.nPts;
+    _a = dd.a || new Uint8Array(_nPts).fill(255);
+    var _titlesArr = dd.titles || [];
+    _titles = { get: function(i) { return _titlesArr[i]; } };
+  } else if (dd && dd.pointsIpcB64) {
+    // Baked mode via __DYF_DATA__
+    _pt = tableFromIPC(await ungzip(b64toBytes(dd.pointsIpcB64)));
+    _x = _pt.getChild("x").toArray();
+    _y = _pt.getChild("y").toArray();
+    _z = _pt.getChild("z").toArray();
+    _a = _pt.getChild("a").toArray();
+    _titles = _pt.getChild("title");
+    _nPts = _pt.numRows;
+  } else {
+    // Legacy template mode
+    _pt = tableFromIPC(await ungzip(b64toBytes("__POINTS_IPC_B64__")));
+    _x = _pt.getChild("x").toArray();
+    _y = _pt.getChild("y").toArray();
+    _z = _pt.getChild("z").toArray();
+    _a = _pt.getChild("a").toArray();
+    _titles = _pt.getChild("title");
+    _nPts = _pt.numRows;
+  }
   var allPoints = new Array(_nPts);
 
   var _mlCols = {};  // per-level cluster ID arrays (populated in multi-level mode)
@@ -100,21 +124,27 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
   var _mlCols3d = {};  // per-level 3D cluster ID arrays (dual cluster mode)
 
   if (clusterMeta) {
-    // Multi-level mode: decode per-level cluster IDs, compute colors at runtime
-    var _mlKeys = Object.keys(clusterMeta.levels);
-    _mlKeys.forEach(function(k) {
-      var col = _pt.getChild("cluster_" + k);
-      if (col) _mlCols[k] = col.toArray();
-    });
-    // Decode 3D cluster columns if dual mode
-    if (clusterMeta.hasDualClusters && clusterMeta.levels_3d) {
-      Object.keys(clusterMeta.levels_3d).forEach(function(k) {
-        var col3d = _pt.getChild("cluster_" + k + "_3d");
-        if (col3d) _mlCols3d[k] = col3d.toArray();
+    // Multi-level mode: decode per-level cluster IDs
+    if (dd && dd.clusterCols) {
+      // DYF mode: cluster columns provided directly
+      _mlCols = dd.clusterCols;
+      _mlCols3d = dd.clusterCols3d || {};
+    } else if (_pt) {
+      // IPC mode: extract from Arrow table
+      var _mlKeys = Object.keys(clusterMeta.levels);
+      _mlKeys.forEach(function(k) {
+        var col = _pt.getChild("cluster_" + k);
+        if (col) _mlCols[k] = col.toArray();
       });
+      if (clusterMeta.hasDualClusters && clusterMeta.levels_3d) {
+        Object.keys(clusterMeta.levels_3d).forEach(function(k) {
+          var col3d = _pt.getChild("cluster_" + k + "_3d");
+          if (col3d) _mlCols3d[k] = col3d.toArray();
+        });
+      }
+      var _lshCol = _pt.getChild("cluster_lsh");
+      if (_lshCol) _mlCols["lsh"] = _lshCol.toArray();
     }
-    var _lshCol = _pt.getChild("cluster_lsh");
-    if (_lshCol) _mlCols["lsh"] = _lshCol.toArray();
 
     // Store per-point cluster IDs for all levels
     for (var _i = 0; _i < _nPts; _i++) {
@@ -166,17 +196,35 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
     }
     return { paths: paths, weights: weights };
   }
-  var _edges2d = await loadEdges("__EDGES_2D_IPC_B64__");
-  var _edges3d = await loadEdges("__EDGES_3D_IPC_B64__");
+  var _edges2d, _edges3d;
+  if (dd && dd.edges2d) {
+    _edges2d = dd.edges2d;
+    _edges3d = dd.edges3d || { paths: [], weights: [] };
+  } else if (dd) {
+    _edges2d = await loadEdges(dd.edges2dIpcB64 || "");
+    _edges3d = await loadEdges(dd.edges3dIpcB64 || "");
+  } else {
+    _edges2d = await loadEdges("__EDGES_2D_IPC_B64__");
+    _edges3d = await loadEdges("__EDGES_3D_IPC_B64__");
+  }
   var edgePaths2d = _edges2d.paths;
   var edgePaths3d = _edges3d.paths;
   var edgeWeights = _edges2d.weights.length ? _edges2d.weights : _edges3d.weights;
 
-  var labels = __LABEL_JSON__;
-  var labelLevels = __LEVELS_JSON__;
-  var edgePairs = __EDGE_PAIRS_JSON__;  // [[c1,c2], ...] matching edgePaths order
-  var tourNarration = __NARRATION_JSON__;  // cluster_id -> narration text for TTS
-  var tourCallouts = __CALLOUTS_JSON__;  // cluster_id -> {indices: [...], labels: [...]}
+  var labels, labelLevels, edgePairs, tourNarration, tourCallouts;
+  if (dd) {
+    labels = dd.labels || [];
+    labelLevels = dd.labelLevels || {};
+    edgePairs = dd.edgePairs || [];
+    tourNarration = dd.tourNarration || {};
+    tourCallouts = dd.tourCallouts || {};
+  } else {
+    labels = __LABEL_JSON__;
+    labelLevels = __LEVELS_JSON__;
+    edgePairs = __EDGE_PAIRS_JSON__;
+    tourNarration = __NARRATION_JSON__;
+    tourCallouts = __CALLOUTS_JSON__;
+  }
 
   // Build cluster centroid map from 3D catenary endpoints (exact cluster centroids).
   // For 2D mode we flatten z to 0 — x,y are the same in both modes since 2D just
@@ -629,7 +677,9 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
   }
 
   // ── Pre-rendered audio for tour narration ─────────────────────────
-  var tourAudio = __AUDIO_JSON__;  // cluster_id -> {data: base64, duration: ms}
+  var tourAudio;
+  if (dd) { tourAudio = dd.tourAudio || {}; }
+  else { tourAudio = __AUDIO_JSON__; }
   var audioContext = null;
   var currentAudioSource = null;
   var currentAudioDuration = 10000;  // duration of current clip in ms
@@ -1017,7 +1067,7 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
       // Handle intro (tourIndex == -1)
       if (tourIndex === -1) {
         if (!tourRunning || gen !== tourGeneration) return;
-        tourLabelEl.textContent = __TOUR_TITLE_JSON__;
+        tourLabelEl.textContent = dd ? (dd.tourTitle || "") : __TOUR_TITLE_JSON__;
         tourLabelEl.classList.add("hero");
         tourLabelEl.style.display = "block";
         document.getElementById("tour-edge-labels").style.display = "none";
@@ -1543,6 +1593,10 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
   }
   // Parse levels: keys are cluster counts (as strings), values are label arrays
   var levelKeys = Object.keys(labelLevels).map(Number).sort(function(a,b) { return a - b; });
+  // Master copy: all levels stay available for zoom-driven label display
+  var allLabelLevels = {};
+  var allLevelKeys = levelKeys.slice();
+  Object.keys(labelLevels).forEach(function(k) { allLabelLevels[k] = labelLevels[k]; });
   // Store z backups per level for 2D/3D toggle, then flatten for 2D init
   var zLevelsBackup = {};
   levelKeys.forEach(function(k) {
@@ -1551,9 +1605,9 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
   });
   // Level style classes: coarsest=coarse, finest=fine, middle=mid
   function levelClass(k) {
-    var idx = levelKeys.indexOf(k);
+    var idx = allLevelKeys.indexOf(k);
     if (idx === 0) return "level-coarse";
-    if (idx === levelKeys.length - 1) return "level-fine";
+    if (idx === allLevelKeys.length - 1) return "level-fine";
     return "level-mid";
   }
   // Pre-create a pool of reusable label DOM elements inside a container
@@ -1981,9 +2035,32 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
   // deck.gl OrbitView zoom ~5.5 default; higher = more zoomed in
   // Show one level at a time: coarse at default zoom, finer when zoomed in.
   // Separation scales inversely with zoom so more labels fit when zoomed in.
+  // Zoom-driven level switching: compute zoom thresholds from level count
+  // Evenly divide the zoom range [defaultZoom, defaultZoom+4] among levels.
+  // Returns a single-element array with the active level key for this zoom.
+  var _zoomLevelKey = null;  // track which level zoom has selected
   function getActiveLevels(zoom) {
-    // Always use current levelKeys (may be reassigned on level switch)
-    return levelKeys;
+    if (allLevelKeys.length <= 1) return allLevelKeys;
+    // Spread levels across zoom range: coarsest at default, finest at +4
+    var zRange = 4.0;
+    var step = zRange / allLevelKeys.length;
+    var idx = Math.floor((zoom - defaultZoom) / step);
+    idx = Math.max(0, Math.min(allLevelKeys.length - 1, idx));
+    var newKey = allLevelKeys[idx];
+    // If zoom crossed a level boundary, recolor points
+    if (_zoomLevelKey !== newKey) {
+      _zoomLevelKey = newKey;
+      currentLevelKey = String(newKey);
+      applyLevelColors(currentLevelKey);
+      rebuildLayer();
+      rebuildClusterList();
+      // Update active state on level buttons if they exist
+      var btns = document.querySelectorAll(".level-btn");
+      btns.forEach(function(btn) {
+        btn.classList.toggle("active", btn.dataset.level === currentLevelKey);
+      });
+    }
+    return [newKey];
   }
 
   // Label placement: project, cull off-screen, spatial separation
@@ -2010,7 +2087,7 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
     // Process levels coarsest first
     for (var li = 0; li < activeLevels.length; li++) {
       var lk = activeLevels[li];
-      var lvlLabels = labelLevels[lk];
+      var lvlLabels = allLabelLevels[lk] || labelLevels[lk];
       if (!lvlLabels) continue;
       var cls = levelClass(lk);
 

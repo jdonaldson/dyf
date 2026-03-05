@@ -153,7 +153,7 @@ def start_server(port=8766, static_dir="demo", open_browser=True, watch=False):
 
     if open_browser:
         # Try to open a default HTML file
-        for name in ["rog_3d_birch_clusters.html", "rog_3d_dyf_tree_clusters.html"]:
+        for name in ["dyf_viewer.html", "rog_3d_birch_clusters.html", "rog_3d_dyf_tree_clusters.html"]:
             if os.path.exists(os.path.join(static_dir, name)):
                 webbrowser.open(f"http://localhost:{port}/{name}")
                 break

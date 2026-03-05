@@ -1086,15 +1086,20 @@ def annotate_cluster_names(names, labels, embeddings,
 
 
 def enrich_cluster(dyf_path, n_clusters_list=None, model="gpt-oss:20b",
-                   output_path=None, force=False, domain=None):
-    """Add BIRCH cluster labels to a .dyf file (Level 1 → 2).
+                   output_path=None, force=False, domain=None,
+                   louvain=True, max_display_k=12):
+    """Add cluster labels to a .dyf file (Level 1 → 2).
+
+    Default mode uses Louvain community detection on tree-leaf centroids
+    to find natural cluster count, then merges to ≤max_display_k if needed.
+    Pass ``louvain=False`` for legacy BIRCH clustering with fixed k values.
 
     Label cache is stored in .dyf metadata under '_label_cache'.
 
     Args:
         dyf_path: Path to .dyf file (must be at least Level 1).
-        n_clusters_list: List of cluster counts, e.g. [12, 25, 50].
-            Defaults to [12, 25, 50].
+        n_clusters_list: List of cluster counts for BIRCH mode, e.g. [12, 25, 50].
+            Defaults to [12, 25, 50]. Only used when ``louvain=False``.
         model: Ollama model for LLM labeling.
         output_path: Output path (defaults to overwriting input).
         force: Re-run even if already at level 2+.
@@ -1102,13 +1107,22 @@ def enrich_cluster(dyf_path, n_clusters_list=None, model="gpt-oss:20b",
         domain: Domain description for LLM prompts (e.g.
             "handwritten digit images"). Falls back to .dyf metadata
             'domain' key, then generic "items".
+        louvain: Use Louvain community detection (default True).
+            When False, uses BIRCH with n_clusters_list.
+        max_display_k: Maximum clusters for display level when using
+            Louvain (default 12). If natural k > max_display_k, a
+            merged display level is also stored.
     """
     if n_clusters_list is None:
         n_clusters_list = [12, 25, 50]
 
-    print(f"\n=== Level 2: BIRCH Clustering ===")
+    mode_label = "Louvain" if louvain else "BIRCH"
+    print(f"\n=== Level 2: {mode_label} Clustering ===")
     print(f"  Input: {dyf_path}")
-    print(f"  Cluster levels: {n_clusters_list}")
+    if louvain:
+        print(f"  Mode: Louvain (max_display_k={max_display_k})")
+    else:
+        print(f"  Cluster levels: {n_clusters_list}")
 
     with LazyIndex(dyf_path) as idx:
         level = idx.detect_enrichment_level()
@@ -1179,35 +1193,37 @@ def enrich_cluster(dyf_path, n_clusters_list=None, model="gpt-oss:20b",
               f"title ratio={diversity.unique_title_ratio:.4f})")
         print(f"    Using frequency-based labeling (no LLM)")
 
-    # Cluster at each level — dual 2D/3D clustering
+    # Cluster — dual 2D/3D
     new_sf = {}
     new_meta = {}
-    cluster_2d = coords[:, :2]
-    cluster_3d = coords[:, :3]
 
-    for target_k in n_clusters_list:
-        # ── 2D clustering (primary — gets LLM labels) ──
-        print(f"\n  Clustering 2D at k={target_k}...")
-        birch_2d = fit_birch(cluster_2d, target_k)
-        labels_2d = birch_2d.predict(cluster_2d)
-        labels_2d = merge_tiny_clusters(labels_2d, cluster_2d)
-        n_2d = len(set(labels_2d.tolist()))
-        print(f"    2D: {n_2d} clusters after merge")
+    def _store_cluster_level(labels, target_k, coords_full):
+        """Store one cluster level: fields, centroids, labels, colors, DAG."""
+        new_sf[f'cluster_{target_k}_2d'] = labels.astype(np.int32)
+        new_sf[f'cluster_{target_k}_3d'] = labels.astype(np.int32)
 
-        new_sf[f'cluster_{target_k}_2d'] = labels_2d.astype(np.int32)
-
-        # 2D centroids (using full 3D coords for centroid positions)
+        # 2D centroids (from 2D coords)
         centroids_2d = {}
-        for cid in sorted(set(labels_2d.tolist())):
-            mask = labels_2d == cid
-            cent = coords[mask].mean(axis=0)
+        for cid in sorted(set(labels.tolist())):
+            mask = labels == cid
+            cent = coords_full[mask, :2].mean(axis=0)
             centroids_2d[cid] = [round(float(cent[0]), 4),
-                                 round(float(cent[1]), 4),
-                                 round(float(cent[2]), 4)]
+                                 round(float(cent[1]), 4), 0.0]
         new_meta[f'cluster_centroids_{target_k}_2d'] = json.dumps(
             centroids_2d)
 
-        # Build cluster-tree DAG for this cluster level (when tree available)
+        # 3D centroids (from full coords)
+        centroids_3d = {}
+        for cid in sorted(set(labels.tolist())):
+            mask = labels == cid
+            cent = coords_full[mask].mean(axis=0)
+            centroids_3d[cid] = [round(float(cent[0]), 4),
+                                 round(float(cent[1]), 4),
+                                 round(float(cent[2]), 4)]
+        new_meta[f'cluster_centroids_{target_k}_3d'] = json.dumps(
+            centroids_3d)
+
+        # Build cluster-tree DAG (when tree available)
         dag_path_labels = None
         dag_sibling_kw = None
         if tree_maps and split_kw_data:
@@ -1220,17 +1236,16 @@ def enrich_cluster(dyf_path, n_clusters_list=None, model="gpt-oss:20b",
                 tree_list, cmap_tree, lbatch_tree = tree_maps
                 dag = build_cluster_tree_dag(
                     tree_list, cmap_tree, lbatch_tree,
-                    labels_2d, target_k)
+                    labels, target_k)
                 dag_path_labels = derive_path_labels(
                     dag, split_kw_data, target_k)
                 dag_sibling_kw = compute_sibling_keywords(
                     dag, titles if isinstance(titles, list)
                     else list(titles),
-                    labels_2d, target_k)
+                    labels, target_k)
                 print(f"    Built cluster-tree DAG: "
                       f"{len(dag_path_labels)} path labels, "
                       f"{len(dag_sibling_kw)} sibling keyword sets")
-                # Store DAG and path labels in metadata
                 new_meta[f'cluster_tree_dag_{target_k}_2d'] = json.dumps(
                     dag.to_dict())
                 new_meta[f'cluster_path_labels_{target_k}_2d'] = json.dumps(
@@ -1238,13 +1253,13 @@ def enrich_cluster(dyf_path, n_clusters_list=None, model="gpt-oss:20b",
             except Exception as e:
                 print(f"    WARNING: cluster-tree DAG failed: {e}")
 
-        # Label 2D clusters
-        print(f"  Labeling 2D k={target_k} clusters...")
+        # Label clusters
+        print(f"  Labeling k={target_k} clusters...")
         if use_frequency_labels:
-            names_2d_raw = label_clusters_frequency(title_list, labels_2d)
+            names_raw = label_clusters_frequency(title_list, labels)
         else:
-            names_2d_raw = label_clusters(
-                titles, coords, labels_2d, embeddings,
+            names_raw = label_clusters(
+                titles, coords_full, labels, embeddings,
                 model=model, cache_data=label_cache_data,
                 cache_key=f"cluster_{target_k}_2d",
                 split_keywords=split_kw_data,
@@ -1252,62 +1267,66 @@ def enrich_cluster(dyf_path, n_clusters_list=None, model="gpt-oss:20b",
                 sibling_keywords=dag_sibling_kw,
                 domain=domain)
         label_cache_data[f"cluster_{target_k}_2d"] = {
-            str(k): v for k, v in names_2d_raw.items()}
-        names_2d, glyphs_2d = annotate_cluster_names(
-            names_2d_raw, labels_2d, embeddings)
-        new_meta[f'cluster_names_{target_k}_2d'] = json.dumps(
-            {str(k): v for k, v in names_2d.items()})
-        new_meta[f'cluster_glyphs_{target_k}_2d'] = json.dumps(
-            {str(k): v for k, v in glyphs_2d.items()})
+            str(k): v for k, v in names_raw.items()}
+        names, glyphs = annotate_cluster_names(
+            names_raw, labels, embeddings)
 
-        # ── 3D clustering (secondary — labels transferred) ──
-        print(f"  Clustering 3D at k={target_k}...")
-        birch_3d = fit_birch(cluster_3d, target_k)
-        labels_3d = birch_3d.predict(cluster_3d)
-        labels_3d = merge_tiny_clusters(labels_3d, cluster_3d)
-        n_3d = len(set(labels_3d.tolist()))
-        print(f"    3D: {n_3d} clusters after merge")
+        # Same names for 2D and 3D (same labels, different centroids)
+        for suffix in ('2d', '3d'):
+            new_meta[f'cluster_names_{target_k}_{suffix}'] = json.dumps(
+                {str(k): v for k, v in names.items()})
+            new_meta[f'cluster_glyphs_{target_k}_{suffix}'] = json.dumps(
+                {str(k): v for k, v in glyphs.items()})
 
-        new_sf[f'cluster_{target_k}_3d'] = labels_3d.astype(np.int32)
+        # Spatial color maps
+        rgb = spatial_rgb_map(labels.tolist(), embeddings)
+        for suffix in ('2d', '3d'):
+            new_meta[f'cluster_colors_{target_k}_{suffix}'] = json.dumps(
+                {str(k): v for k, v in rgb.items()})
+        print(f"    Stored cluster level k={target_k} "
+              f"({len(set(labels.tolist()))} clusters)")
 
-        # 3D centroids
-        centroids_3d = {}
-        for cid in sorted(set(labels_3d.tolist())):
-            mask = labels_3d == cid
-            cent = coords[mask].mean(axis=0)
-            centroids_3d[cid] = [round(float(cent[0]), 4),
-                                 round(float(cent[1]), 4),
-                                 round(float(cent[2]), 4)]
-        new_meta[f'cluster_centroids_{target_k}_3d'] = json.dumps(
-            centroids_3d)
+    if louvain:
+        # ── Louvain: natural communities from tree leaves ──
+        print(f"\n  Computing Louvain communities from tree leaves...")
+        from dyf.agglomerate import louvain_cluster_leaves, merge_to_max_k
+        with LazyIndex(dyf_path) as idx_agg:
+            point_labels, _, _, _, _ = \
+                louvain_cluster_leaves(idx_agg, coords, embeddings)
 
-        # Transfer 2D labels to 3D via majority vote (use raw names)
-        names_3d_raw = transfer_labels_majority_vote(
-            labels_2d, names_2d_raw, labels_3d)
-        names_3d, glyphs_3d = annotate_cluster_names(
-            names_3d_raw, labels_3d, embeddings)
-        new_meta[f'cluster_names_{target_k}_3d'] = json.dumps(
-            {str(k): v for k, v in names_3d.items()})
-        new_meta[f'cluster_glyphs_{target_k}_3d'] = json.dumps(
-            {str(k): v for k, v in glyphs_3d.items()})
+        if point_labels is None:
+            print("    Skipped: tree has fewer than 2 leaves")
+        else:
+            natural_k = len(set(point_labels.tolist()))
+            print(f"    Natural k = {natural_k}")
 
-        print(f"    Transferred labels to {n_3d} 3D clusters")
+            # Store natural level
+            _store_cluster_level(point_labels, natural_k, coords)
 
-        # Spatial color maps (embedding-derived hue ordering)
-        rgb_2d = spatial_rgb_map(labels_2d.tolist(), embeddings)
-        new_meta[f'cluster_colors_{target_k}_2d'] = json.dumps(
-            {str(k): v for k, v in rgb_2d.items()})
-        rgb_3d = spatial_rgb_map(labels_3d.tolist(), embeddings)
-        new_meta[f'cluster_colors_{target_k}_3d'] = json.dumps(
-            {str(k): v for k, v in rgb_3d.items()})
-        print(f"    Stored color maps for 2D ({len(rgb_2d)}) "
-              f"and 3D ({len(rgb_3d)}) clusters")
+            # If natural k exceeds display limit, create merged level
+            if natural_k > max_display_k:
+                display_labels = merge_to_max_k(
+                    point_labels, embeddings, max_display_k)
+                display_k = len(set(display_labels.tolist()))
+                print(f"    Display level: k={display_k}")
+                _store_cluster_level(display_labels, display_k, coords)
+    else:
+        # ── BIRCH fallback: fixed k values ──
+        cluster_2d = coords[:, :2]
+        for target_k in n_clusters_list:
+            print(f"\n  Clustering at k={target_k} (BIRCH)...")
+            birch_2d = fit_birch(cluster_2d, target_k)
+            labels_2d = birch_2d.predict(cluster_2d)
+            labels_2d = merge_tiny_clusters(labels_2d, cluster_2d)
+            n_2d = len(set(labels_2d.tolist()))
+            print(f"    {n_2d} clusters after merge")
+            _store_cluster_level(labels_2d, target_k, coords)
 
-    # ── LSH tree-leaf agglomeration (50 buckets) ──
-    print("\n  Computing agglomerated DYF tree buckets...")
-    from dyf.agglomerate import agglomerate_tree_leaves
+    # ── LSH tree-leaf agglomeration (50-bucket layer) ──
     from dyf.colors import tree_rgb_map
 
+    print("\n  Computing agglomerated DYF tree buckets...")
+    from dyf.agglomerate import agglomerate_tree_leaves
     with LazyIndex(dyf_path) as idx_agg:
         lsh_labels, lsh_names, lsh_label_data, item_leaf_map, tree_struct = \
             agglomerate_tree_leaves(idx_agg, coords, embeddings, n_groups=50)
@@ -1373,7 +1392,10 @@ def enrich_cluster(dyf_path, n_clusters_list=None, model="gpt-oss:20b",
             artifact_type="dyf",
             n_items=n,
             source_paths=[str(dyf_path)],
-            params={"n_clusters_list": n_clusters_list, "model": model},
+            params={"louvain": louvain,
+                    "max_display_k": max_display_k,
+                    "n_clusters_list": n_clusters_list,
+                    "model": model},
         )
     ))
 
@@ -1648,13 +1670,15 @@ def compute_bridge_edges(coords, embeddings, labels, n_clusters):
     return edge_pairs, edge_paths_2d
 
 
-def enrich_viz(dyf_path, cluster_level=25, model="gpt-oss:20b",
+def enrich_viz(dyf_path, cluster_level=None, model="gpt-oss:20b",
                title=None, output_path=None, force=False, domain=None):
     """Add bridge edges and tour narration (Level 2 → 3).
 
     Args:
         dyf_path: Path to .dyf file (must be at least Level 2).
         cluster_level: Which cluster_N level to use for edges/narration.
+            When None (default), auto-detects the smallest available
+            cluster level from the .dyf file.
         model: Ollama model for narration generation.
         title: Title for intro narration.
         output_path: Output path (defaults to overwriting input).
@@ -1693,6 +1717,32 @@ def enrich_viz(dyf_path, cluster_level=25, model="gpt-oss:20b",
         domain = data['metadata'].get('domain')
     if domain:
         print(f"  Domain: {domain}")
+
+    # Auto-detect cluster level if not specified
+    if cluster_level is None:
+        available = [
+            f for f in data['fields']
+            if re.match(r'cluster_\d+_2d$', f)
+        ]
+        if available:
+            cluster_level = min(
+                int(re.match(r'cluster_(\d+)', f).group(1))
+                for f in available)
+            print(f"  Auto-detected cluster_level={cluster_level}")
+        else:
+            # Fallback to bare cluster_N fields
+            available_bare = [
+                f for f in data['fields']
+                if re.match(r'cluster_\d+$', f)
+            ]
+            if available_bare:
+                cluster_level = min(
+                    int(re.match(r'cluster_(\d+)', f).group(1))
+                    for f in available_bare)
+                print(f"  Auto-detected cluster_level={cluster_level} (bare)")
+            else:
+                print("  ERROR: No cluster fields found in .dyf file.")
+                return
 
     # Try dual-cluster naming first (cluster_{k}_2d), fallback to bare
     cluster_field_2d = f'cluster_{cluster_level}_2d'
@@ -1953,10 +2003,11 @@ def main():
 
     # cluster
     p_clust = subparsers.add_parser(
-        "cluster", help="Level 1→2: Add BIRCH clusters + LLM labels")
+        "cluster", help="Level 1→2: Add cluster labels (Louvain default)")
     p_clust.add_argument("dyf_path", help="Path to .dyf file")
     p_clust.add_argument("--n-clusters", default="12,25,50",
-                         help="Comma-separated cluster counts (default: 12,25,50)")
+                         help="Comma-separated cluster counts for BIRCH mode "
+                              "(default: 12,25,50)")
     p_clust.add_argument("--model", default="gpt-oss:20b",
                          help="Ollama model for labeling")
     p_clust.add_argument("--force", action="store_true",
@@ -1964,14 +2015,20 @@ def main():
     p_clust.add_argument("--domain", default=None,
                          help="Domain description for LLM prompts "
                               "(overrides .dyf metadata)")
+    p_clust.add_argument("--birch", action="store_true",
+                         help="Use BIRCH clustering with fixed k values "
+                              "instead of Louvain (legacy mode)")
+    p_clust.add_argument("--max-display-k", type=int, default=12,
+                         help="Max clusters for display level in Louvain mode "
+                              "(default: 12)")
     p_clust.add_argument("-o", "--output", default=None)
 
     # viz
     p_viz = subparsers.add_parser(
         "viz", help="Level 2→3: Add bridge edges + narration")
     p_viz.add_argument("dyf_path", help="Path to .dyf file")
-    p_viz.add_argument("--cluster-level", type=int, default=25,
-                       help="Which cluster level for edges (default: 25)")
+    p_viz.add_argument("--cluster-level", type=int, default=None,
+                       help="Which cluster level for edges (default: auto-detect smallest)")
     p_viz.add_argument("--model", default="gpt-oss:20b")
     p_viz.add_argument("--title", default=None,
                        help="Title for intro narration")
@@ -2014,12 +2071,17 @@ def main():
     p_all = subparsers.add_parser(
         "all", help="Run all enrichment levels in sequence")
     p_all.add_argument("dyf_path", help="Path to .dyf file")
-    p_all.add_argument("--n-clusters", default="12,25,50")
+    p_all.add_argument("--n-clusters", default="12,25,50",
+                       help="Cluster counts for BIRCH mode")
     p_all.add_argument("--model", default="gpt-oss:20b")
     p_all.add_argument("--title", default=None)
     p_all.add_argument("--domain", default=None,
                        help="Domain description for LLM prompts "
                             "(overrides .dyf metadata)")
+    p_all.add_argument("--birch", action="store_true",
+                       help="Use BIRCH clustering instead of Louvain")
+    p_all.add_argument("--max-display-k", type=int, default=12,
+                       help="Max display clusters for Louvain mode (default: 12)")
     p_all.add_argument("--fisher-col", default=None,
                        help="Column name for Fisher dimension weighting")
     p_all.add_argument("--fisher-parquet", default=None,
@@ -2042,7 +2104,8 @@ def main():
         enrich_cluster(args.dyf_path, n_clusters_list=levels,
                        model=args.model,
                        output_path=args.output, force=args.force,
-                       domain=args.domain)
+                       domain=args.domain, louvain=not args.birch,
+                       max_display_k=args.max_display_k)
 
     elif args.command == "viz":
         enrich_viz(args.dyf_path, cluster_level=args.cluster_level,
@@ -2071,11 +2134,13 @@ def main():
                        fisher_col=getattr(args, 'fisher_col', None),
                        fisher_parquet=getattr(args, 'fisher_parquet', None),
                        diagnose_parquet=getattr(args, 'diagnose_parquet', None))
+        use_louvain = not args.birch
         enrich_cluster(out, n_clusters_list=levels,
                        model=args.model,
-                       output_path=out, domain=args.domain)
-        enrich_viz(out, cluster_level=levels[1] if len(levels) > 1
-                   else levels[0],
+                       output_path=out, domain=args.domain,
+                       louvain=use_louvain,
+                       max_display_k=args.max_display_k)
+        enrich_viz(out, cluster_level=None,
                    model=args.model, title=args.title, output_path=out,
                    domain=args.domain)
 
