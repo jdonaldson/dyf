@@ -16,6 +16,7 @@ from pathlib import Path
 import asyncio
 
 import numpy as np
+from scipy.cluster.hierarchy import fcluster
 import websockets
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
@@ -30,6 +31,7 @@ WS_URL = "ws://localhost:8766/ws"
 WS_CONN = None         # Persistent WebSocket connection to viz_server
 DYF_INDEX = None       # LazyIndex instance for semantic search
 EMBED_MODEL = None     # Lazy-loaded embedding model for semantic_search
+LOCKED_LEVEL = None    # When set, all cluster tools use this level
 
 
 def load_cache(dyf_path: str):
@@ -75,6 +77,7 @@ def load_cache(dyf_path: str):
         'labels': {}, 'names': {}, 'centroids': {},
     }
     dendro_data = None
+    natural_k = None
 
     if dendro_json and leaf_comm_json and leaf_item_json:
         dendro_data = json.loads(dendro_json)
@@ -137,6 +140,7 @@ def load_cache(dyf_path: str):
         'cluster_result': cluster_result,
         'cluster_pairs': cluster_pairs,
         'dendro_data': dendro_data,
+        'natural_k': natural_k,
     }
 
     # Also set DYF_INDEX for semantic search
@@ -223,28 +227,133 @@ def _format_search_results(result, include_coords=True) -> list[dict]:
 # Query Functions
 # -----------------------------------------------------------------------------
 
+def _natural_k() -> int:
+    """Return the natural cluster count from Louvain."""
+    if CACHE is None or CACHE.get('natural_k') is None:
+        return 12  # fallback before load
+    return CACHE['natural_k']
+
+
 def _cluster_levels():
-    """Return available cluster levels from loaded cache, sorted ascending."""
+    """Return cached cluster levels (informational, not a constraint)."""
     if CACHE is None:
         return (5, 12, 25, 50)  # fallback before load
     return tuple(sorted(CACHE['cluster_result']['labels'].keys()))
 
 
 def _default_level():
-    """Smallest available cluster level."""
-    levels = _cluster_levels()
-    return levels[0] if levels else 12
+    """Default cluster level (natural Louvain k)."""
+    return _natural_k()
 
 
 def _max_level():
-    """Largest available cluster level (finest granularity)."""
-    levels = _cluster_levels()
-    return levels[-1] if levels else 50
+    """Maximum cluster level (natural Louvain k)."""
+    return _natural_k()
+
+
+def _resolve_level(requested: int | None) -> int:
+    """Resolve the effective cluster level, respecting lock."""
+    if LOCKED_LEVEL is not None:
+        return LOCKED_LEVEL
+    if requested is not None:
+        return requested
+    return _natural_k()
+
+
+def cut_dendrogram(target_k: int) -> tuple[np.ndarray, list[str], np.ndarray] | None:
+    """Cut the dendrogram to target_k clusters.
+
+    Returns (point_labels, names_list, centroids_2d) or None on failure.
+    Results are cached in CACHE['cluster_result'].
+    """
+    if CACHE is None or CACHE['dendro_data'] is None:
+        return None
+
+    nk = _natural_k()
+
+    # Already cached?
+    if target_k in CACHE['cluster_result']['labels']:
+        return (
+            CACHE['cluster_result']['labels'][target_k],
+            CACHE['cluster_result']['names'][target_k],
+            CACHE['cluster_result']['centroids'][target_k],
+        )
+
+    if target_k < 1 or target_k > nk:
+        return None
+
+    Z = np.array(CACHE['dendro_data']['Z'])
+    community_names = CACHE['dendro_data']['community_names']
+    community_centroids = CACHE['dendro_data'].get('community_centroids', {})
+    community_sizes = CACHE['dendro_data'].get('community_sizes', {})
+
+    # fcluster returns 1-indexed labels for each of the nk communities
+    merged = fcluster(Z, target_k, criterion='maxclust')
+    merged = merged - 1  # 0-indexed
+
+    # Map points: each point's community_id -> merged group
+    natural_labels = CACHE['cluster_result']['labels'][nk]
+    point_labels = np.array([int(merged[c]) for c in natural_labels],
+                            dtype=np.int32)
+
+    # Build merged group info
+    group_children = {}  # group_id -> [(comm_id, size), ...]
+    for comm_id in range(nk):
+        group_id = int(merged[comm_id])
+        size = int(community_sizes.get(str(comm_id), 0))
+        group_children.setdefault(group_id, []).append((comm_id, size))
+
+    max_group = max(group_children.keys()) if group_children else 0
+    names_list = []
+    centroids_2d = np.zeros((max_group + 1, 2), dtype=np.float32)
+
+    for group_id in range(max_group + 1):
+        children = group_children.get(group_id, [])
+        if not children:
+            names_list.append(f"Cluster {group_id}")
+            continue
+        # Name from largest child community
+        children.sort(key=lambda x: -x[1])
+        largest_comm_id = children[0][0]
+        names_list.append(
+            community_names.get(str(largest_comm_id), f"Cluster {group_id}"))
+        # Centroid: size-weighted average of child centroids
+        total_size = sum(s for _, s in children)
+        if total_size > 0:
+            cx, cy = 0.0, 0.0
+            for comm_id, size in children:
+                cent = community_centroids.get(str(comm_id), [0.0, 0.0])
+                cx += cent[0] * size
+                cy += cent[1] * size
+            centroids_2d[group_id] = [cx / total_size, cy / total_size]
+
+    # Cache result
+    CACHE['cluster_result']['labels'][target_k] = point_labels
+    CACHE['cluster_result']['names'][target_k] = names_list
+    CACHE['cluster_result']['centroids'][target_k] = centroids_2d
+
+    return (point_labels, names_list, centroids_2d)
+
+
+def _ensure_level(level: int) -> dict | None:
+    """Ensure cluster data exists for the given level.
+
+    Returns error dict if invalid, None if OK.
+    """
+    nk = _natural_k()
+    if level < 1 or level > nk:
+        return {'error': f'Invalid level {level}. Must be 1-{nk}.'}
+    result = cut_dendrogram(level)
+    if result is None:
+        return {'error': 'No dendrogram data available.'}
+    return None
 
 
 def search_points(query: str, limit: int = 20) -> list[dict]:
     """Search points by title (case-insensitive substring match)."""
     query_lower = query.lower()
+    level = _resolve_level(None)
+    _ensure_level(level)
     results = []
     for i, title in enumerate(CACHE['titles']):
         if query_lower in title.lower():
@@ -254,10 +363,9 @@ def search_points(query: str, limit: int = 20) -> list[dict]:
                 'x': float(CACHE['coords_2d'][i, 0]),
                 'y': float(CACHE['coords_2d'][i, 1]),
             }
-            # Add community ID from the natural level
-            levels = _cluster_levels()
-            if levels:
-                result['community_id'] = int(CACHE['cluster_result']['labels'][levels[0]][i])
+            if level in CACHE['cluster_result']['labels']:
+                result['community_id'] = int(
+                    CACHE['cluster_result']['labels'][level][i])
             results.append(result)
             if len(results) >= limit:
                 break
@@ -266,10 +374,10 @@ def search_points(query: str, limit: int = 20) -> list[dict]:
 
 def get_cluster_info(level: int = None) -> list[dict]:
     """Get cluster information for a given level."""
-    if level is None:
-        level = _default_level()
-    if level not in _cluster_levels():
-        return [{'error': f'Invalid level {level}. Must be one of {_cluster_levels()}.'}]
+    level = _resolve_level(level)
+    err = _ensure_level(level)
+    if err:
+        return [err]
 
     labels = CACHE['cluster_result']['labels'][level]
     names = CACHE['cluster_result']['names'][level]
@@ -299,10 +407,10 @@ def get_cluster_info(level: int = None) -> list[dict]:
 
 def get_cluster_members(cluster_id: int, level: int = None, limit: int = 50) -> list[dict]:
     """Get members of a specific cluster."""
-    if level is None:
-        level = _default_level()
-    if level not in _cluster_levels():
-        return [{'error': f'Invalid level {level}. Must be one of {_cluster_levels()}.'}]
+    level = _resolve_level(level)
+    err = _ensure_level(level)
+    if err:
+        return [err]
 
     labels = CACHE['cluster_result']['labels'][level]
     mask = labels == cluster_id
@@ -466,11 +574,11 @@ async def list_tools():
         ),
         Tool(
             name="get_cluster_info",
-            description=f"Get information about clusters at a given level ({', '.join(map(str, _cluster_levels()))} clusters)",
+            description=f"Get information about clusters at a given level (default: {_natural_k()}, range 1-{_natural_k()})",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "level": {"type": "integer", "enum": list(_cluster_levels()), "description": "Cluster level", "default": _default_level()},
+                    "level": {"type": "integer", "description": f"Number of clusters (default: {_natural_k()}, range 1-{_natural_k()})", "default": _default_level()},
                 },
             },
         ),
@@ -481,7 +589,7 @@ async def list_tools():
                 "type": "object",
                 "properties": {
                     "cluster_id": {"type": "integer", "description": "Cluster ID"},
-                    "level": {"type": "integer", "enum": list(_cluster_levels()), "description": "Cluster level", "default": _default_level()},
+                    "level": {"type": "integer", "description": f"Number of clusters (default: {_natural_k()}, range 1-{_natural_k()})", "default": _default_level()},
                     "limit": {"type": "integer", "description": "Max results (default 50)", "default": 50},
                 },
                 "required": ["cluster_id"],
@@ -545,7 +653,7 @@ async def list_tools():
                 "type": "object",
                 "properties": {
                     "cluster_id": {"type": "integer", "description": "Cluster ID to zoom to"},
-                    "level": {"type": "integer", "enum": list(_cluster_levels()), "description": "Cluster level", "default": _default_level()},
+                    "level": {"type": "integer", "description": f"Number of clusters (default: {_natural_k()}, range 1-{_natural_k()})", "default": _default_level()},
                 },
                 "required": ["cluster_id"],
             },
@@ -763,6 +871,23 @@ async def list_tools():
             description="Clear all highlighter annotations (circles and paths)",
             inputSchema={"type": "object", "properties": {}},
         ),
+        # --- Lock tools ---
+        Tool(
+            name="lock_clusters",
+            description="Lock cluster level to a specific k. All cluster tools will use this level until unlocked.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "level": {"type": "integer", "description": f"Cluster level to lock to (1-{_natural_k()})"},
+                },
+                "required": ["level"],
+            },
+        ),
+        Tool(
+            name="unlock_clusters",
+            description="Unlock cluster level. Cluster tools will use their level parameter or natural_k default.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
     ]
 
     # Add semantic search tools only when a DYF index is loaded
@@ -799,17 +924,24 @@ async def list_tools():
 
 @app.call_tool()
 async def call_tool(name: str, arguments: dict):
+    global LOCKED_LEVEL
     # --- Data query tools (local, no WS) ---
     if name == "search_points":
         result = search_points(arguments["query"], arguments.get("limit", 20))
     elif name == "get_cluster_info":
         result = get_cluster_info(arguments.get("level"))
+        if LOCKED_LEVEL is not None and result and 'error' not in result[0]:
+            result = {"locked": True, "locked_level": LOCKED_LEVEL,
+                      "clusters": result}
     elif name == "get_cluster_members":
         result = get_cluster_members(
             arguments["cluster_id"],
             arguments.get("level"),
             arguments.get("limit", 50),
         )
+        if LOCKED_LEVEL is not None and result and 'error' not in result[0]:
+            result = {"locked": True, "locked_level": LOCKED_LEVEL,
+                      "members": result}
     elif name == "get_bucket_connections":
         result = get_bucket_connections(arguments["bucket_id"])
     elif name == "get_bucket_members":
@@ -823,15 +955,37 @@ async def call_tool(name: str, arguments: dict):
             arguments.get("limit", 100),
         )
 
+    # --- Lock tools ---
+    elif name == "lock_clusters":
+        level = arguments["level"]
+        nk = _natural_k()
+        if level < 1 or level > nk:
+            result = {"error": f"Invalid level {level}. Must be 1-{nk}."}
+        else:
+            LOCKED_LEVEL = level
+            _ensure_level(level)
+            await send_ws({"cmd": "set_level", "level": level})
+            result = {"locked": True, "locked_level": level}
+    elif name == "unlock_clusters":
+        LOCKED_LEVEL = None
+        await send_ws({"cmd": "set_level", "level": _natural_k()})
+        result = {"locked": False}
+
     # --- Camera/view tools ---
     elif name == "zoom_to_cluster":
         cluster_id = arguments["cluster_id"]
-        level = arguments.get("level") or _default_level()
-        params = _cluster_zoom_params(cluster_id, level)
-        if params:
-            result = await send_ws({"cmd": "zoom_to", **params})
+        level = _resolve_level(arguments.get("level"))
+        err = _ensure_level(level)
+        if err:
+            result = err
         else:
-            result = {"error": f"Invalid cluster_id {cluster_id}"}
+            # Switch browser cluster level to match
+            await send_ws({"cmd": "set_level", "level": level})
+            params = _cluster_zoom_params(cluster_id, level)
+            if params:
+                result = await send_ws({"cmd": "zoom_to", **params})
+            else:
+                result = {"error": f"Invalid cluster_id {cluster_id}"}
     elif name == "zoom_to_point":
         index = arguments["index"]
         radius = arguments.get("radius", 5)

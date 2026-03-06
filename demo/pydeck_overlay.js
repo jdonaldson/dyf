@@ -158,6 +158,22 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
       };
     }
     _currentMergedIds = new Int32Array(_pointToCommunity);  // start at natural k
+
+    // Recompute community centroids with actual 3D z-coordinates from UMAP
+    // (the .dyf metadata centroids only have 2D x,y with z=0)
+    var _centSums = {};  // {cid: {sx, sy, sz, count}}
+    for (var i = 0; i < _nPts; i++) {
+      var cid = _pointToCommunity[i];
+      if (!_centSums[cid]) _centSums[cid] = { sx: 0, sy: 0, sz: 0, count: 0 };
+      _centSums[cid].sx += _x[i];
+      _centSums[cid].sy += _y[i];
+      _centSums[cid].sz += _z[i];
+      _centSums[cid].count++;
+    }
+    for (var cid in _centSums) {
+      var s = _centSums[cid];
+      _communityCentroids[cid] = [s.sx / s.count, s.sy / s.count, s.sz / s.count];
+    }
   } else {
     // No dendrogram: grey points
     for (var _i = 0; _i < _nPts; _i++) {
@@ -347,18 +363,25 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
     var newLabels = [];
     for (var gid in mergedNames) {
       var cent = mergedCentroids[gid] || [0, 0, 0];
+      var rgb = mergedColors[gid] || [128, 128, 128];
       newLabels.push({
         cid: parseInt(gid),
         text: mergedNames[gid],
         x: cent[0], y: cent[1], z: cent[2] || 0,
         size: mergedSizes[gid] || 0,
         leaf_cids: [parseInt(gid)],
+        color: rgb,
       });
     }
     labels = newLabels;
     labelLevels = {};
     labelLevels["dendro"] = newLabels;
     currentLevelKey = "dendro";
+
+    // Update the zoom-driven label system to use the new cut labels
+    allLabelLevels = {};
+    allLabelLevels["dendro"] = newLabels;
+    allLevelKeys = ["dendro"];
 
     // Rebuild the cluster list and layer
     rebuildClusterList();
@@ -1825,6 +1848,12 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
     var e = document.createElement("div");
     e.className = "cl";
     e.style.opacity = "0";
+    var dot = document.createElement("span");
+    dot.className = "cl-dot";
+    dot.style.cssText = "display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;vertical-align:middle;";
+    e.appendChild(dot);
+    var txt = document.createElement("span");
+    e.appendChild(txt);
     labelContainer.appendChild(e);
     labelPool.push(e);
   }
@@ -2120,6 +2149,7 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
       var k = cut ? cut.k : _naturalK;
       if (height <= 0) k = _naturalK;
       sliderRight.textContent = "k=" + k;
+      _dendroZoomK = k;  // sync so scroll zoom doesn't immediately override
       applyDendrogramCut(height);
     });
 
@@ -2184,7 +2214,56 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
   // Evenly divide the zoom range [defaultZoom, defaultZoom+4] among levels.
   // Returns a single-element array with the active level key for this zoom.
   var _zoomLevelKey = null;  // track which level zoom has selected
+  var _dendroZoomK = null;  // track zoom-driven dendrogram k
+  var _dendroZoomTimer = null;  // debounce timer for zoom-driven cuts
+  var _dendroZoomPendingK = null;  // pending k during debounce
+  function _applyDendroZoomK(targetK) {
+    _dendroZoomK = targetK;
+    if (targetK >= _naturalK) {
+      applyDendrogramCut(0);
+      var sl = document.getElementById("dendro-slider");
+      if (sl) sl.value = "0";
+    } else {
+      var lo = 0, hi = _dendroZ[_dendroZ.length - 1][2] * 1.02;
+      for (var bi = 0; bi < 50; bi++) {
+        var mid = (lo + hi) / 2;
+        var c = cutDendrogram(mid);
+        if (!c) break;
+        if (c.k > targetK) lo = mid;
+        else if (c.k < targetK) hi = mid;
+        else { lo = mid; break; }
+      }
+      applyDendrogramCut(lo);
+      var sl = document.getElementById("dendro-slider");
+      if (sl) sl.value = String(lo);
+    }
+    var kd = document.getElementById("dendro-k-display");
+    if (kd) kd.textContent = "k=" + targetK;
+  }
   function getActiveLevels(zoom) {
+    // Dendrogram mode: map scroll-zoom to dendrogram cut level
+    // Centered so default zoom ≈ half of naturalK, zooming in → more clusters
+    if (_dendro && _naturalK > 0 && _dendroZ) {
+      var zRange = 6.0;
+      var minK = 2;
+      var t = (zoom - defaultZoom + zRange / 2) / zRange;
+      t = Math.max(0, Math.min(1, t));
+      var targetK = Math.round(minK + t * (_naturalK - minK));
+      targetK = Math.max(minK, Math.min(_naturalK, targetK));
+
+      if (targetK !== _dendroZoomK && targetK !== _dendroZoomPendingK) {
+        _dendroZoomPendingK = targetK;
+        clearTimeout(_dendroZoomTimer);
+        _dendroZoomTimer = setTimeout(function() {
+          if (_dendroZoomPendingK !== null && _dendroZoomPendingK !== _dendroZoomK) {
+            _applyDendroZoomK(_dendroZoomPendingK);
+          }
+          _dendroZoomPendingK = null;
+        }, 150);
+      }
+      return ["dendro"];
+    }
+
     if (allLevelKeys.length <= 1) return allLevelKeys;
     // Spread levels across zoom range: coarsest at default, finest at +4
     var zRange = 4.0;
@@ -2196,7 +2275,6 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
     if (_zoomLevelKey !== newKey) {
       _zoomLevelKey = newKey;
       currentLevelKey = String(newKey);
-      // In dendrogram mode, slider controls coloring; no-op here
       rebuildLayer();
       rebuildClusterList();
     }
@@ -2223,6 +2301,10 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
     var minSepSq = Math.pow(baseSep * sepScale, 2);
 
     var placed = [];  // {sx, sy, text, levelKey, depth}
+
+    // In 3D mode, collect all candidates first, then sort by depth (nearest camera first)
+    // so front-facing labels win the separation check over occluded back labels
+    var candidates = [];
 
     // Process levels coarsest first
     for (var li = 0; li < activeLevels.length; li++) {
@@ -2251,17 +2333,26 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
         // Cull off-screen
         if (sx < -30 || sx > w + 30 || sy < -30 || sy > h + 30) continue;
 
-        // Check separation against already-placed labels
-        var tooClose = false;
-        for (var p = 0; p < placed.length; p++) {
-          var dx = sx - placed[p].sx, dy = sy - placed[p].sy;
-          if (dx * dx + dy * dy < minSepSq) { tooClose = true; break; }
-        }
-        if (tooClose) continue;
-
-        if (placed.length >= MAX_VISIBLE_LABELS) break;
-        placed.push({ sx: sx, sy: sy, text: c.text, cls: cls, depth: sp[2] || 0 });
+        candidates.push({ sx: sx, sy: sy, text: c.text, cls: cls, depth: sp[2] || 0, color: c.color || null });
       }
+    }
+
+    // In 3D, sort candidates by depth (nearest camera = smallest depth first)
+    // so front labels claim screen space before back labels
+    if (!is2d) {
+      candidates.sort(function(a, b) { return a.depth - b.depth; });
+    }
+
+    // Apply separation check: first-placed labels win
+    for (var ci = 0; ci < candidates.length; ci++) {
+      var cand = candidates[ci];
+      var tooClose = false;
+      for (var p = 0; p < placed.length; p++) {
+        var dx = cand.sx - placed[p].sx, dy = cand.sy - placed[p].sy;
+        if (dx * dx + dy * dy < minSepSq) { tooClose = true; break; }
+      }
+      if (tooClose) continue;
+      placed.push(cand);
       if (placed.length >= MAX_VISIBLE_LABELS) break;
     }
 
@@ -2276,7 +2367,19 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
       var el = labelPool[i];
       if (i < placed.length) {
         var pl = placed[i];
-        el.textContent = pl.text;
+        var dotEl = el.querySelector(".cl-dot");
+        var txtEl = el.lastChild;
+        if (txtEl && txtEl.nodeType === 3 || txtEl === dotEl) {
+          // Fallback: rebuild structure if needed
+          txtEl = el.childNodes[1] || el;
+        }
+        txtEl.textContent = pl.text;
+        if (dotEl && pl.color) {
+          dotEl.style.backgroundColor = "rgb(" + pl.color[0] + "," + pl.color[1] + "," + pl.color[2] + ")";
+          dotEl.style.display = "inline-block";
+        } else if (dotEl) {
+          dotEl.style.display = "none";
+        }
         el.className = "cl " + pl.cls;
         el.style.left = pl.sx + "px";
         el.style.top = pl.sy + "px";
@@ -2302,11 +2405,8 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
     if (!vps || !vps.length) return;
     var vp = vps[0];
 
-    // Get current zoom from view state
-    var zoom = defaultZoom;
-    if (dk.viewManager) {
-      try { zoom = dk.viewManager.getViewState().zoom || defaultZoom; } catch(e) {}
-    }
+    // Get current zoom from live tracking (set via onViewStateChange)
+    var zoom = window._liveZoom != null ? window._liveZoom : defaultZoom;
 
     // Animate edge fade
     if (edgeFadeAlpha !== edgeFadeTarget) {
@@ -2888,7 +2988,39 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
           }
           break;
         case "set_level":
-          switchLevel(String(msg.level));
+          if (_dendro && typeof msg.level === "number") {
+            var targetK = msg.level;
+            _dendroZoomK = targetK;  // sync so scroll zoom doesn't override
+            if (targetK >= _naturalK) {
+              applyDendrogramCut(0);
+              var sl = document.getElementById("dendro-slider");
+              if (sl) sl.value = "0";
+              var kd = document.getElementById("dendro-k-display");
+              if (kd) kd.textContent = "k=" + _naturalK;
+            } else if (targetK <= 1) {
+              var sl = document.getElementById("dendro-slider");
+              if (sl) { applyDendrogramCut(parseFloat(sl.max)); sl.value = sl.max; }
+              var kd = document.getElementById("dendro-k-display");
+              if (kd) kd.textContent = "k=1";
+            } else {
+              var lo = 0, hi = _dendroZ[_dendroZ.length - 1][2] * 1.02;
+              for (var _bi = 0; _bi < 50; _bi++) {
+                var mid = (lo + hi) / 2;
+                var c = cutDendrogram(mid);
+                if (!c) break;
+                if (c.k > targetK) lo = mid;
+                else if (c.k < targetK) hi = mid;
+                else { lo = mid; break; }
+              }
+              applyDendrogramCut(lo);
+              var sl = document.getElementById("dendro-slider");
+              if (sl) sl.value = String(lo);
+              var kd = document.getElementById("dendro-k-display");
+              if (kd) kd.textContent = "k=" + targetK;
+            }
+          } else {
+            switchLevel(String(msg.level));
+          }
           break;
         case "draw_circle":
           // Fit smooth ellipse around cluster's points

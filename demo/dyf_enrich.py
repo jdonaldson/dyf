@@ -1086,7 +1086,8 @@ def annotate_cluster_names(names, labels, embeddings,
 
 
 def enrich_cluster(dyf_path, model="gpt-oss:20b",
-                   output_path=None, force=False, domain=None):
+                   output_path=None, force=False, domain=None,
+                   resolution=1.0):
     """Add Louvain cluster labels + dendrogram to a .dyf file (Level 1 → 2).
 
     Uses Louvain community detection on tree-leaf centroids to find natural
@@ -1189,7 +1190,8 @@ def enrich_cluster(dyf_path, model="gpt-oss:20b",
     print(f"\n  Computing Louvain communities from tree leaves...")
     from dyf.agglomerate import compute_louvain_hierarchy
     with LazyIndex(dyf_path) as idx_agg:
-        hierarchy = compute_louvain_hierarchy(idx_agg, coords, embeddings)
+        hierarchy = compute_louvain_hierarchy(idx_agg, coords, embeddings,
+                                                 resolution=resolution)
 
     if hierarchy is None:
         print("    Skipped: tree has fewer than 2 leaves")
@@ -1987,6 +1989,8 @@ def main():
     p_clust.add_argument("--domain", default=None,
                          help="Domain description for LLM prompts "
                               "(overrides .dyf metadata)")
+    p_clust.add_argument("--resolution", type=float, default=1.0,
+                         help="Louvain resolution (default: 1.0; higher = more clusters)")
     p_clust.add_argument("-o", "--output", default=None)
 
     # viz
@@ -2062,7 +2066,7 @@ def main():
     elif args.command == "cluster":
         enrich_cluster(args.dyf_path, model=args.model,
                        output_path=args.output, force=args.force,
-                       domain=args.domain)
+                       domain=args.domain, resolution=args.resolution)
 
     elif args.command == "viz":
         enrich_viz(args.dyf_path, cluster_level=args.cluster_level,
