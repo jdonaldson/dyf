@@ -45,6 +45,7 @@ demo/*.pkl
 demo/*.npy
 demo/*.dyf
 demo/*.html
+!demo/dyf_viewer.html
 demo/*.mp4
 demo/*.wav
 demo/*.json

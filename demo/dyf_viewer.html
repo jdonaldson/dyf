@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DYF Viewer</title>
+  <script src="https://unpkg.com/deck.gl@^9.0.0/dist.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&display=swap" rel="stylesheet">
+</head>
+<body>
+<!-- Loading overlay -->
+<div id="loading" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  font-size:16px;z-index:100;text-align:center;opacity:0.8;">
+  <div style="display:inline-block;width:24px;height:24px;
+    border:3px solid rgba(255,255,255,0.2);border-top-color:#7af;
+    border-radius:50%;animation:spin 0.8s linear infinite;margin-bottom:8px;"></div>
+  <br><span id="load-status">Loading .dyf file...</span>
+</div>
+
+<!-- Deck.gl container (named deckgl-wrapper for overlay compat) -->
+<div id="deckgl-wrapper" style="width:100vw;height:100vh;position:relative;"></div>
+
+<!-- Highlighter canvas overlay -->
+<canvas id="hl-canvas" style="position:absolute;top:0;left:0;width:100%;height:100%;
+  z-index:6;pointer-events:none;"></canvas>
+
+<!-- Header -->
+<div id="header" style="position:absolute;top:0;left:0;right:260px;z-index:20;
+  padding:12px 20px;font:14px -apple-system,'Segoe UI',sans-serif;">
+  <div style="margin-bottom:6px;"></div>
+  <div id="header-title" style="font-size:28px;font-weight:700;letter-spacing:0.01em">DYF Viewer</div>
+  <div id="header-subtitle" style="font-size:12px;opacity:0.6;margin-top:2px;"></div>
+  <div id="header-sub" class="sub" style="font-size:11px;">
+    Scroll to zoom &middot; Drag to orbit &middot; Hover for details
+    <span id="session-id" style="margin-left:12px;opacity:0.7;font-family:monospace;"></span>
+    <span id="build-stamp" style="margin-left:12px;opacity:0.5;font-family:monospace;font-size:9px;"></span>
+  </div>
+</div>
+
+<!-- Tour cluster label overlay -->
+<div id="tour-label" style="display:none;position:absolute;z-index:50;padding:8px 16px;
+  background:rgba(0,0,0,0.85);border-radius:6px;
+  font:600 18px -apple-system,'Segoe UI',sans-serif;color:#fff;
+  text-align:center;pointer-events:none;white-space:nowrap;
+  box-shadow:0 2px 12px rgba(0,0,0,0.5);
+  transform:translate(-50%,-100%) translateY(-12px);"></div>
+<div id="tour-edge-labels" style="display:none;"></div>
+<div id="tour-callout-labels" style="display:none;"></div>
+<div id="camera-debug" style="display:none;position:absolute;bottom:10px;left:10px;z-index:20;
+  padding:8px 12px;background:rgba(0,0,0,0.8);border-radius:4px;
+  font:11px monospace;color:#0f0;pointer-events:none;white-space:pre;"></div>
+
+<!-- Panel toggle tab -->
+<div id="panel-toggle" onclick="togglePanel()" style="position:absolute;top:50%;right:260px;
+  transform:translateY(-50%);z-index:11;width:20px;height:60px;
+  background:var(--bg-panel);border:1px solid var(--border);border-right:none;
+  border-radius:6px 0 0 6px;cursor:pointer;display:flex;align-items:center;
+  justify-content:center;font-size:14px;color:var(--fg);transition:right 0.3s ease;">
+  <span id="panel-toggle-arrow">▶</span>
+</div>
+
+<!-- Palette panel -->
+<div id="panel" style="position:absolute;top:0;right:0;bottom:0;width:260px;
+  z-index:10;font:13px -apple-system,'Segoe UI',sans-serif;
+  overflow-y:auto;transition:right 0.3s ease;">
+
+  <!-- DYF logo -->
+  <div style="padding:10px 12px 6px;text-align:center;">
+    <svg class="dyf-logo" viewBox="0 0 340 105" width="85" height="26">
+      <defs><linearGradient id="dyf-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#e94560"/>
+        <stop offset="100%" stop-color="#f9a826"/>
+      </linearGradient></defs>
+      <text x="4" y="82" font-family="Montserrat,sans-serif" font-size="88" font-weight="700">
+        <tspan class="dyf-letter">d</tspan>
+        <tspan fill="url(#dyf-grad)">\u028e</tspan>
+        <tspan class="dyf-letter">f</tspan>
+        <tspan class="dyf-muted">viz</tspan>
+      </text>
+    </svg>
+  </div>
+
+  <!-- View palette -->
+  <div class="palette">
+    <div class="palette-header" onclick="this.parentElement.classList.toggle('collapsed')">
+      <span class="palette-arrow"></span>View
+    </div>
+    <div class="palette-body">
+      <div style="display:flex;gap:6px;margin-bottom:8px;">
+        <button id="reset-btn" class="panel-btn">↻ Reset</button>
+        <button id="mode-btn" class="panel-btn">□ 2D</button>
+        <button id="fullscreen-btn" class="panel-btn">⛶ Fullscreen</button>
+      </div>
+      <div style="display:flex;gap:6px;">
+        <button id="theme-btn" class="panel-btn">☼ Light</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Display palette -->
+  <div class="palette collapsed">
+    <div class="palette-header" onclick="this.parentElement.classList.toggle('collapsed')">
+      <span class="palette-arrow"></span>Display
+    </div>
+    <div class="palette-body">
+      <label class="palette-check">
+        <input type="checkbox" id="toggle-labels" checked>
+        <span>Labels</span>
+      </label>
+      <label class="palette-check">
+        <input type="checkbox" id="toggle-edges" checked>
+        <span>Bridge edges</span>
+      </label>
+      <label class="palette-check">
+        <input type="checkbox" id="toggle-sheen">
+        <span>Specular sweep</span>
+      </label>
+      <label class="palette-check">
+        <input type="checkbox" id="toggle-orbit">
+        <span>Auto-orbit</span>
+      </label>
+      <label class="palette-check">
+        <input type="checkbox" id="toggle-outliers" checked>
+        <span>Show outliers</span>
+      </label>
+      <div style="margin-top:8px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+          <span>Point size</span><span id="ps-val">2</span>
+        </div>
+        <input type="range" id="point-size" min="1" max="8" value="2" step="0.5"
+          style="width:100%;">
+      </div>
+    </div>
+  </div>
+
+  <!-- Clusters palette -->
+  <div class="palette collapsed">
+    <div class="palette-header" onclick="this.parentElement.classList.toggle('collapsed')">
+      <span class="palette-arrow"></span>Clusters
+    </div>
+    <div class="palette-body">
+      <div id="color-mode-section" style="display:none;margin-bottom:8px;">
+        <div style="font-size:10px;opacity:0.6;margin-bottom:4px;">Color by</div>
+        <div id="color-mode-btns" style="display:flex;gap:4px;">
+          <button id="color-cluster" class="panel-btn" style="font-weight:700;">Clusters</button>
+          <button id="color-bucket" class="panel-btn">Buckets</button>
+        </div>
+      </div>
+      <div id="level-selector" style="display:none;margin-bottom:8px;">
+        <div style="font-size:10px;opacity:0.6;margin-bottom:4px;">Cluster level</div>
+        <div id="level-buttons" style="display:flex;flex-wrap:wrap;gap:3px;"></div>
+      </div>
+      <div id="cluster-list" style="font-size:12px;line-height:1.8;max-height:400px;overflow-y:auto;"></div>
+    </div>
+  </div>
+
+  <!-- Tour palette -->
+  <div class="palette collapsed">
+    <div class="palette-header" onclick="this.parentElement.classList.toggle('collapsed')">
+      <span class="palette-arrow"></span>Tour
+    </div>
+    <div class="palette-body">
+      <button id="tour-btn" class="panel-btn" style="width:100%;margin-bottom:8px;">
+        ▶ Start Tour
+      </button>
+      <div id="tour-list" style="font-size:11px;line-height:1.6;max-height:200px;overflow-y:auto;"></div>
+    </div>
+  </div>
+
+  <!-- MCP Debug palette -->
+  <div class="palette collapsed">
+    <div class="palette-header" onclick="this.parentElement.classList.toggle('collapsed')">
+      <span class="palette-arrow"></span>MCP Debug
+    </div>
+    <div class="palette-body">
+      <div id="mcp-log" style="font-size:10px;font-family:monospace;max-height:200px;overflow-y:auto;overflow-x:hidden;word-break:break-all;"></div>
+    </div>
+  </div>
+</div>
+
+<style>
+@keyframes spin { to { transform: rotate(360deg); } }
+* { box-sizing: border-box; }
+body { margin: 0; padding: 0; overflow: hidden; font-family: -apple-system, 'Segoe UI', sans-serif; }
+:root {
+  --bg: #1e1e1e; --bg-panel: rgba(28,28,28,0.95); --bg-header: rgba(30,30,30,0.75);
+  --bg-label: rgba(30,30,30,0.88); --bg-btn: #444; --bg-btn-hover: #555;
+  --bg-palette-header: rgba(40,40,40,0.95);
+  --fg: #ddd; --fg-muted: #999; --fg-section: #aaa;
+  --border: #444; --border-label: rgba(120,120,120,0.5);
+  --range-bg: #555; --range-thumb: #aaa; --accent: #888;
+  --shadow-label: rgba(0,0,0,0.6);
+}
+body { background: var(--bg); color: var(--fg); }
+body.light {
+  --bg: #f5f5f5; --bg-panel: rgba(245,245,245,0.97); --bg-header: rgba(250,250,250,0.75);
+  --bg-label: rgba(255,255,255,0.92); --bg-btn: #ddd; --bg-btn-hover: #ccc;
+  --bg-palette-header: rgba(230,230,230,0.95);
+  --fg: #222; --fg-muted: #666; --fg-section: #555;
+  --border: #ccc; --border-label: rgba(100,100,100,0.3);
+  --range-bg: #ccc; --range-thumb: #666; --accent: #666;
+  --shadow-label: rgba(0,0,0,0.15);
+}
+.cl {
+  position:absolute; pointer-events:none; z-index:5;
+  color:var(--fg); font:bold 14px -apple-system,"Segoe UI",sans-serif;
+  background:var(--bg-label);
+  border:1px solid var(--border-label);
+  padding:2px 6px; border-radius:3px; white-space:nowrap;
+  transform:translate(-50%,-50%);
+  text-shadow:0 1px 2px var(--shadow-label);
+  transition:opacity 0.15s;
+}
+.cl.level-coarse { font-size:15px; font-weight:800; border-width:2px; }
+.cl.level-mid    { font-size:13px; font-weight:700; border-width:1px; }
+.cl.level-fine   { font-size:11px; font-weight:600; border-width:1px; opacity:0.85; }
+#header { background:var(--bg-header); border-bottom:1px solid var(--border); color:var(--fg);
+  backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); }
+#header .sub { color:var(--fg-muted); }
+.dyf-logo .dyf-letter { fill: #dddddd; }
+body.light .dyf-logo .dyf-letter { fill: #333333; }
+.dyf-logo .dyf-muted { fill: #999999; }
+body.light .dyf-logo .dyf-muted { fill: #666666; }
+#panel { background:var(--bg-panel); border-left:1px solid var(--border); color:var(--fg); }
+#panel input[type="range"] {
+  -webkit-appearance:none; height:4px; background:var(--range-bg); border-radius:2px;
+  outline:none; accent-color:var(--accent);
+}
+#panel input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance:none; width:14px; height:14px;
+  background:var(--range-thumb); border-radius:50%; cursor:pointer;
+}
+.panel-btn {
+  flex:1; background:var(--bg-btn); color:var(--fg);
+  border:1px solid var(--border); padding:6px 0; border-radius:3px;
+  cursor:pointer; font-size:11px; font-family:inherit;
+}
+.panel-btn:hover { background:var(--bg-btn-hover); }
+.level-btn {
+  padding:3px 8px; border-radius:3px; border:1px solid var(--border);
+  background:var(--bg-btn); color:var(--fg); cursor:pointer;
+  font-size:10px; font-family:monospace; transition:all 0.15s;
+}
+.level-btn:hover { background:var(--bg-btn-hover); }
+.level-btn.active {
+  background:var(--fg-section); color:var(--bg); border-color:var(--fg-section);
+  font-weight:700;
+}
+.palette { border-bottom:1px solid var(--border); }
+.palette-header {
+  display:flex; align-items:center; gap:6px;
+  padding:8px 12px; cursor:pointer; user-select:none;
+  font-size:11px; font-weight:600; text-transform:uppercase;
+  letter-spacing:0.5px; color:var(--fg-section);
+  background:var(--bg-palette-header);
+}
+.palette-header:hover { background:var(--bg-btn); }
+.palette-arrow {
+  display:inline-block; width:0; height:0;
+  border-left:4px solid transparent; border-right:4px solid transparent;
+  border-top:5px solid var(--fg-muted);
+  transition:transform 0.15s;
+}
+.palette.collapsed .palette-arrow { transform:rotate(-90deg); }
+.palette-body { padding:10px 12px; }
+.palette.collapsed .palette-body { display:none; }
+.palette-check { display:flex; align-items:center; gap:8px; cursor:pointer; padding:3px 0; }
+.palette-check input { accent-color:var(--accent); width:14px; height:14px; }
+.tour-item { opacity:0.6; transition:opacity 0.2s; position:relative; overflow:hidden; }
+.tour-item:hover { opacity:0.9; background:rgba(255,255,255,0.1); }
+.tour-item.active {
+  opacity:1; color:#fff; font-weight:600;
+  background:linear-gradient(to right, var(--accent) var(--progress, 0%), rgba(255,255,255,0.15) var(--progress, 0%));
+}
+.tour-edge-label {
+  position:absolute;z-index:14;padding:4px 10px;
+  background:rgba(60,80,160,0.9);border-radius:4px;
+  font:500 12px -apple-system,'Segoe UI',sans-serif;color:#fff;
+  text-align:center;pointer-events:none;white-space:nowrap;
+  box-shadow:0 1px 6px rgba(0,0,0,0.4);
+  transform:translate(-50%,-50%);
+  border:1px solid rgba(100,140,255,0.5);
+}
+body.light .tour-edge-label {
+  background:rgba(70,100,180,0.95);
+  border-color:rgba(50,80,150,0.6);
+}
+.tour-callout-label {
+  position:absolute;z-index:16;padding:3px 8px;
+  background:rgba(255,255,255,0.92);border-radius:3px;
+  font:500 11px -apple-system,'Segoe UI',sans-serif;color:#1a1a1a;
+  text-align:left;pointer-events:none;white-space:nowrap;
+  box-shadow:0 1px 8px rgba(0,0,0,0.5);
+  transform:translateY(-50%);
+  border:1px solid rgba(255,220,80,0.8);
+  opacity:0;transition:opacity 0.3s ease-in;
+  max-width:200px;overflow:hidden;text-overflow:ellipsis;
+}
+.tour-callout-label.visible { opacity:1; }
+#tour-label.hero {
+  font-size:clamp(42px, 7vw, 84px);
+  padding:32px 56px; border-radius:14px;
+  background:rgba(0,0,0,0.8); box-shadow:0 6px 60px rgba(0,0,0,0.7);
+  transform:translate(-50%,-50%); letter-spacing:0.02em;
+}
+</style>
+
+<!-- Panel toggle (global for module script access) -->
+<script>
+var panelHidden = false;
+function togglePanel() {
+  panelHidden = !panelHidden;
+  var panel = document.getElementById("panel");
+  var toggle = document.getElementById("panel-toggle");
+  var arrow = document.getElementById("panel-toggle-arrow");
+  var header = document.getElementById("header");
+  if (panelHidden) {
+    panel.style.right = "-260px";
+    toggle.style.right = "0";
+    arrow.textContent = "◀";
+    if (header) header.style.right = "0";
+  } else {
+    panel.style.right = "0";
+    toggle.style.right = "260px";
+    arrow.textContent = "▶";
+    if (header) header.style.right = "260px";
+  }
+}
+window.togglePanel = togglePanel;
+</script>
+
+<!-- Main loader: reads .dyf, constructs __DYF_DATA__, creates deck, loads overlay -->
+<script type="module">
+import { loadDyf } from "./js/dyf_reader.mjs";
+
+const params = new URLSearchParams(location.search);
+const file = params.get("file") || "gudid_50k_louvain.dyf";
+const loadingEl = document.getElementById("loading");
+const loadingStatus = document.getElementById("load-status");
+
+try {
+  // ── Load .dyf ────────────────────────────────────────────────────────
+  const dyf = await loadDyf(file, status => { loadingStatus.textContent = status; });
+  const { fields, totalItems, metadata, dendrogram, buildParams } = dyf;
+
+  if (!fields.umap_x || !fields.umap_y) {
+    loadingStatus.textContent = "Error: .dyf missing umap_x/umap_y (needs enrichment level 1+)";
+    throw new Error("Missing UMAP fields");
+  }
+
+  loadingStatus.textContent = "Building visualization...";
+
+  // ── Point data arrays ──────────────────────────────────────────────────
+  const x = fields.umap_x;
+  const y = fields.umap_y;
+  const z = fields.umap_z || new Float32Array(totalItems);
+  const nPts = totalItems;
+  const titles = fields.title || Array.from({length: nPts}, (_, i) => `Item ${i}`);
+  const a = new Uint8Array(nPts).fill(255);
+
+  // ── Parse edge, tour, and LSH bucket data from metadata ────────────────
+  let edgePairs = [];
+  let edgePaths2d = [];
+  let tourNarration = {};
+  let lshBucketColors = {};
+  let lshBucketNames = {};
+  let lshBucketCentroids = {};
+  try {
+    const epJson = dyf.metadata.get("edge_pairs");
+    if (epJson) edgePairs = JSON.parse(epJson);
+    const ep2dJson = dyf.metadata.get("edge_paths_2d");
+    if (ep2dJson) edgePaths2d = JSON.parse(ep2dJson);
+    const tnJson = dyf.metadata.get("tour_narration");
+    if (tnJson) tourNarration = JSON.parse(tnJson);
+    const lbcJson = dyf.metadata.get("lsh_bucket_colors");
+    if (lbcJson) lshBucketColors = JSON.parse(lbcJson);
+    const lbnJson = dyf.metadata.get("lsh_bucket_names");
+    if (lbnJson) lshBucketNames = JSON.parse(lbnJson);
+    const lbcentJson = dyf.metadata.get("lsh_bucket_centroids");
+    if (lbcentJson) lshBucketCentroids = JSON.parse(lbcentJson);
+  } catch (e) {
+    console.warn("[dyf_viewer] Error parsing edge/tour/LSH metadata:", e);
+  }
+
+  // Build edge weights from path count (uniform for now)
+  const edgeWeights = edgePairs.map(() => 1.0);
+
+  // ── Set window.__DYF_DATA__ ────────────────────────────────────────────
+  window.__DYF_DATA__ = {
+    x, y, z, a, titles, nPts,
+    dendrogram,
+    edges2d: { paths: edgePaths2d, weights: edgeWeights },
+    edges3d: { paths: [], weights: [] },
+    edgePairs: edgePairs,
+    tourNarration: tourNarration,
+    tourCallouts: {},
+    tourAudio: {},
+    tourTitle: file.replace(/\.dyf$/, "").replace(/_/g, " "),
+    lshBucketIds: fields.lsh_bucket_ids || null,
+    lshBucketColors: lshBucketColors,
+    lshBucketNames: lshBucketNames,
+    lshBucketCentroids: lshBucketCentroids,
+  };
+
+  // ── Create deck.gl instance ────────────────────────────────────────────
+  // Build initial point data for deck
+  const initPts = new Array(nPts);
+  for (let i = 0; i < nPts; i++) {
+    initPts[i] = { x: x[i], y: y[i], z: 0, r: 128, g: 128, b: 128, a: 255,
+                   title: titles[i] || "", cluster: 0 };
+  }
+
+  window._liveZoom = 5.5;
+  window.deckInstance = new globalThis.deck.DeckGL({
+    container: "deckgl-wrapper",
+    views: [new globalThis.deck.OrbitView({ controller: true, orbitAxis: "Z" })],
+    initialViewState: {
+      target: [0, 0, 0],
+      rotationX: 90,
+      rotationOrbit: 0,
+      zoom: 5.5,
+    },
+    onViewStateChange: function(params) {
+      if (params.viewState && params.viewState.zoom != null) {
+        window._liveZoom = params.viewState.zoom;
+      }
+      return params.viewState;
+    },
+    controller: true,
+    layers: [
+      new globalThis.deck.PointCloudLayer({
+        id: "points",
+        data: initPts,
+        getPosition: function(d) { return [d.x, d.y, d.z]; },
+        getColor: function(d) { return [d.r, d.g, d.b, d.a]; },
+        getNormal: [0, 0, 1],
+        pointSize: 3,
+        pickable: true,
+        autoHighlight: true,
+        highlightColor: [255, 255, 100, 200],
+      }),
+      new globalThis.deck.PathLayer({
+        id: "edges",
+        data: edgePaths2d.map(function(path, i) {
+          return {
+            path: path.map(function(p) { return p.length === 2 ? [p[0], p[1], 0] : p; }),
+            color: [255, 255, 255, 60],
+            width: 0.01,
+          };
+        }),
+        getPath: function(d) { return d.path; },
+        getColor: function(d) { return d.color; },
+        getWidth: function(d) { return d.width; },
+        widthUnits: "common",
+        widthScale: 1,
+        visible: true,
+      }),
+    ],
+    getTooltip: function(info) {
+      if (!info.object) return null;
+      return info.object.title || null;
+    },
+  });
+
+  // Update header
+  const fileName = file.replace(/\.dyf$/, "").replace(/_/g, " ");
+  document.getElementById("header-title").textContent = fileName;
+  const kInfo = dendrogram ? `${dendrogram.naturalK} communities (slider)` : "no clusters";
+  document.getElementById("header-subtitle").textContent =
+    `${totalItems.toLocaleString()} items | ${kInfo}`;
+
+  // Hide loading
+  loadingEl.style.display = "none";
+
+  // ── Load the full overlay ───────────────────────────────────────────────
+  await import("./pydeck_overlay.js");
+
+  console.log(`[dyf_viewer] Loaded ${totalItems} items, dendro=${!!dendrogram}, file=${file}`);
+
+} catch (err) {
+  if (loadingStatus) loadingStatus.textContent = `Error: ${err.message}`;
+  console.error("[dyf_viewer]", err);
+}
+</script>
+</body>
+</html>
