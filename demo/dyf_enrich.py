@@ -1218,14 +1218,15 @@ def enrich_cluster(dyf_path, model="gpt-oss:20b",
         # Compute spatial colors for communities
         rgb = spatial_rgb_map(point_labels.tolist(), embeddings)
 
-        # Compute 2D centroids for label placement
+        # Compute centroids for label placement (3D when available)
         community_centroids = {}
         for cid in sorted(set(point_labels.tolist())):
             mask = point_labels == cid
-            cent = coords[mask, :2].mean(axis=0)
+            cent = coords[mask].mean(axis=0)
             community_centroids[str(cid)] = [
                 round(float(cent[0]), 4),
-                round(float(cent[1]), 4), 0.0]
+                round(float(cent[1]), 4),
+                round(float(cent[2]), 4) if coords.shape[1] > 2 else 0.0]
 
         # Store dendrogram metadata (replaces per-point cluster fields)
         new_meta['louvain_leaf_communities'] = json.dumps({

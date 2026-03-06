@@ -835,6 +835,18 @@ async def list_tools():
                 "required": ["theme"],
             },
         ),
+        Tool(
+            name="set_color_mode",
+            description="Switch point coloring between cluster communities and LSH buckets",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "mode": {"type": "string", "enum": ["cluster", "bucket"],
+                             "description": "Color mode"},
+                },
+                "required": ["mode"],
+            },
+        ),
         # --- Annotation tools ---
         Tool(
             name="draw_circle",
@@ -1063,6 +1075,8 @@ async def call_tool(name: str, arguments: dict):
         result = await send_ws({"cmd": "set_mode", "mode": arguments["mode"]})
     elif name == "set_theme":
         result = await send_ws({"cmd": "set_theme", "theme": arguments["theme"]})
+    elif name == "set_color_mode":
+        result = await send_ws({"cmd": "set_color_mode", "mode": arguments["mode"]})
 
     # --- Annotation tools ---
     elif name == "draw_circle":
