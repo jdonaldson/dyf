@@ -349,6 +349,78 @@ def test_cpp_chunks(tmp_source):
 
 
 # ---------------------------------------------------------------------------
+# Tests: OCaml
+# ---------------------------------------------------------------------------
+
+OCAML_SRC = """\
+let greet name =
+  "Hello " ^ name
+
+let add a b = a + b
+
+type shape =
+  | Circle of float
+  | Rectangle of float * float
+
+module Math = struct
+  let pi = 3.14159
+
+  let area r = pi *. r *. r
+end
+"""
+
+def test_ocaml_chunks(tmp_source):
+    p = tmp_source("example.ml", OCAML_SRC)
+    chunks = chunk_source_file(p)
+
+    titles = [c["title"] for c in chunks]
+    # value_definitions: greet, add
+    assert "example.greet" in titles
+    assert "example.add" in titles
+    # type_definition: shape
+    assert "example.shape" in titles
+    # module_definition: Math
+    assert "example.Math" in titles
+
+    for c in chunks:
+        assert c["language"] == "ocaml"
+        assert c["file"] == "example.ml"
+
+
+def test_ocaml_kinds(tmp_source):
+    p = tmp_source("example.ml", OCAML_SRC)
+    chunks = chunk_source_file(p)
+    kind_map = {c["title"]: c["kind"] for c in chunks}
+
+    assert kind_map["example.greet"] == "function"
+    assert kind_map["example.add"] == "function"
+    assert kind_map["example.shape"] == "type"
+    assert kind_map["example.Math"] == "module"
+
+
+def test_ocaml_nested_let(tmp_source):
+    """let bindings inside a module should get parent-qualified names."""
+    p = tmp_source("nested.ml", OCAML_SRC)
+    chunks = chunk_source_file(p)
+    titles = [c["title"] for c in chunks]
+
+    # Nested let bindings in module Math
+    assert "nested.Math.pi" in titles or "nested.Math.area" in titles
+
+
+def test_ocaml_mli(tmp_source):
+    """Interface files should also parse."""
+    mli_src = "val greet : string -> string\n"
+    p = tmp_source("sig.mli", mli_src)
+    chunks = chunk_source_file(p)
+    # .mli may not have value_definition nodes (they're val_spec),
+    # but it should not crash
+    assert isinstance(chunks, list)
+    for c in chunks:
+        assert c["language"] == "ocaml"
+
+
+# ---------------------------------------------------------------------------
 # Tests: edge cases
 # ---------------------------------------------------------------------------
 

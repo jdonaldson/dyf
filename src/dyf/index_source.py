@@ -4,7 +4,7 @@ Index source code into a .dyf file.
 Chunks at function/class boundaries using tree-sitter, embeds via Ollama,
 builds a DYF tree, and writes a .dyf index.
 
-Supports Python, JavaScript, TypeScript, Rust, Go, Java, C, and C++.
+Supports Python, JavaScript, TypeScript, Rust, Go, Java, C, C++, and OCaml.
 
 Usage (via CLI):
     dyf index-source src/mypackage/ -o mypackage.dyf
@@ -62,6 +62,10 @@ LANG_CONFIG = {
         "extensions": [".cpp", ".cc", ".cxx", ".hpp"],
         "chunk_types": ["function_definition", "class_specifier"],
     },
+    "ocaml": {
+        "extensions": [".ml", ".mli"],
+        "chunk_types": ["value_definition", "type_definition", "module_definition"],
+    },
 }
 
 # Build reverse lookup: extension → (language_name, config)
@@ -80,6 +84,7 @@ _PARENT_TYPES = {
     "class_specifier",       # cpp
     "impl_item",             # rust
     "trait_item",            # rust
+    "module_definition",     # ocaml
 }
 
 
@@ -116,6 +121,13 @@ def _get_node_name(node) -> str | None:
                 if gc.type == "type_identifier":
                     return gc.text.decode("utf-8")
 
+    # OCaml: names live inside *_binding children (let_binding, type_binding, etc.)
+    for child in node.children:
+        if child.type.endswith("_binding"):
+            for gc in child.children:
+                if gc.type in ("value_name", "type_constructor", "module_name"):
+                    return gc.text.decode("utf-8")
+
     # Last resort: first identifier child
     for child in node.children:
         if child.type == "identifier" or child.type == "type_identifier":
@@ -150,6 +162,10 @@ def _node_kind(node_type: str) -> str:
         return "type"
     if "method" in node_type:
         return "method"
+    if node_type == "value_definition":
+        return "function"
+    if node_type == "module_definition":
+        return "module"
     return "function"
 
 
@@ -353,7 +369,7 @@ def main(argv: list[str] | None = None) -> int:
     """CLI entry point for `dyf index-source`."""
     parser = argparse.ArgumentParser(
         prog="dyf index-source",
-        description="Index source code into a .dyf file (Python, JS, TS, Rust, Go, Java, C, C++)",
+        description="Index source code into a .dyf file (Python, JS, TS, Rust, Go, Java, C, C++, OCaml)",
     )
     parser.add_argument(
         "source_dir",
