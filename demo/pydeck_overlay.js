@@ -47,6 +47,15 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
     ];
   }
   function buildColorMap(uniqueCids, levelKey) {
+    // Use LSH bucket colors in bucket mode
+    if (_colorMode === "bucket" && _lshBucketColors && Object.keys(_lshBucketColors).length > 0) {
+      var map = {};
+      for (var i = 0; i < uniqueCids.length; i++) {
+        var cid = uniqueCids[i];
+        map[cid] = _lshBucketColors[String(cid)] || hlsToRgb((i * 0.618033988749895) % 1.0, 0.45, 0.6);
+      }
+      return map;
+    }
     // Use dendrogram community colors if available
     if (_communityColors && Object.keys(_communityColors).length > 0) {
       var map = {};
@@ -196,24 +205,17 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
   }
 
   /**
-   * Cut the dendrogram at a given height.
-   * Returns: { mergedMap: {naturalCid → mergedGroupId}, k: numGroups }
+   * Generic linkage cut: given a linkage matrix Z (n-1 × 4) and n leaves,
+   * cut at height → { mergedMap: {leafIdx → groupId}, k: numGroups }
    */
-  function cutDendrogram(height) {
-    if (!_dendroZ || !_naturalK) return null;
-    var Z = _dendroZ;
-    var n = _naturalK;  // number of original communities
-
-    // Union-Find: nodes 0..n-1 are original communities,
-    // n..n+(n-2) are merge nodes
+  function cutLinkage(Z, n, height) {
+    if (!Z || !n) return null;
     var totalNodes = n + Z.length;
     var parent = new Int32Array(totalNodes);
     var size = new Int32Array(totalNodes);
     for (var i = 0; i < totalNodes; i++) { parent[i] = i; size[i] = 1; }
-
-    // Process merges up to height
     for (var i = 0; i < Z.length; i++) {
-      if (Z[i][2] > height) continue;  // merge distance > cut height
+      if (Z[i][2] > height) continue;
       var a = Math.round(Z[i][0]);
       var b = Math.round(Z[i][1]);
       var mergeNode = n + i;
@@ -223,8 +225,6 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
       parent[rb] = mergeNode;
       size[mergeNode] = size[ra] + size[rb];
     }
-
-    // Map each original community to its root
     var roots = {};
     var rootList = [];
     var mergedMap = {};
@@ -237,6 +237,71 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
       mergedMap[i] = roots[root];
     }
     return { mergedMap: mergedMap, k: rootList.length };
+  }
+
+  /** Cut the community dendrogram at a given height. */
+  function cutDendrogram(height) {
+    return cutLinkage(_dendroZ, _naturalK, height);
+  }
+
+  /**
+   * Build a complete-linkage agglomerative clustering on centroids.
+   * centroids: [[x,y,z], ...], returns linkage matrix Z (n-1 × 4).
+   */
+  function buildLinkage(centroids) {
+    var n = centroids.length;
+    if (n <= 1) return [];
+
+    // Precompute pairwise distances
+    var pairDist = {};
+    for (var i = 0; i < n; i++) {
+      for (var j = i + 1; j < n; j++) {
+        var dx = centroids[i][0] - centroids[j][0];
+        var dy = centroids[i][1] - centroids[j][1];
+        var dz = (centroids[i][2] || 0) - (centroids[j][2] || 0);
+        pairDist[i + "," + j] = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      }
+    }
+
+    // Track which original points are in each active cluster
+    var members = {};
+    for (var i = 0; i < n; i++) members[i] = [i];
+    var active = new Set();
+    for (var i = 0; i < n; i++) active.add(i);
+
+    var Z = [];
+    var nextId = n;
+
+    for (var step = 0; step < n - 1; step++) {
+      // Find closest pair (complete linkage: max pairwise distance)
+      var bestA = -1, bestB = -1, bestD = Infinity;
+      var arr = Array.from(active);
+      for (var ii = 0; ii < arr.length; ii++) {
+        for (var jj = ii + 1; jj < arr.length; jj++) {
+          var a = arr[ii], b = arr[jj];
+          // Complete linkage: max distance between any pair of original members
+          var maxD = 0;
+          for (var mi = 0; mi < members[a].length; mi++) {
+            for (var mj = 0; mj < members[b].length; mj++) {
+              var pi = members[a][mi], pj = members[b][mj];
+              var key = Math.min(pi, pj) + "," + Math.max(pi, pj);
+              if (pairDist[key] > maxD) maxD = pairDist[key];
+            }
+          }
+          if (maxD < bestD) { bestD = maxD; bestA = a; bestB = b; }
+        }
+      }
+
+      Z.push([bestA, bestB, bestD, members[bestA].length + members[bestB].length]);
+      members[nextId] = members[bestA].concat(members[bestB]);
+      delete members[bestA];
+      delete members[bestB];
+      active.delete(bestA);
+      active.delete(bestB);
+      active.add(nextId);
+      nextId++;
+    }
+    return Z;
   }
 
   /**
@@ -386,6 +451,19 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
     // Rebuild the cluster list and layer
     rebuildClusterList();
     rebuildLayer();
+  }
+
+  // ── LSH bucket color mode state ─────────────────────────────────────────
+  var _colorMode = "cluster";  // "cluster" or "bucket"
+  var _lshBucketIds = dd ? dd.lshBucketIds : null;  // Int32Array(N) or null
+  var _lshBucketColors = dd ? (dd.lshBucketColors || {}) : {};
+  var _lshBucketNames = dd ? (dd.lshBucketNames || {}) : {};
+  var _lshBucketCentroids = dd ? (dd.lshBucketCentroids || {}) : {};
+
+  // Show color-by buttons if LSH data is available
+  if (_lshBucketIds) {
+    var colorSection = document.getElementById("color-mode-section");
+    if (colorSection) colorSection.style.display = "";
   }
 
   // Backup original Z for 3D toggle (points start flat in 2D)
@@ -2103,6 +2181,214 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
     if (_dendro) return;
   }
 
+  // ── Color mode switching (cluster vs bucket) ────────────────────────────
+  // Bucket dendrogram state (built once on first switch to bucket mode)
+  var _bucketDendroZ = null;     // linkage matrix for buckets
+  var _bucketK = 0;              // number of natural buckets
+  var _bucketIdMap = null;       // [seqIdx] → bucketId
+  var _bucketIdRevMap = null;    // {bucketId → seqIdx}
+  var _bucketColors = {};        // {bucketId: [r,g,b]}
+  var _bucketNames = {};         // {bucketId: "name"}
+  var _bucketCentroids = {};     // {bucketId: [x,y,z]} computed from UMAP
+  var _bucketSizes = {};         // {bucketId: count}
+  var _bucketZoomK = null;       // current zoom-driven bucket k
+  var _bucketZoomTimer = null;
+  var _bucketZoomPendingK = null;
+  var _currentBucketMergedIds = null;  // Int32Array(N): point → merged bucket group
+
+  function _initBucketDendrogram() {
+    if (_bucketDendroZ) return;  // already built
+
+    // Compute bucket centroids and sizes from UMAP coords
+    var sums = {};
+    for (var i = 0; i < _nPts; i++) {
+      var bid = _lshBucketIds[i];
+      if (!sums[bid]) sums[bid] = { sx: 0, sy: 0, sz: 0, count: 0 };
+      sums[bid].sx += _x[i];
+      sums[bid].sy += _y[i];
+      sums[bid].sz += _z[i];
+      sums[bid].count++;
+    }
+
+    // Build sequential index ↔ bucket ID mapping
+    var bucketIds = Object.keys(sums).map(Number).sort(function(a, b) { return a - b; });
+    _bucketK = bucketIds.length;
+    _bucketIdMap = bucketIds;
+    _bucketIdRevMap = {};
+    var centroids = [];
+    for (var si = 0; si < bucketIds.length; si++) {
+      var bid = bucketIds[si];
+      _bucketIdRevMap[bid] = si;
+      var s = sums[bid];
+      var cent = [s.sx / s.count, s.sy / s.count, s.sz / s.count];
+      centroids.push(cent);
+      _bucketCentroids[bid] = cent;
+      _bucketSizes[bid] = s.count;
+    }
+    _bucketColors = _lshBucketColors;
+    _bucketNames = _lshBucketNames;
+
+    // Build complete-linkage dendrogram on UMAP centroids
+    _bucketDendroZ = buildLinkage(centroids);
+    _currentBucketMergedIds = new Int32Array(_nPts);
+    console.log("[bucket] Built dendrogram for " + _bucketK + " buckets, " + _bucketDendroZ.length + " merges");
+  }
+
+  /**
+   * Apply a bucket dendrogram cut: recolor points and update labels.
+   * height=0 → natural k (all buckets), height=max → k=1.
+   */
+  function applyBucketCut(height) {
+    if (!_bucketDendroZ || !_bucketK) return;
+
+    var cut;
+    if (height <= 0) {
+      // Identity: each sequential index maps to itself
+      cut = { mergedMap: {}, k: _bucketK };
+      for (var si = 0; si < _bucketK; si++) cut.mergedMap[si] = si;
+    } else {
+      cut = cutLinkage(_bucketDendroZ, _bucketK, height);
+      if (!cut) return;
+    }
+
+    // For each merged group, find the bucket with the largest size → inherit its color/name
+    var groupBest = {};
+    for (var siStr in cut.mergedMap) {
+      var si = parseInt(siStr);
+      var group = cut.mergedMap[siStr];
+      var bid = _bucketIdMap[si];
+      var sz = _bucketSizes[bid] || 0;
+      if (!(group in groupBest) || sz > groupBest[group].size) {
+        groupBest[group] = { bid: bid, size: sz };
+      }
+    }
+    var mergedColors = {};
+    var mergedNames = {};
+    var mergedSizes = {};
+    for (var gid in groupBest) {
+      mergedColors[gid] = _bucketColors[String(groupBest[gid].bid)] || [128, 128, 128];
+      mergedNames[gid] = _bucketNames[String(groupBest[gid].bid)] || ("Bucket " + groupBest[gid].bid);
+    }
+    // Compute merged sizes
+    for (var siStr in cut.mergedMap) {
+      var group = cut.mergedMap[siStr];
+      var bid = _bucketIdMap[parseInt(siStr)];
+      mergedSizes[group] = (mergedSizes[group] || 0) + (_bucketSizes[bid] || 0);
+    }
+    // Compute merged centroids (weighted average)
+    var centSums = {};
+    for (var siStr in cut.mergedMap) {
+      var si = parseInt(siStr);
+      var group = cut.mergedMap[siStr];
+      var bid = _bucketIdMap[si];
+      var cent = _bucketCentroids[bid] || [0, 0, 0];
+      var sz = _bucketSizes[bid] || 0;
+      if (!centSums[group]) centSums[group] = { wx: 0, wy: 0, wz: 0, total: 0 };
+      centSums[group].wx += cent[0] * sz;
+      centSums[group].wy += cent[1] * sz;
+      centSums[group].wz += cent[2] * sz;
+      centSums[group].total += sz;
+    }
+    var mergedCentroids = {};
+    for (var gid in centSums) {
+      var cs = centSums[gid];
+      mergedCentroids[gid] = cs.total > 0
+        ? [cs.wx / cs.total, cs.wy / cs.total, cs.wz / cs.total]
+        : [0, 0, 0];
+    }
+
+    // Recolor points
+    for (var i = 0; i < _nPts; i++) {
+      var bid = _lshBucketIds[i];
+      var si = _bucketIdRevMap[bid];
+      var group = cut.mergedMap[String(si)];
+      if (group === undefined) group = si;
+      _currentBucketMergedIds[i] = group;
+      var rgb = mergedColors[group] || [128, 128, 128];
+      allPoints[i].r = rgb[0];
+      allPoints[i].g = rgb[1];
+      allPoints[i].b = rgb[2];
+      allPoints[i].cluster = group;
+    }
+
+    // Update labels
+    var newLabels = [];
+    for (var gid in mergedNames) {
+      var cent = mergedCentroids[gid] || [0, 0, 0];
+      var rgb = mergedColors[gid] || [128, 128, 128];
+      newLabels.push({
+        cid: parseInt(gid),
+        text: mergedNames[gid],
+        x: cent[0], y: cent[1], z: cent[2] || 0,
+        size: mergedSizes[gid] || 0,
+        leaf_cids: [parseInt(gid)],
+        color: rgb,
+      });
+    }
+    labels = newLabels;
+    labelLevels = { "bucket": newLabels };
+    currentLevelKey = "bucket";
+    allLabelLevels = { "bucket": newLabels };
+    allLevelKeys = ["bucket"];
+
+    // Save z backups for 3D toggle and flatten if currently in 2D
+    zLevelsBackup["bucket"] = newLabels.map(function(c) { return c.z; });
+    if (viewMode === "2d") {
+      newLabels.forEach(function(c) { c.z = 0; });
+    }
+
+    rebuildClusterList();
+    rebuildLayer();
+  }
+
+  function applyColorMode(mode) {
+    if (!_lshBucketIds && mode === "bucket") return;
+    _colorMode = mode;
+
+    // Update button active state
+    var btnCluster = document.getElementById("color-cluster");
+    var btnBucket = document.getElementById("color-bucket");
+    if (btnCluster) btnCluster.style.fontWeight = (mode === "cluster") ? "700" : "normal";
+    if (btnBucket) btnBucket.style.fontWeight = (mode === "bucket") ? "700" : "normal";
+
+    if (mode === "bucket") {
+      _initBucketDendrogram();
+      // Apply at natural k (no merging) — zoom will drive cuts
+      _bucketZoomK = _bucketK;
+      applyBucketCut(0);
+    } else {
+      _bucketZoomK = null;
+      // Restore cluster/dendrogram coloring
+      if (_dendro) {
+        var sl = document.getElementById("dendro-slider");
+        var height = sl ? parseFloat(sl.value) : 0;
+        applyDendrogramCut(height);
+      } else {
+        // No dendrogram: restore grey
+        for (var i = 0; i < _nPts; i++) {
+          allPoints[i].r = 128;
+          allPoints[i].g = 128;
+          allPoints[i].b = 128;
+          allPoints[i].cluster = 0;
+        }
+        rebuildClusterList();
+        rebuildLayer();
+      }
+    }
+
+    // Reset hide/isolate state
+    isolatedCluster = null;
+    hiddenClusters.clear();
+  }
+
+  // Wire color-by buttons
+  (function() {
+    var btnCluster = document.getElementById("color-cluster");
+    var btnBucket = document.getElementById("color-bucket");
+    if (btnCluster) btnCluster.addEventListener("click", function() { applyColorMode("cluster"); });
+    if (btnBucket) btnBucket.addEventListener("click", function() { applyColorMode("bucket"); });
+  })();
+
   // ── Initialize cluster slider UI (replaces discrete level buttons) ──
   (function() {
     if (!_dendro) return;
@@ -2240,7 +2526,47 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
     var kd = document.getElementById("dendro-k-display");
     if (kd) kd.textContent = "k=" + targetK;
   }
+  function _applyBucketZoomK(targetK) {
+    _bucketZoomK = targetK;
+    if (targetK >= _bucketK) {
+      applyBucketCut(0);
+    } else {
+      var lo = 0, hi = _bucketDendroZ[_bucketDendroZ.length - 1][2] * 1.02;
+      for (var bi = 0; bi < 50; bi++) {
+        var mid = (lo + hi) / 2;
+        var c = cutLinkage(_bucketDendroZ, _bucketK, mid);
+        if (!c) break;
+        if (c.k > targetK) lo = mid;
+        else if (c.k < targetK) hi = mid;
+        else { lo = mid; break; }
+      }
+      applyBucketCut(lo);
+    }
+  }
   function getActiveLevels(zoom) {
+    // Bucket mode: zoom-driven bucket dendrogram cuts
+    if (_colorMode === "bucket" && _bucketDendroZ && _bucketK > 0) {
+      var zRange = 6.0;
+      var minK = 2;
+      var t = (zoom - defaultZoom + zRange / 2) / zRange;
+      t = Math.max(0, Math.min(1, t));
+      var targetK = Math.round(minK + t * (_bucketK - minK));
+      targetK = Math.max(minK, Math.min(_bucketK, targetK));
+
+      if (targetK !== _bucketZoomK && targetK !== _bucketZoomPendingK) {
+        _bucketZoomPendingK = targetK;
+        clearTimeout(_bucketZoomTimer);
+        _bucketZoomTimer = setTimeout(function() {
+          if (_bucketZoomPendingK !== null && _bucketZoomPendingK !== _bucketZoomK) {
+            _applyBucketZoomK(_bucketZoomPendingK);
+          }
+          _bucketZoomPendingK = null;
+        }, 150);
+      }
+      return ["bucket"];
+    }
+    if (_colorMode === "bucket") return ["bucket"];
+
     // Dendrogram mode: map scroll-zoom to dendrogram cut level
     // Centered so default zoom ≈ half of naturalK, zooming in → more clusters
     if (_dendro && _naturalK > 0 && _dendroZ) {
@@ -2742,8 +3068,9 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
       // Flatten Z (XY already landscape-oriented from Python)
       for (var i = 0; i < allPoints.length; i++) allPoints[i].z = 0;
       // Flatten Z in all label levels
-      levelKeys.forEach(function(k) {
-        labelLevels[k].forEach(function(c) { c.z = 0; });
+      allLevelKeys.forEach(function(k) {
+        var lvl = allLabelLevels[k] || labelLevels[k];
+        if (lvl) lvl.forEach(function(c) { c.z = 0; });
       });
       // Top-down view, lock rotation, pan-only controller
       dk.setProps({
@@ -2757,10 +3084,13 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
     } else {
       // Restore Z
       for (var i = 0; i < allPoints.length; i++) allPoints[i].z = zBackup[i];
-      // Restore Z in all label levels
-      levelKeys.forEach(function(k) {
+      // Restore Z in all label levels (use backup if available, otherwise keep current z)
+      allLevelKeys.forEach(function(k) {
         var backup = zLevelsBackup[k];
-        labelLevels[k].forEach(function(c, j) { c.z = backup[j]; });
+        var lvl = allLabelLevels[k] || labelLevels[k];
+        if (lvl && backup) {
+          lvl.forEach(function(c, j) { c.z = backup[j]; });
+        }
       });
       // Restore orbit controls
       dk.setProps({
@@ -2985,6 +3315,11 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
             labelsVisible = msg.visible;
             var lcbW = document.getElementById("toggle-labels");
             if (lcbW) lcbW.checked = labelsVisible;
+          }
+          break;
+        case "set_color_mode":
+          if (msg.mode === "cluster" || msg.mode === "bucket") {
+            applyColorMode(msg.mode);
           }
           break;
         case "set_level":
