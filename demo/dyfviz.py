@@ -2118,7 +2118,7 @@ def _render_from_dyf(dyf_path, args):
         print(f"  Enrichment level: {level}")
         if level < 1:
             print(f"  ERROR: .dyf file is level 0 (no UMAP coords). "
-                  f"Run 'python demo/dyf_enrich.py project {dyf_path}' first.")
+                  f"Run 'dyf enrich project {dyf_path}' first.")
             return
         data = idx.extract_all_fields()
 

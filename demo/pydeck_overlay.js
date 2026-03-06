@@ -951,8 +951,12 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
     tourRevealedCids.clear();
     setEdgeHighlight([]);
     document.getElementById("tour-btn").textContent = "▶ Start Tour";
-    document.getElementById("tour-label").style.display = "none";
+    var tlEl = document.getElementById("tour-label");
+    tlEl.style.display = "none";
+    tlEl.classList.remove("narration", "hero");
     document.getElementById("tour-edge-labels").style.display = "none";
+    var introSubEl = document.getElementById("tour-intro-narration");
+    if (introSubEl) introSubEl.style.display = "none";
     document.getElementById("camera-debug").style.display = "none";
     // Restore panel after tour
     if (window.panelHidden) window.togglePanel();
@@ -1288,9 +1292,9 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
       return (a.label.x || 0) - (b.label.x || 0);
     });
 
-    // Check if intro/outro audio exists
-    var hasIntro = tourAudio["intro"] && tourAudio["intro"].data;
-    var hasOutro = tourAudio["outro"] && tourAudio["outro"].data;
+    // Check if intro/outro audio or narration text exists
+    var hasIntro = (tourAudio["intro"] && tourAudio["intro"].data) || tourNarration["intro"];
+    var hasOutro = (tourAudio["outro"] && tourAudio["outro"].data) || tourNarration["outro"];
 
     // Start at -1 for intro if available, otherwise start at 0
     tourIndex = hasIntro ? -1 : 0;
@@ -1379,13 +1383,34 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
         if (!tourRunning || gen !== tourGeneration) return;
         tourLabelEl.textContent = dd ? (dd.tourTitle || "") : __TOUR_TITLE_JSON__;
         tourLabelEl.classList.add("hero");
+        tourLabelEl.classList.remove("narration");
         tourLabelEl.style.display = "block";
         document.getElementById("tour-edge-labels").style.display = "none";
+
+        // Show intro narration text below the hero title
+        if (tourNarration["intro"]) {
+          var introSubEl = document.getElementById("tour-intro-narration");
+          if (!introSubEl) {
+            introSubEl = document.createElement("div");
+            introSubEl.id = "tour-intro-narration";
+            introSubEl.style.cssText = "position:absolute;z-index:51;left:50%;top:60%;" +
+              "transform:translateX(-50%);max-width:700px;font-size:16px;line-height:1.5;" +
+              "background:rgba(0,0,0,0.75);color:#eee;padding:12px 24px;border-radius:8px;" +
+              "text-align:center;pointer-events:none;";
+            document.getElementById("deckgl-wrapper").appendChild(introSubEl);
+          }
+          introSubEl.textContent = tourNarration["intro"];
+          introSubEl.style.display = "block";
+        }
 
         // Play intro audio
         var introDuration = 5000;
         if (tourAudio["intro"] && tourAudio["intro"].data) {
           introDuration = playClusterAudio("intro") + 2000;
+        } else if (tourNarration["intro"]) {
+          // Estimate reading time: ~150 wpm, minimum 5s
+          var words = tourNarration["intro"].split(/\s+/).length;
+          introDuration = Math.max(5000, Math.round(words / 150 * 60000) + 2000);
         }
         tourStopDuration = introDuration;
         startTourProgress();
@@ -1405,7 +1430,12 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
         }
 
         tourIndex++;
-        tourTimerId = setTimeout(visitNext, tourStopDuration);
+        tourTimerId = setTimeout(function() {
+          // Hide intro narration text before moving on
+          var introSubEl = document.getElementById("tour-intro-narration");
+          if (introSubEl) introSubEl.style.display = "none";
+          visitNext();
+        }, tourStopDuration);
         return;
       }
 
@@ -1415,13 +1445,38 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
 
         tourLabelEl.textContent = "Thank You";
         tourLabelEl.classList.add("hero");
+        tourLabelEl.classList.remove("narration");
         tourLabelEl.style.display = "block";
         setEdgeHighlight([]);
         rebuildLayer();
         document.getElementById("tour-edge-labels").style.display = "none";
 
-        // Play outro audio
-        var outroDuration = playClusterAudio("outro") + 2000;
+        // Show outro narration text if present
+        if (tourNarration["outro"]) {
+          var introSubEl = document.getElementById("tour-intro-narration");
+          if (!introSubEl) {
+            introSubEl = document.createElement("div");
+            introSubEl.id = "tour-intro-narration";
+            introSubEl.style.cssText = "position:absolute;z-index:51;left:50%;top:60%;" +
+              "transform:translateX(-50%);max-width:700px;font-size:16px;line-height:1.5;" +
+              "background:rgba(0,0,0,0.75);color:#eee;padding:12px 24px;border-radius:8px;" +
+              "text-align:center;pointer-events:none;";
+            document.getElementById("deckgl-wrapper").appendChild(introSubEl);
+          }
+          introSubEl.textContent = tourNarration["outro"];
+          introSubEl.style.display = "block";
+        }
+
+        // Play outro audio or estimate reading time
+        var outroDuration;
+        if (tourAudio["outro"] && tourAudio["outro"].data) {
+          outroDuration = playClusterAudio("outro") + 2000;
+        } else if (tourNarration["outro"]) {
+          var words = tourNarration["outro"].split(/\s+/).length;
+          outroDuration = Math.max(5000, Math.round(words / 150 * 60000) + 2000);
+        } else {
+          outroDuration = 5000;
+        }
         tourStopDuration = outroDuration;
         startTourProgress();
 
@@ -1460,9 +1515,12 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
         rebuildLayer();
         document.getElementById("tour-btn").textContent = "▶ Start Tour";
         tourLabelEl.style.display = "none";
+        tourLabelEl.classList.remove("narration", "hero");
         document.getElementById("tour-edge-labels").style.display = "none";
         document.getElementById("camera-debug").style.display = "none";
         document.getElementById("tour-edge-labels").innerHTML = "";
+        var introSubEl = document.getElementById("tour-intro-narration");
+        if (introSubEl) introSubEl.style.display = "none";
         // Panel stays hidden after tour (user can toggle manually)
         // Clear tour list highlights
         if (tourListEl) {
@@ -1489,9 +1547,16 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
       var cluster = item.label;
       var cid = item.cid;
 
-      // Hide the big cluster label during visits — the ring identifies the cluster
+      // Show narration text during visits, or hide if none
       tourLabelEl.classList.remove("hero");
-      tourLabelEl.style.display = "none";
+      if (tourNarration[String(cid)]) {
+        tourLabelEl.textContent = tourNarration[String(cid)];
+        tourLabelEl.classList.add("narration");
+        tourLabelEl.style.display = "block";
+      } else {
+        tourLabelEl.classList.remove("narration");
+        tourLabelEl.style.display = "none";
+      }
 
       // Get audio duration (playback deferred to holdClose phase after zoom settles)
       tourStopDuration = getAudioDuration(cid) + 2000 + 4000;  // panZoomIn + audio + 4s buffer

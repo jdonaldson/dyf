@@ -2,11 +2,16 @@
 DYF CLI — entry point for `dyf` command.
 
 Usage:
-    dyf concepts build     # build concept graph
-    dyf concepts query ... # query concepts
-    dyf concepts check     # check staleness
-    dyf concepts list      # list all nodes
-    dyf index-source dir/  # index source code into .dyf
+    dyf concepts build       # build concept graph
+    dyf concepts query ...   # query concepts
+    dyf concepts check       # check staleness
+    dyf concepts list        # list all nodes
+    dyf index-source dir/    # index source code into .dyf
+    dyf enrich project f.dyf # UMAP projection (Level 0→1)
+    dyf enrich cluster f.dyf # Louvain clustering (Level 1→2)
+    dyf enrich viz f.dyf     # Bridge edges + narration (Level 2→3)
+    dyf enrich all f.dyf     # Run all enrichment levels
+    dyf tour f.dyf           # Launch browser viewer with tour
 """
 
 import sys
@@ -21,12 +26,22 @@ def main():
         elif cmd == "index-source":
             from .index_source import main as index_main
             sys.exit(index_main(sys.argv[2:]))
+        elif cmd == "enrich":
+            from .enrich import main as enrich_main
+            enrich_main(sys.argv[2:])
+            sys.exit(0)
+        elif cmd == "tour":
+            from .tour import main as tour_main
+            tour_main(sys.argv[2:])
+            sys.exit(0)
 
     print("Usage: dyf <command>")
     print()
     print("Commands:")
     print("  concepts      Build and query concept graphs from markdown files")
-    print("  index-source  Index source code into a .dyf file (Python, JS, TS, Rust, Go, Java, C, C++)")
+    print("  index-source  Index source code into a .dyf file (Python, JS, TS, Rust, Go, Java, C, C++, OCaml)")
+    print("  enrich        Enrich a .dyf file (UMAP, clustering, narration)")
+    print("  tour          Launch browser viewer with tour autoplay")
     sys.exit(1)
 
 

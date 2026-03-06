@@ -21,6 +21,16 @@ Before embarking on lengthy computation (full-corpus embeddings, model retrainin
 - **Measure before optimizing** — e.g., zstd compression on .dyf files only saved 6% (float16 embeddings are near-random), but cost browser compatibility. Always check actual impact before assuming an optimization matters.
 - When in doubt, spend 10 minutes on a sanity check before spending 2 hours on a solution
 
+
+## Embedding Visualization
+
+On macOS (Apple Silicon), use **[mlx-vis](https://github.com/hanxiao/mlx-vis)** (`pip install mlx-vis`) for UMAP/t-SNE/PaCMAP. Pure MLX on Metal GPU — **9-28x faster** than `umap-learn` (70K points: 5s vs 50s). GPU-rendered scatter plots and animations, no matplotlib.
+
+```python
+from mlx_vis import UMAP
+Y = UMAP(n_components=2, n_neighbors=15).fit_transform(X)
+```
+
 ## DAG-Oriented Task Flow
 
 Prefer DAG (directed acyclic graph) oriented pipelines wherever possible:

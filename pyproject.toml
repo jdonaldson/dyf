@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dyf"
-version = "0.7.1"
+version = "0.7.2"
 description = "Density Yields Features - discover structure in embedding spaces"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -65,6 +65,15 @@ mcp = [
 ]
 source = [
     "tree-sitter-language-pack>=0.4",
+]
+enrich = [
+    "umap-learn>=0.5",
+    "scikit-learn>=1.0",
+    "datashader>=0.16",
+    "pandas>=1.5",
+    "pyarrow>=10.0",
+    "flatbuffers>=24.0",
+    "tornado>=6.0",
 ]
 concepts = [
     "scikit-learn>=1.0",

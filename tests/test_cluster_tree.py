@@ -385,16 +385,9 @@ class TestBackwardCompat:
         This tests that the existing codepath (contrastive TF-IDF) remains
         functional when DAG data is not provided.
         """
-        import os
-        import sys
         from unittest.mock import patch
 
-        # Add demo/ to path
-        demo_dir = os.path.join(os.path.dirname(__file__), '..', 'demo')
-        if demo_dir not in sys.path:
-            sys.path.insert(0, os.path.abspath(demo_dir))
-
-        from dyf_enrich import label_clusters
+        from dyf.enrich._labeling import label_clusters
 
         n = 200
         rng = np.random.default_rng(42)
@@ -405,7 +398,7 @@ class TestBackwardCompat:
         embeddings /= np.linalg.norm(embeddings, axis=1, keepdims=True)
 
         # Without split_keywords — should use contrastive TF-IDF fallback
-        with patch('dyf_enrich._call_ollama', return_value="Test Label"):
+        with patch('dyf.enrich._labeling._call_ollama', return_value="Test Label"):
             names = label_clusters(
                 titles, coords, labels, embeddings,
                 split_keywords=None)

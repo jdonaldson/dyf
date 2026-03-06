@@ -196,7 +196,7 @@ def load_dyf(path: str):
         level = idx.detect_enrichment_level()
         if level < 1:
             print(f"ERROR: {path} is Level 0 (no UMAP coords).")
-            print(f"  Run: python demo/dyf_enrich.py project {path}")
+            print(f"  Run: dyf enrich project {path}")
             sys.exit(1)
         data = idx.extract_all_fields()
 

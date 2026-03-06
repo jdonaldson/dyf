@@ -1,4 +1,4 @@
-"""Tests for dyf_enrich.py enrichment pipeline functions.
+"""Tests for dyf.enrich enrichment pipeline functions.
 
 Covers pure functions (no external services) and mocked tests for
 Ollama/UMAP-dependent code paths.
@@ -6,18 +6,12 @@ Ollama/UMAP-dependent code paths.
 
 import json
 import os
-import sys
 import tempfile
 
 import numpy as np
 import pytest
 
 from dyf import check_rust_available
-
-# Add demo/ to path so we can import dyf_enrich
-_demo_dir = os.path.join(os.path.dirname(__file__), '..', 'demo')
-if _demo_dir not in sys.path:
-    sys.path.insert(0, os.path.abspath(_demo_dir))
 
 pytestmark = pytest.mark.skipif(
     not check_rust_available(), reason="Rust extension not available"
@@ -60,7 +54,7 @@ class TestCollectDescendantIndices:
     """Test _collect_descendant_indices recursion."""
 
     def test_leaf_node(self):
-        from dyf_enrich import _collect_descendant_indices
+        from dyf.enrich._tree import _collect_descendant_indices
 
         leaf_batches = {10: np.array([0, 1, 2])}
         children_of = {}
@@ -68,7 +62,7 @@ class TestCollectDescendantIndices:
         np.testing.assert_array_equal(result, [0, 1, 2])
 
     def test_internal_node(self):
-        from dyf_enrich import _collect_descendant_indices
+        from dyf.enrich._tree import _collect_descendant_indices
 
         leaf_batches = {
             2: np.array([10, 11]),
@@ -79,7 +73,7 @@ class TestCollectDescendantIndices:
         assert set(result.tolist()) == {10, 11, 20, 21, 22}
 
     def test_deep_tree(self):
-        from dyf_enrich import _collect_descendant_indices
+        from dyf.enrich._tree import _collect_descendant_indices
 
         leaf_batches = {
             4: np.array([100]),
@@ -90,7 +84,7 @@ class TestCollectDescendantIndices:
         assert set(result.tolist()) == {100, 200, 201}
 
     def test_empty_node(self):
-        from dyf_enrich import _collect_descendant_indices
+        from dyf.enrich._tree import _collect_descendant_indices
 
         leaf_batches = {}
         children_of = {1: []}
@@ -102,7 +96,7 @@ class TestMergeTinyClusters:
     """Test merge_tiny_clusters merging + relabeling."""
 
     def test_no_merge_needed(self):
-        from dyf_enrich import merge_tiny_clusters
+        from dyf.enrich._cluster import merge_tiny_clusters
 
         n = 200
         labels = np.array([i % 4 for i in range(n)])  # 50 each
@@ -112,7 +106,7 @@ class TestMergeTinyClusters:
         assert set(result.tolist()) == {0, 1, 2, 3}
 
     def test_tiny_cluster_merged(self):
-        from dyf_enrich import merge_tiny_clusters
+        from dyf.enrich._cluster import merge_tiny_clusters
 
         n = 200
         rng = np.random.default_rng(42)
@@ -130,7 +124,7 @@ class TestMergeTinyClusters:
         assert len(unique) == 2
 
     def test_contiguous_relabeling(self):
-        from dyf_enrich import merge_tiny_clusters
+        from dyf.enrich._cluster import merge_tiny_clusters
 
         n = 200
         rng = np.random.default_rng(42)
@@ -152,7 +146,7 @@ class TestComputeTFIDFKeywords:
     """Test TF-IDF keyword extraction."""
 
     def test_basic_keywords(self):
-        from dyf_enrich import _compute_tfidf_keywords
+        from dyf.enrich._labeling import _compute_tfidf_keywords
 
         titles = [
             "cardiac pacemaker implant",
@@ -172,7 +166,7 @@ class TestComputeTFIDFKeywords:
         assert 'orthopedic' in c1_words
 
     def test_empty_cluster(self):
-        from dyf_enrich import _compute_tfidf_keywords
+        from dyf.enrich._labeling import _compute_tfidf_keywords
 
         titles = ["item one", "item two"]
         labels = np.array([0, 0])
@@ -185,7 +179,7 @@ class TestFindNearestCluster:
     """Test L2 nearest cluster centroid lookup."""
 
     def test_finds_nearest(self):
-        from dyf_enrich import _find_nearest_cluster
+        from dyf.enrich._labeling import _find_nearest_cluster
 
         centroids = np.array([
             [0.0, 0.0],
@@ -199,7 +193,7 @@ class TestFindNearestCluster:
         assert nearest in (1, 2)
 
     def test_asymmetric_distance(self):
-        from dyf_enrich import _find_nearest_cluster
+        from dyf.enrich._labeling import _find_nearest_cluster
 
         centroids = np.array([
             [0.0, 0.0],
@@ -214,7 +208,7 @@ class TestSampleSpatial:
     """Test farthest-point sampling."""
 
     def test_returns_k_points(self):
-        from dyf_enrich import _sample_spatial
+        from dyf.enrich._labeling import _sample_spatial
 
         rng = np.random.default_rng(42)
         n = 100
@@ -224,7 +218,7 @@ class TestSampleSpatial:
         assert len(result) == 10
 
     def test_unique_results(self):
-        from dyf_enrich import _sample_spatial
+        from dyf.enrich._labeling import _sample_spatial
 
         rng = np.random.default_rng(42)
         n = 50
@@ -234,7 +228,7 @@ class TestSampleSpatial:
         assert len(set(result)) == 10
 
     def test_small_input(self):
-        from dyf_enrich import _sample_spatial
+        from dyf.enrich._labeling import _sample_spatial
 
         indices = np.array([5, 10, 15])
         coords = np.zeros((20, 2), dtype=np.float32)
@@ -246,7 +240,7 @@ class TestGenerateNarration:
     """Test _generate_narration output structure (no-Ollama fallback path)."""
 
     def _narrate(self, cluster_names, titles, labels, **kwargs):
-        from dyf_enrich import _generate_narration
+        from dyf.enrich._narration import _generate_narration
 
         coords = np.zeros((len(labels), 2), dtype=np.float32)
         return _generate_narration(
@@ -295,7 +289,7 @@ class TestTransferLabelsMajorityVote:
     """Test transfer_labels_majority_vote label transfer + disambiguation."""
 
     def test_basic_transfer(self):
-        from dyf_enrich import transfer_labels_majority_vote
+        from dyf.enrich._labeling import transfer_labels_majority_vote
 
         # 2D primary clusters: 3 clusters, clear separation
         labels_2d = np.array([0, 0, 0, 1, 1, 1, 2, 2, 2])
@@ -311,7 +305,7 @@ class TestTransferLabelsMajorityVote:
         assert names_3d[2] == "Gamma"
 
     def test_different_partition(self):
-        from dyf_enrich import transfer_labels_majority_vote
+        from dyf.enrich._labeling import transfer_labels_majority_vote
 
         # 2D: 2 clusters [0,0,0,0, 1,1,1,1]
         labels_2d = np.array([0, 0, 0, 0, 1, 1, 1, 1])
@@ -328,7 +322,7 @@ class TestTransferLabelsMajorityVote:
         assert names_3d[1] == "Right"
 
     def test_disambiguation(self):
-        from dyf_enrich import transfer_labels_majority_vote
+        from dyf.enrich._labeling import transfer_labels_majority_vote
 
         # Both 3D clusters map to the same 2D cluster (both majority = 0)
         labels_2d = np.array([0, 0, 0, 0, 0, 0])
@@ -343,7 +337,7 @@ class TestTransferLabelsMajorityVote:
         assert names_3d[1] == "AllSame (2)"
 
     def test_many_collisions(self):
-        from dyf_enrich import transfer_labels_majority_vote
+        from dyf.enrich._labeling import transfer_labels_majority_vote
 
         # 4 secondary clusters all map to same primary
         labels_2d = np.array([0] * 20)
@@ -370,7 +364,7 @@ class TestEnrichClusterDual:
         from unittest.mock import patch
         from dyf import build_dyf_tree
         from dyf.lazy_index import write_lazy_index, LazyIndex
-        from dyf_enrich import enrich_cluster
+        from dyf.enrich._cluster import enrich_cluster
 
         n = 200
         embeddings = _make_clustered_embeddings(
@@ -396,7 +390,7 @@ class TestEnrichClusterDual:
             write_lazy_index(tree, embeddings, path, quantization='float32',
                              stored_fields=sf)
 
-            with patch('dyf_enrich._call_ollama',
+            with patch('dyf.enrich._labeling._call_ollama',
                        return_value="Test Label"):
                 enrich_cluster(path, output_path=out_path)
 
@@ -427,7 +421,7 @@ class TestEnrichClusterDual:
         from unittest.mock import patch
         from dyf import build_dyf_tree
         from dyf.lazy_index import write_lazy_index, LazyIndex
-        from dyf_enrich import enrich_cluster
+        from dyf.enrich._cluster import enrich_cluster
 
         n = 200
         embeddings = _make_clustered_embeddings(
@@ -453,7 +447,7 @@ class TestEnrichClusterDual:
             write_lazy_index(tree, embeddings, path, quantization='float32',
                              stored_fields=sf)
 
-            with patch('dyf_enrich._call_ollama',
+            with patch('dyf.enrich._labeling._call_ollama',
                        return_value="Test Label"):
                 enrich_cluster(path, output_path=out_path)
                 # Force re-run on already-clustered file
@@ -479,7 +473,7 @@ class TestCallOllama:
 
     def test_successful_call(self):
         from unittest.mock import patch, MagicMock
-        from dyf_enrich import _call_ollama
+        from dyf.enrich._ollama import _call_ollama
 
         mock_resp = MagicMock()
         mock_resp.read.return_value = json.dumps(
@@ -487,7 +481,7 @@ class TestCallOllama:
         mock_resp.__enter__ = MagicMock(return_value=mock_resp)
         mock_resp.__exit__ = MagicMock(return_value=False)
 
-        with patch('dyf_enrich.urllib.request.urlopen',
+        with patch('dyf.enrich._ollama.urllib.request.urlopen',
                    return_value=mock_resp):
             result = _call_ollama("test-model", "test prompt")
 
@@ -495,9 +489,9 @@ class TestCallOllama:
 
     def test_connection_error(self):
         from unittest.mock import patch
-        from dyf_enrich import _call_ollama
+        from dyf.enrich._ollama import _call_ollama
 
-        with patch('dyf_enrich.urllib.request.urlopen',
+        with patch('dyf.enrich._ollama.urllib.request.urlopen',
                    side_effect=ConnectionRefusedError("no server")):
             result = _call_ollama("test-model", "test prompt")
 
@@ -505,14 +499,14 @@ class TestCallOllama:
 
     def test_json_parse_error(self):
         from unittest.mock import patch, MagicMock
-        from dyf_enrich import _call_ollama
+        from dyf.enrich._ollama import _call_ollama
 
         mock_resp = MagicMock()
         mock_resp.read.return_value = b"not json"
         mock_resp.__enter__ = MagicMock(return_value=mock_resp)
         mock_resp.__exit__ = MagicMock(return_value=False)
 
-        with patch('dyf_enrich.urllib.request.urlopen',
+        with patch('dyf.enrich._ollama.urllib.request.urlopen',
                    return_value=mock_resp):
             result = _call_ollama("test-model", "test prompt")
 
@@ -527,7 +521,7 @@ class TestEnrichProject:
         from unittest.mock import patch, MagicMock
         from dyf import build_dyf_tree
         from dyf.lazy_index import write_lazy_index, LazyIndex
-        from dyf_enrich import enrich_project
+        from dyf.enrich._project import enrich_project
 
         n = 60
         embeddings = _make_clustered_embeddings(
@@ -550,9 +544,9 @@ class TestEnrichProject:
             mock_umap = MagicMock()
             mock_umap.fit_transform.return_value = fake_coords
 
-            with patch('dyf_enrich.suggest_n_neighbors', return_value=15), \
-                 patch('dyf_enrich.run_umap') as mock_run_umap, \
-                 patch('dyf_enrich.orient_landscape',
+            with patch('dyf.enrich._project.suggest_n_neighbors', return_value=15), \
+                 patch('dyf.enrich._project.run_umap') as mock_run_umap, \
+                 patch('dyf.enrich._project.orient_landscape',
                        side_effect=lambda c: c):
                 mock_run_umap.return_value = fake_coords
                 enrich_project(path, output_path=out_path)
@@ -580,7 +574,7 @@ class TestEnrichCluster:
         from unittest.mock import patch
         from dyf import build_dyf_tree
         from dyf.lazy_index import write_lazy_index, LazyIndex
-        from dyf_enrich import enrich_cluster
+        from dyf.enrich._cluster import enrich_cluster
 
         n = 200
         embeddings = _make_clustered_embeddings(
@@ -608,7 +602,7 @@ class TestEnrichCluster:
                              stored_fields=sf)
 
             # Mock _call_ollama to return a simple label
-            with patch('dyf_enrich._call_ollama',
+            with patch('dyf.enrich._labeling._call_ollama',
                        return_value="Test Cluster Label"):
                 enrich_cluster(path, output_path=out_path)
 
@@ -640,7 +634,7 @@ class TestEnrichTree:
         from unittest.mock import patch
         from dyf import build_dyf_tree
         from dyf.lazy_index import write_lazy_index, LazyIndex
-        from dyf_enrich import enrich_tree
+        from dyf.enrich._tree import enrich_tree
 
         n = 200
         embeddings = _make_clustered_embeddings(
@@ -672,7 +666,7 @@ class TestEnrichTree:
                     return "\n".join(lines)
                 return "Test Label"
 
-            with patch('dyf_enrich._call_ollama', side_effect=mock_ollama):
+            with patch('dyf.enrich._tree._call_ollama', side_effect=mock_ollama):
                 enrich_tree(path, target_depth=3, output_path=out_path)
 
             with LazyIndex(out_path) as idx:
@@ -697,7 +691,7 @@ class TestLabelTreeBottomup:
         from unittest.mock import patch
         from dyf import build_dyf_tree
         from dyf.lazy_index import write_lazy_index, LazyIndex
-        from dyf_enrich import label_tree_bottomup
+        from dyf.enrich._tree import label_tree_bottomup
 
         n = 200
         embeddings = _make_clustered_embeddings(
@@ -724,7 +718,7 @@ class TestLabelTreeBottomup:
                     return "\n".join(lines)
                 return "Fallback"
 
-            with patch('dyf_enrich._call_ollama', side_effect=mock_ollama):
+            with patch('dyf.enrich._tree._call_ollama', side_effect=mock_ollama):
                 with LazyIndex(path) as idx:
                     result = label_tree_bottomup(
                         idx, titles, target_depth=3,

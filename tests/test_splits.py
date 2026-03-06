@@ -2,18 +2,12 @@
 
 import json
 import os
-import sys
 import tempfile
 
 import numpy as np
 import pytest
 
 from dyf import check_rust_available
-
-# Add demo/ to path so we can import dyf_enrich
-_demo_dir = os.path.join(os.path.dirname(__file__), '..', 'demo')
-if _demo_dir not in sys.path:
-    sys.path.insert(0, os.path.abspath(_demo_dir))
 
 pytestmark = pytest.mark.skipif(
     not check_rust_available(), reason="Rust extension not available"
@@ -419,7 +413,7 @@ class TestEnrichSplits:
     def test_stores_split_keywords_in_metadata(self):
         from dyf import build_dyf_tree
         from dyf.lazy_index import write_lazy_index, LazyIndex
-        from dyf_enrich import enrich_splits
+        from dyf.enrich._splits import enrich_splits
 
         n = 200
         dim = 32
@@ -477,7 +471,7 @@ class TestEnrichSplits:
     def test_bigram_check_flag(self):
         from dyf import build_dyf_tree
         from dyf.lazy_index import write_lazy_index, LazyIndex
-        from dyf_enrich import enrich_splits
+        from dyf.enrich._splits import enrich_splits
 
         n = 200
         dim = 32
@@ -1033,7 +1027,8 @@ class TestLabelClustersWithSplitContext:
         from unittest.mock import patch
         from dyf import build_dyf_tree
         from dyf.lazy_index import write_lazy_index, LazyIndex
-        from dyf_enrich import enrich_splits, enrich_cluster
+        from dyf.enrich._splits import enrich_splits
+        from dyf.enrich._cluster import enrich_cluster
 
         n = 200
         dim = 32
@@ -1090,7 +1085,7 @@ class TestLabelClustersWithSplitContext:
                 prompts_seen.append(prompt)
                 return "Test Label"
 
-            with patch('dyf_enrich._call_ollama', side_effect=mock_ollama):
+            with patch('dyf.enrich._labeling._call_ollama', side_effect=mock_ollama):
                 enrich_cluster(out_path)
 
             # Verify that at least some prompts were generated
@@ -1106,7 +1101,7 @@ class TestLabelClustersWithSplitContext:
         from unittest.mock import patch
         from dyf import build_dyf_tree
         from dyf.lazy_index import write_lazy_index, LazyIndex
-        from dyf_enrich import enrich_cluster
+        from dyf.enrich._cluster import enrich_cluster
 
         n = 200
         dim = 32
@@ -1135,7 +1130,7 @@ class TestLabelClustersWithSplitContext:
                              stored_fields=sf)
 
             # Cluster WITHOUT splits — should still work (Louvain default)
-            with patch('dyf_enrich._call_ollama',
+            with patch('dyf.enrich._labeling._call_ollama',
                        return_value="Test Label"):
                 enrich_cluster(path, output_path=out_path)
 

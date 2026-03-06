@@ -303,6 +303,13 @@ body.light .tour-edge-label {
   background:rgba(0,0,0,0.8); box-shadow:0 6px 60px rgba(0,0,0,0.7);
   transform:translate(-50%,-50%); letter-spacing:0.02em;
 }
+#tour-label.narration {
+  top:auto !important; bottom:40px; left:50%; transform:translateX(-50%);
+  max-width:700px; font-size:16px; line-height:1.5;
+  background:rgba(0,0,0,0.75); color:#eee;
+  padding:12px 24px; border-radius:8px; text-align:center;
+  white-space:normal !important; position:absolute;
+}
 </style>
 
 <!-- Panel toggle (global for module script access) -->
@@ -394,7 +401,12 @@ try {
     edgePairs: edgePairs,
     tourNarration: tourNarration,
     tourCallouts: {},
-    tourAudio: {},
+    tourAudio: (() => {
+      try {
+        const taJson = dyf.metadata.get("tour_audio");
+        return taJson ? JSON.parse(taJson) : {};
+      } catch(e) { console.warn("[dyf_viewer] Error parsing tour_audio:", e); return {}; }
+    })(),
     tourTitle: file.replace(/\.dyf$/, "").replace(/_/g, " "),
     lshBucketIds: fields.lsh_bucket_ids || null,
     lshBucketColors: lshBucketColors,
@@ -476,6 +488,14 @@ try {
   await import("./pydeck_overlay.js");
 
   console.log(`[dyf_viewer] Loaded ${totalItems} items, dendro=${!!dendrogram}, file=${file}`);
+
+  // Auto-start tour if ?autoplay=1 is in the URL
+  if (params.get("autoplay") === "1") {
+    setTimeout(() => {
+      const tourBtn = document.getElementById("tour-btn");
+      if (tourBtn) tourBtn.click();
+    }, 2000);
+  }
 
 } catch (err) {
   if (loadingStatus) loadingStatus.textContent = `Error: ${err.message}`;

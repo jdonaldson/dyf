@@ -48,7 +48,7 @@ def load_cache(dyf_path: str):
           file=sys.stderr)
     if level < 1:
         print("ERROR: .dyf needs at least level 1 (UMAP coords). "
-              "Run 'python demo/dyf_enrich.py project' first.",
+              "Run 'dyf enrich project' first.",
               file=sys.stderr)
         sys.exit(1)
 
