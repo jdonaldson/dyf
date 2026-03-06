@@ -1,15 +1,18 @@
 """
-Index Python source code into a .dyf file.
+Index source code into a .dyf file.
 
-Chunks at function/class boundaries using AST, embeds via Ollama,
+Chunks at function/class boundaries using tree-sitter, embeds via Ollama,
 builds a DYF tree, and writes a .dyf index.
+
+Supports Python, JavaScript, TypeScript, Rust, Go, Java, C, and C++.
 
 Usage (via CLI):
     dyf index-source src/mypackage/ -o mypackage.dyf
     dyf index-source . -o project.dyf --model nomic-embed-text
+
+Requires: pip install "dyf[source]"
 """
 
-import ast
 import argparse
 import sys
 import time
@@ -25,62 +28,200 @@ from .lazy_index import write_lazy_index
 DEFAULT_OLLAMA_URL = "http://localhost:11434/api/embed"
 DEFAULT_MODEL = "nomic-embed-text"
 
+# Per-language config: file extensions and AST node types to extract as chunks.
+LANG_CONFIG = {
+    "python": {
+        "extensions": [".py"],
+        "chunk_types": ["function_definition", "class_definition"],
+    },
+    "javascript": {
+        "extensions": [".js", ".jsx", ".mjs"],
+        "chunk_types": ["function_declaration", "class_declaration", "method_definition"],
+    },
+    "typescript": {
+        "extensions": [".ts", ".tsx"],
+        "chunk_types": ["function_declaration", "class_declaration", "method_definition"],
+    },
+    "rust": {
+        "extensions": [".rs"],
+        "chunk_types": ["function_item", "struct_item", "impl_item", "trait_item"],
+    },
+    "go": {
+        "extensions": [".go"],
+        "chunk_types": ["function_declaration", "method_declaration", "type_declaration"],
+    },
+    "java": {
+        "extensions": [".java"],
+        "chunk_types": ["class_declaration", "method_declaration", "constructor_declaration"],
+    },
+    "c": {
+        "extensions": [".c", ".h"],
+        "chunk_types": ["function_definition"],
+    },
+    "cpp": {
+        "extensions": [".cpp", ".cc", ".cxx", ".hpp"],
+        "chunk_types": ["function_definition", "class_specifier"],
+    },
+}
 
-def chunk_python_file(path: Path) -> list[dict]:
-    """Extract function/class chunks from a Python file using AST."""
-    source = path.read_text()
-    lines = source.splitlines()
+# Build reverse lookup: extension → (language_name, config)
+_EXT_TO_LANG: dict[str, tuple[str, dict]] = {}
+for _lang, _cfg in LANG_CONFIG.items():
+    for _ext in _cfg["extensions"]:
+        _EXT_TO_LANG[_ext] = (_lang, _cfg)
 
+# All supported extensions for globbing
+SUPPORTED_EXTENSIONS: set[str] = set(_EXT_TO_LANG.keys())
+
+# Parent-like node types (class/struct containers) across languages
+_PARENT_TYPES = {
+    "class_definition",      # python
+    "class_declaration",     # js/ts/java
+    "class_specifier",       # cpp
+    "impl_item",             # rust
+    "trait_item",            # rust
+}
+
+
+def _get_node_name(node) -> str | None:
+    """Extract the name from a tree-sitter node.
+
+    Tries `name` field first, then `type` field (for Rust impl),
+    then `declarator.declarator` (for C/C++), then falls back
+    to first identifier child.
+    """
+    # Most languages: name field
+    name_node = node.child_by_field_name("name")
+    if name_node:
+        return name_node.text.decode("utf-8")
+
+    # Rust impl_item: type field (only for impl_item to avoid matching
+    # C/C++ function return types which also use a "type" field)
+    if node.type == "impl_item":
+        type_node = node.child_by_field_name("type")
+        if type_node:
+            return type_node.text.decode("utf-8")
+
+    # C/C++ function_definition: declarator -> declarator (identifier)
+    decl = node.child_by_field_name("declarator")
+    if decl:
+        inner = decl.child_by_field_name("declarator")
+        if inner:
+            return inner.text.decode("utf-8")
+
+    # Go type_declaration: first type_spec child → first type_identifier child
+    for child in node.children:
+        if child.type == "type_spec":
+            for gc in child.children:
+                if gc.type == "type_identifier":
+                    return gc.text.decode("utf-8")
+
+    # Last resort: first identifier child
+    for child in node.children:
+        if child.type == "identifier" or child.type == "type_identifier":
+            return child.text.decode("utf-8")
+
+    return None
+
+
+def _find_parent_name(node) -> str | None:
+    """Walk up from node to find an enclosing class/struct parent name."""
+    current = node.parent
+    while current:
+        if current.type in _PARENT_TYPES:
+            return _get_node_name(current)
+        current = current.parent
+    return None
+
+
+def _node_kind(node_type: str) -> str:
+    """Map tree-sitter node type to a human-readable kind string."""
+    if "class" in node_type or node_type == "class_specifier":
+        return "class"
+    if "constructor" in node_type:
+        return "constructor"
+    if "struct" in node_type:
+        return "struct"
+    if "trait" in node_type:
+        return "trait"
+    if "impl" in node_type:
+        return "impl"
+    if "type" in node_type:
+        return "type"
+    if "method" in node_type:
+        return "method"
+    return "function"
+
+
+def chunk_source_file(path: Path) -> list[dict]:
+    """Extract function/class/struct chunks from a source file using tree-sitter."""
     try:
-        tree = ast.parse(source)
-    except SyntaxError:
+        from tree_sitter_language_pack import get_parser
+    except ImportError:
+        raise ImportError(
+            "tree-sitter-language-pack is required for source indexing.\n"
+            "Install it with: pip install \"dyf[source]\""
+        )
+
+    ext = path.suffix.lower()
+    if ext not in _EXT_TO_LANG:
         return []
 
-    chunks = []
+    language, config = _EXT_TO_LANG[ext]
+    chunk_types = set(config["chunk_types"])
+
+    source_bytes = path.read_bytes()
+    parser = get_parser(language)
+    tree = parser.parse(source_bytes)
+
+    source_text = source_bytes.decode("utf-8", errors="replace")
+    lines = source_text.splitlines()
     module_name = path.stem
 
-    defs = []
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-            defs.append(node)
+    # Walk tree, collect matching nodes
+    matches = []
 
-    defs.sort(key=lambda n: n.lineno)
+    def walk(node):
+        if node.type in chunk_types:
+            matches.append(node)
+        for child in node.children:
+            walk(child)
 
-    for node in defs:
-        start = node.lineno - 1
-        end = node.end_lineno if node.end_lineno else start + 1
-        chunk_lines = lines[start:end]
-        text = "\n".join(chunk_lines)
+    walk(tree.root_node)
 
-        kind = "class" if isinstance(node, ast.ClassDef) else "def"
+    # Sort by line number
+    matches.sort(key=lambda n: n.start_point[0])
 
-        parent = _find_parent(tree, node)
-        if parent:
-            title = f"{module_name}.{parent.name}.{node.name}"
+    chunks = []
+    for node in matches:
+        start_line = node.start_point[0]
+        end_line = node.end_point[0] + 1
+        chunk_text = "\n".join(lines[start_line:end_line])
+
+        name = _get_node_name(node)
+        if not name:
+            name = f"anonymous_{start_line + 1}"
+
+        kind = _node_kind(node.type)
+
+        parent_name = _find_parent_name(node)
+        if parent_name:
+            title = f"{module_name}.{parent_name}.{name}"
         else:
-            title = f"{module_name}.{node.name}"
+            title = f"{module_name}.{name}"
 
-        embed_text = f"search_document: python {kind} {title}\n{text[:2000]}"
+        embed_text = f"search_document: {language} {kind} {title}\n{chunk_text[:2000]}"
 
         chunks.append({
             "title": title,
             "file": path.name,
             "kind": kind,
-            "line": node.lineno,
+            "line": start_line + 1,
+            "language": language,
             "text": embed_text,
         })
 
     return chunks
-
-
-def _find_parent(tree, target_node):
-    """Find the parent class/function of a node, if any."""
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
-            for child in ast.iter_child_nodes(node):
-                if child is target_node:
-                    return node
-    return None
 
 
 def embed_batch(
@@ -118,26 +259,31 @@ def index_source(
     min_leaf_size: int = 5,
     seed: int = 42,
 ) -> None:
-    """Index Python source into a .dyf file."""
-    print(f"Indexing Python source")
+    """Index source code into a .dyf file."""
+    print(f"Indexing source code")
     print(f"  Source: {source_dir}")
     print(f"  Output: {output}")
     print(f"  Model:  {model}")
 
-    # Chunk all Python files
+    # Chunk all supported source files
     t0 = time.time()
     all_chunks = []
-    for py_file in sorted(source_dir.rglob("*.py")):
-        chunks = chunk_python_file(py_file)
-        all_chunks.extend(chunks)
-        if chunks:
-            print(f"  {py_file.relative_to(source_dir)}: {len(chunks)} chunks")
+    langs_seen: set[str] = set()
+
+    for ext in sorted(SUPPORTED_EXTENSIONS):
+        for src_file in sorted(source_dir.rglob(f"*{ext}")):
+            chunks = chunk_source_file(src_file)
+            all_chunks.extend(chunks)
+            if chunks:
+                langs_seen.add(chunks[0]["language"])
+                print(f"  {src_file.relative_to(source_dir)}: {len(chunks)} chunks")
 
     if not all_chunks:
-        print("No Python chunks found.")
+        print("No source chunks found.")
         sys.exit(1)
 
-    print(f"\nTotal: {len(all_chunks)} chunks in {time.time()-t0:.1f}s")
+    langs_str = ", ".join(sorted(langs_seen))
+    print(f"\nTotal: {len(all_chunks)} chunks ({langs_str}) in {time.time()-t0:.1f}s")
 
     # Embed
     print(f"\nEmbedding with {model}...")
@@ -170,17 +316,19 @@ def index_source(
     files = [c["file"] for c in all_chunks]
     kinds = [c["kind"] for c in all_chunks]
     line_nums = [str(c["line"]) for c in all_chunks]
+    languages = [c["language"] for c in all_chunks]
 
     write_lazy_index(
         tree,
         embeddings,
         str(output),
-        compression="zstd",
+        compression="none",
         quantization="float16",
         metadata={
             "embedding_model": model,
-            "domain": "python source code",
-            "chunk_method": "ast_function_class",
+            "domain": "source code",
+            "chunk_method": "tree_sitter",
+            "languages": langs_str,
         },
         build_params={
             "max_depth": max_depth,
@@ -193,6 +341,7 @@ def index_source(
             "file": files,
             "kind": kinds,
             "line": line_nums,
+            "language": languages,
         },
     )
     size_mb = output.stat().st_size / (1024 * 1024)
@@ -204,12 +353,12 @@ def main(argv: list[str] | None = None) -> int:
     """CLI entry point for `dyf index-source`."""
     parser = argparse.ArgumentParser(
         prog="dyf index-source",
-        description="Index Python source code into a .dyf file",
+        description="Index source code into a .dyf file (Python, JS, TS, Rust, Go, Java, C, C++)",
     )
     parser.add_argument(
         "source_dir",
         type=Path,
-        help="Directory containing Python source files",
+        help="Directory containing source files",
     )
     parser.add_argument(
         "-o", "--output",

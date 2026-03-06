@@ -6,7 +6,7 @@ Usage:
     dyf concepts query ... # query concepts
     dyf concepts check     # check staleness
     dyf concepts list      # list all nodes
-    dyf index-source dir/  # index Python source into .dyf
+    dyf index-source dir/  # index source code into .dyf
 """
 
 import sys
@@ -26,7 +26,7 @@ def main():
     print()
     print("Commands:")
     print("  concepts      Build and query concept graphs from markdown files")
-    print("  index-source  Index Python source code into a .dyf file")
+    print("  index-source  Index source code into a .dyf file (Python, JS, TS, Rust, Go, Java, C, C++)")
     sys.exit(1)
 
 
