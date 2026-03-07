@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DYF Tree View</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 0; overflow-x: hidden; overflow-y: auto;
+      background: #1a1a2e; color: #ddd;
+      font-family: -apple-system, 'Segoe UI', sans-serif;
+    }
+    #header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+      padding: 10px 20px;
+      background: rgba(26,26,46,0.9);
+      border-bottom: 1px solid #333;
+      backdrop-filter: blur(8px);
+      display: flex; align-items: center; gap: 16px;
+    }
+    #header-title { font-size: 22px; font-weight: 700; }
+    #header-subtitle { font-size: 12px; opacity: 0.6; }
+    .nav-btn {
+      padding: 4px 10px; border-radius: 4px;
+      background: #333; color: #aaa; border: 1px solid #555;
+      font-size: 11px; cursor: pointer; text-decoration: none;
+      transition: background 0.15s;
+    }
+    .nav-btn:hover { background: #444; color: #ddd; }
+    .depth-control {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 11px; color: #aaa;
+    }
+    .depth-control input[type="range"] {
+      width: 80px; height: 4px;
+      -webkit-appearance: none; background: #555; border-radius: 2px;
+      outline: none; accent-color: #888;
+    }
+    .depth-control input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 12px; height: 12px;
+      background: #aaa; border-radius: 50%; cursor: pointer;
+    }
+    .depth-control span { min-width: 14px; text-align: center; font-family: monospace; }
+    #loading {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 16px; z-index: 100; text-align: center; opacity: 0.8;
+    }
+    #loading .spinner {
+      display: inline-block; width: 24px; height: 24px;
+      border: 3px solid rgba(255,255,255,0.2); border-top-color: #7af;
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+      margin-bottom: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #sankey { width: 100vw; margin-top: 48px; }
+    #minimap {
+      position: fixed; bottom: 16px; right: 16px; z-index: 20;
+      background: rgba(26,26,46,0.92); border: 1px solid #444;
+      border-radius: 4px; overflow: hidden; cursor: pointer;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.5);
+      display: none; /* shown after first render */
+    }
+    #minimap img { display: block; width: 100%; height: 100%; }
+    #minimap-viewport {
+      position: absolute; left: 0; right: 0;
+      border: 2px solid rgba(120,180,255,0.8);
+      background: rgba(120,180,255,0.12);
+      pointer-events: none; border-radius: 2px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="minimap">
+  <img id="minimap-img" src="" alt="minimap">
+  <div id="minimap-viewport"></div>
+</div>
+
+<div id="header">
+  <div id="header-title">DYF Tree</div>
+  <a id="viewer-link" class="nav-btn" href="#">Point Cloud</a>
+  <div class="depth-control">
+    <label for="depth-slider">Depth</label>
+    <input type="range" id="depth-slider" min="1" max="4" value="3">
+    <span id="depth-val">3</span>
+  </div>
+  <div id="header-subtitle"></div>
+</div>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <br><span id="load-status">Loading .dyf file...</span>
+</div>
+
+<div id="sankey"></div>
+
+<script type="module">
+import { loadDyf } from "./js/dyf_reader.mjs";
+
+const params = new URLSearchParams(location.search);
+const file = params.get("file") || "gudid_50k_louvain.dyf";
+const statusEl = document.getElementById("load-status");
+
+document.getElementById("viewer-link").href = `dyf_viewer.html?file=${encodeURIComponent(file)}`;
+
+try {
+  const dyf = await loadDyf(file, s => { statusEl.textContent = s; });
+  const { treeNodes, rootNodeId, totalItems, dendrogram } = dyf;
+
+  if (!treeNodes || treeNodes.length === 0) {
+    statusEl.textContent = "Error: .dyf file has no tree nodes";
+    throw new Error("No tree nodes");
+  }
+
+  statusEl.textContent = "Building Sankey...";
+
+  // ── 1. DFS to assign leaf ordinals (stable, computed once) ──────────
+  const leafOrdinals = {};
+  let leafOrd = 0;
+  function assignLeafOrdinals(nodeId) {
+    const node = treeNodes[nodeId];
+    if (node.batchIndex >= 0) leafOrdinals[nodeId] = leafOrd++;
+    for (const childId of node.children) assignLeafOrdinals(childId);
+  }
+  assignLeafOrdinals(rootNodeId);
+
+  // ── 2. Collect nodes by depth level (stable, computed once) ─────────
+  const levelNodes = {};
+  function walkTree(nodeId, parentNodeId, walkDepth) {
+    if (!levelNodes[walkDepth]) levelNodes[walkDepth] = [];
+    levelNodes[walkDepth].push({ nodeId, parentNodeId });
+    const node = treeNodes[nodeId];
+    for (const childId of node.children) walkTree(childId, nodeId, walkDepth + 1);
+  }
+  walkTree(rootNodeId, null, 0);
+
+  const maxDepth = Math.max(...Object.keys(levelNodes).map(Number));
+  const minDisplaySize = Math.max(10, Math.floor(totalItems / 200));
+  const hasCommunities = !!(dendrogram && dendrogram.leafToCommunity && dendrogram.Z);
+
+  // Helper: find all tree leaves in a subtree
+  function getSubtreeLeaves(nodeId) {
+    const leaves = [];
+    function dfs(nid) {
+      const n = treeNodes[nid];
+      if (n.batchIndex >= 0) leaves.push(nid);
+      for (const cid of n.children) dfs(cid);
+    }
+    dfs(nodeId);
+    return leaves;
+  }
+
+  // Union-find dendrogram cut
+  function cutDendrogram(Z, naturalK, targetK) {
+    const parent = {};
+    for (let i = 0; i < naturalK; i++) parent[i] = i;
+    function find(x) {
+      while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; }
+      return x;
+    }
+    const nMerges = naturalK - targetK;
+    for (let r = 0; r < nMerges && r < Z.length; r++) {
+      const newId = naturalK + r;
+      parent[newId] = newId;
+      parent[find(Z[r][0])] = newId;
+      parent[find(Z[r][1])] = newId;
+    }
+    const result = {};
+    for (let i = 0; i < naturalK; i++) result[i] = find(i);
+    return result;
+  }
+
+  function rgbToRgba(r, g, b, a) {
+    return `rgba(${Math.round(r)},${Math.round(g)},${Math.round(b)},${a})`;
+  }
+
+  // Pre-compute dendrogram cut levels
+  let dendroLevels = [];
+  if (hasCommunities) {
+    const { Z, naturalK } = dendrogram;
+    const kValues = [naturalK];
+    let k = naturalK;
+    while (k > 6) {
+      k = Math.round(k / 2);
+      if (k < 3) k = 3;
+      kValues.push(k);
+      if (k <= 3) break;
+    }
+    for (const kv of kValues) {
+      dendroLevels.push({ k: kv, mapping: kv === naturalK ? null : cutDendrogram(Z, naturalK, kv) });
+    }
+  }
+
+  // ── Configure slider ───────────────────────────────────────────────
+  const depthSlider = document.getElementById("depth-slider");
+  const depthVal = document.getElementById("depth-val");
+  depthSlider.min = 1;
+  depthSlider.max = maxDepth;
+  const defaultDepth = Math.min(3, maxDepth);
+  depthSlider.value = defaultDepth;
+  depthVal.textContent = defaultDepth;
+
+  // ── Header info ────────────────────────────────────────────────────
+  const fileName = file.replace(/\.dyf$/, "").replace(/_/g, " ");
+  const nComm = hasCommunities ? Object.keys(dendrogram.communityNames || {}).length : 0;
+  document.getElementById("header-title").textContent = `${fileName} — Tree`;
+  document.getElementById("header-subtitle").textContent =
+    `${totalItems.toLocaleString()} items | ${maxDepth + 1} levels | ${treeNodes.length} nodes | ${leafOrd} leaves` +
+    (nComm ? ` | ${nComm} communities` : "");
+
+  // ══════════════════════════════════════════════════════════════════
+  // renderSankey(showDepth) — rebuild and render the entire Sankey
+  // ══════════════════════════════════════════════════════════════════
+  function renderSankey(showDepth) {
+    const sankeyNodes = [];
+    const sankeyLinks = [];
+    const nodeToSankey = {};
+
+    // ── 3. Tree columns (clamped to showDepth) ──────────────────────
+    for (let depth = 0; depth <= showDepth; depth++) {
+      const nodesAtLevel = levelNodes[depth] || [];
+
+      if (depth <= 2 && depth < showDepth) {
+        // Show every node at shallow non-terminal levels
+        for (const { nodeId, parentNodeId } of nodesAtLevel) {
+          const node = treeNodes[nodeId];
+          const idx = sankeyNodes.length;
+          sankeyNodes.push({
+            label: `L${depth} (${node.numItems.toLocaleString()})`,
+            level: depth, numItems: node.numItems, treeNodeIds: [nodeId],
+          });
+          nodeToSankey[nodeId] = idx;
+          if (parentNodeId !== null && nodeToSankey[parentNodeId] !== undefined) {
+            sankeyLinks.push({ source: nodeToSankey[parentNodeId], target: idx, value: node.numItems });
+          }
+        }
+      } else {
+        // Collapse small children at deep or terminal levels
+        const byParent = {};
+        for (const { nodeId, parentNodeId } of nodesAtLevel) {
+          const pk = String(parentNodeId);
+          if (!byParent[pk]) byParent[pk] = [];
+          byParent[pk].push(nodeId);
+        }
+        for (const [pk, childIds] of Object.entries(byParent)) {
+          const parentSankey = nodeToSankey[parseInt(pk)];
+          if (parentSankey === undefined) continue;
+          childIds.sort((a, b) => treeNodes[b].numItems - treeNodes[a].numItems);
+          const otherNodeIds = [];
+          let otherItems = 0;
+          for (const childId of childIds) {
+            const node = treeNodes[childId];
+            if (node.numItems >= minDisplaySize) {
+              const idx = sankeyNodes.length;
+              sankeyNodes.push({
+                label: `L${depth} (${node.numItems.toLocaleString()})`,
+                level: depth, numItems: node.numItems, treeNodeIds: [childId],
+              });
+              nodeToSankey[childId] = idx;
+              sankeyLinks.push({ source: parentSankey, target: idx, value: node.numItems });
+            } else {
+              otherNodeIds.push(childId);
+              otherItems += node.numItems;
+            }
+          }
+          if (otherItems > 0) {
+            const idx = sankeyNodes.length;
+            sankeyNodes.push({
+              label: `L${depth} other (${otherItems.toLocaleString()})`,
+              level: depth, numItems: otherItems, treeNodeIds: otherNodeIds,
+            });
+            sankeyLinks.push({ source: parentSankey, target: idx, value: otherItems });
+          }
+        }
+      }
+    }
+
+    // ── 4. Community columns ──────────────────────────────────────────
+    if (hasCommunities) {
+      const { leafToCommunity, communityNames, communityColors, communitySizes, naturalK } = dendrogram;
+      const communityIds = [...new Set(Object.values(leafToCommunity))].sort((a, b) => a - b);
+
+      // Finest level
+      const finestLevel = showDepth + 1;
+      const fineSankeyMap = {};
+      for (const cid of communityIds) {
+        const idx = sankeyNodes.length;
+        const name = communityNames?.[String(cid)] || `Community ${cid}`;
+        const size = communitySizes?.[String(cid)] || 0;
+        fineSankeyMap[cid] = idx;
+        sankeyNodes.push({
+          label: `${name} (${size.toLocaleString()})`,
+          level: finestLevel, numItems: size, treeNodeIds: [],
+          communityId: cid, dendroLevel: 0,
+        });
+      }
+
+      // Link tree terminals → fine communities
+      const hasOutgoing = new Set(sankeyLinks.map(l => l.source));
+      for (let si = 0; si < sankeyNodes.length; si++) {
+        if (hasOutgoing.has(si)) continue;
+        if (sankeyNodes[si].communityId !== undefined) continue;
+        const sn = sankeyNodes[si];
+        const flow = {};
+        for (const treeNodeId of sn.treeNodeIds) {
+          for (const leafNodeId of getSubtreeLeaves(treeNodeId)) {
+            const ord = leafOrdinals[leafNodeId];
+            if (ord !== undefined) {
+              const cid = leafToCommunity[String(ord)];
+              if (cid !== undefined)
+                flow[cid] = (flow[cid] || 0) + treeNodes[leafNodeId].numItems;
+            }
+          }
+        }
+        for (const [cid, count] of Object.entries(flow)) {
+          if (fineSankeyMap[cid] !== undefined)
+            sankeyLinks.push({ source: si, target: fineSankeyMap[cid], value: count });
+        }
+      }
+
+      // Coarser levels
+      let prevSankeyMap = fineSankeyMap;
+      let prevIds = communityIds;
+      for (let li = 1; li < dendroLevels.length; li++) {
+        const { k: kv, mapping } = dendroLevels[li];
+        const colLevel = showDepth + 1 + li;
+
+        const coarseGroups = {};
+        for (const fineId of communityIds) {
+          const coarseId = mapping[fineId];
+          if (!coarseGroups[coarseId]) coarseGroups[coarseId] = { fineIds: [], totalItems: 0 };
+          coarseGroups[coarseId].fineIds.push(fineId);
+          coarseGroups[coarseId].totalItems += (communitySizes?.[String(fineId)] || 0);
+        }
+
+        const prevToCoarse = {};
+        for (const prevId of prevIds) {
+          if (li === 1) {
+            prevToCoarse[prevId] = mapping[prevId];
+          } else {
+            const prevMapping = dendroLevels[li - 1].mapping;
+            const fineMembers = communityIds.filter(fid =>
+              (prevMapping ? prevMapping[fid] : fid) === prevId
+            );
+            if (fineMembers.length > 0) prevToCoarse[prevId] = mapping[fineMembers[0]];
+          }
+        }
+
+        const coarseSankeyMap = {};
+        for (const [gid, group] of Object.entries(coarseGroups)) {
+          const idx = sankeyNodes.length;
+          const largestFine = group.fineIds.reduce((best, fid) => {
+            const s = communitySizes?.[String(fid)] || 0;
+            return s > (best.size || 0) ? { id: fid, size: s } : best;
+          }, {});
+          const name = communityNames?.[String(largestFine.id)] || `Group ${gid}`;
+          coarseSankeyMap[gid] = idx;
+          sankeyNodes.push({
+            label: group.fineIds.length > 1
+              ? `${name} +${group.fineIds.length - 1} (${group.totalItems.toLocaleString()})`
+              : `${name} (${group.totalItems.toLocaleString()})`,
+            level: colLevel, numItems: group.totalItems, treeNodeIds: [],
+            communityId: Number(gid), dendroLevel: li,
+          });
+        }
+
+        for (const prevId of prevIds) {
+          const coarseId = prevToCoarse[prevId];
+          if (coarseId !== undefined && prevSankeyMap[prevId] !== undefined && coarseSankeyMap[coarseId] !== undefined) {
+            sankeyLinks.push({
+              source: prevSankeyMap[prevId],
+              target: coarseSankeyMap[coarseId],
+              value: sankeyNodes[prevSankeyMap[prevId]].numItems,
+            });
+          }
+        }
+        prevSankeyMap = coarseSankeyMap;
+        prevIds = Object.keys(coarseGroups).map(Number);
+      }
+    }
+
+    // ── 5. Colors ─────────────────────────────────────────────────────
+    const nodeColors = sankeyNodes.map(() => "rgba(150,150,150,0.6)");
+    const linkColors = sankeyLinks.map(() => "rgba(150,150,150,0.15)");
+
+    if (hasCommunities) {
+      const { communityColors, communityNames, leafToCommunity, communitySizes } = dendrogram;
+      const communityIds = [...new Set(Object.values(leafToCommunity))].sort((a, b) => a - b);
+
+      for (let i = 0; i < sankeyNodes.length; i++) {
+        const sn = sankeyNodes[i];
+        if (sn.dendroLevel === 0 && sn.communityId !== undefined) {
+          const c = communityColors?.[String(sn.communityId)];
+          if (c) nodeColors[i] = rgbToRgba(c[0], c[1], c[2], 0.85);
+        }
+      }
+
+      for (let i = 0; i < sankeyNodes.length; i++) {
+        const sn = sankeyNodes[i];
+        if (sn.dendroLevel > 0 && sn.communityId !== undefined) {
+          const mapping = dendroLevels[sn.dendroLevel].mapping;
+          let bestFine = null, bestSize = 0;
+          for (const fid of communityIds) {
+            if (mapping[fid] === sn.communityId) {
+              const s = communitySizes?.[String(fid)] || 0;
+              if (s > bestSize) { bestFine = fid; bestSize = s; }
+            }
+          }
+          if (bestFine !== null) {
+            const c = communityColors?.[String(bestFine)];
+            if (c) nodeColors[i] = rgbToRgba(c[0], c[1], c[2], 0.85);
+          }
+        }
+      }
+
+      for (let i = 0; i < sankeyNodes.length; i++) {
+        const sn = sankeyNodes[i];
+        if (sn.communityId !== undefined) continue;
+        const communityCount = {};
+        for (const treeNodeId of sn.treeNodeIds) {
+          for (const leafNodeId of getSubtreeLeaves(treeNodeId)) {
+            const ord = leafOrdinals[leafNodeId];
+            if (ord !== undefined) {
+              const cid = leafToCommunity[String(ord)];
+              if (cid !== undefined)
+                communityCount[cid] = (communityCount[cid] || 0) + treeNodes[leafNodeId].numItems;
+            }
+          }
+        }
+        let dominant = null, maxCount = 0;
+        for (const [cid, cnt] of Object.entries(communityCount)) {
+          if (cnt > maxCount) { dominant = cid; maxCount = cnt; }
+        }
+        if (dominant !== null) {
+          const c = communityColors?.[String(dominant)];
+          if (c) nodeColors[i] = rgbToRgba(c[0], c[1], c[2], 0.7);
+        }
+      }
+
+      for (let i = 0; i < sankeyLinks.length; i++) {
+        const targetIdx = sankeyLinks[i].target;
+        const sn = sankeyNodes[targetIdx];
+        if (sn.communityId !== undefined) {
+          let colorCid = sn.communityId;
+          if (sn.dendroLevel > 0) {
+            const mapping = dendroLevels[sn.dendroLevel].mapping;
+            let bestFine = null, bestSize = 0;
+            for (const fid of communityIds) {
+              if (mapping[fid] === sn.communityId) {
+                const s = communitySizes?.[String(fid)] || 0;
+                if (s > bestSize) { bestFine = fid; bestSize = s; }
+              }
+            }
+            if (bestFine !== null) colorCid = bestFine;
+          }
+          const c = communityColors?.[String(colorCid)];
+          if (c) linkColors[i] = rgbToRgba(c[0], c[1], c[2], 0.4);
+        } else {
+          const color = nodeColors[targetIdx];
+          if (color && color.startsWith("rgba("))
+            linkColors[i] = color.replace(/,[^,]+\)$/, ",0.15)");
+        }
+      }
+    }
+
+    // ── 6. X and Y positions ──────────────────────────────────────────
+    const maxLevel = Math.max(...sankeyNodes.map(n => n.level));
+    const numColumns = maxLevel + 1;
+    const nodeX = sankeyNodes.map(n => 0.001 + (n.level / Math.max(numColumns - 1, 1)) * 0.998);
+    const nodeY = new Array(sankeyNodes.length).fill(0.5);
+
+    const incoming = {};
+    for (let i = 0; i < sankeyLinks.length; i++) {
+      const t = sankeyLinks[i].target;
+      if (!incoming[t]) incoming[t] = [];
+      incoming[t].push({ source: sankeyLinks[i].source, weight: sankeyLinks[i].value });
+    }
+    const colNodes = {};
+    for (let i = 0; i < sankeyNodes.length; i++) {
+      const x = nodeX[i];
+      if (!colNodes[x]) colNodes[x] = [];
+      colNodes[x].push(i);
+    }
+    for (const col of Object.keys(colNodes).sort((a, b) => a - b)) {
+      const indices = colNodes[col];
+      if (indices.length === 1) { nodeY[indices[0]] = 0.5; continue; }
+      const targetY = {};
+      for (const idx of indices) {
+        const sources = incoming[idx] || [];
+        if (sources.length > 0) {
+          const totalW = sources.reduce((s, e) => s + e.weight, 0);
+          targetY[idx] = totalW > 0
+            ? sources.reduce((s, e) => s + nodeY[e.source] * e.weight, 0) / totalW
+            : 0.5;
+        } else {
+          targetY[idx] = 0.5;
+        }
+      }
+      indices.sort((a, b) => targetY[a] - targetY[b]);
+      for (let j = 0; j < indices.length; j++) {
+        nodeY[indices[j]] = 0.02 + (j / Math.max(indices.length - 1, 1)) * 0.96;
+      }
+    }
+
+    // ── 7. Column headers ─────────────────────────────────────────────
+    const colNames = [];
+    for (let d = 0; d <= showDepth; d++) colNames.push(`Level ${d}`);
+    if (hasCommunities) {
+      for (const dl of dendroLevels)
+        colNames.push(dl.mapping === null ? `Communities (k=${dl.k})` : `k=${dl.k}`);
+    }
+    const xPositions = colNames.map((_, i) => 0.001 + (i / Math.max(colNames.length - 1, 1)) * 0.998);
+    const annotations = colNames.map((name, i) => ({
+      x: xPositions[i], y: 1.04, xref: "paper", yref: "paper",
+      text: `<b>${name}</b>`, showarrow: false, font: { size: 12, color: "#999" },
+    }));
+
+    // ── 8. Render ─────────────────────────────────────────────────────
+    const colCounts = {};
+    for (const sn of sankeyNodes) colCounts[sn.level] = (colCounts[sn.level] || 0) + 1;
+    const maxNodesInCol = Math.max(...Object.values(colCounts));
+    const plotHeight = Math.max(window.innerHeight - 48, maxNodesInCol * 25);
+    document.getElementById("sankey").style.height = plotHeight + "px";
+
+    Plotly.react("sankey", [{
+      type: "sankey",
+      arrangement: "snap",
+      node: {
+        pad: 2, thickness: 15,
+        line: { color: "rgba(50,50,50,0.5)", width: 0.5 },
+        label: sankeyNodes.map(n => n.label),
+        color: nodeColors, x: nodeX, y: nodeY,
+      },
+      link: {
+        source: sankeyLinks.map(l => l.source),
+        target: sankeyLinks.map(l => l.target),
+        value: sankeyLinks.map(l => l.value),
+        color: linkColors,
+      },
+    }], {
+      font: { size: 10, color: "#ccc" },
+      paper_bgcolor: "#1a1a2e", plot_bgcolor: "#1a1a2e",
+      height: plotHeight,
+      margin: { l: 10, r: 10, t: 40, b: 40 },
+      annotations,
+    }, {
+      responsive: true, scrollZoom: true, displayModeBar: false,
+    });
+
+    console.log(`[dyf_tree_view] depth=${showDepth}: ${sankeyNodes.length} nodes, ${sankeyLinks.length} links`);
+
+    // ── 9. Minimap ──────────────────────────────────────────────────
+    updateMinimap(plotHeight);
+  }
+
+  // ── Minimap logic ──────────────────────────────────────────────────
+  const minimapEl = document.getElementById("minimap");
+  const minimapImg = document.getElementById("minimap-img");
+  const minimapVp = document.getElementById("minimap-viewport");
+  const MINIMAP_W = 130;
+
+  function updateMinimap(plotHeight) {
+    const sankeyEl = document.getElementById("sankey");
+    // Capture chart as image after a brief delay for render
+    requestAnimationFrame(() => {
+      Plotly.toImage(sankeyEl, { format: "png", width: 800, height: Math.round(plotHeight * (800 / window.innerWidth)) })
+        .then(url => {
+          const aspect = plotHeight / window.innerWidth;
+          const minimapH = Math.min(Math.round(MINIMAP_W * aspect), window.innerHeight - 100);
+          minimapEl.style.width = MINIMAP_W + "px";
+          minimapEl.style.height = minimapH + "px";
+          minimapImg.src = url;
+          minimapEl.style.display = "block";
+          minimapEl._plotHeight = plotHeight;
+          minimapEl._minimapH = minimapH;
+          updateMinimapViewport();
+        });
+    });
+  }
+
+  function updateMinimapViewport() {
+    if (!minimapEl._plotHeight) return;
+    const totalH = minimapEl._plotHeight + 48; // include header offset
+    const viewH = window.innerHeight;
+    const scrollY = window.scrollY;
+    const minimapH = minimapEl._minimapH;
+
+    const vpTop = (scrollY / totalH) * minimapH;
+    const vpHeight = Math.max(8, (viewH / totalH) * minimapH);
+    minimapVp.style.top = vpTop + "px";
+    minimapVp.style.height = vpHeight + "px";
+  }
+
+  window.addEventListener("scroll", updateMinimapViewport, { passive: true });
+  window.addEventListener("resize", updateMinimapViewport, { passive: true });
+
+  // Click/drag on minimap to scroll
+  function minimapScrollTo(e) {
+    const rect = minimapEl.getBoundingClientRect();
+    const clickY = (e.clientY - rect.top) / rect.height;
+    const totalH = minimapEl._plotHeight + 48;
+    const targetScroll = clickY * totalH - window.innerHeight / 2;
+    window.scrollTo({ top: Math.max(0, targetScroll), behavior: "smooth" });
+  }
+
+  let minimapDragging = false;
+  minimapEl.addEventListener("mousedown", (e) => {
+    minimapDragging = true;
+    minimapScrollTo(e);
+    e.preventDefault();
+  });
+  window.addEventListener("mousemove", (e) => {
+    if (minimapDragging) minimapScrollTo(e);
+  });
+  window.addEventListener("mouseup", () => { minimapDragging = false; });
+
+  // ── Initial render ─────────────────────────────────────────────────
+  renderSankey(defaultDepth);
+  document.getElementById("loading").style.display = "none";
+
+  // ── Slider interaction ─────────────────────────────────────────────
+  depthSlider.addEventListener("input", () => {
+    const d = parseInt(depthSlider.value);
+    depthVal.textContent = d;
+    renderSankey(d);
+  });
+
+} catch (err) {
+  if (statusEl) statusEl.textContent = `Error: ${err.message}`;
+  console.error("[dyf_tree_view]", err);
+}
+</script>
+</body>
+</html>

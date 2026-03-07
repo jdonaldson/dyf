@@ -95,6 +95,14 @@ class FBTable {
     const tablePos = elemPos + this.dv.getUint32(elemPos, true);
     return new FBTable(this.buf, tablePos);
   }
+
+  getVectorUint32At(slot, index) {
+    const off = this._fieldOffset(slot);
+    if (!off) return 0;
+    const vecOffset = this.pos + off + this.dv.getUint32(this.pos + off, true);
+    // Scalar vector: [length:u32, elem0:u32, elem1:u32, ...]
+    return this.dv.getUint32(vecOffset + 4 + index * 4, true);
+  }
 }
 
 function getRootTable(buf) {
@@ -120,6 +128,38 @@ function getRootTable(buf) {
 //                    3: seed (u64), 4: quantization (string), 5: compression (string)
 // KeyValue slots: 0: key (string), 1: value (string)
 
+// ── Node parsing ──────────────────────────────────────────────────────────
+// Node table slots (from dyf_index.fbs):
+//   0: children (vector of uint32)
+//   1: hyperplanes (vector of float32)
+//   2: num_bits (uint8)
+//   3: bucket_ids_to_children (vector of uint64)
+//   4: centroid (vector of float32)
+//   5: num_items (uint32)
+//   6: batch_index (int32, default -1)
+//   7: depth (uint8) — NOTE: stores height (distance to deepest leaf), NOT depth from root
+//   8: eigenvalues (vector of float32)
+
+function parseNodes(root) {
+  const numNodes = root.getVectorLength(5); // slot 5 = nodes vector in Index table
+  const nodes = [];
+  for (let i = 0; i < numNodes; i++) {
+    const node = root.getVectorTableAt(5, i);
+    const numChildren = node.getVectorLength(0);
+    const children = [];
+    for (let j = 0; j < numChildren; j++) {
+      children.push(node.getVectorUint32At(0, j));
+    }
+    nodes.push({
+      children,
+      numItems: node.getUint32(5),
+      batchIndex: node.getInt32(6, -1),
+      depth: node.getUint8(7),
+    });
+  }
+  return nodes;
+}
+
 function parseIndex(fbBuf) {
   const root = getRootTable(fbBuf);
 
@@ -128,6 +168,9 @@ function parseIndex(fbBuf) {
   const totalItems = root.getUint64(2);
   const numLeaves = root.getUint32(3);
   const rootNodeId = root.getUint32(4);
+
+  // Parse nodes
+  const nodes = parseNodes(root);
 
   // Parse batches
   const numBatches = root.getVectorLength(6);
@@ -173,6 +216,7 @@ function parseIndex(fbBuf) {
     totalItems,
     numLeaves,
     rootNodeId,
+    nodes,
     batches,
     buildParams,
     metadata,
@@ -269,6 +313,8 @@ export async function loadDyf(url, onProgress) {
       clusterNames: {},
       clusterCentroids: {},
       buildParams: index.buildParams,
+      treeNodes: index.nodes,
+      rootNodeId: index.rootNodeId,
     };
   }
 
@@ -330,7 +376,11 @@ export async function loadDyf(url, onProgress) {
       console.warn(`Batch ${bi}: no item_index column, skipping`);
       continue;
     }
-    const itemIndices = itemIndexCol.toArray();
+    const rawItemIndices = itemIndexCol.toArray();
+    // Arrow JS returns BigInt64Array for int64 columns — convert to Number[]
+    const itemIndices = (rawItemIndices instanceof BigInt64Array || rawItemIndices instanceof BigUint64Array)
+      ? Array.from(rawItemIndices, v => Number(v))
+      : rawItemIndices;
 
     // Extract stored fields (skip embedding column — not needed for viz)
     for (const fname of sfNames) {
@@ -341,6 +391,11 @@ export async function loadDyf(url, onProgress) {
       if (tname === "utf8" || tname === "binary") {
         for (let i = 0; i < itemIndices.length; i++) {
           fields[fname][itemIndices[i]] = col.get(i);
+        }
+      } else if (tname === "int64") {
+        // Arrow JS returns BigInt64Array — convert to Number for Float64Array target
+        for (let i = 0; i < itemIndices.length; i++) {
+          fields[fname][itemIndices[i]] = Number(col.get(i));
         }
       } else {
         const values = col.toArray();
@@ -390,5 +445,7 @@ export async function loadDyf(url, onProgress) {
     metadata: index.metadata,
     dendrogram,
     buildParams: index.buildParams,
+    treeNodes: index.nodes,
+    rootNodeId: index.rootNodeId,
   };
 }

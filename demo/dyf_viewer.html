@@ -28,7 +28,15 @@
 <div id="header" style="position:absolute;top:0;left:0;right:260px;z-index:20;
   padding:12px 20px;font:14px -apple-system,'Segoe UI',sans-serif;">
   <div style="margin-bottom:6px;"></div>
-  <div id="header-title" style="font-size:28px;font-weight:700;letter-spacing:0.01em">DYF Viewer</div>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <div id="header-title" style="font-size:28px;font-weight:700;letter-spacing:0.01em">DYF Viewer</div>
+    <a id="tree-link" style="display:none;padding:3px 8px;border-radius:4px;
+      background:var(--bg-btn);color:var(--fg-muted);border:1px solid var(--border);
+      font-size:11px;cursor:pointer;text-decoration:none;transition:background 0.15s;"
+      onmouseover="this.style.background='var(--bg-btn-hover)'"
+      onmouseout="this.style.background='var(--bg-btn)'"
+      href="#">Tree</a>
+  </div>
   <div id="header-subtitle" style="font-size:12px;opacity:0.6;margin-top:2px;"></div>
   <div id="header-sub" class="sub" style="font-size:11px;">
     Scroll to zoom &middot; Drag to orbit &middot; Hover for details
@@ -122,6 +130,10 @@
       <label class="palette-check">
         <input type="checkbox" id="toggle-outliers" checked>
         <span>Show outliers</span>
+      </label>
+      <label class="palette-check" id="image-nodes-toggle" style="display:none">
+        <input type="checkbox" id="toggle-image-nodes">
+        <span>Image nodes</span>
       </label>
       <div style="margin-top:8px;">
         <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
@@ -363,6 +375,7 @@ try {
   const z = fields.umap_z || new Float32Array(totalItems);
   const nPts = totalItems;
   const titles = fields.title || Array.from({length: nPts}, (_, i) => `Item ${i}`);
+  const thumbnails = fields.thumbnail || null;
   const a = new Uint8Array(nPts).fill(255);
 
   // ── Parse edge, tour, and LSH bucket data from metadata ────────────────
@@ -394,7 +407,7 @@ try {
 
   // ── Set window.__DYF_DATA__ ────────────────────────────────────────────
   window.__DYF_DATA__ = {
-    x, y, z, a, titles, nPts,
+    x, y, z, a, titles, thumbnails, nPts,
     dendrogram,
     edges2d: { paths: edgePaths2d, weights: edgeWeights },
     edges3d: { paths: [], weights: [] },
@@ -419,7 +432,7 @@ try {
   const initPts = new Array(nPts);
   for (let i = 0; i < nPts; i++) {
     initPts[i] = { x: x[i], y: y[i], z: 0, r: 128, g: 128, b: 128, a: 255,
-                   title: titles[i] || "", cluster: 0 };
+                   title: titles[i] || "", thumbnail: thumbnails ? thumbnails[i] : null, cluster: 0 };
   }
 
   window._liveZoom = 5.5;
@@ -470,6 +483,15 @@ try {
     ],
     getTooltip: function(info) {
       if (!info.object) return null;
+      if (info.object.thumbnail && !window.__showImageNodes) {
+        return {
+          html: '<div style="text-align:center">' +
+                '<img src="' + info.object.thumbnail + '" style="width:128px;height:128px;object-fit:cover;border-radius:4px;display:block;margin-bottom:4px" />' +
+                '<div style="font-size:12px;max-width:200px;word-break:break-word">' +
+                (info.object.title || '') + '</div></div>',
+          style: { backgroundColor: 'rgba(0,0,0,0.85)', color: '#eee', padding: '8px', borderRadius: '6px', maxWidth: '220px' }
+        };
+      }
       return info.object.title || null;
     },
   });
@@ -480,6 +502,19 @@ try {
   const kInfo = dendrogram ? `${dendrogram.naturalK} communities (slider)` : "no clusters";
   document.getElementById("header-subtitle").textContent =
     `${totalItems.toLocaleString()} items | ${kInfo}`;
+
+  // Show tree view link if tree nodes exist
+  if (dyf.treeNodes && dyf.treeNodes.length > 0) {
+    const treeLink = document.getElementById("tree-link");
+    treeLink.href = `dyf_tree_view.html?file=${encodeURIComponent(file)}`;
+    treeLink.style.display = "inline-block";
+  }
+
+  // Show image nodes toggle if thumbnails exist
+  window.__showImageNodes = false;
+  if (thumbnails) {
+    document.getElementById("image-nodes-toggle").style.display = "flex";
+  }
 
   // Hide loading
   loadingEl.style.display = "none";
