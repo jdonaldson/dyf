@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>3DGS Luigi Puppet</title>
+<script src="https://unpkg.com/deck.gl@^9.0.0/dist.min.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#111; color:#eee; font-family:-apple-system,sans-serif; overflow:hidden; }
+#deck-canvas { width:100vw; height:100vh; }
+#controls {
+  position:absolute; top:10px; right:10px; width:300px;
+  background:rgba(20,20,20,0.92); border-radius:8px; padding:12px;
+  max-height:95vh; overflow-y:auto; font-size:13px;
+  border:1px solid #333;
+}
+#controls h2 { font-size:15px; margin-bottom:10px; color:#7af; }
+.part { margin-bottom:2px; padding:5px 8px; border-radius:6px; border:1px solid #333; }
+.part-header { display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none; }
+.part-swatch { width:14px; height:14px; border-radius:3px; border:1px solid #555; flex-shrink:0; }
+.part-name { font-weight:600; font-size:12px; flex:1; }
+.part-count { color:#888; font-size:10px; }
+.part-depth { color:#555; font-size:10px; margin-right:4px; }
+.sliders { display:none; margin-top:6px; }
+.part.open .sliders { display:block; }
+.slider-row { display:flex; align-items:center; gap:6px; margin:2px 0; }
+.slider-row label { width:20px; font-size:11px; color:#aaa; text-align:right; }
+.slider-row input[type=range] { flex:1; accent-color:#7af; height:14px; }
+.slider-row .val { width:35px; font-size:10px; color:#888; text-align:right; }
+button.ctrl-btn {
+  width:100%; padding:6px; margin-top:4px; background:#333; border:1px solid #444;
+  color:#eee; border-radius:4px; cursor:pointer; font-size:12px;
+}
+button.ctrl-btn:hover { background:#444; }
+#anim-section { margin-top:8px; padding-top:8px; border-top:1px solid #333; }
+#anim-section h3 { font-size:13px; color:#7af; margin-bottom:6px; }
+.anim-btn {
+  padding:5px 10px; margin:2px; background:#335; border:1px solid #557;
+  color:#aaf; border-radius:4px; cursor:pointer; font-size:12px;
+}
+.anim-btn:hover { background:#447; }
+.anim-btn.active { background:#557; border-color:#77a; }
+</style>
+</head>
+<body>
+<div id="deck-canvas"></div>
+<div id="controls">
+  <h2>Luigi Puppet</h2>
+  <div id="parts-list"></div>
+  <button class="ctrl-btn" onclick="resetAll()">Reset All</button>
+  <button class="ctrl-btn" id="joint-toggle" onclick="toggleJoints()">Hide Joints</button>
+  <button class="ctrl-btn" id="color-toggle" onclick="toggleClusterColor()">Color by Cluster</button>
+  <div id="anim-section">
+    <h3>Animations</h3>
+    <button class="anim-btn" onclick="toggleAnim('wave')">Wave</button>
+    <button class="anim-btn" onclick="toggleAnim('walk')">Walk</button>
+    <button class="anim-btn" onclick="toggleAnim('jump')">Jump</button>
+    <button class="anim-btn" onclick="toggleAnim('dance')">Dance</button>
+  </div>
+</div>
+
+<script>
+let positions, colors, communityIds, meta, skeleton, skeletonLabels;
+let originalPositions;
+let partRotations = {};
+let deckInstance;
+let animFrame = null;
+let activeAnim = null;
+let pointWeights;
+
+// Label → cid lookup (built from skeleton labels)
+let P = {};
+
+async function loadData() {
+  const [posResp, colResp, cidResp, metaResp, skelResp] = await Promise.all([
+    fetch("puppet_positions.bin"),
+    fetch("puppet_colors.bin"),
+    fetch("puppet_communities.bin"),
+    fetch("puppet_meta.json"),
+    fetch("skeleton.json"),
+  ]);
+
+  positions = new Float32Array(await posResp.arrayBuffer());
+  colors = new Int32Array(await colResp.arrayBuffer());
+  communityIds = new Int32Array(await cidResp.arrayBuffer());
+  meta = await metaResp.json();
+  const skelData = await skelResp.json();
+  skeleton = skelData.skeleton;
+  skeletonLabels = skelData.labels || {};
+  window._rootCid = skelData.root;
+
+  originalPositions = new Float32Array(positions);
+
+  for (const cid in skeleton) {
+    partRotations[cid] = { rx: 0, ry: 0, rz: 0 };
+  }
+
+  buildLabelMap();
+  computePointWeights();
+  computeSkinWeights();
+  buildClusterColors();
+  buildControls();
+  initDeck();
+}
+
+// Build reverse map: label → cid string
+function buildLabelMap() {
+  P = {};
+  for (const [cid, label] of Object.entries(skeletonLabels)) {
+    P[label] = cid;
+  }
+  console.log("Part map:", P);
+}
+
+// Get label for a cid
+function getLabel(cid) {
+  return skeleton[String(cid)]?.label || skeletonLabels[String(cid)] || `part_${cid}`;
+}
+
+// Find a part by label pattern (returns cid string or null)
+function findPart(pattern) {
+  for (const [label, cid] of Object.entries(P)) {
+    if (label === pattern) return cid;
+  }
+  // Substring match
+  for (const [label, cid] of Object.entries(P)) {
+    if (label.includes(pattern)) return cid;
+  }
+  return null;
+}
+
+// ── Point weight computation ─────────────────────────────────────────────
+function computePointWeights() {
+  const n = meta.n;
+  pointWeights = new Float32Array(n);
+  const comDists = {};
+  for (const cid in meta.communities) comDists[cid] = [];
+
+  for (let i = 0; i < n; i++) {
+    const cid = communityIds[i];
+    const c = meta.communities[cid].centroid;
+    const dx = originalPositions[i*3] - c[0];
+    const dy = originalPositions[i*3+1] - c[1];
+    const dz = originalPositions[i*3+2] - c[2];
+    comDists[cid].push(Math.sqrt(dx*dx + dy*dy + dz*dz));
+  }
+
+  const comStd = {};
+  for (const cid in comDists) {
+    const d = comDists[cid];
+    const mean = d.reduce((a,b) => a+b, 0) / d.length;
+    const variance = d.reduce((a,b) => a + (b-mean)**2, 0) / d.length;
+    comStd[cid] = Math.sqrt(variance);
+  }
+
+  const idxMap = {};
+  for (const cid in comDists) idxMap[cid] = 0;
+  for (let i = 0; i < n; i++) {
+    const cid = communityIds[i];
+    const dist = comDists[cid][idxMap[cid]++];
+    const std = comStd[cid] || 0.01;
+    const ratio = dist / std;
+    pointWeights[i] = ratio < 1.5 ? 1.0 : ratio < 3.0 ? 1.0 - (ratio - 1.5) / 1.5 : 0.0;
+  }
+}
+
+// ── Forward kinematics ──────────────────────────────────────────────────
+
+function mat4Identity() { return [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]; }
+
+function mat4Translate(tx, ty, tz) {
+  return [1,0,0,0, 0,1,0,0, 0,0,1,0, tx,ty,tz,1];
+}
+
+function mat4RotateX(rad) {
+  const c = Math.cos(rad), s = Math.sin(rad);
+  return [1,0,0,0, 0,c,s,0, 0,-s,c,0, 0,0,0,1];
+}
+function mat4RotateY(rad) {
+  const c = Math.cos(rad), s = Math.sin(rad);
+  return [c,0,-s,0, 0,1,0,0, s,0,c,0, 0,0,0,1];
+}
+function mat4RotateZ(rad) {
+  const c = Math.cos(rad), s = Math.sin(rad);
+  return [c,s,0,0, -s,c,0,0, 0,0,1,0, 0,0,0,1];
+}
+
+function mat4Mul(a, b) {
+  const r = new Array(16);
+  for (let i = 0; i < 4; i++) {
+    for (let j = 0; j < 4; j++) {
+      r[j*4+i] = a[i]*b[j*4] + a[4+i]*b[j*4+1] + a[8+i]*b[j*4+2] + a[12+i]*b[j*4+3];
+    }
+  }
+  return r;
+}
+
+function mat4Apply(m, x, y, z) {
+  return [
+    m[0]*x + m[4]*y + m[8]*z + m[12],
+    m[1]*x + m[5]*y + m[9]*z + m[13],
+    m[2]*x + m[6]*y + m[10]*z + m[14],
+  ];
+}
+
+function computeWorldTransforms() {
+  const transforms = {};
+
+  function walk(cid, parentTransform) {
+    const node = skeleton[cid];
+    const rot = partRotations[cid];
+    const joint = node.joint;
+
+    let localTransform;
+    if (!joint) {
+      const c = node.centroid;
+      const rx = rot.rx * Math.PI / 180;
+      const ry = rot.ry * Math.PI / 180;
+      const rz = rot.rz * Math.PI / 180;
+      localTransform = mat4Mul(
+        mat4Translate(c[0], c[1], c[2]),
+        mat4Mul(mat4RotateZ(rz), mat4Mul(mat4RotateY(ry), mat4Mul(mat4RotateX(rx),
+          mat4Translate(-c[0], -c[1], -c[2])
+        )))
+      );
+    } else {
+      const rx = rot.rx * Math.PI / 180;
+      const ry = rot.ry * Math.PI / 180;
+      const rz = rot.rz * Math.PI / 180;
+      localTransform = mat4Mul(
+        mat4Translate(joint[0], joint[1], joint[2]),
+        mat4Mul(mat4RotateZ(rz), mat4Mul(mat4RotateY(ry), mat4Mul(mat4RotateX(rx),
+          mat4Translate(-joint[0], -joint[1], -joint[2])
+        )))
+      );
+    }
+
+    const worldTransform = mat4Mul(parentTransform, localTransform);
+    transforms[cid] = worldTransform;
+
+    for (const childCid of node.children) {
+      walk(String(childCid), worldTransform);
+    }
+  }
+
+  walk(String(window._rootCid), mat4Identity());
+  return transforms;
+}
+
+// ── Multi-bone Linear Blend Skinning ─────────────────────────────────────
+// Each point is influenced by ALL nearby joints, not just its own community's.
+// A point near the hip-leg joint blends between hip and leg transforms
+// regardless of which community it was assigned to.
+
+let skinInfluences; // Array[n] of [{cid: string, weight: number}, ...]
+
+function computeSkinWeights() {
+  const n = meta.n;
+  skinInfluences = new Array(n);
+
+  // Collect all joints with their bone lengths
+  const joints = [];
+  for (const cid in skeleton) {
+    const node = skeleton[cid];
+    if (node.joint && node.parent !== null) {
+      const j = node.joint, c = node.centroid;
+      const dx = c[0]-j[0], dy = c[1]-j[1], dz = c[2]-j[2];
+      joints.push({
+        childCid: cid,
+        parentCid: String(node.parent),
+        pos: j,
+        boneLen: Math.sqrt(dx*dx + dy*dy + dz*dz),
+      });
+    }
+  }
+
+  for (let i = 0; i < n; i++) {
+    const ox = originalPositions[i*3];
+    const oy = originalPositions[i*3+1];
+    const oz = originalPositions[i*3+2];
+    const ownCid = String(communityIds[i]);
+
+    // Start: full weight on own community
+    const weights = {};
+    weights[ownCid] = 1.0;
+
+    // Check proximity to every joint
+    for (const joint of joints) {
+      const dx = ox - joint.pos[0];
+      const dy = oy - joint.pos[1];
+      const dz = oz - joint.pos[2];
+      const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+
+      const radius = joint.boneLen * 1.5;
+      if (dist < radius) {
+        // Inverse smoothstep: strong influence near joint, zero at radius
+        const t = dist / radius;
+        const influence = 1.0 - t * t * (3.0 - 2.0 * t);
+
+        // This joint separates childCid from parentCid.
+        // Pull this point toward whichever side it's NOT on.
+        if (ownCid === joint.childCid) {
+          // Point is in child → blend toward parent near joint
+          weights[joint.parentCid] = (weights[joint.parentCid] || 0) + influence;
+        } else if (ownCid === joint.parentCid) {
+          // Point is in parent → blend toward child near joint
+          weights[joint.childCid] = (weights[joint.childCid] || 0) + influence;
+        }
+        // If point is in neither community but near the joint,
+        // blend toward the closer side
+        else {
+          const parentC = skeleton[joint.parentCid]?.centroid;
+          const childC = skeleton[joint.childCid]?.centroid;
+          if (parentC && childC) {
+            const dpx = ox-parentC[0], dpy = oy-parentC[1], dpz = oz-parentC[2];
+            const dcx = ox-childC[0], dcy = oy-childC[1], dcz = oz-childC[2];
+            const distParent = Math.sqrt(dpx*dpx+dpy*dpy+dpz*dpz);
+            const distChild = Math.sqrt(dcx*dcx+dcy*dcy+dcz*dcz);
+            const nearerCid = distParent < distChild ? joint.parentCid : joint.childCid;
+            weights[nearerCid] = (weights[nearerCid] || 0) + influence * 0.5;
+          }
+        }
+      }
+    }
+
+    // Normalize
+    const total = Object.values(weights).reduce((a,b) => a+b, 0);
+    const result = [];
+    for (const [cid, w] of Object.entries(weights)) {
+      const nw = w / total;
+      if (nw > 0.01) result.push({cid, weight: nw});
+    }
+    skinInfluences[i] = result;
+  }
+
+  // Stats
+  let multi = 0;
+  for (let i = 0; i < n; i++) {
+    if (skinInfluences[i].length > 1) multi++;
+  }
+  console.log(`Skin weights: ${n} points, ${multi} multi-bone (${(100*multi/n).toFixed(1)}%)`);
+}
+
+function applyTransforms() {
+  const n = meta.n;
+  const worldTransforms = computeWorldTransforms();
+
+  for (let i = 0; i < n; i++) {
+    const ox = originalPositions[i*3];
+    const oy = originalPositions[i*3+1];
+    const oz = originalPositions[i*3+2];
+
+    let fx = 0, fy = 0, fz = 0;
+    for (const {cid, weight} of skinInfluences[i]) {
+      const m = worldTransforms[cid];
+      if (!m) continue;
+      const [tx, ty, tz] = mat4Apply(m, ox, oy, oz);
+      fx += weight * tx;
+      fy += weight * ty;
+      fz += weight * tz;
+    }
+
+    positions[i*3]   = fx;
+    positions[i*3+1] = fy;
+    positions[i*3+2] = fz;
+  }
+
+  rebuildLayer();
+}
+
+// ── UI ──────────────────────────────────────────────────────────────────
+
+function buildControls() {
+  const list = document.getElementById("parts-list");
+
+  function addPart(cid, depth) {
+    const node = skeleton[cid];
+    const info = meta.communities[cid];
+    if (!info) return;
+    const [cr, cg, cb] = info.color;
+    const label = getLabel(cid);
+
+    const div = document.createElement("div");
+    div.className = "part";
+    div.dataset.cid = cid;
+    div.innerHTML = `
+      <div class="part-header" onclick="this.parentElement.classList.toggle('open')">
+        <span class="part-depth">${'\u00b7'.repeat(depth)}</span>
+        <div class="part-swatch" style="background:rgb(${cr},${cg},${cb})"></div>
+        <span class="part-name">${label}</span>
+        <span class="part-count">${info.count}</span>
+      </div>
+      <div class="sliders">
+        ${makeSlider(cid, "rx", "Rx")}
+        ${makeSlider(cid, "ry", "Ry")}
+        ${makeSlider(cid, "rz", "Rz")}
+      </div>
+    `;
+    list.appendChild(div);
+
+    for (const childCid of node.children) {
+      addPart(String(childCid), depth + 1);
+    }
+  }
+
+  addPart(String(window._rootCid), 0);
+}
+
+function makeSlider(cid, axis, label) {
+  return `<div class="slider-row">
+    <label>${label}</label>
+    <input type="range" min="-90" max="90" value="0" step="1"
+      data-cid="${cid}" data-axis="${axis}"
+      oninput="updateTransform('${cid}','${axis}',this.value); this.nextElementSibling.textContent=this.value+'\u00b0'"
+    >
+    <span class="val">0\u00b0</span>
+  </div>`;
+}
+
+function updateTransform(cid, axis, value) {
+  partRotations[cid][axis] = parseFloat(value);
+  applyTransforms();
+}
+
+function resetAll() {
+  for (const cid in partRotations) {
+    partRotations[cid] = { rx: 0, ry: 0, rz: 0 };
+  }
+  positions.set(originalPositions);
+  document.querySelectorAll('input[type=range]').forEach(s => {
+    s.value = 0;
+    s.nextElementSibling.textContent = "0\u00b0";
+  });
+  rebuildLayer();
+}
+
+let showJoints = true;
+let clusterColoring = false;
+let clusterColors; // precomputed per-point cluster colors
+
+function toggleJoints() {
+  showJoints = !showJoints;
+  document.getElementById("joint-toggle").textContent = showJoints ? "Hide Joints" : "Show Joints";
+  rebuildLayer();
+}
+
+function toggleClusterColor() {
+  clusterColoring = !clusterColoring;
+  document.getElementById("color-toggle").textContent = clusterColoring ? "Original Colors" : "Color by Cluster";
+  rebuildLayer();
+}
+
+function buildClusterColors() {
+  // Generate distinct colors per community using golden angle hue spacing
+  const cids = Object.keys(meta.communities).map(Number).sort((a,b) => a-b);
+  const cidColorMap = {};
+  for (let i = 0; i < cids.length; i++) {
+    const hue = (i * 137.508) % 360;
+    const [r, g, b] = hslToRgb(hue / 360, 0.75, 0.55);
+    cidColorMap[cids[i]] = [r, g, b];
+  }
+  const n = meta.n;
+  clusterColors = new Uint8Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    const c = cidColorMap[communityIds[i]] || [128, 128, 128];
+    clusterColors[i*3] = c[0];
+    clusterColors[i*3+1] = c[1];
+    clusterColors[i*3+2] = c[2];
+  }
+}
+
+function hslToRgb(h, s, l) {
+  let r, g, b;
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  r = hue2rgb(p, q, h + 1/3);
+  g = hue2rgb(p, q, h);
+  b = hue2rgb(p, q, h - 1/3);
+  return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+}
+
+function hue2rgb(p, q, t) {
+  if (t < 0) t += 1;
+  if (t > 1) t -= 1;
+  if (t < 1/6) return p + (q - p) * 6 * t;
+  if (t < 1/2) return q;
+  if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+  return p;
+}
+
+function resetTransformsQuiet() {
+  for (const cid in partRotations) {
+    partRotations[cid] = { rx: 0, ry: 0, rz: 0 };
+  }
+}
+
+// ── deck.gl ─────────────────────────────────────────────────────────────
+function buildPointData() {
+  const n = meta.n;
+  const pts = new Array(n);
+  const cc = clusterColoring && clusterColors;
+  for (let i = 0; i < n; i++) {
+    pts[i] = {
+      position: [positions[i*3], positions[i*3+1], positions[i*3+2]],
+      color: cc
+        ? [clusterColors[i*3], clusterColors[i*3+1], clusterColors[i*3+2], 255]
+        : [colors[i*3], colors[i*3+1], colors[i*3+2], 255],
+    };
+  }
+  return pts;
+}
+
+function buildLabelData() {
+  const labels = [];
+  for (const [cid, node] of Object.entries(skeleton)) {
+    const label = node.label || getLabel(cid);
+    if (label.startsWith("part_") || label.startsWith("???")) continue;
+    const info = meta.communities[cid];
+    if (!info) continue;
+
+    // Use current (animated) centroid: average of transformed points in this community
+    let sx = 0, sy = 0, sz = 0, count = 0;
+    for (let i = 0; i < meta.n; i++) {
+      if (communityIds[i] == cid) {
+        sx += positions[i*3];
+        sy += positions[i*3+1];
+        sz += positions[i*3+2];
+        count++;
+      }
+    }
+    if (count === 0) continue;
+    labels.push({
+      position: [sx/count, sy/count, sz/count],
+      text: label,
+    });
+  }
+  return labels;
+}
+
+function buildJointData() {
+  const joints = [];
+  const worldTransforms = computeWorldTransforms();
+  for (const [cid, node] of Object.entries(skeleton)) {
+    if (!node.joint) continue;
+    const j = node.joint;
+    // Transform joint position through parent's world transform
+    const parentCid = String(node.parent);
+    const m = worldTransforms[parentCid];
+    let pos;
+    if (m) {
+      pos = mat4Apply(m, j[0], j[1], j[2]);
+    } else {
+      pos = [j[0], j[1], j[2]];
+    }
+    joints.push({ position: pos });
+  }
+  return joints;
+}
+
+function rebuildLayer() {
+  if (!deckInstance) return;
+  deckInstance.setProps({
+    layers: [
+      new globalThis.deck.PointCloudLayer({
+        id: "points",
+        data: buildPointData(),
+        getPosition: d => d.position,
+        getColor: d => d.color,
+        getNormal: [0, 0, 1],
+        pointSize: 3,
+      }),
+      new globalThis.deck.TextLayer({
+        id: "labels",
+        data: buildLabelData(),
+        getPosition: d => d.position,
+        getText: d => d.text,
+        getSize: 12,
+        getColor: [255, 255, 255, 200],
+        getTextAnchor: "middle",
+        getAlignmentBaseline: "center",
+        fontFamily: "-apple-system, sans-serif",
+        fontWeight: 700,
+        outlineWidth: 2,
+        outlineColor: [0, 0, 0, 180],
+        billboard: true,
+        sizeScale: 0.003,
+      }),
+      new globalThis.deck.PointCloudLayer({
+        id: "joints",
+        data: showJoints ? buildJointData() : [],
+        getPosition: d => d.position,
+        getColor: [255, 50, 50, 255],
+        getNormal: [0, 0, 1],
+        pointSize: 8,
+        visible: showJoints,
+      }),
+    ],
+  });
+}
+
+function initDeck() {
+  deckInstance = new globalThis.deck.DeckGL({
+    container: "deck-canvas",
+    views: [new globalThis.deck.OrbitView({ controller: true, orbitAxis: "Z" })],
+    initialViewState: {
+      target: [0, 0, 0],
+      rotationX: 15,
+      rotationOrbit: -30,
+      zoom: 5.5,
+    },
+    controller: true,
+    layers: [
+      new globalThis.deck.PointCloudLayer({
+        id: "points",
+        data: buildPointData(),
+        getPosition: d => d.position,
+        getColor: d => d.color,
+        getNormal: [0, 0, 1],
+        pointSize: 3,
+      }),
+    ],
+  });
+}
+
+// ── Animations using labeled skeleton ───────────────────────────────────
+function setRot(label, rx, ry, rz) {
+  const cid = P[label];
+  if (cid && partRotations[cid]) {
+    if (rx !== undefined) partRotations[cid].rx = rx;
+    if (ry !== undefined) partRotations[cid].ry = ry;
+    if (rz !== undefined) partRotations[cid].rz = rz;
+  }
+}
+
+function toggleAnim(name) {
+  if (activeAnim === name) {
+    activeAnim = null;
+    if (animFrame) cancelAnimationFrame(animFrame);
+    document.querySelectorAll('.anim-btn').forEach(b => b.classList.remove('active'));
+    resetAll();
+    return;
+  }
+  activeAnim = name;
+  document.querySelectorAll('.anim-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent.toLowerCase() === name);
+  });
+  const t0 = performance.now();
+  function tick() {
+    if (!activeAnim) return;
+    const t = (performance.now() - t0) / 1000;
+    animFunctions[name](t);
+    applyTransforms();
+    for (const cid in partRotations) {
+      const rot = partRotations[cid];
+      document.querySelectorAll(`input[data-cid="${cid}"]`).forEach(s => {
+        const axis = s.dataset.axis;
+        s.value = rot[axis];
+        s.nextElementSibling.textContent = Math.round(rot[axis]) + "\u00b0";
+      });
+    }
+    animFrame = requestAnimationFrame(tick);
+  }
+  tick();
+}
+
+const animFunctions = {
+  wave(t) {
+    resetTransformsQuiet();
+    // Raise right arm out to side (rz) and wave forearm (rx)
+    setRot("R_upper_arm", Math.sin(t * 4) * 15, 0, -70);
+    setRot("R_forearm", 0, 0, Math.sin(t * 4) * 20 - 20);
+    setRot("lower_torso", 0, 0, Math.sin(t * 2) * 3);
+  },
+
+  walk(t) {
+    resetTransformsQuiet();
+    const freq = 2.5;
+    const legSwing = Math.sin(t * freq) * 25;
+
+    // Legs swing forward/backward (rx = rotation around X = front-back)
+    setRot("L_thigh", legSwing, 0, 0);
+    setRot("R_knee", -legSwing, 0, 0);
+
+    // Knees only bend backward (never hyperextend)
+    const lKnee = Math.max(0, -legSwing) * 0.8;  // bend when leg is back
+    const rKnee = Math.max(0, legSwing) * 0.8;
+    setRot("L_knee", -lKnee, 0, 0);
+    setRot("R_shin", -rKnee, 0, 0);
+
+    // Arms counter-swing
+    setRot("L_upper_arm", -legSwing * 0.5, 0, 0);
+    setRot("R_upper_arm", legSwing * 0.5, 0, 0);
+    setRot("L_forearm", -Math.max(0, legSwing) * 0.3, 0, 0);
+    setRot("R_forearm", -Math.max(0, -legSwing) * 0.3, 0, 0);
+
+    // Subtle torso twist (rz = rotate around vertical)
+    setRot("lower_torso", 0, 0, Math.sin(t * freq) * 3);
+    setRot("torso", 0, 0, Math.sin(t * freq + 0.3) * 2);
+  },
+
+  jump(t) {
+    resetTransformsQuiet();
+    const phase = Math.sin(t * 2.5);
+
+    // Crouch then extend (rx for knee bend)
+    const crouch = Math.min(0, phase) * 25;
+    setRot("L_knee", crouch, 0, 0);
+    setRot("R_knee", crouch, 0, 0);
+    setRot("R_shin", crouch * 0.5, 0, 0);
+
+    // Arms spread on jump (rz for lateral raise)
+    const spread = Math.max(0, phase);
+    setRot("L_upper_arm", 0, 0, spread * 40);
+    setRot("R_upper_arm", 0, 0, -spread * 40);
+
+    // Head tilt back on jump
+    setRot("face", spread * 10, 0, 0);
+  },
+
+  dance(t) {
+    resetTransformsQuiet();
+
+    // Body sway side to side
+    setRot("lower_torso", 0, 0, Math.sin(t * 2) * 8);
+    setRot("torso", Math.sin(t * 2) * 4, 0, Math.sin(t * 2 + 0.5) * 5);
+
+    // Arms pump forward/back (rx) with lateral raise (rz)
+    const pump = Math.sin(t * 3);
+    setRot("L_upper_arm", pump * 20, 0, 15 + pump * 15);
+    setRot("R_upper_arm", -pump * 20, 0, -15 + pump * 15);
+    setRot("L_forearm", -Math.abs(pump) * 20, 0, 0);
+    setRot("R_forearm", -Math.abs(pump) * 20, 0, 0);
+
+    // Legs step forward/back (rx)
+    const step = Math.sin(t * 2);
+    setRot("L_thigh", step * 18, 0, 0);
+    setRot("L_knee", -Math.max(0, -step) * 25, 0, 0);
+    setRot("R_knee", -step * 18, 0, 0);
+    setRot("R_shin", -Math.max(0, step) * 25, 0, 0);
+
+    // Head bob
+    setRot("face", Math.sin(t * 4) * 5, Math.sin(t * 2) * 5, 0);
+  },
+};
+
+// ── Init ──
+loadData();
+</script>
+</body>
+</html>
