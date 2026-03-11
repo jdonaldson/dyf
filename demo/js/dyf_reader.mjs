@@ -103,6 +103,15 @@ class FBTable {
     // Scalar vector: [length:u32, elem0:u32, elem1:u32, ...]
     return this.dv.getUint32(vecOffset + 4 + index * 4, true);
   }
+
+  getVectorFloat32(slot) {
+    const off = this._fieldOffset(slot);
+    if (!off) return null;
+    const vecOffset = this.pos + off + this.dv.getUint32(this.pos + off, true);
+    const len = this.dv.getUint32(vecOffset, true);
+    if (len === 0) return null;
+    return new Float32Array(this.buf, vecOffset + 4, len);
+  }
 }
 
 function getRootTable(buf) {
@@ -152,9 +161,12 @@ function parseNodes(root) {
     }
     nodes.push({
       children,
+      hyperplanes: node.getVectorFloat32(1),  // flattened [num_bits * embedding_dim]
+      numBits: node.getUint8(2),
+      centroid: node.getVectorFloat32(4),
       numItems: node.getUint32(5),
       batchIndex: node.getInt32(6, -1),
-      depth: node.getUint8(7),
+      depth: node.getUint8(7),                // NOTE: stores height, not depth from root
     });
   }
   return nodes;
@@ -307,6 +319,7 @@ export async function loadDyf(url, onProgress) {
   if (sfNames.length === 0) {
     return {
       totalItems: index.totalItems,
+      embeddingDim: index.embeddingDim,
       fields: {},
       metadata: index.metadata,
       clusterLevels: [],
@@ -441,6 +454,7 @@ export async function loadDyf(url, onProgress) {
 
   return {
     totalItems: index.totalItems,
+    embeddingDim: index.embeddingDim,
     fields,
     metadata: index.metadata,
     dendrogram,

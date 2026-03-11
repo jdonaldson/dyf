@@ -84,6 +84,7 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
     _a = dd.a || new Uint8Array(_nPts).fill(255);
     var _titlesArr = dd.titles || [];
     _titles = { get: function(i) { return _titlesArr[i]; } };
+    var _thumbnails = dd ? dd.thumbnails : null;
   } else if (dd && dd.pointsIpcB64) {
     // Baked mode via __DYF_DATA__
     _pt = tableFromIPC(await ungzip(b64toBytes(dd.pointsIpcB64)));
@@ -162,8 +163,8 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
       allPoints[i] = {
         x: _x[i], y: _y[i], z: 0,
         r: rgb[0], g: rgb[1], b: rgb[2], a: _a[i],
-        title: _titles.get(i), cluster: cid,
-        clusters: {}
+        title: _titles.get(i), thumbnail: _thumbnails ? _thumbnails[i] : null,
+        cluster: cid, clusters: {}
       };
     }
     _currentMergedIds = new Int32Array(_pointToCommunity);  // start at natural k
@@ -189,8 +190,8 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
       allPoints[_i] = {
         x: _x[_i], y: _y[_i], z: 0,
         r: 128, g: 128, b: 128, a: _a[_i],
-        title: _titles.get(_i), cluster: 0,
-        clusters: {}
+        title: _titles.get(_i), thumbnail: _thumbnails ? _thumbnails[_i] : null,
+        cluster: 0, clusters: {}
       };
     }
   }
@@ -2109,15 +2110,15 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
       if (!isClusterVisible(p.cluster)) continue;
       if (is2d) {
         visible.push({ x: p.x, y: p.y, z: 0, r: p.r, g: p.g, b: p.b,
-                        a: 255, title: p.title, cluster: p.cluster });
+                        a: 255, title: p.title, thumbnail: p.thumbnail, cluster: p.cluster });
       } else if (hasCallouts && tourCalloutHighlightSet.has(_vi)) {
         // Bright yellow-white for callout points
         visible.push({ x: p.x, y: p.y, z: p.z, r: 255, g: 240, b: 80,
-                        a: 255, title: p.title, cluster: p.cluster });
+                        a: 255, title: p.title, thumbnail: p.thumbnail, cluster: p.cluster });
       } else if (hasCallouts) {
         // Dim non-callout points during callout display
         visible.push({ x: p.x, y: p.y, z: p.z, r: p.r, g: p.g, b: p.b,
-                        a: 60, title: p.title, cluster: p.cluster });
+                        a: 60, title: p.title, thumbnail: p.thumbnail, cluster: p.cluster });
       } else {
         visible.push(p);
       }
@@ -2136,6 +2137,30 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
         getWidth: function(d) { return d.width; }
       });
       newLayers.push(newEdgeLayer);
+    }
+    // Add IconLayer when image nodes mode is on
+    if (window.__showImageNodes) {
+      var thumbData = visible.filter(function(d) { return d.thumbnail; });
+      if (thumbData.length > 0) {
+        var iconWorldSize = Math.max(xRange, yRange) / Math.sqrt(thumbData.length) * 0.6;
+        var psSlider = document.getElementById("point-size");
+        var psMul = psSlider ? parseFloat(psSlider.value) / 2 : 1;
+        var iconLayer = new globalThis.deck.IconLayer({
+          id: "image-nodes",
+          data: thumbData,
+          getPosition: function(d) { return [d.x, d.y, is2d ? 0 : d.z]; },
+          getIcon: function(d) {
+            return { url: d.thumbnail, width: 128, height: 128, anchorY: 64 };
+          },
+          getSize: iconWorldSize * psMul,
+          sizeUnits: "common",
+          pickable: true,
+          autoHighlight: true,
+          highlightColor: [255, 255, 100, 200],
+          billboard: !is2d,
+        });
+        newLayers.push(iconLayer);
+      }
     }
     dk.setProps({ layers: newLayers });
     updateRowStyles();
@@ -3043,10 +3068,24 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
   // Cluster tour button
   document.getElementById("tour-btn").addEventListener("click", runTour);
 
+  // Image nodes toggle
+  var imgToggle = document.getElementById("toggle-image-nodes");
+  if (imgToggle) {
+    imgToggle.addEventListener("change", function(e) {
+      window.__showImageNodes = e.target.checked;
+      rebuildLayer();
+    });
+  }
+
   // Point size slider
   document.getElementById("point-size").addEventListener("input", function(e) {
     var sz = parseFloat(e.target.value);
     document.getElementById("ps-val").textContent = sz;
+    if (window.__showImageNodes) {
+      // Rebuild to update icon size
+      rebuildLayer();
+      return;
+    }
     var dk = getDeck();
     if (!dk || !dk.props) return;
     var layers = dk.props.layers;

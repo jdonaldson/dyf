@@ -271,7 +271,6 @@ def compute_louvain_hierarchy(idx, coords, embeddings, leaf_k=10,
 
         Returns ``None`` when the tree has fewer than two leaves.
     """
-    import networkx as nx
     from sklearn.neighbors import NearestNeighbors
 
     result = _collect_leaf_data(idx)
@@ -292,41 +291,53 @@ def compute_louvain_hierarchy(idx, coords, embeddings, leaf_k=10,
     k = min(leaf_k, len(centroids_normed) - 1)
     if k < 1:
         k = 1
-    nn = NearestNeighbors(n_neighbors=k + 1, metric='cosine')
-    nn.fit(centroids_normed)
-    distances, indices = nn.kneighbors(centroids_normed)
 
-    # Build graph: edge if cosine similarity > threshold
-    G = nx.Graph()
-    G.add_nodes_from(range(len(centroids_normed)))
-    for i in range(len(centroids_normed)):
-        for j_pos in range(1, distances.shape[1]):
-            j = indices[i, j_pos]
-            sim = 1.0 - distances[i, j_pos]
-            if sim > similarity_threshold:
-                G.add_edge(i, j, weight=sim)
+    # Try Rust Louvain first (faster, weighted, deterministic)
+    try:
+        from dyf_rs import louvain_from_centroids
+        labels_list, n_communities = louvain_from_centroids(
+            centroids_normed, k=k, resolution=resolution)
+        leaf_labels = np.array(labels_list, dtype=np.int32)
+        print(f"    Louvain (Rust) found {n_communities} communities "
+              f"from {len(leaves)} leaves (k={k}, res={resolution})")
+    except ImportError:
+        # Fall back to NetworkX Louvain
+        import networkx as nx
+        nn = NearestNeighbors(n_neighbors=k + 1, metric='cosine')
+        nn.fit(centroids_normed)
+        distances, indices = nn.kneighbors(centroids_normed)
 
-    # Louvain community detection
-    communities = nx.community.louvain_communities(
-        G, weight='weight', resolution=resolution, seed=42)
+        # Build graph: edge if cosine similarity > threshold
+        G = nx.Graph()
+        G.add_nodes_from(range(len(centroids_normed)))
+        for i in range(len(centroids_normed)):
+            for j_pos in range(1, distances.shape[1]):
+                j = indices[i, j_pos]
+                sim = 1.0 - distances[i, j_pos]
+                if sim > similarity_threshold:
+                    G.add_edge(i, j, weight=sim)
 
-    # Map communities → leaf labels (0-based)
-    leaf_labels = np.full(len(centroids_normed), -1, dtype=np.int32)
-    for comm_id, members in enumerate(communities):
-        for leaf_idx in members:
-            leaf_labels[leaf_idx] = comm_id
+        # Louvain community detection
+        communities = nx.community.louvain_communities(
+            G, weight='weight', resolution=resolution, seed=42)
 
-    # Handle isolated nodes
-    isolated = leaf_labels == -1
-    if isolated.any():
-        next_id = leaf_labels.max() + 1
-        for i in np.where(isolated)[0]:
-            leaf_labels[i] = next_id
-            next_id += 1
+        # Map communities → leaf labels (0-based)
+        leaf_labels = np.full(len(centroids_normed), -1, dtype=np.int32)
+        for comm_id, members in enumerate(communities):
+            for leaf_idx in members:
+                leaf_labels[leaf_idx] = comm_id
 
-    n_communities = len(set(leaf_labels.tolist()))
-    print(f"    Louvain found {n_communities} communities "
-          f"from {len(leaves)} leaves (k={k}, res={resolution})")
+        # Handle isolated nodes
+        isolated = leaf_labels == -1
+        if isolated.any():
+            next_id = leaf_labels.max() + 1
+            for i in np.where(isolated)[0]:
+                leaf_labels[i] = next_id
+                next_id += 1
+
+        n_communities = len(set(leaf_labels.tolist()))
+        print(f"    Louvain (NetworkX) found {n_communities} communities "
+              f"from {len(leaves)} leaves (k={k}, res={resolution})")
 
     # Map points -> leaf -> community
     point_labels = np.full(n_points, -1, dtype=np.int32)

@@ -283,17 +283,15 @@ try {
       const { leafToCommunity, communityNames, communityColors, communitySizes, naturalK } = dendrogram;
       const communityIds = [...new Set(Object.values(leafToCommunity))].sort((a, b) => a - b);
 
-      // Finest level
+      // Finest level — create nodes with numItems=0, fill from actual flow
       const finestLevel = showDepth + 1;
       const fineSankeyMap = {};
       for (const cid of communityIds) {
         const idx = sankeyNodes.length;
-        const name = communityNames?.[String(cid)] || `Community ${cid}`;
-        const size = communitySizes?.[String(cid)] || 0;
         fineSankeyMap[cid] = idx;
         sankeyNodes.push({
-          label: `${name} (${size.toLocaleString()})`,
-          level: finestLevel, numItems: size, treeNodeIds: [],
+          label: "", // set after flow computed
+          level: finestLevel, numItems: 0, treeNodeIds: [],
           communityId: cid, dendroLevel: 0,
         });
       }
@@ -316,9 +314,18 @@ try {
           }
         }
         for (const [cid, count] of Object.entries(flow)) {
-          if (fineSankeyMap[cid] !== undefined)
+          if (fineSankeyMap[cid] !== undefined) {
             sankeyLinks.push({ source: si, target: fineSankeyMap[cid], value: count });
+            sankeyNodes[fineSankeyMap[cid]].numItems += count;
+          }
         }
+      }
+
+      // Set labels from actual flow
+      for (const cid of communityIds) {
+        const si = fineSankeyMap[cid];
+        const name = communityNames?.[String(cid)] || `Community ${cid}`;
+        sankeyNodes[si].label = `${name} (${sankeyNodes[si].numItems.toLocaleString()})`;
       }
 
       // Coarser levels
@@ -333,7 +340,8 @@ try {
           const coarseId = mapping[fineId];
           if (!coarseGroups[coarseId]) coarseGroups[coarseId] = { fineIds: [], totalItems: 0 };
           coarseGroups[coarseId].fineIds.push(fineId);
-          coarseGroups[coarseId].totalItems += (communitySizes?.[String(fineId)] || 0);
+          // Use flow-based numItems from fine community nodes (not communitySizes which is post-reassignment)
+          coarseGroups[coarseId].totalItems += (fineSankeyMap[fineId] !== undefined ? sankeyNodes[fineSankeyMap[fineId]].numItems : 0);
         }
 
         const prevToCoarse = {};
@@ -353,7 +361,7 @@ try {
         for (const [gid, group] of Object.entries(coarseGroups)) {
           const idx = sankeyNodes.length;
           const largestFine = group.fineIds.reduce((best, fid) => {
-            const s = communitySizes?.[String(fid)] || 0;
+            const s = fineSankeyMap[fid] !== undefined ? sankeyNodes[fineSankeyMap[fid]].numItems : 0;
             return s > (best.size || 0) ? { id: fid, size: s } : best;
           }, {});
           const name = communityNames?.[String(largestFine.id)] || `Group ${gid}`;
@@ -501,9 +509,23 @@ try {
       }
       indices.sort((a, b) => targetY[a] - targetY[b]);
       for (let j = 0; j < indices.length; j++) {
-        nodeY[indices[j]] = 0.02 + (j / Math.max(indices.length - 1, 1)) * 0.96;
+        nodeY[indices[j]] = 0.01 + (j / Math.max(indices.length - 1, 1)) * 0.98;
       }
     }
+
+    // Compute bottom overflow: each node's rendered height is proportional
+    // to its value / column total. Find the worst-case bottom extension.
+    let maxOverflow = 0;
+    for (const col of Object.keys(colNodes)) {
+      const indices = colNodes[col];
+      const colTotal = indices.reduce((s, i) => s + (sankeyNodes[i].numItems || 1), 0);
+      for (const idx of indices) {
+        const nodeHeight = (sankeyNodes[idx].numItems || 1) / colTotal;
+        const bottomEdge = nodeY[idx] + nodeHeight;
+        if (bottomEdge > 1) maxOverflow = Math.max(maxOverflow, bottomEdge - 1);
+      }
+    }
+    const domainPad = Math.min(maxOverflow + 0.02, 0.3); // small extra margin, cap at 30%
 
     // ── 7. Column headers ─────────────────────────────────────────────
     const colNames = [];
@@ -528,6 +550,7 @@ try {
     Plotly.react("sankey", [{
       type: "sankey",
       arrangement: "snap",
+      domain: { x: [0, 1], y: [domainPad, 1] },
       node: {
         pad: 2, thickness: 15,
         line: { color: "rgba(50,50,50,0.5)", width: 0.5 },
@@ -552,8 +575,79 @@ try {
 
     console.log(`[dyf_tree_view] depth=${showDepth}: ${sankeyNodes.length} nodes, ${sankeyLinks.length} links`);
 
-    // ── 9. Minimap ──────────────────────────────────────────────────
-    updateMinimap(plotHeight);
+    // ── 9. SVG gradient hack for links ──────────────────────────────
+    // Build per-link source/target color pairs for gradients
+    const linkGradData = sankeyLinks.map((l, i) => ({
+      sourceColor: nodeColors[l.source] || "rgba(150,150,150,0.6)",
+      targetColor: nodeColors[l.target] || "rgba(150,150,150,0.6)",
+    }));
+    applyLinkGradients(linkGradData, plotHeight);
+  }
+
+  // ── Link gradient logic ─────────────────────────────────────────────
+  function parseRgba(str) {
+    const m = str.match(/rgba?\((\d+),\s*(\d+),\s*(\d+),?\s*([\d.]*)\)/);
+    if (!m) return { r: 150, g: 150, b: 150, a: 0.5 };
+    return { r: +m[1], g: +m[2], b: +m[3], a: m[4] !== "" ? +m[4] : 1 };
+  }
+
+  function applyLinkGradients(gradData, plotHeight) {
+    // Wait for Plotly to finish rendering into the DOM
+    setTimeout(() => {
+      const sankeyDiv = document.getElementById("sankey");
+      const svg = sankeyDiv && sankeyDiv.querySelector(".main-svg");
+      if (!svg) { updateMinimap(plotHeight); return; }
+
+      // Ensure <defs> exists
+      let defs = svg.querySelector("defs");
+      if (!defs) {
+        defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+        svg.prepend(defs);
+      }
+      // Remove old gradients
+      defs.querySelectorAll("[id^='lg-']").forEach(el => el.remove());
+
+      // Find link paths — Plotly uses .sankey-link class on path elements
+      const paths = svg.querySelectorAll(".sankey-link");
+
+      for (let i = 0; i < Math.min(paths.length, gradData.length); i++) {
+        const src = parseRgba(gradData[i].sourceColor);
+        const tgt = parseRgba(gradData[i].targetColor);
+
+        const gradId = `lg-${i}`;
+        const grad = document.createElementNS("http://www.w3.org/2000/svg", "linearGradient");
+        grad.setAttribute("id", gradId);
+        grad.setAttribute("gradientUnits", "objectBoundingBox");
+        grad.setAttribute("x1", "0"); grad.setAttribute("y1", "0");
+        grad.setAttribute("x2", "1"); grad.setAttribute("y2", "0");
+
+        const stop1 = document.createElementNS("http://www.w3.org/2000/svg", "stop");
+        stop1.setAttribute("offset", "0%");
+        stop1.setAttribute("stop-color", `rgb(${src.r},${src.g},${src.b})`);
+        stop1.setAttribute("stop-opacity", String(src.a));
+
+        const stop2 = document.createElementNS("http://www.w3.org/2000/svg", "stop");
+        stop2.setAttribute("offset", "100%");
+        stop2.setAttribute("stop-color", `rgb(${tgt.r},${tgt.g},${tgt.b})`);
+        stop2.setAttribute("stop-opacity", String(tgt.a));
+
+        grad.appendChild(stop1);
+        grad.appendChild(stop2);
+        defs.appendChild(grad);
+
+        // Apply gradient — handle both <path class="sankey-link"> and <g><path></g>
+        const pathEl = paths[i].tagName === "path" ? paths[i] : paths[i].querySelector("path");
+        if (pathEl) {
+          pathEl.style.fill = `url(#${gradId})`;
+          pathEl.style.fillOpacity = "1"; // opacity is in the gradient stops
+        }
+      }
+
+      console.log(`[dyf_tree_view] Applied ${Math.min(paths.length, gradData.length)} link gradients`);
+
+      // Capture minimap after gradients are applied
+      updateMinimap(plotHeight);
+    }, 100);
   }
 
   // ── Minimap logic ──────────────────────────────────────────────────

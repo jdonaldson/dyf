@@ -7,6 +7,8 @@ Usage:
     dyf concepts check       # check staleness
     dyf concepts list        # list all nodes
     dyf index-source dir/    # index source code into .dyf
+    dyf index-images dir/    # index images into .dyf (vision embeddings)
+    dyf index-video file.mp4 # index video keyframes into .dyf
     dyf enrich project f.dyf # UMAP projection (Level 0→1)
     dyf enrich cluster f.dyf # Louvain clustering (Level 1→2)
     dyf enrich viz f.dyf     # Bridge edges + narration (Level 2→3)
@@ -30,6 +32,12 @@ def main():
             from .enrich import main as enrich_main
             enrich_main(sys.argv[2:])
             sys.exit(0)
+        elif cmd == "index-images":
+            from .index_images import main as index_images_main
+            sys.exit(index_images_main(sys.argv[2:]))
+        elif cmd == "index-video":
+            from .index_video import main as index_video_main
+            sys.exit(index_video_main(sys.argv[2:]))
         elif cmd == "tour":
             from .tour import main as tour_main
             tour_main(sys.argv[2:])
@@ -40,6 +48,8 @@ def main():
     print("Commands:")
     print("  concepts      Build and query concept graphs from markdown files")
     print("  index-source  Index source code into a .dyf file (Python, JS, TS, Rust, Go, Java, C, C++, OCaml)")
+    print("  index-images  Index images into a .dyf file (vision embeddings + thumbnails)")
+    print("  index-video   Index video keyframes into a .dyf file (scene detection + vision)")
     print("  enrich        Enrich a .dyf file (UMAP, clustering, narration)")
     print("  tour          Launch browser viewer with tour autoplay")
     sys.exit(1)

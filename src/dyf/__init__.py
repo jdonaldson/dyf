@@ -83,6 +83,7 @@ try:
         LazyIndex, write_lazy_index, rewrite_lazy_index,
         from_faiss, SearchResult,
         ExtractedData, StoredFieldValue, StoredFieldInput, TreeNode,
+        detect_dyf_version,
     )
     _HAS_LAZY = True
 except ImportError:
@@ -282,6 +283,7 @@ __all__ = [
     "StoredFieldValue",
     "StoredFieldInput",
     "TreeNode",
+    "detect_dyf_version",
     # Fisher dimension weighting
     "compute_fisher_weights",
     "apply_fisher_weights",

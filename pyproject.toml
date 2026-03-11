@@ -66,6 +66,17 @@ mcp = [
 source = [
     "tree-sitter-language-pack>=0.4",
 ]
+vision = [
+    "transformers>=4.36",
+    "Pillow>=9.0",
+    "torch>=2.0",
+]
+video = [
+    "scenedetect[opencv]>=0.6",
+    "transformers>=4.36",
+    "Pillow>=9.0",
+    "torch>=2.0",
+]
 enrich = [
     "umap-learn>=0.5",
     "scikit-learn>=1.0",

@@ -52,8 +52,29 @@ class ExtractedData(TypedDict):
     metadata: dict[str, str]
 
 MAGIC = b"DYF1"
+MAGIC_V2 = b"DYF2"
 HEADER_SIZE = 16  # 4 magic + 8 fb_size + 4 reserved
 PAGE_SIZE = 4096
+
+
+def detect_dyf_version(path: str) -> int:
+    """Detect the DYF format version of a file.
+
+    Returns:
+        1 for DYF1 (header-based FlatBuffers),
+        2 for DYF2 (footer-based FlatBuffers, append-friendly).
+
+    Raises:
+        ValueError if the file has an unknown magic.
+    """
+    with open(path, "rb") as f:
+        magic = f.read(4)
+    if magic == MAGIC:
+        return 1
+    elif magic == MAGIC_V2:
+        return 2
+    else:
+        raise ValueError(f"Unknown DYF magic: {magic!r}")
 
 
 @dataclass
@@ -336,6 +357,7 @@ def write_lazy_index(
     metadata: dict[str, str] | None = None,
     build_params: dict[str, int] | None = None,
     stored_fields: Mapping[str, StoredFieldInput] | None = None,
+    format_version: int = 1,
 ) -> None:
     """Write a DYF lazy index file (FlatBuffers tree + Arrow IPC leaf data).
 
@@ -354,6 +376,8 @@ def write_lazy_index(
         stored_fields: Optional dict mapping field name to array-like of
             length n_items. Supported types: str/list[str] (Arrow utf8),
             np.int32/int64/float32/float64 arrays, list[bytes] (Arrow binary).
+        format_version: 1 (DYF1, header-based) or 2 (DYF2, footer-based,
+            append-friendly). Default: 1.
     """
     import flatbuffers
     import pyarrow as pa
@@ -497,7 +521,8 @@ def write_lazy_index(
     builder = flatbuffers.Builder(4096)
 
     # Pre-build all strings and vectors
-    version_off = builder.CreateString("1.0")
+    ver_str = "2.0" if format_version == 2 else "1.0"
+    version_off = builder.CreateString(ver_str)
     quant_off = builder.CreateString(quantization)
     comp_off = builder.CreateString(compression)
 
@@ -647,26 +672,46 @@ def write_lazy_index(
 
     # Write file
     fb_size = len(fb_bytes)
-    # Compute padding to 4KB boundary
-    total_header_fb = HEADER_SIZE + fb_size
-    padding = (PAGE_SIZE - (total_header_fb % PAGE_SIZE)) % PAGE_SIZE
 
-    with open(path, 'wb') as f:
-        # Header
-        f.write(MAGIC)
-        f.write(struct.pack('<Q', fb_size))
-        f.write(struct.pack('<I', 0))  # reserved
+    if format_version == 2:
+        # DYF2: header(8) + arrow batches + FlatBuffers + footer(16)
+        with open(path, 'wb') as f:
+            # 8-byte header: magic + flags
+            f.write(MAGIC_V2)
+            f.write(struct.pack('<I', 0))  # flags (reserved)
 
-        # FlatBuffers
-        f.write(fb_bytes)
+            # Arrow IPC batches
+            for buf in batch_buffers:
+                f.write(buf)
 
-        # Padding to 4KB boundary
-        if padding > 0:
-            f.write(b'\x00' * padding)
+            # FlatBuffers index
+            fb_offset = f.tell()
+            f.write(fb_bytes)
 
-        # Arrow IPC batches
-        for buf in batch_buffers:
-            f.write(buf)
+            # 16-byte footer: fb_offset (u64 LE) + fb_size (u64 LE)
+            f.write(struct.pack('<Q', fb_offset))
+            f.write(struct.pack('<Q', fb_size))
+    else:
+        # DYF1: header(16) + FlatBuffers + padding + arrow batches
+        total_header_fb = HEADER_SIZE + fb_size
+        padding = (PAGE_SIZE - (total_header_fb % PAGE_SIZE)) % PAGE_SIZE
+
+        with open(path, 'wb') as f:
+            # Header
+            f.write(MAGIC)
+            f.write(struct.pack('<Q', fb_size))
+            f.write(struct.pack('<I', 0))  # reserved
+
+            # FlatBuffers
+            f.write(fb_bytes)
+
+            # Padding to 4KB boundary
+            if padding > 0:
+                f.write(b'\x00' * padding)
+
+            # Arrow IPC batches
+            for buf in batch_buffers:
+                f.write(buf)
 
 
 class LazyIndex:
@@ -687,26 +732,46 @@ class LazyIndex:
         self._file = open(path, 'rb')
         self._mm = mmap.mmap(self._file.fileno(), 0, access=mmap.ACCESS_READ)
 
-        # Parse header
+        # Parse header — detect format version
         magic = self._mm[:4]
-        if magic != MAGIC:
-            raise ValueError(f"Invalid magic: {magic!r}, expected {MAGIC!r}")
+        if magic == MAGIC:
+            self._format_version = 1
+        elif magic == MAGIC_V2:
+            self._format_version = 2
+        else:
+            raise ValueError(
+                f"Invalid magic: {magic!r}, expected {MAGIC!r} or {MAGIC_V2!r}"
+            )
 
-        self._fb_size = struct.unpack_from('<Q', self._mm, 4)[0]
-        # reserved = struct.unpack_from('<I', self._mm, 12)[0]
+        if self._format_version == 1:
+            self._fb_size = struct.unpack_from('<Q', self._mm, 4)[0]
 
-        # Parse FlatBuffers
-        fb_start = HEADER_SIZE
-        fb_end = fb_start + self._fb_size
-        fb_buf = self._mm[fb_start:fb_end]
+            # Parse FlatBuffers (at start of file)
+            fb_start = HEADER_SIZE
+            fb_end = fb_start + self._fb_size
+            fb_buf = self._mm[fb_start:fb_end]
 
-        from dyf.schema.Index import Index as FBIndex
-        self._index = FBIndex.GetRootAs(fb_buf, 0)
+            from dyf.schema.Index import Index as FBIndex
+            self._index = FBIndex.GetRootAs(fb_buf, 0)
 
-        # Compute arrow section start
-        total_header_fb = HEADER_SIZE + self._fb_size
-        self._arrow_start = total_header_fb + (
-            (PAGE_SIZE - (total_header_fb % PAGE_SIZE)) % PAGE_SIZE)
+            # Compute arrow section start
+            total_header_fb = HEADER_SIZE + self._fb_size
+            self._arrow_start = total_header_fb + (
+                (PAGE_SIZE - (total_header_fb % PAGE_SIZE)) % PAGE_SIZE)
+        else:
+            # DYF2: FlatBuffers in footer, Arrow batches after 8-byte header
+            file_len = len(self._mm)
+            # Read 16-byte footer (last 16 bytes)
+            fb_offset = struct.unpack_from('<Q', self._mm, file_len - 16)[0]
+            self._fb_size = struct.unpack_from('<Q', self._mm, file_len - 8)[0]
+
+            fb_buf = self._mm[fb_offset:fb_offset + self._fb_size]
+
+            from dyf.schema.Index import Index as FBIndex
+            self._index = FBIndex.GetRootAs(fb_buf, 0)
+
+            # Arrow data starts right after the 8-byte header
+            self._arrow_start = 8
 
         # Cache for decompressed batches
         self._batch_cache = {}
@@ -730,6 +795,11 @@ class LazyIndex:
 
     def __exit__(self, *args):
         self.close()
+
+    @property
+    def format_version(self) -> int:
+        """DYF format version: 1 (header FB) or 2 (footer FB, append-friendly)."""
+        return self._format_version
 
     @property
     def embedding_dim(self):
@@ -2020,6 +2090,7 @@ def rewrite_lazy_index(
         ValueError: If the index uses PQ quantization (lossy round-trip).
     """
     out_path = output_path or path
+    format_ver = detect_dyf_version(path)
 
     # Read everything while file is open
     with LazyIndex(path) as idx:
@@ -2063,6 +2134,22 @@ def rewrite_lazy_index(
             else:
                 merged_meta[k] = v
 
+    # For v2 files with only new stored fields (no drops, no output redirect),
+    # use efficient append via Rust DyfFile instead of full rewrite.
+    if (
+        format_ver == 2
+        and new_stored_fields
+        and not drop_fields
+        and not new_metadata
+        and output_path is None
+    ):
+        try:
+            from dyf_rs import DyfFile as RustDyfFile
+            _append_fields_v2(path, new_stored_fields)
+            return
+        except ImportError:
+            pass  # Fall through to full rewrite
+
     write_lazy_index(
         tree, data['embeddings'], out_path,
         compression=compression,
@@ -2071,3 +2158,50 @@ def rewrite_lazy_index(
         build_params=build_params,
         stored_fields=merged_sf if merged_sf else None,
     )
+
+
+def _append_fields_v2(
+    path: str,
+    new_stored_fields: Mapping[str, StoredFieldInput],
+) -> None:
+    """Efficiently append stored fields to a DYF2 file using Rust backend.
+
+    Uses DyfFile.append_field_layer() which only rewrites the footer,
+    avoiding the O(all_data) cost of full rewrite.
+    """
+    import pyarrow as pa
+    from dyf_rs import DyfFile as RustDyfFile
+
+    dyf = RustDyfFile.open(path)
+
+    for field_name, values in new_stored_fields.items():
+        arr = np.asarray(values)
+
+        # Determine Arrow type from numpy dtype
+        if arr.dtype == np.int32:
+            arrow_type = "int32"
+        elif arr.dtype == np.int64:
+            arrow_type = "int64"
+        elif arr.dtype == np.float32:
+            arrow_type = "float32"
+        elif arr.dtype == np.float64:
+            arrow_type = "float64"
+        elif arr.dtype.kind in ('U', 'O'):
+            arrow_type = "utf8"
+        else:
+            arrow_type = str(arr.dtype)
+
+        # Serialize as Arrow IPC batch
+        if arrow_type == "utf8":
+            pa_arr = pa.array([str(v) if v is not None else None for v in values])
+        else:
+            pa_arr = pa.array(arr)
+
+        batch = pa.record_batch([pa_arr], names=[field_name])
+        sink = pa.BufferOutputStream()
+        writer = pa.ipc.new_stream(sink, batch.schema)
+        writer.write_batch(batch)
+        writer.close()
+        batch_bytes = sink.getvalue().to_pybytes()
+
+        dyf.append_field_layer(field_name, field_name, arrow_type, [batch_bytes])

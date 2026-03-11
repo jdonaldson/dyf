@@ -141,7 +141,7 @@ class EmbedderConfig:
         if verbose:
             print(f"Loading {self.model_id}...")
 
-        model = SentenceTransformer(self.model_id)
+        model = SentenceTransformer(self.model_id, trust_remote_code=True)
         embeddings = model.encode(
             texts, batch_size=batch_size,
             show_progress_bar=verbose,

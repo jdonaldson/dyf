@@ -170,7 +170,7 @@ def _get_embed_model():
     else:
         print(f"Loading SentenceTransformer: {model_name} ...", file=sys.stderr)
         from sentence_transformers import SentenceTransformer
-        model = SentenceTransformer(model_name)
+        model = SentenceTransformer(model_name, trust_remote_code=True)
         EMBED_MODEL = ('st', model)
 
     print("Model loaded.", file=sys.stderr)
