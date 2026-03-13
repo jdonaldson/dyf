@@ -123,7 +123,7 @@ class DensityClassifier:
         seed: int = 31,
         isolation_k: int = 10,
         isolation_sample_size: int = 1000,
-        num_stability_seeds: int = 3,
+        num_stability_seeds: int = 0,
     ):
         """
         Initialize density classifier.
@@ -134,7 +134,7 @@ class DensityClassifier:
             seed: Random seed
             isolation_k: Number of top neighbors for isolation score
             isolation_sample_size: Sample size for median similarity computation
-            num_stability_seeds: Number of seeds for stability scoring (default: 3)
+            num_stability_seeds: Number of seeds for stability scoring (default: 0, off)
         """
         self.embedding_dim = embedding_dim
         self.num_bits = num_bits
