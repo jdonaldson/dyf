@@ -106,6 +106,21 @@ class SearchResult:
         return 2
 
 
+@dataclass
+class AdaptiveProbeConfig:
+    """Configuration for adaptive probe count based on routing margin.
+
+    Queries with small routing margins (near decision boundaries) probe more
+    leaves; confident queries (large margins) probe fewer. Linear interpolation
+    between min_probes and max_probes based on where min_margin falls between
+    margin_lo and margin_hi.
+    """
+    margin_lo: float = 0.01   # below this, always probe max
+    margin_hi: float = 0.1    # above this, always probe min
+    min_probes: int = 1
+    max_probes: int = 5
+
+
 def _flatten_tree_bfs(tree, embeddings, embedding_dim=None):
     """Flatten tree to a BFS-ordered list of node dicts with computed fields.
 
@@ -1362,7 +1377,10 @@ class LazyIndex:
         Args:
             query: (dim,) query vector.
             k: Number of results to return.
-            nprobe: Number of leaf probes (1 = single path, >1 = multi-probe).
+            nprobe: Number of leaf probes. Accepts:
+                - int: fixed probe count (1 = single path, >1 = multi-probe)
+                - "auto": adaptive probing with default AdaptiveProbeConfig
+                - AdaptiveProbeConfig: adaptive probing with custom thresholds
             return_routing: If True, populate result.routing with diagnostics.
 
         Returns:
@@ -1386,7 +1404,7 @@ class LazyIndex:
             query_normed = query
 
         # Find candidate leaves by tree traversal
-        candidate_leaves = self._find_candidate_leaves(query, nprobe)
+        candidate_leaves, min_margin = self._find_candidate_leaves(query, nprobe)
 
         # Precompute ADC tables once per query if PQ
         adc_tables = None
@@ -1416,11 +1434,16 @@ class LazyIndex:
                 np.array([], dtype=np.float32),
                 {fname: [] for fname in sf_names})
             if return_routing:
-                result.routing = {
+                routing = {
                     'leaves_probed': list(candidate_leaves),
                     'candidates_scored': 0,
+                    'min_margin': min_margin if min_margin != float('inf') else None,
                     'elapsed_ms': (time.perf_counter() - t0) * 1000,
                 }
+                if not isinstance(nprobe, int):
+                    routing['nprobe_mode'] = 'adaptive'
+                    routing['adaptive_nprobe'] = len(candidate_leaves)
+                result.routing = routing
             return result
 
         all_indices = np.concatenate(all_indices)
@@ -1473,8 +1496,12 @@ class LazyIndex:
             routing_info = {
                 'leaves_probed': list(candidate_leaves),
                 'candidates_scored': candidates_scored,
+                'min_margin': min_margin if min_margin != float('inf') else None,
                 'elapsed_ms': (time.perf_counter() - t0) * 1000,
             }
+            if not isinstance(nprobe, int):
+                routing_info['nprobe_mode'] = 'adaptive'
+                routing_info['adaptive_nprobe'] = len(candidate_leaves)
 
         return SearchResult(
             all_indices[order], all_scores[order], result_fields, routing_info)
@@ -1820,21 +1847,64 @@ class LazyIndex:
             return 1
         return 0
 
+    def _resolve_nprobe(self, nprobe, min_margin):
+        """Resolve effective probe count from nprobe spec and routing margin.
+
+        Args:
+            nprobe: int (pass-through), "auto" (default config), or
+                AdaptiveProbeConfig instance.
+            min_margin: Minimum absolute projection margin along primary path.
+
+        Returns:
+            int — effective number of probes.
+        """
+        if isinstance(nprobe, int):
+            return nprobe
+
+        if nprobe == "auto":
+            cfg = AdaptiveProbeConfig()
+        elif isinstance(nprobe, AdaptiveProbeConfig):
+            cfg = nprobe
+        else:
+            raise ValueError(
+                f"nprobe must be int, 'auto', or AdaptiveProbeConfig, got {nprobe!r}")
+
+        if min_margin <= cfg.margin_lo:
+            return cfg.max_probes
+        if min_margin >= cfg.margin_hi:
+            return cfg.min_probes
+
+        # Linear interpolation: low margin → max probes, high margin → min probes
+        t = (min_margin - cfg.margin_lo) / (cfg.margin_hi - cfg.margin_lo)
+        return round(cfg.max_probes + t * (cfg.min_probes - cfg.max_probes))
+
     def _find_candidate_leaves(self, query, nprobe):
         """Traverse tree to find candidate leaf batch indices.
 
         For nprobe=1: follows the primary LSH path.
         For nprobe>1: also probes siblings with nearest Hamming-distance buckets.
+        For nprobe="auto" or AdaptiveProbeConfig: two-phase traversal that
+        determines effective nprobe from the primary path's routing margin.
+
+        Returns:
+            (candidates, min_margin) — list of batch indices and the minimum
+            absolute projection margin observed on the primary routing path.
         """
+        is_adaptive = not isinstance(nprobe, int)
+        # For adaptive mode, always enqueue alternatives during phase 1
+        effective_nprobe = nprobe if isinstance(nprobe, int) else float('inf')
+
         root_id = self._index.Root()
         candidates = set()
+        min_margin = float('inf')
 
         # Use a priority queue of (priority, node_id) to manage probes
         # Priority 0 = primary path, 1+ = alternative paths
         probe_queue = [(0, root_id)]
         visited_leaves = set()
+        first_leaf_found = False
 
-        while probe_queue and len(candidates) < nprobe:
+        while probe_queue and len(candidates) < effective_nprobe:
             # Pop lowest priority (greedy)
             probe_queue.sort(key=lambda x: x[0])
             priority, node_id = probe_queue.pop(0)
@@ -1849,6 +1919,12 @@ class LazyIndex:
                 if bi >= 0 and bi not in visited_leaves:
                     candidates.add(bi)
                     visited_leaves.add(bi)
+
+                    # Phase transition: after first leaf, resolve adaptive nprobe
+                    if is_adaptive and not first_leaf_found:
+                        first_leaf_found = True
+                        effective_nprobe = self._resolve_nprobe(
+                            nprobe, min_margin)
                 continue
 
             # Internal node: compute hash and route
@@ -1858,6 +1934,11 @@ class LazyIndex:
             if hyperplanes is not None:
                 bucket_id, projections = self._hash_query(query, hyperplanes)
                 num_bits = node.NumBits()
+
+                # Track min margin on primary path
+                if priority == 0:
+                    node_min_proj = float(np.min(np.abs(projections)))
+                    min_margin = min(min_margin, node_min_proj)
 
                 # Find primary child via bucket_id_to_child mapping
                 primary_child = None
@@ -1887,8 +1968,8 @@ class LazyIndex:
                 if primary_child is not None:
                     probe_queue.append((priority, primary_child))
 
-                # For nprobe > 1: add alternative children by margin distance
-                if nprobe > 1:
+                # Enqueue alternatives when multi-probe or adaptive
+                if effective_nprobe > 1 or is_adaptive:
                     alternatives = []
                     for bid, child_nid in bid_to_child.items():
                         if bid == primary_bid:
@@ -1915,14 +1996,14 @@ class LazyIndex:
                 if best_child is not None:
                     probe_queue.append((priority, best_child))
 
-                # For nprobe > 1: also add other children
-                if nprobe > 1:
+                # For multi-probe or adaptive: also add other children
+                if effective_nprobe > 1 or is_adaptive:
                     for ci in range(n_children):
                         child_nid = node.Children(ci)
                         if child_nid != best_child:
                             probe_queue.append((priority + 1, child_nid))
 
-        return list(candidates)
+        return list(candidates), min_margin
 
     def to_faiss(self, pq_subquantizers=None, pq_bits=8):
         """Export dyf index as a FAISS IVF index.

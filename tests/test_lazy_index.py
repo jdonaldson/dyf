@@ -887,3 +887,113 @@ class TestDetectEnrichmentLevel:
         finally:
             if os.path.exists(path):
                 os.unlink(path)
+
+
+@lazy_deps
+class TestAdaptiveProbing:
+    """Tests for adaptive probe count based on routing margin."""
+
+    @pytest.fixture
+    def index_data(self):
+        """Build a DYF tree and write a lazy index file."""
+        from dyf import build_dyf_tree
+        from dyf.lazy_index import write_lazy_index, LazyIndex
+
+        embeddings = _make_clustered_embeddings(
+            n_clusters=5, points_per_cluster=40, dim=32, seed=42)
+        tree = build_dyf_tree(embeddings, max_depth=3, num_bits=3,
+                              min_leaf_size=4, seed=42)
+
+        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+            path = f.name
+
+        try:
+            write_lazy_index(tree, embeddings, path, compression='zstd',
+                             quantization='float16',
+                             metadata={'test': 'true'})
+            yield {
+                'path': path,
+                'embeddings': embeddings,
+                'tree': tree,
+            }
+        finally:
+            if os.path.exists(path):
+                os.unlink(path)
+
+    def test_adaptive_probes_more_for_boundary_queries(self, index_data):
+        """Low-margin queries should probe more leaves than high-margin ones."""
+        from dyf.lazy_index import LazyIndex
+
+        embeddings = index_data['embeddings']
+
+        with LazyIndex(index_data['path']) as idx:
+            margins_and_probes = []
+            for i in range(len(embeddings)):
+                result = idx.search(embeddings[i], k=10, nprobe="auto",
+                                    return_routing=True)
+                margins_and_probes.append(
+                    (result.routing['min_margin'],
+                     len(result.routing['leaves_probed'])))
+
+            # Split into low-margin and high-margin groups by median
+            margins_and_probes.sort(key=lambda x: x[0])
+            mid = len(margins_and_probes) // 2
+            low_margin_probes = [p for _, p in margins_and_probes[:mid]]
+            high_margin_probes = [p for _, p in margins_and_probes[mid:]]
+
+            avg_low = sum(low_margin_probes) / len(low_margin_probes)
+            avg_high = sum(high_margin_probes) / len(high_margin_probes)
+
+            # Low-margin queries should probe at least as many leaves on average
+            assert avg_low >= avg_high, (
+                f"Low-margin queries should probe more: "
+                f"avg_low={avg_low:.2f}, avg_high={avg_high:.2f}")
+
+    def test_adaptive_backward_compatible(self, index_data):
+        """Fixed nprobe=3 still works and routing includes min_margin."""
+        from dyf.lazy_index import LazyIndex
+
+        embeddings = index_data['embeddings']
+        query = embeddings[0]
+
+        with LazyIndex(index_data['path']) as idx:
+            result = idx.search(query, k=10, nprobe=3, return_routing=True)
+            assert len(result.indices) > 0
+            assert 'min_margin' in result.routing
+            assert 'nprobe_mode' not in result.routing
+            assert 'adaptive_nprobe' not in result.routing
+
+    def test_adaptive_config_custom(self, index_data):
+        """AdaptiveProbeConfig with custom thresholds works."""
+        from dyf.lazy_index import LazyIndex, AdaptiveProbeConfig
+
+        embeddings = index_data['embeddings']
+        query = embeddings[0]
+
+        cfg = AdaptiveProbeConfig(
+            margin_lo=0.005, margin_hi=0.2,
+            min_probes=2, max_probes=8)
+
+        with LazyIndex(index_data['path']) as idx:
+            result = idx.search(query, k=10, nprobe=cfg, return_routing=True)
+            assert len(result.indices) > 0
+            nprobe_used = result.routing['adaptive_nprobe']
+            assert 2 <= nprobe_used <= 8
+
+    def test_adaptive_routing_diagnostics(self, index_data):
+        """nprobe='auto' routing includes min_margin, adaptive_nprobe, nprobe_mode."""
+        from dyf.lazy_index import LazyIndex
+
+        embeddings = index_data['embeddings']
+        query = embeddings[0]
+
+        with LazyIndex(index_data['path']) as idx:
+            result = idx.search(query, k=10, nprobe="auto",
+                                return_routing=True)
+            r = result.routing
+            assert 'min_margin' in r
+            assert 'adaptive_nprobe' in r
+            assert r['nprobe_mode'] == 'adaptive'
+            assert isinstance(r['min_margin'], float)
+            assert isinstance(r['adaptive_nprobe'], int)
+            assert r['adaptive_nprobe'] >= 1

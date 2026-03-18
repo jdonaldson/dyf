@@ -81,7 +81,7 @@ from .dyf_tree import (
 try:
     from .lazy_index import (
         LazyIndex, write_lazy_index, rewrite_lazy_index, split_dyf3,
-        from_faiss, SearchResult,
+        from_faiss, SearchResult, AdaptiveProbeConfig,
         ExtractedData, StoredFieldValue, StoredFieldInput, TreeNode,
         detect_dyf_version,
     )
@@ -94,6 +94,7 @@ except ImportError:
     split_dyf3 = None
     from_faiss = None
     SearchResult = None
+    AdaptiveProbeConfig = None
     ExtractedData = None
     StoredFieldValue = None
     StoredFieldInput = None
@@ -281,6 +282,7 @@ __all__ = [
     "split_dyf3",
     "from_faiss",
     "SearchResult",
+    "AdaptiveProbeConfig",
     "ExtractedData",
     "StoredFieldValue",
     "StoredFieldInput",
