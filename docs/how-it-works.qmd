@@ -91,6 +91,40 @@ classifier.fit(embeddings)
 classifier.fit_itq(embeddings)
 ```
 
+## Why Hashing Yields Density
+
+Most hash tables try to spread items *evenly* across buckets — collisions are a bug. DYF flips this: **uneven bucket sizes are the signal**. When you hash embeddings with data-adaptive hyperplanes, the resulting bucket distribution directly encodes the density structure of the embedding space.
+
+```{mermaid}
+%%| fig-width: 8
+flowchart LR
+    subgraph hash ["Data-adaptive hash"]
+        direction TB
+        H1["PCA hyperplanes<br/>split along cluster<br/>boundaries"]
+    end
+
+    subgraph buckets ["Bucket sizes encode density"]
+        direction TB
+        B1["Bucket 3: 1,200 items<br/>→ dense region"]
+        B2["Bucket 7: 45 items<br/>→ sparse region"]
+        B3["Bucket 12: 2 items<br/>→ orphan territory"]
+    end
+
+    hash --> buckets
+
+    style hash stroke:#4a6fa5,stroke-width:2
+    style buckets stroke:#2d8a2d,stroke-width:2
+```
+
+A large bucket means many embeddings landed on the same side of every hyperplane — they occupy a coherent, well-populated region of the space. A tiny bucket means those items ended up in a region with almost no neighbors. The bucket size *is* a density estimate, computed as a byproduct of the hash with no additional distance calculations.
+
+This idea draws from [Krapivin et al. (2025)](https://arxiv.org/abs/2501.02305), which analyzes hash table occupancy patterns and probe complexity under non-uniform distributions. DYF applies this principle to embedding spaces: instead of fighting non-uniform bucket sizes, it treats them as a feature — the load pattern of the hash table reveals the topology of the data.
+
+::: {.callout-note}
+## Multi-resolution density
+DYF can also read density at multiple scales by masking bucket IDs to fewer bits. With 14-bit hashes, masking to 8 bits merges neighboring buckets — items that looked sparse at fine resolution may cluster at coarser resolution. This multi-resolution view separates true orphans (sparse at every scale) from items that belong to broad, diffuse regions.
+:::
+
 ## What the Metrics Tell You
 
 After fitting, DYF computes per-item metrics that characterize each point's role:
