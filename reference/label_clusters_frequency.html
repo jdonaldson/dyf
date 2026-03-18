@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>save_index</title>
+<title>label_clusters_frequency</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -331,7 +331,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
       <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
         <i class="bi bi-layout-text-sidebar-reverse"></i>
       </button>
-        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../reference/save_index.html">I/O</a></li><li class="breadcrumb-item"><a href="../reference/save_index.html">save_index</a></li></ol></nav>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../reference/compute_split_keywords.html">Split Keywords</a></li><li class="breadcrumb-item"><a href="../reference/label_clusters_frequency.html">label_clusters_frequency</a></li></ol></nav>
         <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
         </a>
     </div>
@@ -362,12 +362,6 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
   <div class="sidebar-item-container"> 
   <a href="../reference/DensityClassifierFull.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">DensityClassifierFull</span></a>
-  </div>
-</li>
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../reference/DensityReportFull.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">DensityReportFull</span></a>
   </div>
 </li>
       </ul>
@@ -664,41 +658,12 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
         <li class="sidebar-item sidebar-item-section">
       <div class="sidebar-item-container"> 
             <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-7" role="navigation" aria-expanded="true">
- <span class="menu-text">I/O</span></a>
+ <span class="menu-text">Lazy Index</span></a>
           <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-7" role="navigation" aria-expanded="true" aria-label="Toggle section">
             <i class="bi bi-chevron-right ms-2"></i>
           </a> 
       </div>
       <ul id="quarto-sidebar-section-7" class="collapse list-unstyled sidebar-section depth1 show">  
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../reference/save_index.html" class="sidebar-item-text sidebar-link active">
- <span class="menu-text">save_index</span></a>
-  </div>
-</li>
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../reference/load_index.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">load_index</span></a>
-  </div>
-</li>
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../reference/PrecomputedIndex.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">PrecomputedIndex</span></a>
-  </div>
-</li>
-      </ul>
-  </li>
-        <li class="sidebar-item sidebar-item-section">
-      <div class="sidebar-item-container"> 
-            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-8" role="navigation" aria-expanded="true">
- <span class="menu-text">Lazy Index</span></a>
-          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-8" role="navigation" aria-expanded="true" aria-label="Toggle section">
-            <i class="bi bi-chevron-right ms-2"></i>
-          </a> 
-      </div>
-      <ul id="quarto-sidebar-section-8" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="../reference/LazyIndex.html" class="sidebar-item-text sidebar-link">
@@ -713,6 +678,18 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
+  <a href="../reference/rewrite_lazy_index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">rewrite_lazy_index</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/split_dyf3.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">split_dyf3</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
   <a href="../reference/from_faiss.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">from_faiss</span></a>
   </div>
@@ -723,17 +700,181 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
  <span class="menu-text">SearchResult</span></a>
   </div>
 </li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/AdaptiveProbeConfig.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">AdaptiveProbeConfig</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-8" role="navigation" aria-expanded="true">
+ <span class="menu-text">Fisher Weighting</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-8" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-8" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/compute_fisher_weights.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">compute_fisher_weights</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/apply_fisher_weights.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">apply_fisher_weights</span></a>
+  </div>
+</li>
       </ul>
   </li>
         <li class="sidebar-item sidebar-item-section">
       <div class="sidebar-item-container"> 
             <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-9" role="navigation" aria-expanded="true">
- <span class="menu-text">Categorical</span></a>
+ <span class="menu-text">Split Keywords</span></a>
           <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-9" role="navigation" aria-expanded="true" aria-label="Toggle section">
             <i class="bi bi-chevron-right ms-2"></i>
           </a> 
       </div>
       <ul id="quarto-sidebar-section-9" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/compute_split_keywords.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">compute_split_keywords</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/compute_embedding_keywords.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">compute_embedding_keywords</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/label_clusters_frequency.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">label_clusters_frequency</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/build_tree_maps.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">build_tree_maps</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/collect_descendant_indices.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">collect_descendant_indices</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/compute_domain_stopwords.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">compute_domain_stopwords</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/format_split_path.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">format_split_path</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/tokenize.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">tokenize</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/TextDiversityReport.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">TextDiversityReport</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/assess_text_diversity.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">assess_text_diversity</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-10" role="navigation" aria-expanded="true">
+ <span class="menu-text">Cluster Tree</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-10" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-10" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/build_cluster_tree_dag.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">build_cluster_tree_dag</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/compute_sibling_keywords.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">compute_sibling_keywords</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/derive_path_labels.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">derive_path_labels</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/format_cluster_context.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">format_cluster_context</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-11" role="navigation" aria-expanded="true">
+ <span class="menu-text">Agglomeration</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-11" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-11" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/agglomerate_tree_leaves.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">agglomerate_tree_leaves</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/louvain_cluster_leaves.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">louvain_cluster_leaves</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/merge_to_max_k.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">merge_to_max_k</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-12" role="navigation" aria-expanded="true">
+ <span class="menu-text">Categorical</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-12" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-12" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="../reference/CategoryGraph.html" class="sidebar-item-text sidebar-link">
@@ -764,17 +905,129 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
  <span class="menu-text">load_category_graphs</span></a>
   </div>
 </li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/AxisDiagnostic.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">AxisDiagnostic</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/diagnose_axes.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">diagnose_axes</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/diagnostics_to_metadata.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">diagnostics_to_metadata</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/discover_categorical_columns.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">discover_categorical_columns</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/embed_with_diagnostics.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">embed_with_diagnostics</span></a>
+  </div>
+</li>
       </ul>
   </li>
         <li class="sidebar-item sidebar-item-section">
       <div class="sidebar-item-container"> 
-            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-10" role="navigation" aria-expanded="true">
- <span class="menu-text">Configuration</span></a>
-          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-10" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-13" role="navigation" aria-expanded="true">
+ <span class="menu-text">Colors</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-13" role="navigation" aria-expanded="true" aria-label="Toggle section">
             <i class="bi bi-chevron-right ms-2"></i>
           </a> 
       </div>
-      <ul id="quarto-sidebar-section-10" class="collapse list-unstyled sidebar-section depth1 show">  
+      <ul id="quarto-sidebar-section-13" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/spatial_rgb_map.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">spatial_rgb_map</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/spatial_color_map.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">spatial_color_map</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/tree_rgb_map.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">tree_rgb_map</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-14" role="navigation" aria-expanded="true">
+ <span class="menu-text">Provenance</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-14" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-14" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/Provenance.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Provenance</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/create_provenance.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">create_provenance</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/file_hash.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">file_hash</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/params_hash.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">params_hash</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/check_compatible.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">check_compatible</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/provenance_to_dict.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">provenance_to_dict</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/provenance_from_dict.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">provenance_from_dict</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-15" role="navigation" aria-expanded="true">
+ <span class="menu-text">Configuration</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-15" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-15" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="../reference/EmbedderConfig.html" class="sidebar-item-text sidebar-link">
@@ -805,31 +1058,26 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#dyf.save_index" id="toc-dyf.save_index" class="nav-link active" data-scroll-target="#dyf.save_index">save_index</a>
+  <li><a href="#dyf.label_clusters_frequency" id="toc-dyf.label_clusters_frequency" class="nav-link active" data-scroll-target="#dyf.label_clusters_frequency">label_clusters_frequency</a>
   <ul class="collapse">
   <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
-  <li><a href="#example" id="toc-example" class="nav-link" data-scroll-target="#example">Example</a></li>
+  <li><a href="#returns" id="toc-returns" class="nav-link" data-scroll-target="#returns">Returns</a></li>
   </ul></li>
   </ul>
 </nav>
     </div>
 <!-- main -->
-<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../reference/save_index.html">I/O</a></li><li class="breadcrumb-item"><a href="../reference/save_index.html">save_index</a></li></ol></nav></header>
+<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../reference/compute_split_keywords.html">Split Keywords</a></li><li class="breadcrumb-item"><a href="../reference/label_clusters_frequency.html">label_clusters_frequency</a></li></ol></nav></header>
 
 
 
 
 
-<section id="dyf.save_index" class="level1">
-<h1>save_index</h1>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>save_index(</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    classifier,</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    path,</span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    embeddings<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    include_embeddings<span class="op">=</span><span class="va">True</span>,</span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    metadata<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Save a fitted classifier’s index to safetensors format.</p>
+<section id="dyf.label_clusters_frequency" class="level1">
+<h1>label_clusters_frequency</h1>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>label_clusters_frequency(titles, labels)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Label clusters using TF-IDF token frequency (no LLM).</p>
+<p>Per-cluster TF-IDF: tokens frequent in one cluster but rare globally win. Falls back to raw title frequency if tokenization yields nothing (e.g.&nbsp;numeric-only titles like “Digit 7”). Disambiguates identical labels across clusters with <code>(2)</code>, <code>(3)</code> suffixes.</p>
 <section id="parameters" class="level2 doc-section doc-section-parameters">
 <h2 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters">Parameters</h2>
 <table class="caption-top table">
@@ -843,41 +1091,38 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 </thead>
 <tbody>
 <tr class="odd">
-<td>classifier</td>
-<td></td>
-<td>Fitted OutlierClassifier instance</td>
+<td>titles</td>
+<td><a href="`list`">list</a>[<a href="`str`">str</a>]</td>
+<td>List of title strings, one per item.</td>
 <td><em>required</em></td>
 </tr>
 <tr class="even">
-<td>path</td>
-<td><a href="`typing.Union`">Union</a>[<a href="`str`">str</a>, <a href="`pathlib.Path`">Path</a>]</td>
-<td>Output file path (.safetensors)</td>
+<td>labels</td>
+<td><a href="`numpy`">np</a>.<a href="`numpy.ndarray`">ndarray</a></td>
+<td>Integer cluster assignments, same length as titles.</td>
 <td><em>required</em></td>
-</tr>
-<tr class="odd">
-<td>embeddings</td>
-<td><a href="`typing.Optional`">Optional</a>[<a href="`numpy`">np</a>.<a href="`numpy.ndarray`">ndarray</a>]</td>
-<td>Original embeddings (required if include_embeddings=True)</td>
-<td><code>None</code></td>
-</tr>
-<tr class="even">
-<td>include_embeddings</td>
-<td><a href="`bool`">bool</a></td>
-<td>Whether to include embeddings in the file</td>
-<td><code>True</code></td>
 </tr>
 </tbody>
 </table>
 </section>
-<section id="example" class="level2 doc-section doc-section-example">
-<h2 class="doc-section doc-section-example anchored" data-anchor-id="example">Example</h2>
-<blockquote class="blockquote">
-<blockquote class="blockquote">
-<blockquote class="blockquote">
-<p>classifier.fit(embeddings) save_index(classifier, ‘index.safetensors’, embeddings)</p>
-</blockquote>
-</blockquote>
-</blockquote>
+<section id="returns" class="level2 doc-section doc-section-returns">
+<h2 class="doc-section doc-section-returns anchored" data-anchor-id="returns">Returns</h2>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td></td>
+<td><a href="`dict`">dict</a>[<a href="`int`">int</a>, <a href="`str`">str</a>]</td>
+<td>dict mapping cluster_id -&gt; label string.</td>
+</tr>
+</tbody>
+</table>
 
 
 </section>

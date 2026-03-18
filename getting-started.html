@@ -344,7 +344,10 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
   <ul class="collapse">
   <li><a href="#dataframe-integration" id="toc-dataframe-integration" class="nav-link" data-scroll-target="#dataframe-integration">DataFrame Integration</a></li>
   </ul></li>
-  <li><a href="#saving-and-loading" id="toc-saving-and-loading" class="nav-link" data-scroll-target="#saving-and-loading">Saving and Loading</a></li>
+  <li><a href="#building-searching-indexes" id="toc-building-searching-indexes" class="nav-link" data-scroll-target="#building-searching-indexes">Building &amp; Searching Indexes</a>
+  <ul class="collapse">
+  <li><a href="#adaptive-probing" id="toc-adaptive-probing" class="nav-link" data-scroll-target="#adaptive-probing">Adaptive Probing</a></li>
+  </ul></li>
   <li><a href="#tree-methods" id="toc-tree-methods" class="nav-link" data-scroll-target="#tree-methods">Tree Methods</a></li>
   <li><a href="#bridge-aware-retrieval-rag" id="toc-bridge-aware-retrieval-rag" class="nav-link" data-scroll-target="#bridge-aware-retrieval-rag">Bridge-Aware Retrieval (RAG)</a></li>
   <li><a href="#re-ranking" id="toc-re-ranking" class="nav-link" data-scroll-target="#re-ranking">Re-ranking</a></li>
@@ -443,60 +446,78 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 <p>Pandas works the same way via <code>from_pandas()</code> / <code>to_pandas()</code>.</p>
 </section>
 </section>
-<section id="saving-and-loading" class="level2">
-<h2 class="anchored" data-anchor-id="saving-and-loading">Saving and Loading</h2>
-<p>Save a fitted classifier for later use without needing the Rust dependency:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dyf <span class="im">import</span> save_index, PrecomputedIndex</span>
+<section id="building-searching-indexes" class="level2">
+<h2 class="anchored" data-anchor-id="building-searching-indexes">Building &amp; Searching Indexes</h2>
+<p>Build a <code>.dyf</code> index file for fast, memory-mapped search:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dyf <span class="im">import</span> build_dyf_tree, write_lazy_index, LazyIndex</span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Save</span></span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>save_index(</span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>    classifier, <span class="st">"index.safetensors"</span>, embeddings,</span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>    metadata<span class="op">=</span>{<span class="st">"model"</span>: <span class="st">"all-MiniLM-L6-v2"</span>}</span>
-<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Load (no dyf-rs needed)</span></span>
-<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>index <span class="op">=</span> PrecomputedIndex.load(<span class="st">"index.safetensors"</span>)</span>
-<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>dense <span class="op">=</span> index.get_dense()</span>
-<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>bucket_5 <span class="op">=</span> index.get_bucket(<span class="dv">5</span>)</span>
-<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(index.metadata)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Build a DYF tree</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>tree <span class="op">=</span> build_dyf_tree(embeddings, max_depth<span class="op">=</span><span class="dv">4</span>, num_bits<span class="op">=</span><span class="dv">3</span>, min_leaf_size<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Write to disk</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>write_lazy_index(tree, embeddings, <span class="st">"index.dyf"</span>,</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>                 quantization<span class="op">=</span><span class="st">"float16"</span>, compression<span class="op">=</span><span class="st">"zstd"</span>,</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>                 stored_fields<span class="op">=</span>{<span class="st">"title"</span>: titles},</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>                 metadata<span class="op">=</span>{<span class="st">"model"</span>: <span class="st">"nomic-embed-text-v1.5"</span>})</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a><span class="co"># Search (instant open, zero startup cost)</span></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> LazyIndex(<span class="st">"index.dyf"</span>) <span class="im">as</span> idx:</span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> idx.search(query_embedding, k<span class="op">=</span><span class="dv">10</span>, nprobe<span class="op">=</span><span class="dv">3</span>)</span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(result.indices, result.scores)</span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(result.fields[<span class="st">"title"</span>])</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<section id="adaptive-probing" class="level3">
+<h3 class="anchored" data-anchor-id="adaptive-probing">Adaptive Probing</h3>
+<p>Queries near decision boundaries automatically probe more leaves:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dyf <span class="im">import</span> LazyIndex, AdaptiveProbeConfig</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> LazyIndex(<span class="st">"index.dyf"</span>) <span class="im">as</span> idx:</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Auto mode — margin-based probe count</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> idx.search(query, k<span class="op">=</span><span class="dv">10</span>, nprobe<span class="op">=</span><span class="st">"auto"</span>, return_routing<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(result.routing[<span class="st">"adaptive_nprobe"</span>])</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Custom thresholds</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>    cfg <span class="op">=</span> AdaptiveProbeConfig(margin_lo<span class="op">=</span><span class="fl">0.005</span>, margin_hi<span class="op">=</span><span class="fl">0.2</span>,</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>                              min_probes<span class="op">=</span><span class="dv">1</span>, max_probes<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> idx.search(query, k<span class="op">=</span><span class="dv">10</span>, nprobe<span class="op">=</span>cfg)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
 </section>
 <section id="tree-methods" class="level2">
 <h2 class="anchored" data-anchor-id="tree-methods">Tree Methods</h2>
 <p>Build hierarchical structure from embeddings for multi-resolution analysis:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dyf <span class="im">import</span> build_pca_tree, cut_tree_to_labels</span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Build a PCA-based binary tree</span></span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>tree <span class="op">=</span> build_pca_tree(embeddings, max_depth<span class="op">=</span><span class="dv">8</span>)</span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Cut to get cluster labels</span></span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>labels <span class="op">=</span> cut_tree_to_labels(tree, max_depth<span class="op">=</span><span class="dv">8</span>, n_points<span class="op">=</span><span class="bu">len</span>(embeddings), n_clusters<span class="op">=</span><span class="dv">25</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dyf <span class="im">import</span> build_pca_tree, cut_tree_to_labels</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Build a PCA-based binary tree</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>tree <span class="op">=</span> build_pca_tree(embeddings, max_depth<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Cut to get cluster labels</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>labels <span class="op">=</span> cut_tree_to_labels(tree, max_depth<span class="op">=</span><span class="dv">8</span>, n_points<span class="op">=</span><span class="bu">len</span>(embeddings), n_clusters<span class="op">=</span><span class="dv">25</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 <section id="bridge-aware-retrieval-rag" class="level2">
 <h2 class="anchored" data-anchor-id="bridge-aware-retrieval-rag">Bridge-Aware Retrieval (RAG)</h2>
 <p>Use <code>BridgeIndex</code> for structure-aware approximate nearest neighbor search:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dyf <span class="im">import</span> BridgeIndex</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Build index</span></span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>index <span class="op">=</span> BridgeIndex(n_anchors<span class="op">=</span><span class="dv">1000</span>)</span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>index.fit(embeddings)</span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Query</span></span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>query <span class="op">=</span> np.random.randn(<span class="dv">384</span>).astype(np.float32)</span>
-<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>indices, scores <span class="op">=</span> index.query(query, k<span class="op">=</span><span class="dv">10</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dyf <span class="im">import</span> BridgeIndex</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Build index</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>index <span class="op">=</span> BridgeIndex(n_anchors<span class="op">=</span><span class="dv">1000</span>)</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>index.fit(embeddings)</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Query</span></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>query <span class="op">=</span> np.random.randn(<span class="dv">384</span>).astype(np.float32)</span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>indices, scores <span class="op">=</span> index.query(query, k<span class="op">=</span><span class="dv">10</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 <section id="re-ranking" class="level2">
 <h2 class="anchored" data-anchor-id="re-ranking">Re-ranking</h2>
 <p>Apply diversity-aware re-ranking to search results:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dyf <span class="im">import</span> rerank_mmr, rerank_bridge_mmr</span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Standard MMR re-ranking</span></span>
-<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>reranked <span class="op">=</span> rerank_mmr(query_emb, candidate_indices, embeddings_normed, top_k<span class="op">=</span><span class="dv">10</span>)</span>
-<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Bridge-aware MMR (boosts items that span clusters)</span></span>
-<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>reranked <span class="op">=</span> rerank_bridge_mmr(</span>
-<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>    query_emb, candidate_indices, embeddings_normed,</span>
-<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>    bridge_scores, cluster_labels, top_k<span class="op">=</span><span class="dv">10</span>,</span>
-<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dyf <span class="im">import</span> rerank_mmr, rerank_bridge_mmr</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Standard MMR re-ranking</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>reranked <span class="op">=</span> rerank_mmr(query_emb, candidate_indices, embeddings_normed, top_k<span class="op">=</span><span class="dv">10</span>)</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Bridge-aware MMR (boosts items that span clusters)</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>reranked <span class="op">=</span> rerank_bridge_mmr(</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>    query_emb, candidate_indices, embeddings_normed,</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>    bridge_scores, cluster_labels, top_k<span class="op">=</span><span class="dv">10</span>,</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 <section id="next-steps" class="level2">
 <h2 class="anchored" data-anchor-id="next-steps">Next Steps</h2>
