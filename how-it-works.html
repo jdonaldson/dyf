@@ -350,6 +350,8 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
   <li><a href="#step-2-compute-centroids" id="toc-step-2-compute-centroids" class="nav-link" data-scroll-target="#step-2-compute-centroids">Step 2: Compute centroids</a></li>
   <li><a href="#step-3-pca-on-centroids" id="toc-step-3-pca-on-centroids" class="nav-link" data-scroll-target="#step-3-pca-on-centroids">Step 3: PCA on centroids</a></li>
   <li><a href="#step-4-re-hash" id="toc-step-4-re-hash" class="nav-link" data-scroll-target="#step-4-re-hash">Step 4: Re-hash</a></li>
+  <li><a href="#how-the-hash-works-sign-bit-lsh" id="toc-how-the-hash-works-sign-bit-lsh" class="nav-link" data-scroll-target="#how-the-hash-works-sign-bit-lsh">How the hash works: sign-bit LSH</a></li>
+  <li><a href="#improving-the-hash-itq-rotation" id="toc-improving-the-hash-itq-rotation" class="nav-link" data-scroll-target="#improving-the-hash-itq-rotation">Improving the hash: ITQ rotation</a></li>
   </ul></li>
   <li><a href="#what-the-metrics-tell-you" id="toc-what-the-metrics-tell-you" class="nav-link" data-scroll-target="#what-the-metrics-tell-you">What the Metrics Tell You</a></li>
   <li><a href="#dense-bridge-orphan" id="toc-dense-bridge-orphan" class="nav-link" data-scroll-target="#dense-bridge-orphan">Dense, Bridge, Orphan</a></li>
@@ -423,11 +425,11 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 </section>
 <section id="step-3-pca-on-centroids" class="level3">
 <h3 class="anchored" data-anchor-id="step-3-pca-on-centroids">Step 3: PCA on centroids</h3>
-<p>Run PCA on the centroids to find the directions along which they vary most. These principal components become the new hyperplanes — data-adaptive, not random. They cut along the natural seams in your data.</p>
+<p>Run PCA on the <em>centroids</em>, not the full dataset. This is the key move — centroids are a small matrix (hundreds of rows, not millions), so PCA is fast. And because each centroid represents a cluster of similar items, the principal components capture the directions that <em>separate</em> clusters. These become the new hyperplanes.</p>
 </section>
 <section id="step-4-re-hash" class="level3">
 <h3 class="anchored" data-anchor-id="step-4-re-hash">Step 4: Re-hash</h3>
-<p>Project all embeddings onto the learned hyperplanes. Now the buckets reflect actual semantic regions rather than arbitrary splits.</p>
+<p>Project all embeddings onto the learned hyperplanes using the same sign-bit scheme. Now the buckets reflect actual semantic regions rather than arbitrary splits.</p>
 <div class="callout callout-style-default callout-tip callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -441,6 +443,47 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 <p>DYF uses randomness to <em>discover</em> structure, then learns from it. The final hyperplanes aren’t random — they’re fit to your data.</p>
 </div>
 </div>
+</section>
+<section id="how-the-hash-works-sign-bit-lsh" class="level3">
+<h3 class="anchored" data-anchor-id="how-the-hash-works-sign-bit-lsh">How the hash works: sign-bit LSH</h3>
+<p>Each hyperplane is a unit vector in embedding space. To assign an item to a bucket, DYF computes the dot product of the embedding with each hyperplane and takes the sign:</p>
+<ul>
+<li>Positive dot product → bit = 1 (item is on the “positive” side)</li>
+<li>Negative dot product → bit = 0 (item is on the “negative” side)</li>
+</ul>
+<p>The bits from all hyperplanes are packed into a single integer — the <strong>bucket ID</strong>. With 3 hyperplanes, each item gets a 3-bit ID (0–7). Items that share a bucket ID are on the same side of every hyperplane, meaning they’re in the same region of the space.</p>
+<div class="cell" data-fig-width="8" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">flowchart LR
+    E["Embedding"] --&gt; D1["dot with h1&lt;br/&gt;→ positive → 1"]
+    E --&gt; D2["dot with h2&lt;br/&gt;→ negative → 0"]
+    E --&gt; D3["dot with h3&lt;br/&gt;→ positive → 1"]
+    D1 --&gt; ID["bucket = 101₂ = 5"]
+    D2 --&gt; ID
+    D3 --&gt; ID
+
+    style E stroke:#4a6fa5,stroke-width:2
+    style ID stroke:#2d8a2d,stroke-width:2
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p>This is a form of <strong>Locality Sensitive Hashing</strong> (LSH) — nearby embeddings are likely to land in the same bucket because they’ll be on the same side of most hyperplanes. What makes DYF different from standard random-projection LSH is the second pass: the hyperplanes are learned from the data’s own structure via PCA, so the splits align with natural cluster boundaries instead of arbitrary directions.</p>
+</section>
+<section id="improving-the-hash-itq-rotation" class="level3">
+<h3 class="anchored" data-anchor-id="improving-the-hash-itq-rotation">Improving the hash: ITQ rotation</h3>
+<p>The sign function is lossy — embeddings near a decision boundary can flip to the wrong side. <strong>Iterative Quantization</strong> (ITQ) reduces this loss by learning a rotation matrix that aligns the PCA projections with the sign thresholds.</p>
+<p>The idea: after PCA, the projections are continuous values. ITQ finds a rotation that makes those values as far from zero as possible — pushing them away from the decision boundary before the sign function is applied. This typically improves recall by 5–12% with minimal extra build cost.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Standard PCA-based hash</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>classifier.fit(embeddings)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co"># ITQ-refined hash (better quantization)</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>classifier.fit_itq(embeddings)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 </section>
 <section id="what-the-metrics-tell-you" class="level2">
@@ -487,17 +530,17 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 </tr>
 </tbody>
 </table>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dyf <span class="im">import</span> DensityClassifier</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>classifier <span class="op">=</span> DensityClassifier(embedding_dim<span class="op">=</span><span class="dv">384</span>)</span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>classifier.fit(embeddings)</span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>bucket_ids <span class="op">=</span> classifier.get_bucket_ids()</span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>bucket_sizes <span class="op">=</span> classifier.get_bucket_sizes()</span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>centroid_sims <span class="op">=</span> classifier.get_centroid_similarities()</span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>isolation <span class="op">=</span> classifier.get_isolation_scores()</span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>stability <span class="op">=</span> classifier.get_stability_scores()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dyf <span class="im">import</span> DensityClassifier</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>classifier <span class="op">=</span> DensityClassifier(embedding_dim<span class="op">=</span><span class="dv">384</span>)</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>classifier.fit(embeddings)</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>bucket_ids <span class="op">=</span> classifier.get_bucket_ids()</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>bucket_sizes <span class="op">=</span> classifier.get_bucket_sizes()</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>centroid_sims <span class="op">=</span> classifier.get_centroid_similarities()</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>isolation <span class="op">=</span> classifier.get_isolation_scores()</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>stability <span class="op">=</span> classifier.get_stability_scores()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 <section id="dense-bridge-orphan" class="level2">
 <h2 class="anchored" data-anchor-id="dense-bridge-orphan">Dense, Bridge, Orphan</h2>
@@ -541,9 +584,9 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 <p><strong>Dense</strong> items sit in large buckets with high centroid similarity. They’re the core members of a semantic region — the papers that are clearly <em>about</em> machine learning, the products that are obviously <em>kitchen appliances</em>.</p>
 <p><strong>Bridge</strong> items are unstable under perturbation. If you re-run the classifier with slightly different hyperplanes, they change buckets. This means they sit near a decision boundary — a paper about “ML for medical imaging” bridges the ML cluster and the Medicine cluster. Bridges reveal the <em>connections</em> in your data’s topology.</p>
 <p><strong>Orphan</strong> items land in small buckets with high isolation scores. They’re genuinely unlike everything else — not noise, but unique.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>dense_indices <span class="op">=</span> classifier.get_dense()</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>bridge_indices <span class="op">=</span> classifier.get_bridge()</span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>orphan_indices <span class="op">=</span> classifier.get_orphans()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>dense_indices <span class="op">=</span> classifier.get_dense()</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>bridge_indices <span class="op">=</span> classifier.get_bridge()</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>orphan_indices <span class="op">=</span> classifier.get_orphans()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 <section id="going-deeper-the-dyf-tree" class="level2">
 <h2 class="anchored" data-anchor-id="going-deeper-the-dyf-tree">Going Deeper: The DYF Tree</h2>
@@ -576,15 +619,15 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 </div>
 </div>
 <p>Each level re-fits PCA to the <em>local</em> data at that node. This means deeper levels discover structure <em>within</em> clusters — sub-topics that wouldn’t be visible at the top level. With <code>num_bits=3</code>, each node splits up to 8 ways, so a tree of depth 4 can produce up to 4,096 leaf buckets.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dyf <span class="im">import</span> build_dyf_tree</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>tree <span class="op">=</span> build_dyf_tree(</span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    embeddings,</span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    max_depth<span class="op">=</span><span class="dv">4</span>,</span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>    num_bits<span class="op">=</span><span class="dv">3</span>,</span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    min_leaf_size<span class="op">=</span><span class="dv">8</span>,</span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    fit_method<span class="op">=</span><span class="st">"itq"</span>,  <span class="co"># ITQ gives +5-12% recall over raw PCA</span></span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dyf <span class="im">import</span> build_dyf_tree</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>tree <span class="op">=</span> build_dyf_tree(</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    embeddings,</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    max_depth<span class="op">=</span><span class="dv">4</span>,</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    num_bits<span class="op">=</span><span class="dv">3</span>,</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>    min_leaf_size<span class="op">=</span><span class="dv">8</span>,</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>    fit_method<span class="op">=</span><span class="st">"itq"</span>,  <span class="co"># ITQ gives +5-12% recall over raw PCA</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 <section id="from-tree-to-search-index" class="level2">
 <h2 class="anchored" data-anchor-id="from-tree-to-search-index">From Tree to Search Index</h2>
@@ -614,20 +657,20 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 </div>
 <p><strong>Zero startup cost</strong>: metadata lives in a small header; embeddings stay on disk (memory-mapped) until a query actually needs them. Opening a <code>.dyf</code> file is instant regardless of index size.</p>
 <p><strong>Adaptive probing</strong>: when a query embedding is close to a decision boundary (low margin on a hyperplane), the search automatically checks neighboring leaves. This trades a small amount of speed for significantly better recall on ambiguous queries.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dyf <span class="im">import</span> write_lazy_index, LazyIndex</span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Build and write index</span></span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>write_lazy_index(</span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    tree, embeddings, <span class="st">"index.dyf"</span>,</span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    quantization<span class="op">=</span><span class="st">"float16"</span>,</span>
-<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>    stored_fields<span class="op">=</span>{<span class="st">"title"</span>: titles},</span>
-<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Search</span></span>
-<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> LazyIndex(<span class="st">"index.dyf"</span>) <span class="im">as</span> idx:</span>
-<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> idx.search(query_embedding, k<span class="op">=</span><span class="dv">10</span>, nprobe<span class="op">=</span><span class="st">"auto"</span>)</span>
-<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(result.indices, result.scores)</span>
-<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(result.fields[<span class="st">"title"</span>])</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dyf <span class="im">import</span> write_lazy_index, LazyIndex</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Build and write index</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>write_lazy_index(</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>    tree, embeddings, <span class="st">"index.dyf"</span>,</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>    quantization<span class="op">=</span><span class="st">"float16"</span>,</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>    stored_fields<span class="op">=</span>{<span class="st">"title"</span>: titles},</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Search</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> LazyIndex(<span class="st">"index.dyf"</span>) <span class="im">as</span> idx:</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> idx.search(query_embedding, k<span class="op">=</span><span class="dv">10</span>, nprobe<span class="op">=</span><span class="st">"auto"</span>)</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(result.indices, result.scores)</span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(result.fields[<span class="st">"title"</span>])</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 <section id="next-steps" class="level2">
 <h2 class="anchored" data-anchor-id="next-steps">Next Steps</h2>
