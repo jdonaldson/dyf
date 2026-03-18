@@ -134,9 +134,57 @@ def broadcast(message):
             _clients.discard(c)
 
 
-def start_server(port=8766, static_dir="demo", open_browser=True, watch=False):
+def start_server(port=8766, static_dir="demo", open_browser=True, watch=False,
+                 dyf_file=None):
     """Start the HTTP + WebSocket server."""
     static_dir = os.path.abspath(static_dir)
+
+    # If a .dyf file was specified, resolve chunks and override static_dir
+    open_url = None
+    if dyf_file:
+        # Expand glob pattern (e.g. "gudid_viz.dyf*")
+        matches = sorted(glob.glob(dyf_file))
+        if not matches:
+            print(f"[viz_server] No files matching: {dyf_file}")
+            raise SystemExit(1)
+
+        # Find the base .dyf file (no .N suffix)
+        base = None
+        chunks = []
+        for m in matches:
+            if m.endswith('.dyf'):
+                base = m
+            else:
+                chunks.append(m)
+        if base is None:
+            print(f"[viz_server] No base .dyf file in matches: {matches}")
+            raise SystemExit(1)
+
+        base = os.path.abspath(base)
+        base_name = os.path.basename(base)
+
+        # Report chunks
+        size_mb = os.path.getsize(base) / (1024 * 1024)
+        if chunks:
+            chunk_info = [f"{base_name} ({size_mb:.1f} MB)"]
+            for c in sorted(chunks):
+                c_size = os.path.getsize(c) / (1024 * 1024)
+                chunk_info.append(f"{os.path.basename(c)} ({c_size:.1f} MB)")
+            print(f"[viz_server] DYF3 chunked: {' + '.join(chunk_info)}")
+        else:
+            print(f"[viz_server] File: {base_name} ({size_mb:.1f} MB)")
+
+        # Serve from the directory containing dyf_viewer.html (demo/).
+        # Compute the file's path relative to static_dir for the URL.
+        data_dir = os.path.dirname(base)
+        rel_path = os.path.relpath(base, static_dir)
+
+        # If the file isn't under static_dir, serve from the file's directory
+        if rel_path.startswith(".."):
+            static_dir = data_dir
+            rel_path = base_name
+
+        open_url = f"http://localhost:{port}/dyf_viewer.html?file={rel_path}"
 
     app = tornado.web.Application([
         (r"/ws", WSHandler),
@@ -152,11 +200,14 @@ def start_server(port=8766, static_dir="demo", open_browser=True, watch=False):
         watcher.start()
 
     if open_browser:
-        # Try to open a default HTML file
-        for name in ["dyf_viewer.html", "rog_3d_birch_clusters.html", "rog_3d_dyf_tree_clusters.html"]:
-            if os.path.exists(os.path.join(static_dir, name)):
-                webbrowser.open(f"http://localhost:{port}/{name}")
-                break
+        if open_url:
+            webbrowser.open(open_url)
+        else:
+            # Try to open a default HTML file
+            for name in ["dyf_viewer.html", "rog_3d_birch_clusters.html", "rog_3d_dyf_tree_clusters.html"]:
+                if os.path.exists(os.path.join(static_dir, name)):
+                    webbrowser.open(f"http://localhost:{port}/{name}")
+                    break
 
     tornado.ioloop.IOLoop.current().start()
 
@@ -181,6 +232,8 @@ def main():
     parser.add_argument("--dir", default="demo", help="Static file directory (default: demo)")
     parser.add_argument("--cmd", type=str, default=None,
                         help="Send a JSON command to a running server and exit")
+    parser.add_argument("--file", type=str, default=None,
+                        help="DYF file to serve (glob pattern, e.g. 'data/viz.dyf*' for chunks)")
     parser.add_argument("--no-browser", action="store_true",
                         help="Don't open browser on start")
     parser.add_argument("--watch", action="store_true",
@@ -199,7 +252,8 @@ def main():
     else:
         # Server mode
         start_server(port=args.port, static_dir=args.dir,
-                     open_browser=not args.no_browser, watch=args.watch)
+                     open_browser=not args.no_browser, watch=args.watch,
+                     dyf_file=args.file)
 
 
 if __name__ == "__main__":

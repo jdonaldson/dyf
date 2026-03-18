@@ -80,7 +80,7 @@ from .dyf_tree import (
 # Lazy index (FlatBuffers + Arrow IPC)
 try:
     from .lazy_index import (
-        LazyIndex, write_lazy_index, rewrite_lazy_index,
+        LazyIndex, write_lazy_index, rewrite_lazy_index, split_dyf3,
         from_faiss, SearchResult,
         ExtractedData, StoredFieldValue, StoredFieldInput, TreeNode,
         detect_dyf_version,
@@ -91,6 +91,7 @@ except ImportError:
     LazyIndex = None
     write_lazy_index = None
     rewrite_lazy_index = None
+    split_dyf3 = None
     from_faiss = None
     SearchResult = None
     ExtractedData = None
@@ -277,6 +278,7 @@ __all__ = [
     "LazyIndex",
     "write_lazy_index",
     "rewrite_lazy_index",
+    "split_dyf3",
     "from_faiss",
     "SearchResult",
     "ExtractedData",

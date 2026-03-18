@@ -1,12 +1,14 @@
 """DYF Lazy Index: FlatBuffers + Arrow IPC for mmap-based query serving.
 
-File format:
-    [16-byte header: magic "DYF1" + fb_size (u64) + reserved (u32)]
-    [FlatBuffers section (tree structure)]
-    [padding to 4KB boundary]
-    [Arrow IPC batch 0]
-    [Arrow IPC batch 1]
-    ...
+File formats:
+    DYF1: [16-byte header: magic "DYF1" + fb_size (u64) + reserved (u32)]
+          [FlatBuffers section] [4KB padding] [Arrow IPC batches...]
+
+    DYF3: [32-byte header: magic "DYF3" + fb_size (u64) + n_chunks (u16)
+           + flags (u16) + reserved (16 bytes)]
+          [FlatBuffers section] [4KB padding] [Arrow IPC batches...]
+          Supports chunked transport: split_dyf3() splits into foo.dyf +
+          foo.dyf.1, foo.dyf.2, ... for GitHub Pages / CDN hosting.
 
 Writer:
     write_lazy_index(tree, embeddings, path, ...)
@@ -53,7 +55,9 @@ class ExtractedData(TypedDict):
 
 MAGIC = b"DYF1"
 MAGIC_V2 = b"DYF2"
+MAGIC_V3 = b"DYF3"
 HEADER_SIZE = 16  # 4 magic + 8 fb_size + 4 reserved
+HEADER_SIZE_V3 = 32  # 4 magic + 8 fb_size + 2 n_chunks + 2 flags + 16 reserved
 PAGE_SIZE = 4096
 
 
@@ -62,7 +66,8 @@ def detect_dyf_version(path: str) -> int:
 
     Returns:
         1 for DYF1 (header-based FlatBuffers),
-        2 for DYF2 (footer-based FlatBuffers, append-friendly).
+        2 for DYF2 (footer-based FlatBuffers, append-friendly),
+        3 for DYF3 (chunked, header-based like DYF1 but 32-byte header).
 
     Raises:
         ValueError if the file has an unknown magic.
@@ -73,6 +78,8 @@ def detect_dyf_version(path: str) -> int:
         return 1
     elif magic == MAGIC_V2:
         return 2
+    elif magic == MAGIC_V3:
+        return 3
     else:
         raise ValueError(f"Unknown DYF magic: {magic!r}")
 
@@ -99,8 +106,14 @@ class SearchResult:
         return 2
 
 
-def _flatten_tree_bfs(tree, embeddings):
+def _flatten_tree_bfs(tree, embeddings, embedding_dim=None):
     """Flatten tree to a BFS-ordered list of node dicts with computed fields.
+
+    Args:
+        tree: Tree dict from build_dyf_tree() or _reconstruct_tree().
+        embeddings: (n, d) array of embedding vectors, or None if
+            embeddings are being dropped (centroids must be in tree).
+        embedding_dim: Required when embeddings is None, to size zero-centroids.
 
     Returns:
         (flat_nodes, leaf_batch_map)
@@ -133,15 +146,22 @@ def _flatten_tree_bfs(tree, embeddings):
     for node_id, node in enumerate(flat_nodes):
         is_leaf = not node['children']
 
-        # Compute centroid from embeddings
+        # Use pre-computed centroid if available, else compute from embeddings
         indices = node['indices']
-        if len(indices) > 0:
-            centroid = embeddings[indices].mean(axis=0).astype(np.float32)
-            norm = np.linalg.norm(centroid)
-            if norm > 1e-10:
-                centroid /= norm
+        if node.get('centroid') is not None:
+            centroid = node['centroid']
+        elif embeddings is not None:
+            if len(indices) > 0:
+                centroid = embeddings[indices].mean(axis=0).astype(np.float32)
+                norm = np.linalg.norm(centroid)
+                if norm > 1e-10:
+                    centroid /= norm
+            else:
+                centroid = np.zeros(embeddings.shape[1], dtype=np.float32)
         else:
-            centroid = np.zeros(embeddings.shape[1], dtype=np.float32)
+            # No embeddings and no pre-computed centroid — use zero vector
+            dim = embedding_dim or 0
+            centroid = np.zeros(dim, dtype=np.float32)
 
         # Get children IDs
         children_ids = []
@@ -350,7 +370,7 @@ def _infer_arrow_type(values):
 
 def write_lazy_index(
     tree: dict,
-    embeddings: np.ndarray,
+    embeddings: np.ndarray | None,
     path: str,
     compression: str = 'none',
     quantization: str = 'float16',
@@ -358,13 +378,15 @@ def write_lazy_index(
     build_params: dict[str, int] | None = None,
     stored_fields: Mapping[str, StoredFieldInput] | None = None,
     format_version: int = 1,
+    embedding_dim: int | None = None,
 ) -> None:
     """Write a DYF lazy index file (FlatBuffers tree + Arrow IPC leaf data).
 
     Args:
         tree: Tree dict from build_dyf_tree() (must include hyperplanes/bucket
             mapping from updated _build_dyf_tree).
-        embeddings: (n, d) array of embedding vectors.
+        embeddings: (n, d) array of embedding vectors, or None to write
+            a viz-only file without embeddings (requires embedding_dim).
         path: Output file path (e.g. "index.dyf").
         compression: "none", "zstd", or "lz4" (default: "none").
         quantization: "float32", "float16", "int8", or "pq-M" where M is the
@@ -378,6 +400,8 @@ def write_lazy_index(
             np.int32/int64/float32/float64 arrays, list[bytes] (Arrow binary).
         format_version: 1 (DYF1, header-based) or 2 (DYF2, footer-based,
             append-friendly). Default: 1.
+        embedding_dim: Embedding dimension. Required when embeddings is None.
+            Inferred from embeddings shape when provided.
     """
     import flatbuffers
     import pyarrow as pa
@@ -389,17 +413,34 @@ def write_lazy_index(
         KeyValue as FBKeyValue,
     )
 
-    embeddings = np.asarray(embeddings, dtype=np.float32)
-    n_items, embedding_dim = embeddings.shape
+    has_embeddings = embeddings is not None
+    if has_embeddings:
+        embeddings = np.asarray(embeddings, dtype=np.float32)
+        n_items, embedding_dim = embeddings.shape
+    else:
+        if embedding_dim is None:
+            raise ValueError(
+                "embedding_dim is required when embeddings is None")
+        # Count items from tree leaves
+        n_items = len(tree['indices'])
 
     # Flatten tree to BFS node list
-    flat_nodes, leaf_batch_map = _flatten_tree_bfs(tree, embeddings)
+    flat_nodes, leaf_batch_map = _flatten_tree_bfs(
+        tree, embeddings, embedding_dim=embedding_dim)
     n_leaves = sum(1 for n in flat_nodes if n['is_leaf'])
 
     # Detect PQ quantization
-    is_pq = quantization.startswith('pq')
+    is_pq = has_embeddings and quantization.startswith('pq')
 
-    if is_pq:
+    if not has_embeddings:
+        # No embeddings — schema has item_index + stored fields only
+        arrow_schema = pa.schema([
+            ('item_index', pa.uint32()),
+        ])
+        if metadata is None:
+            metadata = {}
+        metadata['has_embeddings'] = 'false'
+    elif is_pq:
         if quantization == 'pq':
             # Auto-select M = dim // 4 (dsub=4, canonical PQ default)
             n_subquantizers = embedding_dim // 4
@@ -473,28 +514,29 @@ def write_lazy_index(
         # Build Arrow RecordBatch
         item_idx_arr = pa.array(indices.astype(np.uint32), type=pa.uint32())
 
-        if is_pq:
-            # PQ path: slice pre-encoded codes for this leaf
-            leaf_codes = all_codes[indices]  # (n_leaf, M) uint8
-            flat_codes = leaf_codes.flatten()
-            values_arr = pa.array(flat_codes, type=pa.uint8())
-            emb_arr = pa.FixedSizeListArray.from_arrays(
-                values_arr, n_subquantizers)
-        else:
-            # Standard path: quantized embeddings
-            leaf_emb = q_embeddings[indices]
-            flat_values = leaf_emb.flatten()
-            if quantization == 'int8':
-                values_arr = pa.array(flat_values, type=pa.int8())
-            elif quantization == 'float16':
-                values_arr = pa.array(flat_values, type=pa.float16())
-            else:
-                values_arr = pa.array(flat_values, type=pa.float32())
-            emb_arr = pa.FixedSizeListArray.from_arrays(
-                values_arr, embedding_dim)
+        columns = [item_idx_arr]
 
-        # Build column list: item_index, embedding, then stored fields
-        columns = [item_idx_arr, emb_arr]
+        if has_embeddings:
+            if is_pq:
+                # PQ path: slice pre-encoded codes for this leaf
+                leaf_codes = all_codes[indices]  # (n_leaf, M) uint8
+                flat_codes = leaf_codes.flatten()
+                values_arr = pa.array(flat_codes, type=pa.uint8())
+                emb_arr = pa.FixedSizeListArray.from_arrays(
+                    values_arr, n_subquantizers)
+            else:
+                # Standard path: quantized embeddings
+                leaf_emb = q_embeddings[indices]
+                flat_values = leaf_emb.flatten()
+                if quantization == 'int8':
+                    values_arr = pa.array(flat_values, type=pa.int8())
+                elif quantization == 'float16':
+                    values_arr = pa.array(flat_values, type=pa.float16())
+                else:
+                    values_arr = pa.array(flat_values, type=pa.float32())
+                emb_arr = pa.FixedSizeListArray.from_arrays(
+                    values_arr, embedding_dim)
+            columns.append(emb_arr)
         if stored_fields:
             for fname in sf_types:
                 fvalues = stored_fields[fname]
@@ -521,7 +563,7 @@ def write_lazy_index(
     builder = flatbuffers.Builder(4096)
 
     # Pre-build all strings and vectors
-    ver_str = "2.0" if format_version == 2 else "1.0"
+    ver_str = {1: "1.0", 2: "2.0", 3: "3.0"}.get(format_version, "1.0")
     version_off = builder.CreateString(ver_str)
     quant_off = builder.CreateString(quantization)
     comp_off = builder.CreateString(compression)
@@ -691,6 +733,30 @@ def write_lazy_index(
             # 16-byte footer: fb_offset (u64 LE) + fb_size (u64 LE)
             f.write(struct.pack('<Q', fb_offset))
             f.write(struct.pack('<Q', fb_size))
+    elif format_version == 3:
+        # DYF3: header(32) + FlatBuffers + padding + arrow batches
+        # Same layout as DYF1 but with 32-byte header supporting chunked reads
+        total_header_fb = HEADER_SIZE_V3 + fb_size
+        padding = (PAGE_SIZE - (total_header_fb % PAGE_SIZE)) % PAGE_SIZE
+
+        with open(path, 'wb') as f:
+            # 32-byte header
+            f.write(MAGIC_V3)                      # 4: magic
+            f.write(struct.pack('<Q', fb_size))     # 8: fb_size (u64 LE)
+            f.write(struct.pack('<H', 1))           # 2: n_chunks (u16 LE, 1 = single file)
+            f.write(struct.pack('<H', 0))           # 2: flags (reserved)
+            f.write(b'\x00' * 16)                   # 16: reserved
+
+            # FlatBuffers
+            f.write(fb_bytes)
+
+            # Padding to 4KB boundary
+            if padding > 0:
+                f.write(b'\x00' * padding)
+
+            # Arrow IPC batches
+            for buf in batch_buffers:
+                f.write(buf)
     else:
         # DYF1: header(16) + FlatBuffers + padding + arrow batches
         total_header_fb = HEADER_SIZE + fb_size
@@ -714,6 +780,67 @@ def write_lazy_index(
                 f.write(buf)
 
 
+def split_dyf3(
+    path: str,
+    chunk_size: int = 95_000_000,
+) -> int:
+    """Split a DYF3 file into chunks for transport (e.g. GitHub Pages).
+
+    Chunk 0 keeps the original filename (truncated to chunk_size).
+    Chunks 1..N are written as ``path.1``, ``path.2``, etc. with raw
+    continuation bytes (no headers).  The ``n_chunks`` field in chunk 0's
+    header is patched in place.
+
+    Args:
+        path: Path to a DYF3 file (must already be format version 3).
+        chunk_size: Maximum bytes per chunk.  Default 95 MB (fits GitHub's
+            100 MB per-file limit with margin).
+
+    Returns:
+        Number of chunks (1 means no split was needed).
+
+    Raises:
+        ValueError: If the file is not DYF3.
+    """
+    import math
+    import os
+
+    with open(path, 'rb') as f:
+        magic = f.read(4)
+    if magic != MAGIC_V3:
+        raise ValueError(f"split_dyf3 requires a DYF3 file, got magic {magic!r}")
+
+    file_size = os.path.getsize(path)
+    if file_size <= chunk_size:
+        return 1
+
+    n_chunks = math.ceil(file_size / chunk_size)
+    if n_chunks > 65535:
+        raise ValueError(
+            f"Too many chunks ({n_chunks}); increase chunk_size or reduce file")
+
+    # Write companion chunks (1..N) as raw byte slices
+    with open(path, 'rb') as f:
+        for ci in range(1, n_chunks):
+            offset = ci * chunk_size
+            f.seek(offset)
+            data = f.read(chunk_size)
+            chunk_path = f"{path}.{ci}"
+            with open(chunk_path, 'wb') as cf:
+                cf.write(data)
+
+    # Truncate original to chunk_size
+    with open(path, 'r+b') as f:
+        f.truncate(chunk_size)
+
+    # Patch n_chunks in header (offset 12, u16 LE)
+    with open(path, 'r+b') as f:
+        f.seek(12)
+        f.write(struct.pack('<H', n_chunks))
+
+    return n_chunks
+
+
 class LazyIndex:
     """Memory-mapped DYF index for instant-start query serving.
 
@@ -731,6 +858,7 @@ class LazyIndex:
         self._path = path
         self._file = open(path, 'rb')
         self._mm = mmap.mmap(self._file.fileno(), 0, access=mmap.ACCESS_READ)
+        self._extra_files = []  # track companion chunk file handles
 
         # Parse header — detect format version
         magic = self._mm[:4]
@@ -738,12 +866,51 @@ class LazyIndex:
             self._format_version = 1
         elif magic == MAGIC_V2:
             self._format_version = 2
+        elif magic == MAGIC_V3:
+            self._format_version = 3
         else:
             raise ValueError(
-                f"Invalid magic: {magic!r}, expected {MAGIC!r} or {MAGIC_V2!r}"
+                f"Invalid magic: {magic!r}, expected {MAGIC!r}, "
+                f"{MAGIC_V2!r}, or {MAGIC_V3!r}"
             )
 
-        if self._format_version == 1:
+        if self._format_version == 3:
+            # DYF3: 32-byte header, same layout as DYF1 but supports chunks
+            self._fb_size = struct.unpack_from('<Q', self._mm, 4)[0]
+            n_chunks = struct.unpack_from('<H', self._mm, 12)[0]
+
+            if n_chunks > 1:
+                # Multi-chunk: concatenate all chunks into a bytearray
+                import os
+                base_path = path
+                buf = bytearray(self._mm[:])
+                self._mm.close()
+                self._file.close()
+                self._mm = None
+                self._file = None
+
+                for ci in range(1, n_chunks):
+                    chunk_path = f"{base_path}.{ci}"
+                    if not os.path.exists(chunk_path):
+                        raise FileNotFoundError(
+                            f"DYF3 chunk {ci} not found: {chunk_path}")
+                    with open(chunk_path, 'rb') as cf:
+                        buf.extend(cf.read())
+
+                self._mm = memoryview(buf)
+            # else: n_chunks == 1, mmap is fine as-is
+
+            fb_start = HEADER_SIZE_V3
+            fb_buf = bytes(self._mm[fb_start:fb_start + self._fb_size])
+
+            from dyf.schema.Index import Index as FBIndex
+            self._index = FBIndex.GetRootAs(fb_buf, 0)
+
+            total_header_fb = HEADER_SIZE_V3 + self._fb_size
+            self._arrow_start = total_header_fb + (
+                (PAGE_SIZE - (total_header_fb % PAGE_SIZE)) % PAGE_SIZE)
+
+        elif self._format_version == 1:
             self._fb_size = struct.unpack_from('<Q', self._mm, 4)[0]
 
             # Parse FlatBuffers (at start of file)
@@ -781,7 +948,10 @@ class LazyIndex:
     def close(self):
         """Release mmap and file handle."""
         if self._mm is not None:
-            self._mm.close()
+            if isinstance(self._mm, mmap.mmap):
+                self._mm.close()
+            elif isinstance(self._mm, memoryview):
+                self._mm.release()
             self._mm = None
         if self._file is not None:
             self._file.close()
@@ -1550,15 +1720,18 @@ class LazyIndex:
 
         Returns:
             dict with keys:
-                'embeddings': (n, d) float32 array (PQ indexes return
+                'embeddings': (n, d) float32 array, or None if the file
+                    was written without embeddings (PQ indexes return
                     approximate reconstructions)
                 'fields': {field_name: array} for all stored fields
                 'metadata': dict of metadata key-value pairs
         """
         n = self.total_items
         dim = self.embedding_dim
+        meta = self._get_metadata()
+        has_embeddings = meta.get('has_embeddings') != 'false'
 
-        embeddings = np.zeros((n, dim), dtype=np.float32)
+        embeddings = np.zeros((n, dim), dtype=np.float32) if has_embeddings else None
         sf_names = self.stored_field_names
         sf_types = self._get_stored_field_types()
 
@@ -1584,20 +1757,21 @@ class LazyIndex:
             batch = self.get_leaf(bi)
             item_indices = batch.column('item_index').to_numpy()
 
-            # Extract embeddings
-            emb_col = batch.column('embedding')
-            n_rows = len(emb_col)
-            flat_values = emb_col.values.to_numpy()
+            # Extract embeddings (if present)
+            if has_embeddings:
+                emb_col = batch.column('embedding')
+                n_rows = len(emb_col)
+                flat_values = emb_col.values.to_numpy()
 
-            if self.is_pq:
-                meta = self._get_metadata()
-                m = int(meta['pq_n_subquantizers'])
-                codes = flat_values.reshape(n_rows, m)
-                leaf_emb = self._pq_reconstruct(codes)
-            else:
-                leaf_emb = flat_values.reshape(n_rows, dim).astype(np.float32)
+                if self.is_pq:
+                    m = int(meta['pq_n_subquantizers'])
+                    codes = flat_values.reshape(n_rows, m)
+                    leaf_emb = self._pq_reconstruct(codes)
+                else:
+                    leaf_emb = flat_values.reshape(n_rows, dim).astype(
+                        np.float32)
 
-            embeddings[item_indices] = leaf_emb
+                embeddings[item_indices] = leaf_emb
 
             # Extract stored fields
             for fname in sf_names:
@@ -2012,6 +2186,11 @@ def _reconstruct_tree(idx):
         if not fb_node.EigenvaluesIsNone() and fb_node.EigenvaluesLength() > 0:
             ev = np.array(fb_node.EigenvaluesAsNumpy(), dtype=np.float32)
 
+        # Centroid
+        centroid = None
+        if not fb_node.CentroidIsNone() and fb_node.CentroidLength() > 0:
+            centroid = np.array(fb_node.CentroidAsNumpy(), dtype=np.float32)
+
         is_leaf = len(children_ids) == 0
         batch_index = fb_node.BatchIndex()
 
@@ -2026,6 +2205,7 @@ def _reconstruct_tree(idx):
             'hyperplanes': hp,
             'bucket_id_to_child': bid_to_child,
             'eigenvalues': ev,
+            'centroid': centroid,
             'depth': int(fb_node.Depth()),
             'is_leaf': is_leaf,
             'indices': indices,
@@ -2055,6 +2235,7 @@ def _reconstruct_tree(idx):
             'hyperplanes': nd['hyperplanes'],
             'bucket_id_to_child': nd['bucket_id_to_child'],
             'eigenvalues': nd['eigenvalues'],
+            'centroid': nd['centroid'],
         }
 
     root_id = idx._index.Root()
@@ -2068,6 +2249,8 @@ def rewrite_lazy_index(
     output_path: str | None = None,
     compression: str | None = None,
     drop_fields: Set[str] | list[str] | None = None,
+    drop_embeddings: bool = False,
+    format_version: int | None = None,
 ) -> None:
     """Rewrite a .dyf file with additional stored fields and/or metadata.
 
@@ -2085,12 +2268,18 @@ def rewrite_lazy_index(
             If None, preserves the original file's compression.
         drop_fields: Optional set/list of stored field names to remove.
             Applied after merging existing and new fields (exact names only).
+        drop_embeddings: If True, write a viz-only file without embedding
+            vectors in Arrow batches. Tree centroids are preserved.
+        format_version: Output format version (1, 2, or 3). If None,
+            preserves the source file's format version.
 
     Raises:
         ValueError: If the index uses PQ quantization (lossy round-trip).
     """
     out_path = output_path or path
     format_ver = detect_dyf_version(path)
+    if format_version is not None:
+        format_ver = format_version
 
     # Read everything while file is open
     with LazyIndex(path) as idx:
@@ -2101,6 +2290,7 @@ def rewrite_lazy_index(
 
         tree = _reconstruct_tree(idx)
         data = idx.extract_all_fields()
+        src_embedding_dim = idx.embedding_dim
 
         bp = idx._index.BuildParams()
         build_params = {
@@ -2150,13 +2340,16 @@ def rewrite_lazy_index(
         except ImportError:
             pass  # Fall through to full rewrite
 
+    out_embeddings = None if drop_embeddings else data['embeddings']
     write_lazy_index(
-        tree, data['embeddings'], out_path,
+        tree, out_embeddings, out_path,
         compression=compression,
         quantization=quantization,
         metadata=merged_meta if merged_meta else None,
         build_params=build_params,
         stored_fields=merged_sf if merged_sf else None,
+        format_version=format_ver,
+        embedding_dim=src_embedding_dim,
     )
 
 

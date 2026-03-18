@@ -9,8 +9,10 @@
 import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+esm";
 
 // ── Constants ────────────────────────────────────────────────────────────────
-const MAGIC = new Uint8Array([0x44, 0x59, 0x46, 0x31]); // "DYF1"
-const HEADER_SIZE = 16;
+const MAGIC_V1 = new Uint8Array([0x44, 0x59, 0x46, 0x31]); // "DYF1"
+const MAGIC_V3 = new Uint8Array([0x44, 0x59, 0x46, 0x33]); // "DYF3"
+const HEADER_SIZE_V1 = 16;
+const HEADER_SIZE_V3 = 32;
 const PAGE_SIZE = 4096;
 
 // ── Minimal FlatBuffers reader ───────────────────────────────────────────────
@@ -251,13 +253,13 @@ function parseIndex(fbBuf) {
  * }
  */
 export async function loadDyf(url, onProgress) {
-  // Fetch the file
+  // Fetch chunk 0
   if (onProgress) onProgress("Downloading...");
   const response = await fetch(url);
   if (!response.ok) throw new Error(`Failed to fetch ${url}: ${response.status}`);
 
   // Read with progress if possible
-  let buffer;
+  let chunk0;
   if (response.body && onProgress) {
     const contentLength = +response.headers.get("Content-Length") || 0;
     const reader = response.body.getReader();
@@ -273,26 +275,87 @@ export async function loadDyf(url, onProgress) {
         onProgress(`Downloading... ${pct}% (${(received / 1e6).toFixed(1)} MB)`);
       }
     }
-    // Concatenate chunks
+    // Concatenate stream chunks
     const full = new Uint8Array(received);
     let offset = 0;
     for (const chunk of chunks) {
       full.set(chunk, offset);
       offset += chunk.length;
     }
-    buffer = full.buffer;
+    chunk0 = full.buffer;
   } else {
-    buffer = await response.arrayBuffer();
+    chunk0 = await response.arrayBuffer();
   }
 
   if (onProgress) onProgress("Parsing header...");
 
-  // Validate magic
-  const magic = new Uint8Array(buffer, 0, 4);
-  for (let i = 0; i < 4; i++) {
-    if (magic[i] !== MAGIC[i]) {
-      throw new Error(`Invalid .dyf magic: expected DYF1, got ${String.fromCharCode(...magic)}`);
+  // Detect format version from magic bytes
+  const magic = new Uint8Array(chunk0, 0, 4);
+  const magicStr = String.fromCharCode(...magic);
+  let headerSize;
+  let nChunks = 1;
+
+  const isV1 = magic.every((b, i) => b === MAGIC_V1[i]);
+  const isV3 = magic.every((b, i) => b === MAGIC_V3[i]);
+
+  if (isV3) {
+    headerSize = HEADER_SIZE_V3;
+    const dv0 = new DataView(chunk0);
+    nChunks = dv0.getUint16(12, true);
+    const chunk0MB = (chunk0.byteLength / 1e6).toFixed(1);
+    if (onProgress) {
+      if (nChunks > 1) {
+        onProgress(`DYF3 ✦ ${nChunks} chunks — loaded chunk 1/${nChunks} (${chunk0MB} MB)`);
+      } else {
+        onProgress(`DYF3 — ${chunk0MB} MB`);
+      }
     }
+  } else if (isV1) {
+    headerSize = HEADER_SIZE_V1;
+    if (onProgress) onProgress(`DYF1 — ${(chunk0.byteLength / 1e6).toFixed(1)} MB`);
+  } else {
+    throw new Error(`Invalid .dyf magic: expected DYF1 or DYF3, got ${magicStr}`);
+  }
+
+  // If DYF3 with multiple chunks, fetch companions in parallel and concatenate
+  let buffer;
+  if (nChunks > 1) {
+    let chunksLoaded = 1;
+    const fetchPromises = [];
+    for (let ci = 1; ci < nChunks; ci++) {
+      const chunkUrl = `${url}.${ci}`;
+      fetchPromises.push(
+        fetch(chunkUrl).then(async (r) => {
+          if (!r.ok) throw new Error(`Failed to fetch chunk ${ci}: ${r.status}`);
+          const ab = await r.arrayBuffer();
+          chunksLoaded++;
+          if (onProgress) {
+            const mb = (ab.byteLength / 1e6).toFixed(1);
+            onProgress(`DYF3 ✦ ${nChunks} chunks — loaded ${chunksLoaded}/${nChunks} (+${mb} MB)`);
+          }
+          return { index: ci, data: new Uint8Array(ab) };
+        })
+      );
+    }
+    const companions = await Promise.all(fetchPromises);
+    companions.sort((a, b) => a.index - b.index);
+
+    // Compute total size and concatenate
+    const chunk0Bytes = new Uint8Array(chunk0);
+    let totalSize = chunk0Bytes.length;
+    for (const c of companions) totalSize += c.data.length;
+
+    const full = new Uint8Array(totalSize);
+    full.set(chunk0Bytes, 0);
+    let offset = chunk0Bytes.length;
+    for (const c of companions) {
+      full.set(c.data, offset);
+      offset += c.data.length;
+    }
+    buffer = full.buffer;
+    if (onProgress) onProgress(`DYF3 ✦ ${nChunks} chunks assembled (${(totalSize / 1e6).toFixed(1)} MB total)`);
+  } else {
+    buffer = chunk0;
   }
 
   // Read fb_size (uint64 LE at offset 4)
@@ -300,12 +363,12 @@ export async function loadDyf(url, onProgress) {
   const fbSize = Number(dv.getBigUint64(4, true));
 
   // Parse FlatBuffers section
-  const fbStart = HEADER_SIZE;
+  const fbStart = headerSize;
   const fbBuf = buffer.slice(fbStart, fbStart + fbSize);
   const index = parseIndex(fbBuf);
 
   // Compute Arrow section start (4KB aligned)
-  const totalHeaderFb = HEADER_SIZE + fbSize;
+  const totalHeaderFb = headerSize + fbSize;
   const arrowStart = totalHeaderFb + ((PAGE_SIZE - (totalHeaderFb % PAGE_SIZE)) % PAGE_SIZE);
 
   if (onProgress) onProgress("Parsing stored fields...");
