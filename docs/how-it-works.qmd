@@ -19,14 +19,14 @@ DYF uses a two-pass approach: start with random structure, then learn from it.
 ```{mermaid}
 %%| fig-width: 8
 flowchart LR
-    A["**Step 1**\nRandom\nhyperplanes"] --> B["**Step 2**\nCompute bucket\ncentroids"]
-    B --> C["**Step 3**\nPCA on\ncentroids"]
-    C --> D["**Step 4**\nRe-hash with\nlearned planes"]
+    A["<b>Step 1</b><br/>Random<br/>hyperplanes"] --> B["<b>Step 2</b><br/>Compute bucket<br/>centroids"]
+    B --> C["<b>Step 3</b><br/>PCA on<br/>centroids"]
+    C --> D["<b>Step 4</b><br/>Re-hash with<br/>learned planes"]
 
-    style A fill:#f0f4ff,stroke:#4a6fa5
-    style B fill:#f0f4ff,stroke:#4a6fa5
-    style C fill:#fff4e6,stroke:#c47f17
-    style D fill:#e6ffe6,stroke:#2d8a2d
+    style A stroke:#4a6fa5,stroke-width:2
+    style B stroke:#4a6fa5,stroke-width:2
+    style C stroke:#c47f17,stroke-width:2
+    style D stroke:#2d8a2d,stroke-width:2
 ```
 
 ### Step 1: Random bucketing
@@ -85,30 +85,30 @@ DYF classifies every item into one of three roles based on its metrics:
 ```{mermaid}
 %%| fig-width: 8
 flowchart TD
-    subgraph dense["**Dense**"]
+    subgraph dense ["Dense"]
         direction TB
         D1["Large bucket"]
         D2["High centroid similarity"]
         D3["Core of a topic"]
     end
 
-    subgraph bridge["**Bridge**"]
+    subgraph bridge ["Bridge"]
         direction TB
-        B1["Changes buckets\nunder perturbation"]
+        B1["Changes buckets<br/>under perturbation"]
         B2["Low stability score"]
         B3["Connects two regions"]
     end
 
-    subgraph orphan["**Orphan**"]
+    subgraph orphan ["Orphan"]
         direction TB
         O1["Small bucket"]
         O2["High isolation"]
         O3["Genuinely unique"]
     end
 
-    style dense fill:#e6ffe6,stroke:#2d8a2d
-    style bridge fill:#fff4e6,stroke:#c47f17
-    style orphan fill:#ffe6e6,stroke:#c44a4a
+    style dense stroke:#2d8a2d,stroke-width:2
+    style bridge stroke:#c47f17,stroke-width:2
+    style orphan stroke:#c44a4a,stroke-width:2
 ```
 
 **Dense** items sit in large buckets with high centroid similarity. They're the core members of a semantic region — the papers that are clearly *about* machine learning, the products that are obviously *kitchen appliances*.
@@ -130,21 +130,21 @@ One level of bucketing captures coarse structure. For finer resolution, DYF buil
 ```{mermaid}
 %%| fig-width: 8
 graph TD
-    R["Root\n10,000 items\n3 bits → 8 buckets"] --> A["Bucket 0\n2,100 items"]
-    R --> B["Bucket 1\n1,800 items"]
+    R["Root<br/>10,000 items<br/>3 bits → 8 buckets"] --> A["Bucket 0<br/>2,100 items"]
+    R --> B["Bucket 1<br/>1,800 items"]
     R --> C["..."]
-    R --> D["Bucket 7\n900 items"]
+    R --> D["Bucket 7<br/>900 items"]
 
-    A --> A1["Sub-bucket 0\n450 items"]
-    A --> A2["Sub-bucket 1\n380 items"]
+    A --> A1["Sub-bucket 0<br/>450 items"]
+    A --> A2["Sub-bucket 1<br/>380 items"]
     A --> A3["..."]
 
-    style R fill:#f0f4ff,stroke:#4a6fa5
-    style A fill:#e6ffe6,stroke:#2d8a2d
-    style B fill:#e6ffe6,stroke:#2d8a2d
-    style D fill:#e6ffe6,stroke:#2d8a2d
-    style A1 fill:#fff4e6,stroke:#c47f17
-    style A2 fill:#fff4e6,stroke:#c47f17
+    style R stroke:#4a6fa5,stroke-width:2
+    style A stroke:#2d8a2d,stroke-width:2
+    style B stroke:#2d8a2d,stroke-width:2
+    style D stroke:#2d8a2d,stroke-width:2
+    style A1 stroke:#c47f17,stroke-width:2
+    style A2 stroke:#c47f17,stroke-width:2
 ```
 
 Each level re-fits PCA to the *local* data at that node. This means deeper levels discover structure *within* clusters — sub-topics that wouldn't be visible at the top level. With `num_bits=3`, each node splits up to 8 ways, so a tree of depth 4 can produce up to 4,096 leaf buckets.
@@ -168,17 +168,17 @@ The DYF tree can be serialized to a `.dyf` file for fast approximate nearest nei
 ```{mermaid}
 %%| fig-width: 8
 flowchart LR
-    Q["Query\nembedding"] --> H["Hash through\ntree"]
-    H --> L["Find matching\nleaf bucket"]
-    L --> S["Score embeddings\nin leaf"]
-    S --> R["Return\ntop-k"]
+    Q["Query<br/>embedding"] --> H["Hash through<br/>tree"]
+    H --> L["Find matching<br/>leaf bucket"]
+    L --> S["Score embeddings<br/>in leaf"]
+    S --> R["Return<br/>top-k"]
 
-    H -.->|"near boundary?"| P["Probe\nadditional leaves"]
+    H -.->|"near boundary?"| P["Probe<br/>additional leaves"]
     P --> S
 
-    style Q fill:#f0f4ff,stroke:#4a6fa5
-    style R fill:#e6ffe6,stroke:#2d8a2d
-    style P fill:#fff4e6,stroke:#c47f17
+    style Q stroke:#4a6fa5,stroke-width:2
+    style R stroke:#2d8a2d,stroke-width:2
+    style P stroke:#c47f17,stroke-width:2
 ```
 
 **Zero startup cost**: metadata lives in a small header; embeddings stay on disk (memory-mapped) until a query actually needs them. Opening a `.dyf` file is instant regardless of index size.
