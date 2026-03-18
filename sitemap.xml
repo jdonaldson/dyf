@@ -2,374 +2,374 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://dyf.io/reference/ROGResult.html</loc>
-    <lastmod>2026-03-18T22:55:33.057Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.245Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/tokenize.html</loc>
-    <lastmod>2026-03-18T22:55:33.059Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.248Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/deduplicate_chunks.html</loc>
-    <lastmod>2026-03-18T22:55:33.058Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.246Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/AxisDiagnostic.html</loc>
-    <lastmod>2026-03-18T22:55:33.057Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.245Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/LazyIndex.html</loc>
-    <lastmod>2026-03-18T22:55:33.057Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.245Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/coarsen.html</loc>
-    <lastmod>2026-03-18T22:55:33.057Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.246Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/embed_with_diagnostics.html</loc>
-    <lastmod>2026-03-18T22:55:33.058Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.246Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/Provenance.html</loc>
-    <lastmod>2026-03-18T22:55:33.057Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.245Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/split_dyf3.html</loc>
-    <lastmod>2026-03-18T22:55:33.059Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.248Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/build_unified_ontology.html</loc>
-    <lastmod>2026-03-18T22:55:33.057Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.246Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/from_faiss.html</loc>
-    <lastmod>2026-03-18T22:55:33.058Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.247Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/cluster_quality.html</loc>
-    <lastmod>2026-03-18T22:55:33.057Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.246Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/write_lazy_index.html</loc>
-    <lastmod>2026-03-18T22:55:33.060Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.248Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/select_orthogonal_anchors.html</loc>
-    <lastmod>2026-03-18T22:55:33.059Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.248Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/build_tree_maps.html</loc>
-    <lastmod>2026-03-18T22:55:33.057Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.246Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/compute_neighbor_diversity.html</loc>
-    <lastmod>2026-03-18T22:55:33.058Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.246Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/DensityClassifierFull.html</loc>
-    <lastmod>2026-03-18T22:55:33.057Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.245Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/ROGLayer.html</loc>
-    <lastmod>2026-03-18T22:55:33.057Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.245Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/mine_dag_chains.html</loc>
-    <lastmod>2026-03-18T22:55:33.059Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.247Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/assess_text_diversity.html</loc>
-    <lastmod>2026-03-18T22:55:33.057Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.245Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/rerank_bridge_boost.html</loc>
-    <lastmod>2026-03-18T22:55:33.059Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.247Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/BridgeIndex.html</loc>
-    <lastmod>2026-03-18T22:55:33.057Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.245Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/FacetDiverseResult.html</loc>
-    <lastmod>2026-03-18T22:55:33.057Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.245Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/TextDiversityReport.html</loc>
-    <lastmod>2026-03-18T22:55:33.057Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.245Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/label_clusters_frequency.html</loc>
-    <lastmod>2026-03-18T22:55:33.059Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.247Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/doc_spread.html</loc>
-    <lastmod>2026-03-18T22:55:33.058Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.246Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/compute_hub_score.html</loc>
-    <lastmod>2026-03-18T22:55:33.058Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.246Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/cut_dyf_tree_to_labels.html</loc>
-    <lastmod>2026-03-18T22:55:33.058Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.246Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/DAGChain.html</loc>
-    <lastmod>2026-03-18T22:55:33.057Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.245Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/CategoryGraph.html</loc>
-    <lastmod>2026-03-18T22:55:33.057Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.245Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/UnifiedOntologyResult.html</loc>
-    <lastmod>2026-03-18T22:55:33.057Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.245Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/build_dyf_tree.html</loc>
-    <lastmod>2026-03-18T22:55:33.057Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.245Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/build_rog_ontology.html</loc>
-    <lastmod>2026-03-18T22:55:33.057Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.246Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/DAGTaxonomy.html</loc>
-    <lastmod>2026-03-18T22:55:33.057Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.245Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/rerank_mmr.html</loc>
-    <lastmod>2026-03-18T22:55:33.059Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.247Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/HubScoreResult.html</loc>
-    <lastmod>2026-03-18T22:55:33.057Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.245Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/OrthogonalAnchorResult.html</loc>
-    <lastmod>2026-03-18T22:55:33.057Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.245Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/SearchResult.html</loc>
-    <lastmod>2026-03-18T22:55:33.057Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.245Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/apply_fisher_weights.html</loc>
-    <lastmod>2026-03-18T22:55:33.057Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.245Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/compute_fisher_weights.html</loc>
-    <lastmod>2026-03-18T22:55:33.058Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.246Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/spatial_color_map.html</loc>
-    <lastmod>2026-03-18T22:55:33.059Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.248Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/DocSpread.html</loc>
-    <lastmod>2026-03-18T22:55:33.057Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.245Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/extract_boundary_persistence.html</loc>
-    <lastmod>2026-03-18T22:55:33.058Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.247Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/boundary_persistence_scores.html</loc>
-    <lastmod>2026-03-18T22:55:33.057Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.245Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/tree_rgb_map.html</loc>
-    <lastmod>2026-03-18T22:55:33.060Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.248Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/how-it-works.html</loc>
-    <lastmod>2026-03-18T22:55:33.051Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.240Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/index.html</loc>
-    <lastmod>2026-03-18T22:55:33.054Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.243Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/getting-started.html</loc>
-    <lastmod>2026-03-18T22:55:33.047Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.236Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/index.html</loc>
-    <lastmod>2026-03-18T22:55:33.058Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.247Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/louvain_cluster_leaves.html</loc>
-    <lastmod>2026-03-18T22:55:33.059Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.247Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/list_configs.html</loc>
-    <lastmod>2026-03-18T22:55:33.059Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.247Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/compute_split_keywords.html</loc>
-    <lastmod>2026-03-18T22:55:33.058Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.246Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/check_compatible.html</loc>
-    <lastmod>2026-03-18T22:55:33.057Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.246Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/merge_to_max_k.html</loc>
-    <lastmod>2026-03-18T22:55:33.059Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.247Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/compute_embedding_keywords.html</loc>
-    <lastmod>2026-03-18T22:55:33.058Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.246Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/compute_sibling_keywords.html</loc>
-    <lastmod>2026-03-18T22:55:33.058Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.246Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/format_cluster_context.html</loc>
-    <lastmod>2026-03-18T22:55:33.058Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.247Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/store_category_graph.html</loc>
-    <lastmod>2026-03-18T22:55:33.059Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.248Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/build_cluster_tree_dag.html</loc>
-    <lastmod>2026-03-18T22:55:33.057Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.245Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/neighbor_coherence.html</loc>
-    <lastmod>2026-03-18T22:55:33.059Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.247Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/rerank_bridge_mmr.html</loc>
-    <lastmod>2026-03-18T22:55:33.059Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.247Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/SuperConnectorResult.html</loc>
-    <lastmod>2026-03-18T22:55:33.057Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.245Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/EmbedderConfig.html</loc>
-    <lastmod>2026-03-18T22:55:33.057Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.245Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/create_provenance.html</loc>
-    <lastmod>2026-03-18T22:55:33.058Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.246Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/rerank_standard.html</loc>
-    <lastmod>2026-03-18T22:55:33.059Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.248Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/diagnostics_to_metadata.html</loc>
-    <lastmod>2026-03-18T22:55:33.058Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.246Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/diversify_by_facet.html</loc>
-    <lastmod>2026-03-18T22:55:33.058Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.246Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/get_kmeans_init.html</loc>
-    <lastmod>2026-03-18T22:55:33.058Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.247Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/build_dag_taxonomy.html</loc>
-    <lastmod>2026-03-18T22:55:33.057Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.245Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/collect_descendant_indices.html</loc>
-    <lastmod>2026-03-18T22:55:33.057Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.246Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/LabelerConfig.html</loc>
-    <lastmod>2026-03-18T22:55:33.057Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.245Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/file_hash.html</loc>
-    <lastmod>2026-03-18T22:55:33.058Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.247Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/cut_tree_to_labels.html</loc>
-    <lastmod>2026-03-18T22:55:33.058Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.246Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/params_hash.html</loc>
-    <lastmod>2026-03-18T22:55:33.059Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.247Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/refine_clusters.html</loc>
-    <lastmod>2026-03-18T22:55:33.059Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.247Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/agglomerate_tree_leaves.html</loc>
-    <lastmod>2026-03-18T22:55:33.057Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.245Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/rewrite_lazy_index.html</loc>
-    <lastmod>2026-03-18T22:55:33.059Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.248Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/refine_dyf_tree.html</loc>
-    <lastmod>2026-03-18T22:55:33.059Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.247Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/discover_categorical_columns.html</loc>
-    <lastmod>2026-03-18T22:55:33.058Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.246Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/multi_level_fisher_weights.html</loc>
-    <lastmod>2026-03-18T22:55:33.059Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.247Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/format_split_path.html</loc>
-    <lastmod>2026-03-18T22:55:33.058Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.247Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/build_pca_tree.html</loc>
-    <lastmod>2026-03-18T22:55:33.057Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.245Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/provenance_from_dict.html</loc>
-    <lastmod>2026-03-18T22:55:33.059Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.247Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/AdaptiveProbeConfig.html</loc>
-    <lastmod>2026-03-18T22:55:33.056Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.244Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/DAGMiningResult.html</loc>
-    <lastmod>2026-03-18T22:55:33.057Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.245Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/provenance_to_dict.html</loc>
-    <lastmod>2026-03-18T22:55:33.059Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.247Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/chunk_redundancy.html</loc>
-    <lastmod>2026-03-18T22:55:33.057Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.246Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/load_category_graphs.html</loc>
-    <lastmod>2026-03-18T22:55:33.059Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.247Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/diagnose_axes.html</loc>
-    <lastmod>2026-03-18T22:55:33.058Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.246Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/spatial_rgb_map.html</loc>
-    <lastmod>2026-03-18T22:55:33.059Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.248Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/derive_path_labels.html</loc>
-    <lastmod>2026-03-18T22:55:33.058Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.246Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/compute_domain_stopwords.html</loc>
-    <lastmod>2026-03-18T22:55:33.057Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.246Z</lastmod>
   </url>
   <url>
     <loc>https://dyf.io/reference/find_super_connectors.html</loc>
-    <lastmod>2026-03-18T22:55:33.058Z</lastmod>
+    <lastmod>2026-03-18T23:32:16.247Z</lastmod>
   </url>
 </urlset>

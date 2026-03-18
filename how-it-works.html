@@ -353,6 +353,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
   <li><a href="#how-the-hash-works-sign-bit-lsh" id="toc-how-the-hash-works-sign-bit-lsh" class="nav-link" data-scroll-target="#how-the-hash-works-sign-bit-lsh">How the hash works: sign-bit LSH</a></li>
   <li><a href="#improving-the-hash-itq-rotation" id="toc-improving-the-hash-itq-rotation" class="nav-link" data-scroll-target="#improving-the-hash-itq-rotation">Improving the hash: ITQ rotation</a></li>
   </ul></li>
+  <li><a href="#why-hashing-yields-density" id="toc-why-hashing-yields-density" class="nav-link" data-scroll-target="#why-hashing-yields-density">Why Hashing Yields Density</a></li>
   <li><a href="#what-the-metrics-tell-you" id="toc-what-the-metrics-tell-you" class="nav-link" data-scroll-target="#what-the-metrics-tell-you">What the Metrics Tell You</a></li>
   <li><a href="#dense-bridge-orphan" id="toc-dense-bridge-orphan" class="nav-link" data-scroll-target="#dense-bridge-orphan">Dense, Bridge, Orphan</a></li>
   <li><a href="#going-deeper-the-dyf-tree" id="toc-going-deeper-the-dyf-tree" class="nav-link" data-scroll-target="#going-deeper-the-dyf-tree">Going Deeper: The DYF Tree</a></li>
@@ -485,6 +486,53 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 <span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co"># ITQ-refined hash (better quantization)</span></span>
 <span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>classifier.fit_itq(embeddings)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
+</section>
+<section id="why-hashing-yields-density" class="level2">
+<h2 class="anchored" data-anchor-id="why-hashing-yields-density">Why Hashing Yields Density</h2>
+<p>Most hash tables try to spread items <em>evenly</em> across buckets — collisions are a bug. DYF flips this: <strong>uneven bucket sizes are the signal</strong>. When you hash embeddings with data-adaptive hyperplanes, the resulting bucket distribution directly encodes the density structure of the embedding space.</p>
+<div class="cell" data-fig-width="8" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">flowchart LR
+    subgraph hash ["Data-adaptive hash"]
+        direction TB
+        H1["PCA hyperplanes&lt;br/&gt;split along cluster&lt;br/&gt;boundaries"]
+    end
+
+    subgraph buckets ["Bucket sizes encode density"]
+        direction TB
+        B1["Bucket 3: 1,200 items&lt;br/&gt;→ dense region"]
+        B2["Bucket 7: 45 items&lt;br/&gt;→ sparse region"]
+        B3["Bucket 12: 2 items&lt;br/&gt;→ orphan territory"]
+    end
+
+    hash --&gt; buckets
+
+    style hash stroke:#4a6fa5,stroke-width:2
+    style buckets stroke:#2d8a2d,stroke-width:2
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p>A large bucket means many embeddings landed on the same side of every hyperplane — they occupy a coherent, well-populated region of the space. A tiny bucket means those items ended up in a region with almost no neighbors. The bucket size <em>is</em> a density estimate, computed as a byproduct of the hash with no additional distance calculations.</p>
+<p>This idea draws from <a href="https://arxiv.org/abs/2501.02305">Krapivin et al.&nbsp;(2025)</a>, which analyzes hash table occupancy patterns and probe complexity under non-uniform distributions. DYF applies this principle to embedding spaces: instead of fighting non-uniform bucket sizes, it treats them as a feature — the load pattern of the hash table reveals the topology of the data.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Multi-resolution density
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>DYF can also read density at multiple scales by masking bucket IDs to fewer bits. With 14-bit hashes, masking to 8 bits merges neighboring buckets — items that looked sparse at fine resolution may cluster at coarser resolution. This multi-resolution view separates true orphans (sparse at every scale) from items that belong to broad, diffuse regions.</p>
+</div>
+</div>
 </section>
 <section id="what-the-metrics-tell-you" class="level2">
 <h2 class="anchored" data-anchor-id="what-the-metrics-tell-you">What the Metrics Tell You</h2>
