@@ -1,0 +1,16 @@
+# Provenance { #dyf.Provenance }
+
+```python
+Provenance(
+    artifact_type,
+    n_items,
+    source_hash,
+    params_hash,
+    created_at,
+    params=dict(),
+    sample_seed=None,
+    sample_n=None,
+)
+```
+
+Identity fingerprint for a pipeline artifact.

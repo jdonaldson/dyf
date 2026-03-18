@@ -1,0 +1,20 @@
+# apply_fisher_weights { #dyf.apply_fisher_weights }
+
+```python
+apply_fisher_weights(embeddings, weights)
+```
+
+Multiply embeddings by per-dimension weights.
+
+
+
+## Parameters {.doc-section .doc-section-parameters}
+
+embeddings : (n, d) float32
+weights : (d,) float32
+
+
+
+## Returns {.doc-section .doc-section-returns}
+
+weighted : (n, d) float32

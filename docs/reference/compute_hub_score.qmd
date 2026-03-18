@@ -32,9 +32,9 @@ score low on both.
 
 ## Returns {.doc-section .doc-section-returns}
 
-| Name   | Type                                       | Description                                       |
-|--------|--------------------------------------------|---------------------------------------------------|
-|        | [HubScoreResult](`dyf.rag.HubScoreResult`) | HubScoreResult with scores and component signals. |
+| Name   | Type                                            | Description                                       |
+|--------|-------------------------------------------------|---------------------------------------------------|
+|        | [HubScoreResult](`dyf.ontology.HubScoreResult`) | HubScoreResult with scores and component signals. |
 
 ## Example {.doc-section .doc-section-example}
 

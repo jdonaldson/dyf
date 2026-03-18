@@ -1,0 +1,24 @@
+# diagnostics_to_metadata { #dyf.diagnostics_to_metadata }
+
+```python
+diagnostics_to_metadata(before, after)
+```
+
+Serialize axis diagnostics for .dyf metadata.
+
+
+
+## Parameters {.doc-section .doc-section-parameters}
+
+before : list[AxisDiagnostic]
+    Diagnostics from the first pass.
+after : list[AxisDiagnostic]
+    Diagnostics from the second pass.
+
+
+
+## Returns {.doc-section .doc-section-returns}
+
+metadata : dict[str, str]
+    Keys ``axis_diagnostics_before`` and ``axis_diagnostics_after``,
+    each a JSON string.

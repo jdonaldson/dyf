@@ -1,0 +1,44 @@
+# build_cluster_tree_dag { #dyf.build_cluster_tree_dag }
+
+```python
+build_cluster_tree_dag(
+    tree,
+    children_map,
+    leaf_batches,
+    cluster_labels,
+    n_clusters,
+    *,
+    straddle_threshold=0.15,
+    max_tree_depth=None,
+)
+```
+
+Build a DAG connecting BIRCH clusters to tree nodes they overlap with.
+
+
+
+## Parameters {.doc-section .doc-section-parameters}
+
+tree : list[dict]
+    Tree structure from ``idx.get_tree_structure()``.
+children_map : dict[int, list[int]]
+    ``{parent_id: [child_ids]}``.
+leaf_batches : dict[int, np.ndarray]
+    ``{node_id: item_indices}`` for leaf nodes.
+cluster_labels : (n,) int array
+    Per-item BIRCH cluster ID.
+n_clusters : int
+    The cluster resolution (e.g. 25), used for node naming.
+straddle_threshold : float
+    Minimum overlap fraction to create a cluster→tree edge.
+max_tree_depth : int or None
+    If set, only consider tree nodes up to this depth from root.
+
+
+
+## Returns {.doc-section .doc-section-returns}
+
+CategoryGraph
+    DAG with tree-internal edges and cluster-to-tree edges.
+    Node names: ``"tree_0"``, ``"tree_1"``, ... for tree nodes;
+    ``"cluster_25_0"``, ``"cluster_25_14"``, ... for clusters.

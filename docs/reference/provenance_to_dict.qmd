@@ -1,0 +1,7 @@
+# provenance_to_dict { #dyf.provenance_to_dict }
+
+```python
+provenance_to_dict(p)
+```
+
+JSON-serializable dict.

@@ -1,0 +1,25 @@
+# merge_to_max_k { #dyf.merge_to_max_k }
+
+```python
+merge_to_max_k(point_labels, embeddings, max_k=12)
+```
+
+Merge communities to ≤max_k using complete linkage on community centroids.
+
+Returns ``point_labels`` unchanged if already ≤ max_k.
+Otherwise: compute community centroids → L2-normalize → complete linkage →
+fcluster at max_k → remap point labels → reassign points.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+| Name         | Type   | Description                                      | Default    |
+|--------------|--------|--------------------------------------------------|------------|
+| point_labels |        | int32 array (N,) of cluster IDs.                 | _required_ |
+| embeddings   |        | (N, D) embedding matrix (float32).               | _required_ |
+| max_k        |        | Maximum number of clusters to keep (default 12). | `12`       |
+
+## Returns {.doc-section .doc-section-returns}
+
+| Name   | Type   | Description                                                  |
+|--------|--------|--------------------------------------------------------------|
+|        |        | int32 array (N,) of merged cluster IDs (0-based contiguous). |

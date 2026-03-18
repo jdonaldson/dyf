@@ -1,0 +1,20 @@
+# compute_domain_stopwords { #dyf.compute_domain_stopwords }
+
+```python
+compute_domain_stopwords(titles, threshold=0.1)
+```
+
+Words appearing in >threshold fraction of titles. Corpus-level stop words.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+| Name      | Type                           | Description                                                                                                          | Default    |
+|-----------|--------------------------------|----------------------------------------------------------------------------------------------------------------------|------------|
+| titles    | [list](`list`)\[[str](`str`)\] | List of title strings.                                                                                               | _required_ |
+| threshold | [float](`float`)               | Fraction threshold (0.0-1.0). Words appearing in more than this fraction of titles are considered domain stop words. | `0.1`      |
+
+## Returns {.doc-section .doc-section-returns}
+
+| Name   | Type                         | Description                               |
+|--------|------------------------------|-------------------------------------------|
+|        | [set](`set`)\[[str](`str`)\] | Set of domain-specific stop word strings. |

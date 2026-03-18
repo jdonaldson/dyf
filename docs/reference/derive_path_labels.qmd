@@ -1,0 +1,29 @@
+# derive_path_labels { #dyf.derive_path_labels }
+
+```python
+derive_path_labels(dag, split_keywords, n_clusters, *, top_k=3)
+```
+
+Derive deterministic path labels for each cluster from the DAG.
+
+
+
+## Parameters {.doc-section .doc-section-parameters}
+
+dag : CategoryGraph
+    DAG from ``build_cluster_tree_dag()``.
+split_keywords : dict
+    Output of ``compute_split_keywords()``.
+n_clusters : int
+    Cluster resolution (e.g. 25).
+top_k : int
+    Number of keywords per path step.
+
+
+
+## Returns {.doc-section .doc-section-returns}
+
+dict[int, str]
+    ``{cluster_id: "keyword1, keyword2 / keyword3, keyword4"}``.
+    Single path → ``"cardiac / pacemaker"``.
+    Straddling → ``"cardiac / {pacemaker, defibrillator}"``.

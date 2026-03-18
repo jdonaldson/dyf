@@ -1,0 +1,39 @@
+# louvain_cluster_leaves { #dyf.louvain_cluster_leaves }
+
+```python
+louvain_cluster_leaves(
+    idx,
+    coords,
+    embeddings,
+    leaf_k=10,
+    similarity_threshold=0.5,
+    resolution=1.0,
+)
+```
+
+Cluster tree leaves via centroid KNN + Louvain community detection.
+
+Finds natural communities without requiring a target k.  Builds a KNN
+graph over leaf centroids, filters weak edges by cosine similarity
+threshold, then runs Louvain to discover communities.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+| Name                 | Type   | Description                                                            | Default    |
+|----------------------|--------|------------------------------------------------------------------------|------------|
+| idx                  |        | An open ``LazyIndex`` handle.                                          | _required_ |
+| coords               |        | (N, 2-or-3) UMAP coordinates for every item.                           | _required_ |
+| embeddings           |        | (N, D) embedding matrix (float32).                                     | _required_ |
+| leaf_k               |        | Number of nearest neighbors per leaf centroid (default 10).            | `10`       |
+| similarity_threshold |        | Minimum cosine similarity to keep an edge (default 0.5).               | `0.5`      |
+| resolution           |        | Louvain resolution parameter; higher = more communities (default 1.0). | `1.0`      |
+
+## Returns {.doc-section .doc-section-returns}
+
+| Name   | Type   | Description                                                         |
+|--------|--------|---------------------------------------------------------------------|
+|        |        | Same tuple as ``agglomerate_tree_leaves``:                          |
+|        |        | ``(point_labels, lsh_names, lsh_label_data, item_leaf_map,          |
+|        |        | tree_structure)``.                                                  |
+|        |        | Returns ``(None, {}, [], None, tree)`` when the tree has fewer than |
+|        |        | two leaves.                                                         |

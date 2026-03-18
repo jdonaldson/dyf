@@ -36,9 +36,9 @@ This achieves ~96% coverage vs ~89% for single-threshold approach.
 
 ## Returns {.doc-section .doc-section-returns}
 
-| Name   | Type                                                     | Description                                                |
-|--------|----------------------------------------------------------|------------------------------------------------------------|
-|        | [UnifiedOntologyResult](`dyf.rag.UnifiedOntologyResult`) | UnifiedOntologyResult with combined ontology and metadata. |
+| Name   | Type                                                          | Description                                                |
+|--------|---------------------------------------------------------------|------------------------------------------------------------|
+|        | [UnifiedOntologyResult](`dyf.ontology.UnifiedOntologyResult`) | UnifiedOntologyResult with combined ontology and metadata. |
 
 ## Example {.doc-section .doc-section-example}
 

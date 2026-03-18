@@ -1,0 +1,25 @@
+# label_clusters_frequency { #dyf.label_clusters_frequency }
+
+```python
+label_clusters_frequency(titles, labels)
+```
+
+Label clusters using TF-IDF token frequency (no LLM).
+
+Per-cluster TF-IDF: tokens frequent in one cluster but rare globally win.
+Falls back to raw title frequency if tokenization yields nothing
+(e.g. numeric-only titles like "Digit 7"). Disambiguates identical
+labels across clusters with ``(2)``, ``(3)`` suffixes.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+| Name   | Type                                     | Description                                         | Default    |
+|--------|------------------------------------------|-----------------------------------------------------|------------|
+| titles | [list](`list`)\[[str](`str`)\]           | List of title strings, one per item.                | _required_ |
+| labels | [np](`numpy`).[ndarray](`numpy.ndarray`) | Integer cluster assignments, same length as titles. | _required_ |
+
+## Returns {.doc-section .doc-section-returns}
+
+| Name   | Type                                         | Description                              |
+|--------|----------------------------------------------|------------------------------------------|
+|        | [dict](`dict`)\[[int](`int`), [str](`str`)\] | dict mapping cluster_id -> label string. |

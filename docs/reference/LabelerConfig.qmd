@@ -29,6 +29,15 @@ Configuration for LLM-based bucket labeling.
 >>> config = LabelerConfig.MEDIUM
 >>> labels = classifier.label_buckets(**config.as_kwargs())
 
+## Attributes
+
+| Name | Description |
+| --- | --- |
+| [base_url](#dyf.LabelerConfig.base_url) | str(object='') -> str |
+| [description](#dyf.LabelerConfig.description) | str(object='') -> str |
+| [mlx_name](#dyf.LabelerConfig.mlx_name) | str(object='') -> str |
+| [ollama_name](#dyf.LabelerConfig.ollama_name) | str(object='') -> str |
+
 ## Methods
 
 | Name | Description |

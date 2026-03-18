@@ -1,0 +1,38 @@
+# rewrite_lazy_index { #dyf.rewrite_lazy_index }
+
+```python
+rewrite_lazy_index(
+    path,
+    new_stored_fields=None,
+    new_metadata=None,
+    output_path=None,
+    compression=None,
+    drop_fields=None,
+    drop_embeddings=False,
+    format_version=None,
+)
+```
+
+Rewrite a .dyf file with additional stored fields and/or metadata.
+
+Preserves the tree structure, embeddings, and existing stored fields.
+Adds new per-point stored_fields columns and/or metadata key-value pairs.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+| Name              | Type                                                                                                                | Description                                                                                                          | Default    |
+|-------------------|---------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------|------------|
+| path              | [str](`str`)                                                                                                        | Path to existing .dyf file.                                                                                          | _required_ |
+| new_stored_fields | [Mapping](`collections.abc.Mapping`)\[[str](`str`), [StoredFieldInput](`dyf.lazy_index.StoredFieldInput`)\] \| None | Optional dict mapping field name to array-like of length total_items. Values are indexed by item_index.              | `None`     |
+| new_metadata      | [Mapping](`collections.abc.Mapping`)\[[str](`str`), [str](`str`) \| None\] \| None                                  | Optional dict of string key-value pairs to add/update. Values of None delete the key from existing metadata.         | `None`     |
+| output_path       | [str](`str`) \| None                                                                                                | Output file path. If None, overwrites the input file.                                                                | `None`     |
+| compression       | [str](`str`) \| None                                                                                                | Override compression codec ('none', 'zstd', 'lz4'). If None, preserves the original file's compression.              | `None`     |
+| drop_fields       | [Set](`collections.abc.Set`)\[[str](`str`)\] \| [list](`list`)\[[str](`str`)\] \| None                              | Optional set/list of stored field names to remove. Applied after merging existing and new fields (exact names only). | `None`     |
+| drop_embeddings   | [bool](`bool`)                                                                                                      | If True, write a viz-only file without embedding vectors in Arrow batches. Tree centroids are preserved.             | `False`    |
+| format_version    | [int](`int`) \| None                                                                                                | Output format version (1, 2, or 3). If None, preserves the source file's format version.                             | `None`     |
+
+## Raises {.doc-section .doc-section-raises}
+
+| Name   | Type                       | Description                                           |
+|--------|----------------------------|-------------------------------------------------------|
+|        | [ValueError](`ValueError`) | If the index uses PQ quantization (lossy round-trip). |

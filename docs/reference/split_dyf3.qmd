@@ -1,0 +1,31 @@
+# split_dyf3 { #dyf.split_dyf3 }
+
+```python
+split_dyf3(path, chunk_size=95000000)
+```
+
+Split a DYF3 file into chunks for transport (e.g. GitHub Pages).
+
+Chunk 0 keeps the original filename (truncated to chunk_size).
+Chunks 1..N are written as ``path.1``, ``path.2``, etc. with raw
+continuation bytes (no headers).  The ``n_chunks`` field in chunk 0's
+header is patched in place.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+| Name       | Type         | Description                                                                                | Default    |
+|------------|--------------|--------------------------------------------------------------------------------------------|------------|
+| path       | [str](`str`) | Path to a DYF3 file (must already be format version 3).                                    | _required_ |
+| chunk_size | [int](`int`) | Maximum bytes per chunk.  Default 95 MB (fits GitHub's 100 MB per-file limit with margin). | `95000000` |
+
+## Returns {.doc-section .doc-section-returns}
+
+| Name   | Type         | Description                                     |
+|--------|--------------|-------------------------------------------------|
+|        | [int](`int`) | Number of chunks (1 means no split was needed). |
+
+## Raises {.doc-section .doc-section-raises}
+
+| Name   | Type                       | Description              |
+|--------|----------------------------|--------------------------|
+|        | [ValueError](`ValueError`) | If the file is not DYF3. |

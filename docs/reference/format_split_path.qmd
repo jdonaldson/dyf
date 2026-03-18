@@ -1,0 +1,36 @@
+# format_split_path { #dyf.format_split_path }
+
+```python
+format_split_path(
+    item_index,
+    split_keywords,
+    tree,
+    leaf_batches,
+    children_map,
+    *,
+    top_k=3,
+)
+```
+
+Return the keyword path for a single item from root to leaf.
+
+Traces which child the item belongs to at each split level and
+returns the top-k keywords for that child.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+| Name           | Type                                                                     | Description                         | Default    |
+|----------------|--------------------------------------------------------------------------|-------------------------------------|------------|
+| item_index     | [int](`int`)                                                             | The item's index in the dataset.    | _required_ |
+| split_keywords | [dict](`dict`)                                                           | Output of compute_split_keywords(). | _required_ |
+| tree           | [list](`list`)\[[TreeNode](`dyf.lazy_index.TreeNode`)\]                  | Tree structure list.                | _required_ |
+| leaf_batches   | [dict](`dict`)\[[int](`int`), [np](`numpy`).[ndarray](`numpy.ndarray`)\] | {node_id: item_indices}.            | _required_ |
+| children_map   | [dict](`dict`)\[[int](`int`), [list](`list`)\[[int](`int`)\]\]           | {parent_id: [child_ids]}.           | _required_ |
+| top_k          | [int](`int`)                                                             | Number of keywords per path step.   | `3`        |
+
+## Returns {.doc-section .doc-section-returns}
+
+| Name   | Type                           | Description                                                   |
+|--------|--------------------------------|---------------------------------------------------------------|
+|        | [list](`list`)\[[str](`str`)\] | List of comma-separated keyword strings, one per split level. |
+|        | [list](`list`)\[[str](`str`)\] | E.g.: ["screw,plate,fixation", "pedicle,cervical,spine"]      |

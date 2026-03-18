@@ -1,0 +1,31 @@
+# assess_text_diversity { #dyf.assess_text_diversity }
+
+```python
+assess_text_diversity(
+    titles,
+    *,
+    min_unique_tokens=50,
+    min_token_ratio=0.01,
+    min_unique_title_ratio=0.05,
+)
+```
+
+Cheaply assess whether a title collection has enough diversity for LLM labeling.
+
+Single O(n) pass: collects unique tokens (via tokenize()) and unique title strings.
+Returns a report with three signals and a boolean gate.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+| Name                   | Type                           | Description                                          | Default    |
+|------------------------|--------------------------------|------------------------------------------------------|------------|
+| titles                 | [list](`list`)\[[str](`str`)\] | List of title strings.                               | _required_ |
+| min_unique_tokens      | [int](`int`)                   | Minimum unique token count to be considered diverse. | `50`       |
+| min_token_ratio        | [float](`float`)               | Minimum ratio of unique tokens to total items.       | `0.01`     |
+| min_unique_title_ratio | [float](`float`)               | Minimum ratio of unique titles to total titles.      | `0.05`     |
+
+## Returns {.doc-section .doc-section-returns}
+
+| Name   | Type                                                    | Description                                                      |
+|--------|---------------------------------------------------------|------------------------------------------------------------------|
+|        | [TextDiversityReport](`dyf.splits.TextDiversityReport`) | TextDiversityReport with is_diverse=True if all thresholds pass. |

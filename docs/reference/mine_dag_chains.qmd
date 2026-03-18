@@ -32,9 +32,9 @@ Chains flow from general → specific, following the diversity gradient.
 
 ## Returns {.doc-section .doc-section-returns}
 
-| Name   | Type                                         | Description                                                          |
-|--------|----------------------------------------------|----------------------------------------------------------------------|
-|        | [DAGMiningResult](`dyf.rag.DAGMiningResult`) | DAGMiningResult with chains, diversity scores, and edge information. |
+| Name   | Type                                              | Description                                                          |
+|--------|---------------------------------------------------|----------------------------------------------------------------------|
+|        | [DAGMiningResult](`dyf.ontology.DAGMiningResult`) | DAGMiningResult with chains, diversity scores, and edge information. |
 
 ## Example {.doc-section .doc-section-example}
 

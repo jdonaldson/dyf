@@ -84,24 +84,45 @@ results_df = classifier.to_polars()
 
 Pandas works the same way via `from_pandas()` / `to_pandas()`.
 
-## Saving and Loading
+## Building & Searching Indexes
 
-Save a fitted classifier for later use without needing the Rust dependency:
+Build a `.dyf` index file for fast, memory-mapped search:
 
 ```python
-from dyf import save_index, PrecomputedIndex
+from dyf import build_dyf_tree, write_lazy_index, LazyIndex
 
-# Save
-save_index(
-    classifier, "index.safetensors", embeddings,
-    metadata={"model": "all-MiniLM-L6-v2"}
-)
+# Build a DYF tree
+tree = build_dyf_tree(embeddings, max_depth=4, num_bits=3, min_leaf_size=8)
 
-# Load (no dyf-rs needed)
-index = PrecomputedIndex.load("index.safetensors")
-dense = index.get_dense()
-bucket_5 = index.get_bucket(5)
-print(index.metadata)
+# Write to disk
+write_lazy_index(tree, embeddings, "index.dyf",
+                 quantization="float16", compression="zstd",
+                 stored_fields={"title": titles},
+                 metadata={"model": "nomic-embed-text-v1.5"})
+
+# Search (instant open, zero startup cost)
+with LazyIndex("index.dyf") as idx:
+    result = idx.search(query_embedding, k=10, nprobe=3)
+    print(result.indices, result.scores)
+    print(result.fields["title"])
+```
+
+### Adaptive Probing
+
+Queries near decision boundaries automatically probe more leaves:
+
+```python
+from dyf import LazyIndex, AdaptiveProbeConfig
+
+with LazyIndex("index.dyf") as idx:
+    # Auto mode — margin-based probe count
+    result = idx.search(query, k=10, nprobe="auto", return_routing=True)
+    print(result.routing["adaptive_nprobe"])
+
+    # Custom thresholds
+    cfg = AdaptiveProbeConfig(margin_lo=0.005, margin_hi=0.2,
+                              min_probes=1, max_probes=8)
+    result = idx.search(query, k=10, nprobe=cfg)
 ```
 
 ## Tree Methods

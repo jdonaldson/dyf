@@ -44,6 +44,7 @@ quartodoc:
   title: API Reference
   parser: google
   style: pkgdown
+  dynamic: true
   render_interlinks: true
   sidebar: "reference/_sidebar.yml"
   sections:
@@ -54,7 +55,6 @@ quartodoc:
         LLM-based labeling.
       contents:
         - DensityClassifierFull
-        - DensityReportFull
 
     - title: Tree Methods
       desc: Hierarchical tree construction for multi-resolution analysis of embeddings.
@@ -115,20 +115,57 @@ quartodoc:
         - cluster_quality
         - neighbor_coherence
 
-    - title: I/O
-      desc: Save and load fitted classifiers as safetensors files.
-      contents:
-        - save_index
-        - load_index
-        - PrecomputedIndex
-
     - title: Lazy Index
-      desc: Memory-mapped tree index with FlatBuffers + Arrow IPC.
+      desc: >
+        Memory-mapped tree index with FlatBuffers + Arrow IPC. Build indexes
+        with `write_lazy_index`, search with `LazyIndex`, and use adaptive
+        probing for margin-aware probe counts.
       contents:
         - LazyIndex
         - write_lazy_index
+        - rewrite_lazy_index
+        - split_dyf3
         - from_faiss
         - SearchResult
+        - AdaptiveProbeConfig
+
+    - title: Fisher Weighting
+      desc: Per-dimension Fisher ratio weighting for supervised embedding refinement.
+      contents:
+        - compute_fisher_weights
+        - apply_fisher_weights
+
+    - title: Split Keywords
+      desc: >
+        TF-IDF keyword extraction from DYF tree splits. Each PCA split naturally
+        separates vocabularies — these functions extract discriminative terms per
+        split side without LLM calls.
+      contents:
+        - compute_split_keywords
+        - compute_embedding_keywords
+        - label_clusters_frequency
+        - build_tree_maps
+        - collect_descendant_indices
+        - compute_domain_stopwords
+        - format_split_path
+        - tokenize
+        - TextDiversityReport
+        - assess_text_diversity
+
+    - title: Cluster Tree
+      desc: Connect BIRCH spatial clusters to DYF tree nodes for deterministic cluster naming.
+      contents:
+        - build_cluster_tree_dag
+        - compute_sibling_keywords
+        - derive_path_labels
+        - format_cluster_context
+
+    - title: Agglomeration
+      desc: Merge DYF tree leaves into coarser groups via linkage or community detection.
+      contents:
+        - agglomerate_tree_leaves
+        - louvain_cluster_leaves
+        - merge_to_max_k
 
     - title: Categorical
       desc: Hierarchical taxonomy graphs, label coarsening, and multi-level Fisher weighting.
@@ -138,6 +175,29 @@ quartodoc:
         - multi_level_fisher_weights
         - store_category_graph
         - load_category_graphs
+        - AxisDiagnostic
+        - diagnose_axes
+        - diagnostics_to_metadata
+        - discover_categorical_columns
+        - embed_with_diagnostics
+
+    - title: Colors
+      desc: Deterministic color assignment for spatial clusters.
+      contents:
+        - spatial_rgb_map
+        - spatial_color_map
+        - tree_rgb_map
+
+    - title: Provenance
+      desc: Artifact identity fingerprinting for DAG-oriented pipelines.
+      contents:
+        - Provenance
+        - create_provenance
+        - file_hash
+        - params_hash
+        - check_compatible
+        - provenance_to_dict
+        - provenance_from_dict
 
     - title: Configuration
       desc: Pre-built configurations for embedding models and LLM labelers.

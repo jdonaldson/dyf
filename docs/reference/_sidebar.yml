@@ -4,7 +4,6 @@ website:
     - reference/index.qmd
     - contents:
       - reference/DensityClassifierFull.qmd
-      - reference/DensityReportFull.qmd
       section: Core
     - contents:
       - reference/build_pca_tree.qmd
@@ -56,23 +55,67 @@ website:
       - reference/neighbor_coherence.qmd
       section: Chunk Analysis
     - contents:
-      - reference/save_index.qmd
-      - reference/load_index.qmd
-      - reference/PrecomputedIndex.qmd
-      section: I/O
-    - contents:
       - reference/LazyIndex.qmd
       - reference/write_lazy_index.qmd
+      - reference/rewrite_lazy_index.qmd
+      - reference/split_dyf3.qmd
       - reference/from_faiss.qmd
       - reference/SearchResult.qmd
+      - reference/AdaptiveProbeConfig.qmd
       section: Lazy Index
+    - contents:
+      - reference/compute_fisher_weights.qmd
+      - reference/apply_fisher_weights.qmd
+      section: Fisher Weighting
+    - contents:
+      - reference/compute_split_keywords.qmd
+      - reference/compute_embedding_keywords.qmd
+      - reference/label_clusters_frequency.qmd
+      - reference/build_tree_maps.qmd
+      - reference/collect_descendant_indices.qmd
+      - reference/compute_domain_stopwords.qmd
+      - reference/format_split_path.qmd
+      - reference/tokenize.qmd
+      - reference/TextDiversityReport.qmd
+      - reference/assess_text_diversity.qmd
+      section: Split Keywords
+    - contents:
+      - reference/build_cluster_tree_dag.qmd
+      - reference/compute_sibling_keywords.qmd
+      - reference/derive_path_labels.qmd
+      - reference/format_cluster_context.qmd
+      section: Cluster Tree
+    - contents:
+      - reference/agglomerate_tree_leaves.qmd
+      - reference/louvain_cluster_leaves.qmd
+      - reference/merge_to_max_k.qmd
+      section: Agglomeration
     - contents:
       - reference/CategoryGraph.qmd
       - reference/coarsen.qmd
       - reference/multi_level_fisher_weights.qmd
       - reference/store_category_graph.qmd
       - reference/load_category_graphs.qmd
+      - reference/AxisDiagnostic.qmd
+      - reference/diagnose_axes.qmd
+      - reference/diagnostics_to_metadata.qmd
+      - reference/discover_categorical_columns.qmd
+      - reference/embed_with_diagnostics.qmd
       section: Categorical
+    - contents:
+      - reference/spatial_rgb_map.qmd
+      - reference/spatial_color_map.qmd
+      - reference/tree_rgb_map.qmd
+      section: Colors
+    - contents:
+      - reference/Provenance.qmd
+      - reference/create_provenance.qmd
+      - reference/file_hash.qmd
+      - reference/params_hash.qmd
+      - reference/check_compatible.qmd
+      - reference/provenance_to_dict.qmd
+      - reference/provenance_from_dict.qmd
+      section: Provenance
     - contents:
       - reference/EmbedderConfig.qmd
       - reference/LabelerConfig.qmd

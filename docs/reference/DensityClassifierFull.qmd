@@ -7,7 +7,7 @@ DensityClassifierFull(
     seed=31,
     isolation_k=10,
     isolation_sample_size=1000,
-    num_stability_seeds=3,
+    num_stability_seeds=0,
 )
 ```
 

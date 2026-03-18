@@ -1,0 +1,41 @@
+# compute_split_keywords { #dyf.compute_split_keywords }
+
+```python
+compute_split_keywords(
+    titles,
+    tree,
+    leaf_batches,
+    children_map,
+    *,
+    max_depth_from_root=3,
+    min_child_items=50,
+    top_k=10,
+    domain_stopwords=None,
+    bigram_check=False,
+)
+```
+
+Compute discriminative TF-IDF keywords for each side of each tree split.
+
+For each internal node (up to max_depth_from_root), treats each child as a
+"document class" and computes TF-IDF scores to find discriminative words.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+| Name                | Type                                                                     | Description                                   | Default    |
+|---------------------|--------------------------------------------------------------------------|-----------------------------------------------|------------|
+| titles              | [list](`list`)\[[str](`str`)\]                                           | List of title strings, indexed by item index. | _required_ |
+| tree                | [list](`list`)\[[TreeNode](`dyf.lazy_index.TreeNode`)\]                  | Tree structure from idx.get_tree_structure(). | _required_ |
+| leaf_batches        | [dict](`dict`)\[[int](`int`), [np](`numpy`).[ndarray](`numpy.ndarray`)\] | {node_id: item_indices} for leaf nodes.       | _required_ |
+| children_map        | [dict](`dict`)\[[int](`int`), [list](`list`)\[[int](`int`)\]\]           | {parent_id: [child_ids]} for internal nodes.  | _required_ |
+| max_depth_from_root | [int](`int`)                                                             | Maximum tree depth to process.                | `3`        |
+| min_child_items     | [int](`int`)                                                             | Skip children with fewer items than this.     | `50`       |
+| top_k               | [int](`int`)                                                             | Number of top keywords to return per child.   | `10`       |
+| domain_stopwords    | [set](`set`)\[[str](`str`)\] \| None                                     | Additional stop words to filter.              | `None`     |
+| bigram_check        | [bool](`bool`)                                                           | Enable PMI-based compound meaning detection.  | `False`    |
+
+## Returns {.doc-section .doc-section-returns}
+
+| Name   | Type           | Description                                                                                                                                                                                                                                                                                                                       |
+|--------|----------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+|        | [dict](`dict`) | dict with keys: "domain_stopwords": list of domain stop words used "splits": {node_id: {     "depth": int,     "children": {child_id: {         "count": int,         "unigrams": [("word", score), ...],         "bigrams": [("w1_w2", score), ...],  # if bigram_check     }},     "bigram_needed": bool,  # if bigram_check }} |

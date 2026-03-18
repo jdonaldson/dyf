@@ -1,0 +1,9 @@
+# file_hash { #dyf.file_hash }
+
+```python
+file_hash(path)
+```
+
+Fast partial hash: first 64 KB + file size + mtime.
+
+Not a full SHA — just enough to detect changes quickly.

@@ -1,0 +1,7 @@
+# params_hash { #dyf.params_hash }
+
+```python
+params_hash(params)
+```
+
+Deterministic hash of sorted JSON-serialized params.

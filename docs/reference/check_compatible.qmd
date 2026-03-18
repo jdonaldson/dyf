@@ -1,0 +1,14 @@
+# check_compatible { #dyf.check_compatible }
+
+```python
+check_compatible(
+    upstream,
+    downstream_n_items=None,
+    downstream_sample_n=None,
+    downstream_sample_seed=None,
+)
+```
+
+Check if an upstream artifact is compatible with the current pipeline.
+
+Returns ``(ok, warnings)``.

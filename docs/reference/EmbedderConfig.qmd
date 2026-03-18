@@ -20,6 +20,12 @@ Configuration for text embedding models.
 >>> config = EmbedderConfig.MEDIUM
 >>> embeddings = config.embed(texts)
 
+## Attributes
+
+| Name | Description |
+| --- | --- |
+| [description](#dyf.EmbedderConfig.description) | str(object='') -> str |
+
 ## Methods
 
 | Name | Description |

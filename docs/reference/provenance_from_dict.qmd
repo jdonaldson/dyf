@@ -1,0 +1,7 @@
+# provenance_from_dict { #dyf.provenance_from_dict }
+
+```python
+provenance_from_dict(d)
+```
+
+Reconstruct from dict.

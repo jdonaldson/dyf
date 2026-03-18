@@ -15,7 +15,7 @@ neighbors (tight clusters) are "specific".
 
 | Name               | Type                                                                                                               | Description                                     |
 |--------------------|--------------------------------------------------------------------------------------------------------------------|-------------------------------------------------|
-| chains             | [List](`typing.List`)\[[DAGChain](`dyf.rag.DAGChain`)\]                                                            | List of extracted DAG chains                    |
+| chains             | [List](`typing.List`)\[[DAGChain](`dyf.ontology.DAGChain`)\]                                                       | List of extracted DAG chains                    |
 | diversity          | [np](`numpy`).[ndarray](`numpy.ndarray`)                                                                           | Neighbor diversity score for each point         |
 | parent_child_edges | [List](`typing.List`)\[[Tuple](`typing.Tuple`)\[[int](`int`), [int](`int`), [float](`float`), [float](`float`)\]\] | List of (parent, child, similarity, gap) tuples |
 | n_components       | [int](`int`)                                                                                                       | Number of connected components in the DAG       |

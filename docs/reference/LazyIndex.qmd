@@ -20,6 +20,7 @@ print(idx.tree_summary)
 
 | Name | Description |
 | --- | --- |
+| [format_version](#dyf.LazyIndex.format_version) | DYF format version: 1 (header FB) or 2 (footer FB, append-friendly). |
 | [has_stored_fields](#dyf.LazyIndex.has_stored_fields) | True if this index has stored fields. |
 | [is_pq](#dyf.LazyIndex.is_pq) | True if this index uses Product Quantization. |
 | [quantization](#dyf.LazyIndex.quantization) | Read quantization string from BuildParams. |
@@ -35,6 +36,7 @@ print(idx.tree_summary)
 | [extract_all_fields](#dyf.LazyIndex.extract_all_fields) | Bulk-read all leaf batches, concatenate, sort by item_index. |
 | [get_item_vector](#dyf.LazyIndex.get_item_vector) | Extract a single item's embedding vector from the index. |
 | [get_leaf](#dyf.LazyIndex.get_leaf) | Decompress and return a leaf's Arrow RecordBatch. |
+| [get_split_eigenvalues](#dyf.LazyIndex.get_split_eigenvalues) | Return PCA eigenvalues for each internal node. |
 | [get_split_hyperplanes](#dyf.LazyIndex.get_split_hyperplanes) | Return the PCA hyperplane(s) for each internal node. |
 | [get_stored_fields](#dyf.LazyIndex.get_stored_fields) | Look up stored fields for given item indices without re-searching. |
 | [get_tree_structure](#dyf.LazyIndex.get_tree_structure) | Export tree hierarchy for visualization (FlatBuffers only, no Arrow). |
@@ -62,7 +64,7 @@ Detect enrichment level based on stored fields and metadata.
 
 0: Base (embeddings + tree only)
 1: Projected (has umap_x, umap_y, umap_z stored fields)
-2: Clustered (has cluster_* stored fields)
+2: Clustered (has community_id or cluster_* stored fields)
 3: Viz-ready (has edge_pairs or tour_narration in metadata)
 
 ### extract_all_fields { #dyf.LazyIndex.extract_all_fields }
@@ -75,9 +77,9 @@ Bulk-read all leaf batches, concatenate, sort by item_index.
 
 #### Returns {.doc-section .doc-section-returns}
 
-| Name   | Type   | Description                                                                                                                                                                                             |
-|--------|--------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-|        |        | dict with keys: 'embeddings': (n, d) float32 array (PQ indexes return     approximate reconstructions) 'fields': {field_name: array} for all stored fields 'metadata': dict of metadata key-value pairs |
+| Name   | Type                                            | Description                                                                                                                                                                                                                                                     |
+|--------|-------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+|        | [ExtractedData](`dyf.lazy_index.ExtractedData`) | dict with keys: 'embeddings': (n, d) float32 array, or None if the file     was written without embeddings (PQ indexes return     approximate reconstructions) 'fields': {field_name: array} for all stored fields 'metadata': dict of metadata key-value pairs |
 
 ### get_item_vector { #dyf.LazyIndex.get_item_vector }
 
@@ -128,6 +130,21 @@ Decompress and return a leaf's Arrow RecordBatch.
 |--------|--------|----------------------------------------------------------|
 |        |        | pyarrow.RecordBatch with columns: item_index, embedding. |
 
+### get_split_eigenvalues { #dyf.LazyIndex.get_split_eigenvalues }
+
+```python
+LazyIndex.get_split_eigenvalues()
+```
+
+Return PCA eigenvalues for each internal node.
+
+#### Returns {.doc-section .doc-section-returns}
+
+| Name   | Type                                                                     | Description                                                  |
+|--------|--------------------------------------------------------------------------|--------------------------------------------------------------|
+|        | [dict](`dict`)\[[int](`int`), [np](`numpy`).[ndarray](`numpy.ndarray`)\] | {node_id: (num_bits,) float32 array} for internal nodes that |
+|        | [dict](`dict`)\[[int](`int`), [np](`numpy`).[ndarray](`numpy.ndarray`)\] | have eigenvalues stored. Empty dict for old .dyf files.      |
+
 ### get_split_hyperplanes { #dyf.LazyIndex.get_split_hyperplanes }
 
 ```python
@@ -176,10 +193,10 @@ Export tree hierarchy for visualization (FlatBuffers only, no Arrow).
 
 #### Returns {.doc-section .doc-section-returns}
 
-| Name   | Type   | Description                                                    |
-|--------|--------|----------------------------------------------------------------|
-|        |        | list of dicts with keys: node_id, parent_id, depth, num_items, |
-|        |        | is_leaf, batch_index. Cached after first call.                 |
+| Name   | Type                                                    | Description                                                    |
+|--------|---------------------------------------------------------|----------------------------------------------------------------|
+|        | [list](`list`)\[[TreeNode](`dyf.lazy_index.TreeNode`)\] | list of dicts with keys: node_id, parent_id, depth, num_items, |
+|        | [list](`list`)\[[TreeNode](`dyf.lazy_index.TreeNode`)\] | is_leaf, batch_index. Cached after first call.                 |
 
 ### search { #dyf.LazyIndex.search }
 
@@ -191,12 +208,12 @@ Search the index for nearest neighbors.
 
 #### Parameters {.doc-section .doc-section-parameters}
 
-| Name           | Type   | Description                                                | Default    |
-|----------------|--------|------------------------------------------------------------|------------|
-| query          |        | (dim,) query vector.                                       | _required_ |
-| k              |        | Number of results to return.                               | `10`       |
-| nprobe         |        | Number of leaf probes (1 = single path, >1 = multi-probe). | `3`        |
-| return_routing |        | If True, populate result.routing with diagnostics.         | `False`    |
+| Name           | Type   | Description                                                                                                                                                                                                             | Default    |
+|----------------|--------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------|
+| query          |        | (dim,) query vector.                                                                                                                                                                                                    | _required_ |
+| k              |        | Number of results to return.                                                                                                                                                                                            | `10`       |
+| nprobe         |        | Number of leaf probes. Accepts: - int: fixed probe count (1 = single path, >1 = multi-probe) - "auto": adaptive probing with default AdaptiveProbeConfig - AdaptiveProbeConfig: adaptive probing with custom thresholds | `3`        |
+| return_routing |        | If True, populate result.routing with diagnostics.                                                                                                                                                                      | `False`    |
 
 #### Returns {.doc-section .doc-section-returns}
 

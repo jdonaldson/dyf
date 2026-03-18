@@ -1,0 +1,21 @@
+# AdaptiveProbeConfig { #dyf.AdaptiveProbeConfig }
+
+```python
+AdaptiveProbeConfig(margin_lo=0.01, margin_hi=0.1, min_probes=1, max_probes=5)
+```
+
+Configuration for adaptive probe count based on routing margin.
+
+Queries with small routing margins (near decision boundaries) probe more
+leaves; confident queries (large margins) probe fewer. Linear interpolation
+between min_probes and max_probes based on where min_margin falls between
+margin_lo and margin_hi.
+
+## Attributes
+
+| Name | Description |
+| --- | --- |
+| [margin_hi](#dyf.AdaptiveProbeConfig.margin_hi) | Convert a string or number to a floating point number, if possible. |
+| [margin_lo](#dyf.AdaptiveProbeConfig.margin_lo) | Convert a string or number to a floating point number, if possible. |
+| [max_probes](#dyf.AdaptiveProbeConfig.max_probes) | int([x]) -> integer |
+| [min_probes](#dyf.AdaptiveProbeConfig.min_probes) | int([x]) -> integer |

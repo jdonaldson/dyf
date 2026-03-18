@@ -14,13 +14,13 @@ ROG applies density-adaptive thresholding recursively:
 
 ## Attributes {.doc-section .doc-section-attributes}
 
-| Name           | Type                                                    | Description                                         |
-|----------------|---------------------------------------------------------|-----------------------------------------------------|
-| ontology       | [DAGTaxonomy](`dyf.rag.DAGTaxonomy`)                    | The unified DAGTaxonomy                             |
-| layers         | [List](`typing.List`)\[[ROGLayer](`dyf.rag.ROGLayer`)\] | List of ROGLayer describing each recursion level    |
-| excluded_nodes | [np](`numpy`).[ndarray](`numpy.ndarray`)                | Indices that couldn't be connected at any threshold |
-| total_coverage | [float](`float`)                                        | Fraction of input nodes in ontology                 |
-| bridge_edges   | [int](`int`)                                            | Edges connecting different layers                   |
+| Name           | Type                                                         | Description                                         |
+|----------------|--------------------------------------------------------------|-----------------------------------------------------|
+| ontology       | [DAGTaxonomy](`dyf.ontology.DAGTaxonomy`)                    | The unified DAGTaxonomy                             |
+| layers         | [List](`typing.List`)\[[ROGLayer](`dyf.ontology.ROGLayer`)\] | List of ROGLayer describing each recursion level    |
+| excluded_nodes | [np](`numpy`).[ndarray](`numpy.ndarray`)                     | Indices that couldn't be connected at any threshold |
+| total_coverage | [float](`float`)                                             | Fraction of input nodes in ontology                 |
+| bridge_edges   | [int](`int`)                                                 | Edges connecting different layers                   |
 
 ## Methods
 

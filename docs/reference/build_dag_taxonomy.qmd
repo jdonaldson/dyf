@@ -29,9 +29,9 @@ Creates a lattice structure where:
 
 ## Returns {.doc-section .doc-section-returns}
 
-| Name   | Type                                 | Description                          |
-|--------|--------------------------------------|--------------------------------------|
-|        | [DAGTaxonomy](`dyf.rag.DAGTaxonomy`) | DAGTaxonomy with navigation methods. |
+| Name   | Type                                      | Description                          |
+|--------|-------------------------------------------|--------------------------------------|
+|        | [DAGTaxonomy](`dyf.ontology.DAGTaxonomy`) | DAGTaxonomy with navigation methods. |
 
 ## Example {.doc-section .doc-section-example}
 

@@ -1,0 +1,7 @@
+# collect_descendant_indices { #dyf.collect_descendant_indices }
+
+```python
+collect_descendant_indices(node_id, children_map, leaf_batches)
+```
+
+Recursively collect all item indices under a node.

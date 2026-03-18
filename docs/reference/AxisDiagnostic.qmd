@@ -1,0 +1,25 @@
+# AxisDiagnostic { #dyf.AxisDiagnostic }
+
+```python
+AxisDiagnostic(name, knn_purity, random_baseline, lift, n_classes)
+```
+
+Diagnostic result for a single categorical axis.
+
+
+
+## Attributes {.doc-section .doc-section-attributes}
+
+name : str
+    Column / axis name.
+knn_purity : float
+    Observed k-NN purity (fraction of each point's neighbors sharing
+    its label, averaged over all points).
+random_baseline : float
+    Herfindahl index — expected purity under random label assignment
+    (sum of squared class proportions).
+lift : float
+    ``knn_purity / random_baseline``.  Low lift means the embedding
+    barely improves on chance for this axis.
+n_classes : int
+    Number of unique label values.

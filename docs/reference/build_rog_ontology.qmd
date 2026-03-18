@@ -45,9 +45,9 @@ approaches by adapting to local density.
 
 ## Returns {.doc-section .doc-section-returns}
 
-| Name   | Type                             | Description                                         |
-|--------|----------------------------------|-----------------------------------------------------|
-|        | [ROGResult](`dyf.rag.ROGResult`) | ROGResult with unified ontology and layer metadata. |
+| Name   | Type                                  | Description                                         |
+|--------|---------------------------------------|-----------------------------------------------------|
+|        | [ROGResult](`dyf.ontology.ROGResult`) | ROGResult with unified ontology and layer metadata. |
 
 ## Example {.doc-section .doc-section-example}
 

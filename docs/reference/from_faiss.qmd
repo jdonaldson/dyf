@@ -18,17 +18,17 @@ dyf tree (one node per IVF cell), and writes to the dyf file format.
 
 ## Parameters {.doc-section .doc-section-parameters}
 
-| Name          | Type   | Description                                                                             | Default     |
-|---------------|--------|-----------------------------------------------------------------------------------------|-------------|
-| faiss_index   |        | A trained faiss.IndexIVFFlat or faiss.IndexIVFPQ.                                       | _required_  |
-| path          |        | Output file path (e.g., "index.dyf").                                                   | _required_  |
-| compression   |        | "none", "zstd", or "lz4" (default: "zstd").                                             | `'zstd'`    |
-| quantization  |        | "float32", "float16", or "int8" (default: "float16").                                   | `'float16'` |
-| metadata      |        | Optional dict of string key-value pairs.                                                | `None`      |
-| stored_fields |        | Optional dict mapping field name to array-like of length n_items (indexed by FAISS ID). | `None`      |
+| Name          | Type                                                                                                                | Description                                                                             | Default     |
+|---------------|---------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------|-------------|
+| faiss_index   |                                                                                                                     | A trained faiss.IndexIVFFlat or faiss.IndexIVFPQ.                                       | _required_  |
+| path          | [str](`str`)                                                                                                        | Output file path (e.g., "index.dyf").                                                   | _required_  |
+| compression   | [str](`str`)                                                                                                        | "none", "zstd", or "lz4" (default: "none").                                             | `'zstd'`    |
+| quantization  | [str](`str`)                                                                                                        | "float32", "float16", or "int8" (default: "float16").                                   | `'float16'` |
+| metadata      | [dict](`dict`)\[[str](`str`), [str](`str`)\] \| None                                                                | Optional dict of string key-value pairs.                                                | `None`      |
+| stored_fields | [Mapping](`collections.abc.Mapping`)\[[str](`str`), [StoredFieldInput](`dyf.lazy_index.StoredFieldInput`)\] \| None | Optional dict mapping field name to array-like of length n_items (indexed by FAISS ID). | `None`      |
 
 ## Returns {.doc-section .doc-section-returns}
 
-| Name   | Type   | Description                           |
-|--------|--------|---------------------------------------|
-|        |        | LazyIndex opened on the written file. |
+| Name   | Type                                    | Description                           |
+|--------|-----------------------------------------|---------------------------------------|
+|        | [LazyIndex](`dyf.lazy_index.LazyIndex`) | LazyIndex opened on the written file. |

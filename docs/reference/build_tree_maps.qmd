@@ -1,0 +1,22 @@
+# build_tree_maps { #dyf.build_tree_maps }
+
+```python
+build_tree_maps(idx)
+```
+
+Extract tree structure, children_map, and leaf_batches from a LazyIndex.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+| Name   | Type   | Description                 | Default    |
+|--------|--------|-----------------------------|------------|
+| idx    |        | An open LazyIndex instance. | _required_ |
+
+## Returns {.doc-section .doc-section-returns}
+
+| Name   | Type   | Description                                              |
+|--------|--------|----------------------------------------------------------|
+|        |        | (tree, children_map, leaf_batches) where:                |
+|        |        | - tree: list of node dicts from idx.get_tree_structure() |
+|        |        | - children_map: {parent_node_id: [child_node_id, ...]}   |
+|        |        | - leaf_batches: {node_id: np.ndarray of item indices}    |

@@ -1,0 +1,7 @@
+# spatial_color_map { #dyf.spatial_color_map }
+
+```python
+spatial_color_map(labels, embeddings)
+```
+
+Return dict mapping label -> hex color with spatially coherent hues.

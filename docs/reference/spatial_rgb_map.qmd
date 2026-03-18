@@ -1,0 +1,11 @@
+# spatial_rgb_map { #dyf.spatial_rgb_map }
+
+```python
+spatial_rgb_map(labels, embeddings)
+```
+
+Return dict mapping label -> [r, g, b] with spatially coherent hues.
+
+Clusters that are close in embedding space get similar colors.
+Hues are evenly spaced in the sorted angular order so every cluster
+remains visually distinguishable from its neighbors.

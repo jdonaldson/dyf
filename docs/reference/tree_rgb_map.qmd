@@ -1,0 +1,19 @@
+# tree_rgb_map { #dyf.tree_rgb_map }
+
+```python
+tree_rgb_map(labels, tree_structure, item_leaf_map)
+```
+
+Assign colors by DFS leaf order of the DYF tree.
+
+Leaves adjacent in DFS share subtree ancestry, so they get similar hues.
+This produces smooth color gradients within tree subtrees and natural
+discontinuities at subtree boundaries.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+| Name           | Type   | Description                                         | Default    |
+|----------------|--------|-----------------------------------------------------|------------|
+| labels         |        | per-item cluster/bucket labels (array-like of ints) | _required_ |
+| tree_structure |        | list of node dicts from idx.get_tree_structure()    | _required_ |
+| item_leaf_map  |        | array of length N mapping item index → leaf node_id | _required_ |

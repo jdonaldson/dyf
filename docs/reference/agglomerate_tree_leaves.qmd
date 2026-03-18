@@ -1,0 +1,35 @@
+# agglomerate_tree_leaves { #dyf.agglomerate_tree_leaves }
+
+```python
+agglomerate_tree_leaves(idx, coords, embeddings, n_groups=50)
+```
+
+Agglomerate DYF tree leaves into ~n_groups using embedding centroids.
+
+Walks the tree to find leaf nodes, computes per-leaf embedding centroids,
+then uses complete linkage to merge leaves into n_groups agglomerated
+clusters.  After initial assignment, reassigns individual points to their
+nearest bucket centroid to clean up impure leaves and bad merges.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+| Name       | Type   | Description                                                                  | Default    |
+|------------|--------|------------------------------------------------------------------------------|------------|
+| idx        |        | An open ``LazyIndex`` handle (used to read tree structure and leaf batches). | _required_ |
+| coords     |        | (N, 2-or-3) UMAP coordinates for every item.                                 | _required_ |
+| embeddings |        | (N, D) embedding matrix (float32).                                           | _required_ |
+| n_groups   |        | Target number of agglomerated buckets (default 50).                          | `50`       |
+
+## Returns {.doc-section .doc-section-returns}
+
+| Name   | Type   | Description                                                                                                    |
+|--------|--------|----------------------------------------------------------------------------------------------------------------|
+|        |        | Tuple of ``(point_labels, lsh_names, lsh_label_data,                                                           |
+|        |        | item_leaf_map, tree_structure)`` ready for ``multi_level_data``.                                               |
+|        |        | *  ``point_labels`` – int32 array (N,) of bucket ids (0-based).                                                |
+|        |        | *  ``lsh_names`` – ``{cid: "Bucket <cid>"}`` placeholder names.                                                |
+|        |        | *  ``lsh_label_data`` – list of dicts with centroid x/y/z, size, cid.                                          |
+|        |        | *  ``item_leaf_map`` – int32 array (N,) mapping each item to its tree leaf ``node_id`` (before agglomeration). |
+|        |        | *  ``tree_structure`` – raw tree node list from ``idx.get_tree_structure()``.                                  |
+|        |        | Returns ``(None, {}, [], None, tree)`` when the tree has fewer than                                            |
+|        |        | two leaves.                                                                                                    |

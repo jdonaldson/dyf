@@ -1,0 +1,37 @@
+# discover_categorical_columns { #dyf.discover_categorical_columns }
+
+```python
+discover_categorical_columns(
+    df,
+    text_col='text',
+    max_cardinality=500,
+    min_cardinality=2,
+)
+```
+
+Auto-detect categorical columns from a polars DataFrame.
+
+String columns with bounded cardinality are treated as categorical
+axes. List[str] columns are coarsened via ``coarsen(strategy='first_term')``.
+High-cardinality string columns (likely free text) and the embedding
+column are skipped.
+
+
+
+## Parameters {.doc-section .doc-section-parameters}
+
+df : polars.DataFrame
+    Input dataframe.
+text_col : str
+    Name of the text column used for embedding (excluded from axes).
+max_cardinality : int
+    Columns with more unique values than this are skipped.
+min_cardinality : int
+    Columns with fewer unique values than this are skipped.
+
+
+
+## Returns {.doc-section .doc-section-returns}
+
+label_columns : dict[str, np.ndarray]
+    Mapping of column name → per-row string labels.

@@ -1,0 +1,28 @@
+# compute_sibling_keywords { #dyf.compute_sibling_keywords }
+
+```python
+compute_sibling_keywords(dag, titles, cluster_labels, n_clusters, *, top_k=8)
+```
+
+Compute contrastive TF-IDF keywords for clusters sharing tree parents.
+
+
+
+## Parameters {.doc-section .doc-section-parameters}
+
+dag : CategoryGraph
+titles : list[str]
+    Per-item title strings.
+cluster_labels : (n,) int array
+    Per-item BIRCH cluster ID.
+n_clusters : int
+    Cluster resolution.
+top_k : int
+    Keywords per cluster.
+
+
+
+## Returns {.doc-section .doc-section-returns}
+
+dict[int, list[tuple[str, float]]]
+    ``{cluster_id: [("word", score), ...]}``.

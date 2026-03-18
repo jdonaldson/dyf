@@ -107,6 +107,9 @@ def extract_fisher_labels(
 ) -> np.ndarray:
     """Extract coarse family labels from a column of values.
 
+    .. deprecated::
+        Use ``coarsen(raw_values, strategy=mode)`` from ``dyf.categorical`` instead.
+
     Parameters
     ----------
     raw_values : list or array
@@ -121,6 +124,12 @@ def extract_fisher_labels(
     -------
     labels : (n,) str array
     """
+    import warnings
+    warnings.warn(
+        "extract_fisher_labels is deprecated, use coarsen(raw_values, strategy=mode) instead",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     from dyf.categorical import coarsen
 
     return coarsen(raw_values, strategy=mode)

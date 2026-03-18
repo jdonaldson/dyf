@@ -1,0 +1,7 @@
+# tokenize { #dyf.tokenize }
+
+```python
+tokenize(text)
+```
+
+Lowercase, extract words of 3+ chars, filter stop words.

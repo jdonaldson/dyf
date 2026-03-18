@@ -1,0 +1,14 @@
+# create_provenance { #dyf.create_provenance }
+
+```python
+create_provenance(
+    artifact_type,
+    n_items,
+    source_paths,
+    params,
+    sample_seed=None,
+    sample_n=None,
+)
+```
+
+Create a provenance record for a new artifact.

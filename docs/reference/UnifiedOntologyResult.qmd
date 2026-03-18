@@ -21,15 +21,15 @@ The unified ontology combines:
 
 ## Attributes {.doc-section .doc-section-attributes}
 
-| Name              | Type                                     | Description                                            |
-|-------------------|------------------------------------------|--------------------------------------------------------|
-| ontology          | [DAGTaxonomy](`dyf.rag.DAGTaxonomy`)     | The unified DAGTaxonomy                                |
-| main_nodes        | [np](`numpy`).[ndarray](`numpy.ndarray`) | Indices of nodes from main ontology                    |
-| outlier_nodes     | [np](`numpy`).[ndarray](`numpy.ndarray`) | Indices of nodes from outlier ontology                 |
-| excluded_nodes    | [np](`numpy`).[ndarray](`numpy.ndarray`) | Indices of double outliers (excluded)                  |
-| bridge_edges      | [int](`int`)                             | Number of edges connecting main and outlier components |
-| main_threshold    | [float](`float`)                         | Similarity threshold used for main ontology            |
-| outlier_threshold | [float](`float`)                         | Similarity threshold used for outlier ontology         |
+| Name              | Type                                      | Description                                            |
+|-------------------|-------------------------------------------|--------------------------------------------------------|
+| ontology          | [DAGTaxonomy](`dyf.ontology.DAGTaxonomy`) | The unified DAGTaxonomy                                |
+| main_nodes        | [np](`numpy`).[ndarray](`numpy.ndarray`)  | Indices of nodes from main ontology                    |
+| outlier_nodes     | [np](`numpy`).[ndarray](`numpy.ndarray`)  | Indices of nodes from outlier ontology                 |
+| excluded_nodes    | [np](`numpy`).[ndarray](`numpy.ndarray`)  | Indices of double outliers (excluded)                  |
+| bridge_edges      | [int](`int`)                              | Number of edges connecting main and outlier components |
+| main_threshold    | [float](`float`)                          | Similarity threshold used for main ontology            |
+| outlier_threshold | [float](`float`)                          | Similarity threshold used for outlier ontology         |
 
 ## Methods
 

@@ -8,7 +8,6 @@ Core density classification and reporting. `DensityClassifierFull` wraps the Rus
 | | |
 | --- | --- |
 | [DensityClassifierFull](DensityClassifierFull.qmd#dyf.DensityClassifierFull) | Density Classifier using PCA-based LSH. |
-| [DensityReportFull](DensityReportFull.qmd#dyf.DensityReportFull) | Report on density classification. |
 
 ## Tree Methods
 
@@ -84,26 +83,68 @@ Analyze chunk redundancy, document spread, and cluster quality.
 | [cluster_quality](cluster_quality.qmd#dyf.cluster_quality) | Identify meta/structural clusters from neighbor coherence. |
 | [neighbor_coherence](neighbor_coherence.qmd#dyf.neighbor_coherence) | Measure how coherent each point's neighborhood is. |
 
-## I/O
-
-Save and load fitted classifiers as safetensors files.
-
-| | |
-| --- | --- |
-| [save_index](save_index.qmd#dyf.save_index) | Save a fitted classifier's index to safetensors format. |
-| [load_index](load_index.qmd#dyf.load_index) | Load a pre-computed index from safetensors format. |
-| [PrecomputedIndex](PrecomputedIndex.qmd#dyf.PrecomputedIndex) | Work with a pre-computed DYF index without the Rust classifier. |
-
 ## Lazy Index
 
-Memory-mapped tree index with FlatBuffers + Arrow IPC.
+Memory-mapped tree index with FlatBuffers + Arrow IPC. Build indexes with `write_lazy_index`, search with `LazyIndex`, and use adaptive probing for margin-aware probe counts.
+
 
 | | |
 | --- | --- |
 | [LazyIndex](LazyIndex.qmd#dyf.LazyIndex) | Memory-mapped DYF index for instant-start query serving. |
 | [write_lazy_index](write_lazy_index.qmd#dyf.write_lazy_index) | Write a DYF lazy index file (FlatBuffers tree + Arrow IPC leaf data). |
+| [rewrite_lazy_index](rewrite_lazy_index.qmd#dyf.rewrite_lazy_index) | Rewrite a .dyf file with additional stored fields and/or metadata. |
+| [split_dyf3](split_dyf3.qmd#dyf.split_dyf3) | Split a DYF3 file into chunks for transport (e.g. GitHub Pages). |
 | [from_faiss](from_faiss.qmd#dyf.from_faiss) | Build a dyf lazy index file from a FAISS IVF index. |
 | [SearchResult](SearchResult.qmd#dyf.SearchResult) | Search result with indices, scores, and optional stored fields. |
+| [AdaptiveProbeConfig](AdaptiveProbeConfig.qmd#dyf.AdaptiveProbeConfig) | Configuration for adaptive probe count based on routing margin. |
+
+## Fisher Weighting
+
+Per-dimension Fisher ratio weighting for supervised embedding refinement.
+
+| | |
+| --- | --- |
+| [compute_fisher_weights](compute_fisher_weights.qmd#dyf.compute_fisher_weights) | Compute sqrt(Fisher ratio) per dimension, L2-normalized. |
+| [apply_fisher_weights](apply_fisher_weights.qmd#dyf.apply_fisher_weights) | Multiply embeddings by per-dimension weights. |
+
+## Split Keywords
+
+TF-IDF keyword extraction from DYF tree splits. Each PCA split naturally separates vocabularies — these functions extract discriminative terms per split side without LLM calls.
+
+
+| | |
+| --- | --- |
+| [compute_split_keywords](compute_split_keywords.qmd#dyf.compute_split_keywords) | Compute discriminative TF-IDF keywords for each side of each tree split. |
+| [compute_embedding_keywords](compute_embedding_keywords.qmd#dyf.compute_embedding_keywords) | Compute discriminative keywords by projecting term embeddings onto split hyperplanes. |
+| [label_clusters_frequency](label_clusters_frequency.qmd#dyf.label_clusters_frequency) | Label clusters using TF-IDF token frequency (no LLM). |
+| [build_tree_maps](build_tree_maps.qmd#dyf.build_tree_maps) | Extract tree structure, children_map, and leaf_batches from a LazyIndex. |
+| [collect_descendant_indices](collect_descendant_indices.qmd#dyf.collect_descendant_indices) | Recursively collect all item indices under a node. |
+| [compute_domain_stopwords](compute_domain_stopwords.qmd#dyf.compute_domain_stopwords) | Words appearing in >threshold fraction of titles. Corpus-level stop words. |
+| [format_split_path](format_split_path.qmd#dyf.format_split_path) | Return the keyword path for a single item from root to leaf. |
+| [tokenize](tokenize.qmd#dyf.tokenize) | Lowercase, extract words of 3+ chars, filter stop words. |
+| [TextDiversityReport](TextDiversityReport.qmd#dyf.TextDiversityReport) | Result of text diversity assessment for a collection of titles. |
+| [assess_text_diversity](assess_text_diversity.qmd#dyf.assess_text_diversity) | Cheaply assess whether a title collection has enough diversity for LLM labeling. |
+
+## Cluster Tree
+
+Connect BIRCH spatial clusters to DYF tree nodes for deterministic cluster naming.
+
+| | |
+| --- | --- |
+| [build_cluster_tree_dag](build_cluster_tree_dag.qmd#dyf.build_cluster_tree_dag) | Build a DAG connecting BIRCH clusters to tree nodes they overlap with. |
+| [compute_sibling_keywords](compute_sibling_keywords.qmd#dyf.compute_sibling_keywords) | Compute contrastive TF-IDF keywords for clusters sharing tree parents. |
+| [derive_path_labels](derive_path_labels.qmd#dyf.derive_path_labels) | Derive deterministic path labels for each cluster from the DAG. |
+| [format_cluster_context](format_cluster_context.qmd#dyf.format_cluster_context) | Format cluster context for an LLM labeling prompt. |
+
+## Agglomeration
+
+Merge DYF tree leaves into coarser groups via linkage or community detection.
+
+| | |
+| --- | --- |
+| [agglomerate_tree_leaves](agglomerate_tree_leaves.qmd#dyf.agglomerate_tree_leaves) | Agglomerate DYF tree leaves into ~n_groups using embedding centroids. |
+| [louvain_cluster_leaves](louvain_cluster_leaves.qmd#dyf.louvain_cluster_leaves) | Cluster tree leaves via centroid KNN + Louvain community detection. |
+| [merge_to_max_k](merge_to_max_k.qmd#dyf.merge_to_max_k) | Merge communities to ≤max_k using complete linkage on community centroids. |
 
 ## Categorical
 
@@ -116,6 +157,35 @@ Hierarchical taxonomy graphs, label coarsening, and multi-level Fisher weighting
 | [multi_level_fisher_weights](multi_level_fisher_weights.qmd#dyf.multi_level_fisher_weights) | Compute Fisher weights averaged across multiple DAG depths. |
 | [store_category_graph](store_category_graph.qmd#dyf.store_category_graph) | Serialize a CategoryGraph for .dyf metadata. |
 | [load_category_graphs](load_category_graphs.qmd#dyf.load_category_graphs) | Deserialize CategoryGraphs from .dyf metadata. |
+| [AxisDiagnostic](AxisDiagnostic.qmd#dyf.AxisDiagnostic) | Diagnostic result for a single categorical axis. |
+| [diagnose_axes](diagnose_axes.qmd#dyf.diagnose_axes) | Detect which categorical axes are under-served by the embedding. |
+| [diagnostics_to_metadata](diagnostics_to_metadata.qmd#dyf.diagnostics_to_metadata) | Serialize axis diagnostics for .dyf metadata. |
+| [discover_categorical_columns](discover_categorical_columns.qmd#dyf.discover_categorical_columns) | Auto-detect categorical columns from a polars DataFrame. |
+| [embed_with_diagnostics](embed_with_diagnostics.qmd#dyf.embed_with_diagnostics) | Two-pass embedding with axis diagnostics. |
+
+## Colors
+
+Deterministic color assignment for spatial clusters.
+
+| | |
+| --- | --- |
+| [spatial_rgb_map](spatial_rgb_map.qmd#dyf.spatial_rgb_map) | Return dict mapping label -> [r, g, b] with spatially coherent hues. |
+| [spatial_color_map](spatial_color_map.qmd#dyf.spatial_color_map) | Return dict mapping label -> hex color with spatially coherent hues. |
+| [tree_rgb_map](tree_rgb_map.qmd#dyf.tree_rgb_map) | Assign colors by DFS leaf order of the DYF tree. |
+
+## Provenance
+
+Artifact identity fingerprinting for DAG-oriented pipelines.
+
+| | |
+| --- | --- |
+| [Provenance](Provenance.qmd#dyf.Provenance) | Identity fingerprint for a pipeline artifact. |
+| [create_provenance](create_provenance.qmd#dyf.create_provenance) | Create a provenance record for a new artifact. |
+| [file_hash](file_hash.qmd#dyf.file_hash) | Fast partial hash: first 64 KB + file size + mtime. |
+| [params_hash](params_hash.qmd#dyf.params_hash) | Deterministic hash of sorted JSON-serialized params. |
+| [check_compatible](check_compatible.qmd#dyf.check_compatible) | Check if an upstream artifact is compatible with the current pipeline. |
+| [provenance_to_dict](provenance_to_dict.qmd#dyf.provenance_to_dict) | JSON-serializable dict. |
+| [provenance_from_dict](provenance_from_dict.qmd#dyf.provenance_from_dict) | Reconstruct from dict. |
 
 ## Configuration
 

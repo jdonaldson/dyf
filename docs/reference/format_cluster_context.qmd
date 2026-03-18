@@ -1,0 +1,31 @@
+# format_cluster_context { #dyf.format_cluster_context }
+
+```python
+format_cluster_context(
+    cluster_id,
+    path_label,
+    sibling_keywords,
+    sibling_labels=None,
+)
+```
+
+Format cluster context for an LLM labeling prompt.
+
+
+
+## Parameters {.doc-section .doc-section-parameters}
+
+cluster_id : int
+path_label : str
+    From ``derive_path_labels()``.
+sibling_keywords : list[tuple[str, float]]
+    From ``compute_sibling_keywords()``.
+sibling_labels : dict[int, str] or None
+    Labels of sibling clusters (for disambiguation context).
+
+
+
+## Returns {.doc-section .doc-section-returns}
+
+str
+    Formatted context string.

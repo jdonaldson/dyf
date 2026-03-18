@@ -104,7 +104,6 @@ except ImportError:
 from .fisher import (
     compute_fisher_weights,
     apply_fisher_weights,
-    extract_fisher_labels,
 )
 
 # Categorical DAG
@@ -121,14 +120,8 @@ from .categorical import (
     load_category_graphs,
 )
 
-# CatalogSpace (multi-catalog matching)
-from .catalog import (
-    CatalogConfig,
-    CatalogMatch,
-    CatalogSpace,
-    CrossMapping,
-    JointMatchResult,
-)
+# CatalogSpace — available via dyf.catalog (not re-exported)
+from . import catalog  # noqa: F401
 
 # Split-based tree keywords
 from .splits import (
@@ -153,13 +146,13 @@ from .cluster_tree import (
 )
 
 # Tree-leaf agglomeration
-from .agglomerate import agglomerate_tree_leaves, louvain_cluster_leaves, merge_to_max_k, LouvainHierarchy
+from .agglomerate import agglomerate_tree_leaves, louvain_cluster_leaves, merge_to_max_k
 
 # Spatial cluster coloring
 from .colors import spatial_rgb_map, spatial_color_map, tree_rgb_map
 
-# Pipeline DAG runner
-from .pipeline import Pipeline, Stage
+# Pipeline DAG runner — available via dyf.pipeline (not re-exported)
+from . import pipeline  # noqa: F401
 
 # Provenance tracking
 from .provenance import (
@@ -172,19 +165,8 @@ from .provenance import (
     provenance_from_dict,
 )
 
-# Concept graph
-from .concept_graph import (
-    ConceptGraphConfig,
-    ConceptNode,
-    MarkdownChunk,
-    build_concept_graph,
-    chunk_markdown,
-    fuzzy_match,
-    load_graph,
-    save_graph,
-    semantic_search,
-    check_staleness,
-)
+# Concept graph — available via dyf.concept_graph (not re-exported)
+from . import concept_graph  # noqa: F401
 
 # Re-ranking
 from .rerank import (
@@ -291,7 +273,7 @@ __all__ = [
     # Fisher dimension weighting
     "compute_fisher_weights",
     "apply_fisher_weights",
-    "extract_fisher_labels",
+    # extract_fisher_labels — deprecated, use coarsen() directly
     # Categorical DAG
     "AxisDiagnostic",
     "CategoryGraph",
@@ -303,12 +285,7 @@ __all__ = [
     "multi_level_fisher_weights",
     "store_category_graph",
     "load_category_graphs",
-    # CatalogSpace
-    "CatalogConfig",
-    "CatalogMatch",
-    "CatalogSpace",
-    "CrossMapping",
-    "JointMatchResult",
+    # CatalogSpace — internal/experimental, import directly from dyf.catalog
     # Split-based tree keywords
     "TextDiversityReport",
     "assess_text_diversity",
@@ -329,13 +306,12 @@ __all__ = [
     "agglomerate_tree_leaves",
     "louvain_cluster_leaves",
     "merge_to_max_k",
-    "LouvainHierarchy",
+    # LouvainHierarchy — internal type, import directly from dyf.agglomerate
     # Spatial cluster coloring
     "spatial_rgb_map",
     "spatial_color_map",
-    # Pipeline DAG runner
-    "Pipeline",
-    "Stage",
+    "tree_rgb_map",
+    # Pipeline DAG runner — internal/experimental, import directly from dyf.pipeline
     # Provenance tracking
     "Provenance",
     "file_hash",
@@ -349,17 +325,7 @@ __all__ = [
     "rerank_mmr",
     "rerank_bridge_boost",
     "rerank_bridge_mmr",
-    # Concept graph
-    "ConceptGraphConfig",
-    "ConceptNode",
-    "MarkdownChunk",
-    "build_concept_graph",
-    "chunk_markdown",
-    "fuzzy_match",
-    "load_graph",
-    "save_graph",
-    "semantic_search",
-    "check_staleness",
+    # Concept graph — dev tooling, import directly from dyf.concept_graph
 ]
 
 def check_rust_available():

@@ -1,0 +1,14 @@
+# TextDiversityReport { #dyf.TextDiversityReport }
+
+```python
+TextDiversityReport(
+    unique_token_count,
+    token_item_ratio,
+    unique_title_ratio,
+    n_items,
+    is_diverse,
+    reason,
+)
+```
+
+Result of text diversity assessment for a collection of titles.

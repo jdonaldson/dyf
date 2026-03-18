@@ -103,7 +103,8 @@ def enrich_project(dyf_path, n_components=3, densmap=False, output_path=None,
     # Optional Fisher dimension weighting
     fisher_weights = None
     if fisher_col:
-        from dyf.fisher import extract_fisher_labels, compute_fisher_weights, apply_fisher_weights
+        from dyf.fisher import compute_fisher_weights, apply_fisher_weights
+        from dyf.categorical import coarsen
         import polars as pl
 
         if fisher_parquet:
@@ -122,7 +123,7 @@ def enrich_project(dyf_path, n_components=3, densmap=False, output_path=None,
             raw_vals = None
 
         if raw_vals is not None:
-            fisher_labels = extract_fisher_labels(raw_vals)
+            fisher_labels = coarsen(raw_vals)
             fisher_weights = compute_fisher_weights(embeddings, fisher_labels)
             embeddings = apply_fisher_weights(embeddings, fisher_weights)
             print(f"  Fisher weighting applied ({fisher_col}): "
