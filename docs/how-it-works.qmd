@@ -41,16 +41,55 @@ Average the embeddings in each bucket. These centroids are a compressed view of 
 
 ### Step 3: PCA on centroids
 
-Run PCA on the centroids to find the directions along which they vary most. These principal components become the new hyperplanes — data-adaptive, not random. They cut along the natural seams in your data.
+Run PCA on the *centroids*, not the full dataset. This is the key move — centroids are a small matrix (hundreds of rows, not millions), so PCA is fast. And because each centroid represents a cluster of similar items, the principal components capture the directions that *separate* clusters. These become the new hyperplanes.
 
 ### Step 4: Re-hash
 
-Project all embeddings onto the learned hyperplanes. Now the buckets reflect actual semantic regions rather than arbitrary splits.
+Project all embeddings onto the learned hyperplanes using the same sign-bit scheme. Now the buckets reflect actual semantic regions rather than arbitrary splits.
 
 ::: {.callout-tip}
 ## Key insight
 DYF uses randomness to *discover* structure, then learns from it. The final hyperplanes aren't random — they're fit to your data.
 :::
+
+### How the hash works: sign-bit LSH
+
+Each hyperplane is a unit vector in embedding space. To assign an item to a bucket, DYF computes the dot product of the embedding with each hyperplane and takes the sign:
+
+- Positive dot product → bit = 1 (item is on the "positive" side)
+- Negative dot product → bit = 0 (item is on the "negative" side)
+
+The bits from all hyperplanes are packed into a single integer — the **bucket ID**. With 3 hyperplanes, each item gets a 3-bit ID (0–7). Items that share a bucket ID are on the same side of every hyperplane, meaning they're in the same region of the space.
+
+```{mermaid}
+%%| fig-width: 8
+flowchart LR
+    E["Embedding"] --> D1["dot with h1<br/>→ positive → 1"]
+    E --> D2["dot with h2<br/>→ negative → 0"]
+    E --> D3["dot with h3<br/>→ positive → 1"]
+    D1 --> ID["bucket = 101₂ = 5"]
+    D2 --> ID
+    D3 --> ID
+
+    style E stroke:#4a6fa5,stroke-width:2
+    style ID stroke:#2d8a2d,stroke-width:2
+```
+
+This is a form of **Locality Sensitive Hashing** (LSH) — nearby embeddings are likely to land in the same bucket because they'll be on the same side of most hyperplanes. What makes DYF different from standard random-projection LSH is the second pass: the hyperplanes are learned from the data's own structure via PCA, so the splits align with natural cluster boundaries instead of arbitrary directions.
+
+### Improving the hash: ITQ rotation
+
+The sign function is lossy — embeddings near a decision boundary can flip to the wrong side. **Iterative Quantization** (ITQ) reduces this loss by learning a rotation matrix that aligns the PCA projections with the sign thresholds.
+
+The idea: after PCA, the projections are continuous values. ITQ finds a rotation that makes those values as far from zero as possible — pushing them away from the decision boundary before the sign function is applied. This typically improves recall by 5–12% with minimal extra build cost.
+
+```python
+# Standard PCA-based hash
+classifier.fit(embeddings)
+
+# ITQ-refined hash (better quantization)
+classifier.fit_itq(embeddings)
+```
 
 ## What the Metrics Tell You
 
