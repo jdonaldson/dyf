@@ -99,6 +99,12 @@ def main(argv=None):
     p_reann.add_argument("dyf_path", help="Path to .dyf file")
     p_reann.add_argument("-o", "--output", default=None)
 
+    # scaffold
+    p_scaffold = subparsers.add_parser(
+        "scaffold", help="Pre-compute LLM scaffold (no LLM needed)")
+    p_scaffold.add_argument("dyf_path", help="Path to .dyf file")
+    p_scaffold.add_argument("-o", "--output", default=None)
+
     # audio
     p_audio = subparsers.add_parser(
         "audio", help="Generate Kokoro TTS audio for tour narration")
@@ -164,6 +170,10 @@ def main(argv=None):
                     target_depth=args.depth,
                     samples_per_child=args.samples,
                     output_path=args.output)
+
+    elif args.command == "scaffold":
+        from ._scaffold import enrich_scaffold
+        enrich_scaffold(args.dyf_path, output_path=args.output)
 
     elif args.command == "audio":
         from ._audio import generate_tour_audio
