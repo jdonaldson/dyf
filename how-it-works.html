@@ -398,14 +398,14 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 <p></p><figure class="figure"><p></p>
 <div>
 <pre class="mermaid mermaid-js">flowchart LR
-    A["**Step 1**\nRandom\nhyperplanes"] --&gt; B["**Step 2**\nCompute bucket\ncentroids"]
-    B --&gt; C["**Step 3**\nPCA on\ncentroids"]
-    C --&gt; D["**Step 4**\nRe-hash with\nlearned planes"]
+    A["&lt;b&gt;Step 1&lt;/b&gt;&lt;br/&gt;Random&lt;br/&gt;hyperplanes"] --&gt; B["&lt;b&gt;Step 2&lt;/b&gt;&lt;br/&gt;Compute bucket&lt;br/&gt;centroids"]
+    B --&gt; C["&lt;b&gt;Step 3&lt;/b&gt;&lt;br/&gt;PCA on&lt;br/&gt;centroids"]
+    C --&gt; D["&lt;b&gt;Step 4&lt;/b&gt;&lt;br/&gt;Re-hash with&lt;br/&gt;learned planes"]
 
-    style A fill:#f0f4ff,stroke:#4a6fa5
-    style B fill:#f0f4ff,stroke:#4a6fa5
-    style C fill:#fff4e6,stroke:#c47f17
-    style D fill:#e6ffe6,stroke:#2d8a2d
+    style A stroke:#4a6fa5,stroke-width:2
+    style B stroke:#4a6fa5,stroke-width:2
+    style C stroke:#c47f17,stroke-width:2
+    style D stroke:#2d8a2d,stroke-width:2
 </pre>
 </div>
 <p></p></figure><p></p>
@@ -508,30 +508,30 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 <p></p><figure class="figure"><p></p>
 <div>
 <pre class="mermaid mermaid-js">flowchart TD
-    subgraph dense["**Dense**"]
+    subgraph dense ["Dense"]
         direction TB
         D1["Large bucket"]
         D2["High centroid similarity"]
         D3["Core of a topic"]
     end
 
-    subgraph bridge["**Bridge**"]
+    subgraph bridge ["Bridge"]
         direction TB
-        B1["Changes buckets\nunder perturbation"]
+        B1["Changes buckets&lt;br/&gt;under perturbation"]
         B2["Low stability score"]
         B3["Connects two regions"]
     end
 
-    subgraph orphan["**Orphan**"]
+    subgraph orphan ["Orphan"]
         direction TB
         O1["Small bucket"]
         O2["High isolation"]
         O3["Genuinely unique"]
     end
 
-    style dense fill:#e6ffe6,stroke:#2d8a2d
-    style bridge fill:#fff4e6,stroke:#c47f17
-    style orphan fill:#ffe6e6,stroke:#c44a4a
+    style dense stroke:#2d8a2d,stroke-width:2
+    style bridge stroke:#c47f17,stroke-width:2
+    style orphan stroke:#c44a4a,stroke-width:2
 </pre>
 </div>
 <p></p></figure><p></p>
@@ -554,21 +554,21 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 <p></p><figure class="figure"><p></p>
 <div>
 <pre class="mermaid mermaid-js">graph TD
-    R["Root\n10,000 items\n3 bits → 8 buckets"] --&gt; A["Bucket 0\n2,100 items"]
-    R --&gt; B["Bucket 1\n1,800 items"]
+    R["Root&lt;br/&gt;10,000 items&lt;br/&gt;3 bits → 8 buckets"] --&gt; A["Bucket 0&lt;br/&gt;2,100 items"]
+    R --&gt; B["Bucket 1&lt;br/&gt;1,800 items"]
     R --&gt; C["..."]
-    R --&gt; D["Bucket 7\n900 items"]
+    R --&gt; D["Bucket 7&lt;br/&gt;900 items"]
 
-    A --&gt; A1["Sub-bucket 0\n450 items"]
-    A --&gt; A2["Sub-bucket 1\n380 items"]
+    A --&gt; A1["Sub-bucket 0&lt;br/&gt;450 items"]
+    A --&gt; A2["Sub-bucket 1&lt;br/&gt;380 items"]
     A --&gt; A3["..."]
 
-    style R fill:#f0f4ff,stroke:#4a6fa5
-    style A fill:#e6ffe6,stroke:#2d8a2d
-    style B fill:#e6ffe6,stroke:#2d8a2d
-    style D fill:#e6ffe6,stroke:#2d8a2d
-    style A1 fill:#fff4e6,stroke:#c47f17
-    style A2 fill:#fff4e6,stroke:#c47f17
+    style R stroke:#4a6fa5,stroke-width:2
+    style A stroke:#2d8a2d,stroke-width:2
+    style B stroke:#2d8a2d,stroke-width:2
+    style D stroke:#2d8a2d,stroke-width:2
+    style A1 stroke:#c47f17,stroke-width:2
+    style A2 stroke:#c47f17,stroke-width:2
 </pre>
 </div>
 <p></p></figure><p></p>
@@ -595,17 +595,17 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 <p></p><figure class="figure"><p></p>
 <div>
 <pre class="mermaid mermaid-js">flowchart LR
-    Q["Query\nembedding"] --&gt; H["Hash through\ntree"]
-    H --&gt; L["Find matching\nleaf bucket"]
-    L --&gt; S["Score embeddings\nin leaf"]
-    S --&gt; R["Return\ntop-k"]
+    Q["Query&lt;br/&gt;embedding"] --&gt; H["Hash through&lt;br/&gt;tree"]
+    H --&gt; L["Find matching&lt;br/&gt;leaf bucket"]
+    L --&gt; S["Score embeddings&lt;br/&gt;in leaf"]
+    S --&gt; R["Return&lt;br/&gt;top-k"]
 
-    H -.-&gt;|"near boundary?"| P["Probe\nadditional leaves"]
+    H -.-&gt;|"near boundary?"| P["Probe&lt;br/&gt;additional leaves"]
     P --&gt; S
 
-    style Q fill:#f0f4ff,stroke:#4a6fa5
-    style R fill:#e6ffe6,stroke:#2d8a2d
-    style P fill:#fff4e6,stroke:#c47f17
+    style Q stroke:#4a6fa5,stroke-width:2
+    style R stroke:#2d8a2d,stroke-width:2
+    style P stroke:#c47f17,stroke-width:2
 </pre>
 </div>
 <p></p></figure><p></p>
