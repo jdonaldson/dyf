@@ -63,22 +63,43 @@ bridges = classifier.get_bridge()  # Transitional items
 orphans = classifier.get_orphans() # Unique items
 ```
 
-### Save & Load Pre-computed Indexes
+### Build & Search Indexes
 
 ```python
-from dyf import save_index, PrecomputedIndex
+from dyf import build_dyf_tree, write_lazy_index, LazyIndex
 
-# Save (includes embeddings + metadata)
-save_index(classifier, 'index.safetensors', embeddings,
-           metadata={'model': 'all-MiniLM-L6-v2', 'created': '2026-01-12'})
+# Build tree from embeddings
+tree = build_dyf_tree(embeddings, max_depth=4, num_bits=3, min_leaf_size=8)
 
-# Load (no dyf-rs dependency needed!)
-index = PrecomputedIndex.load('index.safetensors')
-print(index.version)  # Check what version created this
-print(index.metadata)  # All metadata
+# Write to disk (mmap-friendly, zero startup cost)
+write_lazy_index(tree, embeddings, "index.dyf",
+                 quantization="float16", compression="zstd",
+                 stored_fields={"title": titles},
+                 metadata={"model": "nomic-embed-text-v1.5"})
 
-dense_items = index.get_dense()
-bucket_5 = index.get_bucket(5)
+# Search (instant open, LRU-cached leaf access)
+with LazyIndex("index.dyf") as idx:
+    result = idx.search(query_embedding, k=10, nprobe=3)
+    print(result.indices, result.scores)
+    print(result.fields["title"])  # stored fields returned with results
+```
+
+### Adaptive Probing
+
+Queries near decision boundaries automatically probe more leaves:
+
+```python
+from dyf import LazyIndex, AdaptiveProbeConfig
+
+with LazyIndex("index.dyf") as idx:
+    # Auto mode: margin-based probe count (default thresholds)
+    result = idx.search(query, k=10, nprobe="auto", return_routing=True)
+    print(result.routing["adaptive_nprobe"])  # how many leaves were probed
+
+    # Custom thresholds
+    cfg = AdaptiveProbeConfig(margin_lo=0.005, margin_hi=0.2,
+                              min_probes=1, max_probes=8)
+    result = idx.search(query, k=10, nprobe=cfg)
 ```
 
 ### Full-Featured Usage
@@ -138,24 +159,25 @@ classifier.get_bucket_id(idx)    # Which bucket is item in?
 classifier.report()              # Summary statistics
 ```
 
-### Index Serialization
+### LazyIndex
 
 ```python
-from dyf import save_index, load_index, PrecomputedIndex
+from dyf import LazyIndex
 
-# Save fitted classifier
-save_index(classifier, 'index.safetensors', embeddings, metadata={...})
+with LazyIndex("index.dyf") as idx:
+    # Search with fixed or adaptive probing
+    result = idx.search(query, k=10, nprobe=3)       # fixed
+    result = idx.search(query, k=10, nprobe="auto")   # adaptive
 
-# Load as dict
-data = load_index('index.safetensors')
-data, metadata = load_index('index.safetensors', include_metadata=True)
+    # Inspect index structure
+    idx.tree_summary          # metadata, dims, leaf count
+    idx.total_items           # total indexed items
+    idx.stored_field_names    # available stored fields
 
-# Load as object (recommended)
-index = PrecomputedIndex.load('index.safetensors')
-index.get_dense()
-index.get_bucket(5)
-index.metadata
-index.version
+    # Extract all data
+    data = idx.extract_all_fields()
+    data['embeddings']        # (n, d) float32
+    data['fields']            # {field_name: array}
 ```
 
 ## Documentation

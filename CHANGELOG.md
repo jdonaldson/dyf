@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.8.0
+
+DYF3 chunked format, adaptive search, and embedding-optional indexes.
+
+### Added
+
+- **DYF3 chunked format** — new file format version with 32-byte header supporting chunked transport for CDN/GitHub Pages hosting. `split_dyf3()` splits large `.dyf` files into <95MB chunks that reassemble transparently on load. JS reader (`dyf_reader.mjs`) and viz server updated for DYF3.
+- **Embedding-optional indexes** — `write_lazy_index(embeddings=None)` creates viz-only `.dyf` files without embedding vectors, preserving tree centroids for structure while dropping bulk data. `rewrite_lazy_index(drop_embeddings=True)` strips embeddings from existing files.
+- **Adaptive probing** — `LazyIndex.search(nprobe="auto")` dynamically adjusts probe count based on routing margin. Confident queries (large margins) probe fewer leaves; uncertain queries (small margins) probe more. Achieves ~90% recall at ~70% of uniform 3-probe cost. Configurable via `AdaptiveProbeConfig(margin_lo, margin_hi, min_probes, max_probes)`.
+- **Enrich scaffold CLI** — `dyf enrich scaffold` pre-computes LLM scaffold data (cluster structure, keyword extraction) without requiring an LLM call.
+- **Routing diagnostics** — `search(return_routing=True)` now includes `min_margin` (minimum projection margin on primary path). Adaptive mode adds `adaptive_nprobe` and `nprobe_mode`.
+
+### API Changes
+
+- `search()` `nprobe` parameter accepts `int`, `"auto"`, or `AdaptiveProbeConfig`
+- `write_lazy_index()` gains `format_version` (1/2/3) and `embedding_dim` parameters
+- `rewrite_lazy_index()` gains `drop_embeddings` and `format_version` parameters
+- `AdaptiveProbeConfig`, `split_dyf3` added to public API exports
+
+## 0.7.4
+
+- Default `num_stability_seeds` to 0 (off) for 3-4x `fit()` speedup
+
+## 0.7.3
+
+- Require `dyf-rs>=0.6.0` for `ComputeBackend` support
+
 ## 0.6.2
 
 ### Added

@@ -1,5 +1,11 @@
 # DYF Project Notes
 
+## Release Workflow
+
+When adding features or making API changes:
+1. **CHANGELOG.md** — add entry under current version (or new `## Unreleased` section)
+2. **README.md** — update if the feature touches Quick Start, API examples, or installation
+
 ## Visualization Development Pattern
 
 The pydeck visualizations use a WebSocket bridge for live control:
