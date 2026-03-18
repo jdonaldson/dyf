@@ -18,6 +18,8 @@ website:
         text: Home
       - href: getting-started.qmd
         text: Getting Started
+      - href: how-it-works.qmd
+        text: How It Works
       - href: reference/index.qmd
         text: API Reference
     right:

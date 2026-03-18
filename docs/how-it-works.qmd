@@ -1,0 +1,208 @@
+---
+title: "How DYF Works"
+---
+
+DYF discovers structure in embedding spaces — dense clusters, bridge connections, and orphan outliers — without requiring you to choose the number of clusters. This page explains the algorithm, the metrics, and the tools built on top of them.
+
+## The Problem
+
+Embedding models turn text, images, or other data into high-dimensional vectors. Similar items end up near each other, but the *structure* of that space — where the clusters are, what connects them, which items are truly unique — is invisible. You have a cloud of points and no map.
+
+Traditional clustering forces choices. k-means requires picking k upfront, and the result is just a partition — it doesn't tell you which items are central to their cluster, which ones sit between clusters, or which ones don't belong anywhere. HDBSCAN handles variable-density clusters but scales poorly and still gives you a flat labeling.
+
+DYF takes a different approach. Instead of assigning every point to exactly one cluster, it characterizes each point's *role* in the space: **Dense** (core member of a region), **Bridge** (connector between regions), or **Orphan** (genuinely unique). It does this without choosing k, and it reveals the topology of your data — not just its partitions.
+
+## The Algorithm: Four Steps
+
+DYF uses a two-pass approach: start with random structure, then learn from it.
+
+```{mermaid}
+%%| fig-width: 8
+flowchart LR
+    A["**Step 1**\nRandom\nhyperplanes"] --> B["**Step 2**\nCompute bucket\ncentroids"]
+    B --> C["**Step 3**\nPCA on\ncentroids"]
+    C --> D["**Step 4**\nRe-hash with\nlearned planes"]
+
+    style A fill:#f0f4ff,stroke:#4a6fa5
+    style B fill:#f0f4ff,stroke:#4a6fa5
+    style C fill:#fff4e6,stroke:#c47f17
+    style D fill:#e6ffe6,stroke:#2d8a2d
+```
+
+### Step 1: Random bucketing
+
+Throw random hyperplanes through the embedding space. Each hyperplane splits the space in two — items on the same side of *all* hyperplanes land in the same bucket. With 3 hyperplanes you get up to 8 buckets, with 6 you get up to 64.
+
+This is fast but noisy. The hyperplanes don't know anything about your data's structure.
+
+### Step 2: Compute centroids
+
+Average the embeddings in each bucket. These centroids are a compressed view of how the data is distributed — a rough sketch of its topology.
+
+### Step 3: PCA on centroids
+
+Run PCA on the centroids to find the directions along which they vary most. These principal components become the new hyperplanes — data-adaptive, not random. They cut along the natural seams in your data.
+
+### Step 4: Re-hash
+
+Project all embeddings onto the learned hyperplanes. Now the buckets reflect actual semantic regions rather than arbitrary splits.
+
+::: {.callout-tip}
+## Key insight
+DYF uses randomness to *discover* structure, then learns from it. The final hyperplanes aren't random — they're fit to your data.
+:::
+
+## What the Metrics Tell You
+
+After fitting, DYF computes per-item metrics that characterize each point's role:
+
+| Metric | What it means | Analogy |
+|--------|--------------|---------|
+| `bucket_id` | Which region this item belongs to | Which neighborhood you live in |
+| `bucket_size` | How many items share this bucket | How many neighbors you have |
+| `centroid_similarity` | Cosine similarity to bucket centroid | How central you are (1 = city center, 0 = edge of town) |
+| `isolation_score` | Distance to nearest item outside the bucket | How different you are from everyone around you |
+| `stability_score` | Fraction of reruns where this item stays in the same bucket | If we redrew the map, would you stay put? |
+
+```python
+from dyf import DensityClassifier
+import numpy as np
+
+classifier = DensityClassifier(embedding_dim=384)
+classifier.fit(embeddings)
+
+bucket_ids = classifier.get_bucket_ids()
+bucket_sizes = classifier.get_bucket_sizes()
+centroid_sims = classifier.get_centroid_similarities()
+isolation = classifier.get_isolation_scores()
+stability = classifier.get_stability_scores()
+```
+
+## Dense, Bridge, Orphan
+
+DYF classifies every item into one of three roles based on its metrics:
+
+```{mermaid}
+%%| fig-width: 8
+flowchart TD
+    subgraph dense["**Dense**"]
+        direction TB
+        D1["Large bucket"]
+        D2["High centroid similarity"]
+        D3["Core of a topic"]
+    end
+
+    subgraph bridge["**Bridge**"]
+        direction TB
+        B1["Changes buckets\nunder perturbation"]
+        B2["Low stability score"]
+        B3["Connects two regions"]
+    end
+
+    subgraph orphan["**Orphan**"]
+        direction TB
+        O1["Small bucket"]
+        O2["High isolation"]
+        O3["Genuinely unique"]
+    end
+
+    style dense fill:#e6ffe6,stroke:#2d8a2d
+    style bridge fill:#fff4e6,stroke:#c47f17
+    style orphan fill:#ffe6e6,stroke:#c44a4a
+```
+
+**Dense** items sit in large buckets with high centroid similarity. They're the core members of a semantic region — the papers that are clearly *about* machine learning, the products that are obviously *kitchen appliances*.
+
+**Bridge** items are unstable under perturbation. If you re-run the classifier with slightly different hyperplanes, they change buckets. This means they sit near a decision boundary — a paper about "ML for medical imaging" bridges the ML cluster and the Medicine cluster. Bridges reveal the *connections* in your data's topology.
+
+**Orphan** items land in small buckets with high isolation scores. They're genuinely unlike everything else — not noise, but unique.
+
+```python
+dense_indices = classifier.get_dense()
+bridge_indices = classifier.get_bridge()
+orphan_indices = classifier.get_orphans()
+```
+
+## Going Deeper: The DYF Tree
+
+One level of bucketing captures coarse structure. For finer resolution, DYF builds a tree: fit a `DensityClassifier` at each node, then recurse into each bucket.
+
+```{mermaid}
+%%| fig-width: 8
+graph TD
+    R["Root\n10,000 items\n3 bits → 8 buckets"] --> A["Bucket 0\n2,100 items"]
+    R --> B["Bucket 1\n1,800 items"]
+    R --> C["..."]
+    R --> D["Bucket 7\n900 items"]
+
+    A --> A1["Sub-bucket 0\n450 items"]
+    A --> A2["Sub-bucket 1\n380 items"]
+    A --> A3["..."]
+
+    style R fill:#f0f4ff,stroke:#4a6fa5
+    style A fill:#e6ffe6,stroke:#2d8a2d
+    style B fill:#e6ffe6,stroke:#2d8a2d
+    style D fill:#e6ffe6,stroke:#2d8a2d
+    style A1 fill:#fff4e6,stroke:#c47f17
+    style A2 fill:#fff4e6,stroke:#c47f17
+```
+
+Each level re-fits PCA to the *local* data at that node. This means deeper levels discover structure *within* clusters — sub-topics that wouldn't be visible at the top level. With `num_bits=3`, each node splits up to 8 ways, so a tree of depth 4 can produce up to 4,096 leaf buckets.
+
+```python
+from dyf import build_dyf_tree
+
+tree = build_dyf_tree(
+    embeddings,
+    max_depth=4,
+    num_bits=3,
+    min_leaf_size=8,
+    fit_method="itq",  # ITQ gives +5-12% recall over raw PCA
+)
+```
+
+## From Tree to Search Index
+
+The DYF tree can be serialized to a `.dyf` file for fast approximate nearest neighbor search.
+
+```{mermaid}
+%%| fig-width: 8
+flowchart LR
+    Q["Query\nembedding"] --> H["Hash through\ntree"]
+    H --> L["Find matching\nleaf bucket"]
+    L --> S["Score embeddings\nin leaf"]
+    S --> R["Return\ntop-k"]
+
+    H -.->|"near boundary?"| P["Probe\nadditional leaves"]
+    P --> S
+
+    style Q fill:#f0f4ff,stroke:#4a6fa5
+    style R fill:#e6ffe6,stroke:#2d8a2d
+    style P fill:#fff4e6,stroke:#c47f17
+```
+
+**Zero startup cost**: metadata lives in a small header; embeddings stay on disk (memory-mapped) until a query actually needs them. Opening a `.dyf` file is instant regardless of index size.
+
+**Adaptive probing**: when a query embedding is close to a decision boundary (low margin on a hyperplane), the search automatically checks neighboring leaves. This trades a small amount of speed for significantly better recall on ambiguous queries.
+
+```python
+from dyf import write_lazy_index, LazyIndex
+
+# Build and write index
+write_lazy_index(
+    tree, embeddings, "index.dyf",
+    quantization="float16",
+    stored_fields={"title": titles},
+)
+
+# Search
+with LazyIndex("index.dyf") as idx:
+    result = idx.search(query_embedding, k=10, nprobe="auto")
+    print(result.indices, result.scores)
+    print(result.fields["title"])
+```
+
+## Next Steps
+
+- **[Getting Started](getting-started.qmd)** — hands-on code recipes
+- **[API Reference](reference/index.qmd)** — full documentation for all classes and functions
