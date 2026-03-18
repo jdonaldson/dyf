@@ -1548,6 +1548,62 @@
     ]
   },
   {
+    "objectID": "how-it-works.html",
+    "href": "how-it-works.html",
+    "title": "How DYF Works",
+    "section": "",
+    "text": "DYF discovers structure in embedding spaces — dense clusters, bridge connections, and orphan outliers — without requiring you to choose the number of clusters. This page explains the algorithm, the metrics, and the tools built on top of them."
+  },
+  {
+    "objectID": "how-it-works.html#the-problem",
+    "href": "how-it-works.html#the-problem",
+    "title": "How DYF Works",
+    "section": "The Problem",
+    "text": "The Problem\nEmbedding models turn text, images, or other data into high-dimensional vectors. Similar items end up near each other, but the structure of that space — where the clusters are, what connects them, which items are truly unique — is invisible. You have a cloud of points and no map.\nTraditional clustering forces choices. k-means requires picking k upfront, and the result is just a partition — it doesn’t tell you which items are central to their cluster, which ones sit between clusters, or which ones don’t belong anywhere. HDBSCAN handles variable-density clusters but scales poorly and still gives you a flat labeling.\nDYF takes a different approach. Instead of assigning every point to exactly one cluster, it characterizes each point’s role in the space: Dense (core member of a region), Bridge (connector between regions), or Orphan (genuinely unique). It does this without choosing k, and it reveals the topology of your data — not just its partitions."
+  },
+  {
+    "objectID": "how-it-works.html#the-algorithm-four-steps",
+    "href": "how-it-works.html#the-algorithm-four-steps",
+    "title": "How DYF Works",
+    "section": "The Algorithm: Four Steps",
+    "text": "The Algorithm: Four Steps\nDYF uses a two-pass approach: start with random structure, then learn from it.\n\n\n\n\n\nflowchart LR\n    A[\"**Step 1**\\nRandom\\nhyperplanes\"] --&gt; B[\"**Step 2**\\nCompute bucket\\ncentroids\"]\n    B --&gt; C[\"**Step 3**\\nPCA on\\ncentroids\"]\n    C --&gt; D[\"**Step 4**\\nRe-hash with\\nlearned planes\"]\n\n    style A fill:#f0f4ff,stroke:#4a6fa5\n    style B fill:#f0f4ff,stroke:#4a6fa5\n    style C fill:#fff4e6,stroke:#c47f17\n    style D fill:#e6ffe6,stroke:#2d8a2d\n\n\n\n\n\n\n\nStep 1: Random bucketing\nThrow random hyperplanes through the embedding space. Each hyperplane splits the space in two — items on the same side of all hyperplanes land in the same bucket. With 3 hyperplanes you get up to 8 buckets, with 6 you get up to 64.\nThis is fast but noisy. The hyperplanes don’t know anything about your data’s structure.\n\n\nStep 2: Compute centroids\nAverage the embeddings in each bucket. These centroids are a compressed view of how the data is distributed — a rough sketch of its topology.\n\n\nStep 3: PCA on centroids\nRun PCA on the centroids to find the directions along which they vary most. These principal components become the new hyperplanes — data-adaptive, not random. They cut along the natural seams in your data.\n\n\nStep 4: Re-hash\nProject all embeddings onto the learned hyperplanes. Now the buckets reflect actual semantic regions rather than arbitrary splits.\n\n\n\n\n\n\nTipKey insight\n\n\n\nDYF uses randomness to discover structure, then learns from it. The final hyperplanes aren’t random — they’re fit to your data."
+  },
+  {
+    "objectID": "how-it-works.html#what-the-metrics-tell-you",
+    "href": "how-it-works.html#what-the-metrics-tell-you",
+    "title": "How DYF Works",
+    "section": "What the Metrics Tell You",
+    "text": "What the Metrics Tell You\nAfter fitting, DYF computes per-item metrics that characterize each point’s role:\n\n\n\n\n\n\n\n\nMetric\nWhat it means\nAnalogy\n\n\n\n\nbucket_id\nWhich region this item belongs to\nWhich neighborhood you live in\n\n\nbucket_size\nHow many items share this bucket\nHow many neighbors you have\n\n\ncentroid_similarity\nCosine similarity to bucket centroid\nHow central you are (1 = city center, 0 = edge of town)\n\n\nisolation_score\nDistance to nearest item outside the bucket\nHow different you are from everyone around you\n\n\nstability_score\nFraction of reruns where this item stays in the same bucket\nIf we redrew the map, would you stay put?\n\n\n\nfrom dyf import DensityClassifier\nimport numpy as np\n\nclassifier = DensityClassifier(embedding_dim=384)\nclassifier.fit(embeddings)\n\nbucket_ids = classifier.get_bucket_ids()\nbucket_sizes = classifier.get_bucket_sizes()\ncentroid_sims = classifier.get_centroid_similarities()\nisolation = classifier.get_isolation_scores()\nstability = classifier.get_stability_scores()"
+  },
+  {
+    "objectID": "how-it-works.html#dense-bridge-orphan",
+    "href": "how-it-works.html#dense-bridge-orphan",
+    "title": "How DYF Works",
+    "section": "Dense, Bridge, Orphan",
+    "text": "Dense, Bridge, Orphan\nDYF classifies every item into one of three roles based on its metrics:\n\n\n\n\n\nflowchart TD\n    subgraph dense[\"**Dense**\"]\n        direction TB\n        D1[\"Large bucket\"]\n        D2[\"High centroid similarity\"]\n        D3[\"Core of a topic\"]\n    end\n\n    subgraph bridge[\"**Bridge**\"]\n        direction TB\n        B1[\"Changes buckets\\nunder perturbation\"]\n        B2[\"Low stability score\"]\n        B3[\"Connects two regions\"]\n    end\n\n    subgraph orphan[\"**Orphan**\"]\n        direction TB\n        O1[\"Small bucket\"]\n        O2[\"High isolation\"]\n        O3[\"Genuinely unique\"]\n    end\n\n    style dense fill:#e6ffe6,stroke:#2d8a2d\n    style bridge fill:#fff4e6,stroke:#c47f17\n    style orphan fill:#ffe6e6,stroke:#c44a4a\n\n\n\n\n\n\nDense items sit in large buckets with high centroid similarity. They’re the core members of a semantic region — the papers that are clearly about machine learning, the products that are obviously kitchen appliances.\nBridge items are unstable under perturbation. If you re-run the classifier with slightly different hyperplanes, they change buckets. This means they sit near a decision boundary — a paper about “ML for medical imaging” bridges the ML cluster and the Medicine cluster. Bridges reveal the connections in your data’s topology.\nOrphan items land in small buckets with high isolation scores. They’re genuinely unlike everything else — not noise, but unique.\ndense_indices = classifier.get_dense()\nbridge_indices = classifier.get_bridge()\norphan_indices = classifier.get_orphans()"
+  },
+  {
+    "objectID": "how-it-works.html#going-deeper-the-dyf-tree",
+    "href": "how-it-works.html#going-deeper-the-dyf-tree",
+    "title": "How DYF Works",
+    "section": "Going Deeper: The DYF Tree",
+    "text": "Going Deeper: The DYF Tree\nOne level of bucketing captures coarse structure. For finer resolution, DYF builds a tree: fit a DensityClassifier at each node, then recurse into each bucket.\n\n\n\n\n\ngraph TD\n    R[\"Root\\n10,000 items\\n3 bits → 8 buckets\"] --&gt; A[\"Bucket 0\\n2,100 items\"]\n    R --&gt; B[\"Bucket 1\\n1,800 items\"]\n    R --&gt; C[\"...\"]\n    R --&gt; D[\"Bucket 7\\n900 items\"]\n\n    A --&gt; A1[\"Sub-bucket 0\\n450 items\"]\n    A --&gt; A2[\"Sub-bucket 1\\n380 items\"]\n    A --&gt; A3[\"...\"]\n\n    style R fill:#f0f4ff,stroke:#4a6fa5\n    style A fill:#e6ffe6,stroke:#2d8a2d\n    style B fill:#e6ffe6,stroke:#2d8a2d\n    style D fill:#e6ffe6,stroke:#2d8a2d\n    style A1 fill:#fff4e6,stroke:#c47f17\n    style A2 fill:#fff4e6,stroke:#c47f17\n\n\n\n\n\n\nEach level re-fits PCA to the local data at that node. This means deeper levels discover structure within clusters — sub-topics that wouldn’t be visible at the top level. With num_bits=3, each node splits up to 8 ways, so a tree of depth 4 can produce up to 4,096 leaf buckets.\nfrom dyf import build_dyf_tree\n\ntree = build_dyf_tree(\n    embeddings,\n    max_depth=4,\n    num_bits=3,\n    min_leaf_size=8,\n    fit_method=\"itq\",  # ITQ gives +5-12% recall over raw PCA\n)"
+  },
+  {
+    "objectID": "how-it-works.html#from-tree-to-search-index",
+    "href": "how-it-works.html#from-tree-to-search-index",
+    "title": "How DYF Works",
+    "section": "From Tree to Search Index",
+    "text": "From Tree to Search Index\nThe DYF tree can be serialized to a .dyf file for fast approximate nearest neighbor search.\n\n\n\n\n\nflowchart LR\n    Q[\"Query\\nembedding\"] --&gt; H[\"Hash through\\ntree\"]\n    H --&gt; L[\"Find matching\\nleaf bucket\"]\n    L --&gt; S[\"Score embeddings\\nin leaf\"]\n    S --&gt; R[\"Return\\ntop-k\"]\n\n    H -.-&gt;|\"near boundary?\"| P[\"Probe\\nadditional leaves\"]\n    P --&gt; S\n\n    style Q fill:#f0f4ff,stroke:#4a6fa5\n    style R fill:#e6ffe6,stroke:#2d8a2d\n    style P fill:#fff4e6,stroke:#c47f17\n\n\n\n\n\n\nZero startup cost: metadata lives in a small header; embeddings stay on disk (memory-mapped) until a query actually needs them. Opening a .dyf file is instant regardless of index size.\nAdaptive probing: when a query embedding is close to a decision boundary (low margin on a hyperplane), the search automatically checks neighboring leaves. This trades a small amount of speed for significantly better recall on ambiguous queries.\nfrom dyf import write_lazy_index, LazyIndex\n\n# Build and write index\nwrite_lazy_index(\n    tree, embeddings, \"index.dyf\",\n    quantization=\"float16\",\n    stored_fields={\"title\": titles},\n)\n\n# Search\nwith LazyIndex(\"index.dyf\") as idx:\n    result = idx.search(query_embedding, k=10, nprobe=\"auto\")\n    print(result.indices, result.scores)\n    print(result.fields[\"title\"])"
+  },
+  {
+    "objectID": "how-it-works.html#next-steps",
+    "href": "how-it-works.html#next-steps",
+    "title": "How DYF Works",
+    "section": "Next Steps",
+    "text": "Next Steps\n\nGetting Started — hands-on code recipes\nAPI Reference — full documentation for all classes and functions"
+  },
+  {
     "objectID": "getting-started.html",
     "href": "getting-started.html",
     "title": "Getting Started",
