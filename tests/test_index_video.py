@@ -114,6 +114,14 @@ class TestDetectScenes:
 # Tests: index_video end-to-end (mocked)
 # ---------------------------------------------------------------------------
 
+try:
+    import PIL  # noqa: F401
+    _has_pil = True
+except ImportError:
+    _has_pil = False
+
+
+@pytest.mark.skipif(not _has_pil, reason="requires Pillow")
 class TestIndexVideoE2E:
     @patch("dyf.index_video.detect_scenes")
     @patch("dyf.index_video.extract_keyframes")

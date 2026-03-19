@@ -3,6 +3,8 @@
 import pytest
 from pathlib import Path
 
+pytest.importorskip("tree_sitter_language_pack", reason="requires dyf[source]")
+
 from dyf.index_source import chunk_source_file, LANG_CONFIG, _EXT_TO_LANG
 
 
