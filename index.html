@@ -818,7 +818,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
     <div class="hero-logo">
     </div>
     <h1>Discover structure in<br>your embeddings</h1>
-    <p>Density-based LSH that reveals dense clusters, bridge items, and orphans — the natural topology of your data.</p>
+    <p>Turn any collection of embeddings into a map — find what's common, what connects, and what's unique.</p>
     <div class="hero-actions">
       <a href="getting-started.html" class="btn btn-primary">Get Started</a>
       <a href="https://github.com/jdonaldson/dyf" class="btn btn-secondary">View on GitHub</a>
@@ -1212,16 +1212,16 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 </g>
 </svg>
     <div class="stat">
-      <div class="stat-value">60K</div>
-      <div class="stat-label">Embeddings in 60ms</div>
+      <div class="stat-value">0 config</div>
+      <div class="stat-label">No k to pick, no hyperparams to tune</div>
     </div>
     <div class="stat">
-      <div class="stat-value">4x</div>
-      <div class="stat-label">Faster via Rust / PyO3</div>
+      <div class="stat-value">3 roles</div>
+      <div class="stat-label">Dense, Bridge, Orphan — every item classified</div>
     </div>
     <div class="stat">
-      <div class="stat-value">384d</div>
-      <div class="stat-label">Embedding dimensions</div>
+      <div class="stat-value">Instant open</div>
+      <div class="stat-label">Memory-mapped indexes, zero startup cost</div>
     </div>
   </div>
 
@@ -1494,32 +1494,24 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
           <span class="dot"></span>
           <span class="filename">example.py</span>
         </div>
-        <pre><code><span class="im">import</span> numpy <span class="im">as</span> np
-<span class="im">from</span> dyf <span class="im">import</span> DensityClassifier
+        <pre><code><span class="im">from</span> dyf <span class="im">import</span> DensityClassifierFull
 
-<span class="cm"># Your embeddings</span>
-embeddings <span class="op">=</span> np.random.<span class="fn">randn</span>(
-    <span class="dv">10000</span>, <span class="dv">384</span>
-).<span class="fn">astype</span>(np.float32)
-
-<span class="cm"># Find structure</span>
-clf <span class="op">=</span> <span class="fn">DensityClassifier</span>(
-    embedding_dim<span class="op">=</span><span class="dv">384</span>
+classifier <span class="op">=</span> DensityClassifierFull.<span class="fn">from_texts</span>(
+    texts<span class="op">=</span>documents,       <span class="cm"># any list of strings</span>
+    categories<span class="op">=</span>categories, <span class="cm"># optional grouping</span>
 )
-clf.<span class="fn">fit</span>(embeddings)
 
 <span class="cm"># What did we find?</span>
-<span class="nb">print</span>(clf.<span class="fn">report</span>())</code></pre>
+<span class="nb">print</span>(classifier.<span class="fn">report</span>())
+<span class="cm"># Dense:  8,420 (84.2%) — core topics</span>
+<span class="cm"># Bridge:   980 (9.8%)  — cross-topic items</span>
+<span class="cm"># Orphan:   600 (6.0%)  — unique outliers</span></code></pre>
       </div>
 
       <div class="text">
         <h3>How it works</h3>
-        <p>DYF uses a two-stage PCA-based LSH to classify every item in your corpus.</p>
-        <ol class="steps">
-          <li><strong>Random hashing</strong> <span>— L2 normalize, project onto random hyperplanes, form coarse buckets</span></li>
-          <li><strong>Learn semantics</strong> <span>— PCA on bucket centroids discovers the real directions in your data</span></li>
-          <li><strong>Re-hash</strong> <span>— Re-hash all items with semantic hyperplanes for clean, meaningful buckets</span></li>
-        </ol>
+        <p>DYF uses a two-stage PCA-based LSH to classify every item in your corpus. Bucket sizes reveal density, centroid similarity reveals centrality, and stability under perturbation reveals bridges.</p>
+        <p><a href="how-it-works.html" class="btn btn-outline-dark btn-sm">Learn the algorithm →</a></p>
       </div>
     </div>
   </section>
@@ -1860,27 +1852,19 @@ clf.<span class="fn">fit</span>(embeddings)
 </svg>
       <div class="feature-card">
         <h3>Semantic Navigation</h3>
-        <p>Find paths between concepts through bridge items that connect distant clusters.</p>
+        <p>Trace paths between concepts through bridge items that connect distant clusters.</p>
       </div>
-      <div class="feature-card" style="outline: 1px solid rgba(255,255,255,0.45); outline-offset: -1px; position: relative; z-index: 1;">
+      <div class="feature-card">
         <h3>Structure Discovery</h3>
-        <p>Understand how your data organizes itself without imposing external taxonomies.</p>
+        <p>See how your data organizes itself — no k to pick, no taxonomy to impose.</p>
       </div>
       <div class="feature-card">
         <h3>Anomaly Detection</h3>
-        <p>Identify orphans that don't belong anywhere and bridges that span multiple domains.</p>
+        <p>Surface orphans that don't fit anywhere and bridges that span multiple domains.</p>
       </div>
       <div class="feature-card">
         <h3>Index Building</h3>
-        <p>Pre-compute hierarchical structure for fast approximate nearest-neighbor queries.</p>
-      </div>
-      <div class="feature-card">
-        <h3>RAG Re-ranking</h3>
-        <p>Diversity-aware re-ranking that boosts items spanning clusters for richer retrieval.</p>
-      </div>
-      <div class="feature-card">
-        <h3>DataFrame I/O</h3>
-        <p>Works directly with Polars and Pandas. Classify from DataFrames, export results back.</p>
+        <p>Build <code>.dyf</code> files for instant-open, memory-mapped approximate search.</p>
       </div>
     </div>
   </section>
