@@ -38,7 +38,7 @@ def load_and_dedup(parquet_path, sample=None):
 
     clf = DensityClassifier(embedding_dim=embeddings.shape[1], num_bits=12, seed=42)
     clf.fit(embeddings)
-    bucket_ids = np.asarray(clf.get_bucket_ids())
+    bucket_ids = clf.get_bucket_ids()
     dedup_mask = deduplicate_chunks(bucket_ids, np.asarray(titles))
 
     titles = [t for t, keep in zip(titles, dedup_mask) if keep]
@@ -51,7 +51,7 @@ def suggest_n_neighbors(embeddings):
     from dyf_rs import DensityClassifier
     clf = DensityClassifier(embedding_dim=embeddings.shape[1], num_bits=12, seed=42)
     clf.fit(embeddings)
-    mean_size = np.array(clf.get_bucket_sizes()).mean()
+    mean_size = clf.get_bucket_sizes().mean()
     return int(np.clip(mean_size, 15, 100))
 
 

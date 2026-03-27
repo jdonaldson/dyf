@@ -49,7 +49,7 @@ def load_and_dedup(parquet_path, sample=None):
 
     clf = DensityClassifier(embedding_dim=embeddings.shape[1], num_bits=12, seed=42)
     clf.fit(embeddings)
-    bucket_ids = np.asarray(clf.get_bucket_ids())
+    bucket_ids = clf.get_bucket_ids()
     dedup_mask = deduplicate_chunks(bucket_ids, np.asarray(titles))
 
     titles = [t for t, keep in zip(titles, dedup_mask) if keep]
@@ -62,7 +62,7 @@ def suggest_n_neighbors(embeddings):
     from dyf_rs import DensityClassifier
     clf = DensityClassifier(embedding_dim=embeddings.shape[1], num_bits=12, seed=42)
     clf.fit(embeddings)
-    mean_size = np.array(clf.get_bucket_sizes()).mean()
+    mean_size = clf.get_bucket_sizes().mean()
     return int(np.clip(mean_size, 15, 100))
 
 
@@ -117,7 +117,7 @@ def dyf_single_level(embeddings, target_k, seed=42):
     for bits in range(3, 9):
         clf = DensityClassifier(embedding_dim=dim, num_bits=bits, seed=seed)
         clf.fit(embeddings)
-        bucket_ids = np.array(clf.get_bucket_ids())
+        bucket_ids = clf.get_bucket_ids()
         n_populated = len(set(bucket_ids.tolist()))
         diff = abs(n_populated - target_k)
         if diff < best_diff:
@@ -147,7 +147,7 @@ def dyf_hierarchical(embeddings, target_k, seed=42):
     global_bits = 8
     global_clf = DensityClassifier(embedding_dim=dim, num_bits=global_bits, seed=seed)
     global_clf.fit(embeddings)
-    global_ids = np.array(global_clf.get_bucket_ids())
+    global_ids = global_clf.get_bucket_ids()
 
     bucket_to_indices = defaultdict(list)
     for idx, bid in enumerate(global_ids):
@@ -173,7 +173,7 @@ def dyf_hierarchical(embeddings, target_k, seed=42):
                 facet_clf = DensityClassifier(
                     embedding_dim=dim, num_bits=bits, seed=seed)
                 facet_clf.fit(bucket_emb)
-                local_ids = np.array(facet_clf.get_bucket_ids())
+                local_ids = facet_clf.get_bucket_ids()
                 local_unique = set(local_ids.tolist())
                 local_remap = {old: facet_id + i
                                for i, old in enumerate(sorted(local_unique))}

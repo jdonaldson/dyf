@@ -295,9 +295,9 @@ def compute_louvain_hierarchy(idx, coords, embeddings, leaf_k=10,
     # Try Rust Louvain first (faster, weighted, deterministic)
     try:
         from dyf_rs import louvain_from_centroids
-        labels_list, n_communities = louvain_from_centroids(
+        labels_arr, n_communities = louvain_from_centroids(
             centroids_normed, k=k, resolution=resolution)
-        leaf_labels = np.array(labels_list, dtype=np.int32)
+        leaf_labels = labels_arr.astype(np.int32)
         print(f"    Louvain (Rust) found {n_communities} communities "
               f"from {len(leaves)} leaves (k={k}, res={resolution})")
     except ImportError:

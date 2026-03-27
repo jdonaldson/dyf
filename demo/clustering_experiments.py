@@ -187,8 +187,8 @@ def experiment_bucket_agglomerative(embeddings, classifier, n_clusters=15):
 
 def experiment_isolation_stratified(embeddings, classifier, n_strata=10):
     """Stratify by isolation score, then subdivide by bucket."""
-    bucket_ids = np.array(classifier.get_bucket_ids())
-    isolation_scores = np.array(classifier.get_isolation_scores())
+    bucket_ids = classifier.get_bucket_ids()
+    isolation_scores = classifier.get_isolation_scores()
 
     # Create isolation strata
     percentiles = np.percentile(isolation_scores, np.linspace(0, 100, n_strata + 1))
@@ -222,8 +222,8 @@ def experiment_isolation_stratified(embeddings, classifier, n_strata=10):
 
 def experiment_stability_weighted(embeddings, classifier, n_clusters=15):
     """Weight buckets by stability score, cluster high-stability separately."""
-    bucket_ids = np.array(classifier.get_bucket_ids())
-    stability_scores = np.array(classifier.get_stability_scores())
+    bucket_ids = classifier.get_bucket_ids()
+    stability_scores = classifier.get_stability_scores()
 
     # High stability points (top 50%) - cluster by bucket
     high_stability_mask = stability_scores >= np.median(stability_scores)
@@ -296,8 +296,8 @@ def experiment_density_hierarchical(embeddings, classifier, bridge_analysis, tar
 
 def experiment_centroid_similarity_split(embeddings, classifier, n_clusters=15):
     """Split buckets by centroid similarity - low similarity items form separate clusters."""
-    bucket_ids = np.array(classifier.get_bucket_ids())
-    centroid_sims = np.array(classifier.get_centroid_similarities())
+    bucket_ids = classifier.get_bucket_ids()
+    centroid_sims = classifier.get_centroid_similarities()
 
     # Points with low centroid similarity are "edge" points
     sim_threshold = np.percentile(centroid_sims, 30)  # bottom 30%
@@ -355,7 +355,7 @@ def experiment_bridge_merge_controlled(embeddings, classifier, bridge_analysis, 
     """Bridge communities but force merge small ones until we hit target."""
     import networkx as nx
 
-    bucket_ids = np.array(classifier.get_bucket_ids())
+    bucket_ids = classifier.get_bucket_ids()
     unique_buckets = set(bucket_ids)
 
     # Build graph
@@ -403,7 +403,7 @@ def experiment_bridge_merge_controlled(embeddings, classifier, bridge_analysis, 
 
 def experiment_bucket_size_balanced(embeddings, classifier, target_clusters=15):
     """Greedily assign buckets to clusters to balance sizes."""
-    bucket_ids = np.array(classifier.get_bucket_ids())
+    bucket_ids = classifier.get_bucket_ids()
 
     bucket_to_indices = defaultdict(list)
     for i, bid in enumerate(bucket_ids):
@@ -429,7 +429,7 @@ def experiment_bucket_size_balanced(embeddings, classifier, target_clusters=15):
 
 def experiment_similarity_then_merge(embeddings, classifier, sim_threshold=0.4, max_clusters=12):
     """Create natural clusters by similarity, then merge smallest until we hit max_clusters."""
-    bucket_ids = np.array(classifier.get_bucket_ids())
+    bucket_ids = classifier.get_bucket_ids()
 
     bucket_to_indices = defaultdict(list)
     for i, bid in enumerate(bucket_ids):
@@ -514,7 +514,7 @@ def experiment_similarity_then_merge(embeddings, classifier, sim_threshold=0.4, 
 
 def experiment_similarity_threshold_only(embeddings, classifier, sim_threshold=0.4):
     """Cluster buckets purely by similarity - no target cluster count."""
-    bucket_ids = np.array(classifier.get_bucket_ids())
+    bucket_ids = classifier.get_bucket_ids()
 
     bucket_to_indices = defaultdict(list)
     for i, bid in enumerate(bucket_ids):
@@ -570,7 +570,7 @@ def experiment_similarity_threshold_only(embeddings, classifier, sim_threshold=0
 
 def experiment_similarity_constrained_balance(embeddings, classifier, target_clusters=15, min_sim_threshold=0.35):
     """Balance sizes but only merge buckets if their centroids are similar."""
-    bucket_ids = np.array(classifier.get_bucket_ids())
+    bucket_ids = classifier.get_bucket_ids()
 
     bucket_to_indices = defaultdict(list)
     for i, bid in enumerate(bucket_ids):
@@ -634,8 +634,8 @@ def experiment_similarity_constrained_balance(embeddings, classifier, target_clu
 
 def experiment_isolation_buckets_hybrid(embeddings, classifier, target_clusters=15):
     """Combine isolation stratification with bucket coherence."""
-    bucket_ids = np.array(classifier.get_bucket_ids())
-    isolation_scores = np.array(classifier.get_isolation_scores())
+    bucket_ids = classifier.get_bucket_ids()
+    isolation_scores = classifier.get_isolation_scores()
 
     bucket_to_indices = defaultdict(list)
     for i, bid in enumerate(bucket_ids):

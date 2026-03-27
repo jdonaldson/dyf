@@ -95,8 +95,8 @@ def build_hierarchical_dyf(
     global_clf = DensityClassifier(embedding_dim=dim, num_bits=global_num_bits, seed=seed)
     global_clf.fit(embeddings)
 
-    global_bucket_ids = np.array(global_clf.get_bucket_ids())
-    global_centroid_sims = np.array(global_clf.get_centroid_similarities())
+    global_bucket_ids = global_clf.get_bucket_ids()
+    global_centroid_sims = global_clf.get_centroid_similarities()
     global_bridge_analysis = global_clf.analyze_bridges(embeddings)
     global_bridge_indices = list(global_bridge_analysis.bridge_indices)
 
@@ -129,8 +129,8 @@ def build_hierarchical_dyf(
             facet_clf = DensityClassifier(embedding_dim=dim, num_bits=bits, seed=seed)
             facet_clf.fit(bucket_emb)
 
-            local_ids = np.array(facet_clf.get_bucket_ids())
-            facet_sims = np.array(facet_clf.get_centroid_similarities())
+            local_ids = facet_clf.get_bucket_ids()
+            facet_sims = facet_clf.get_centroid_similarities()
             facet_bridge = facet_clf.analyze_bridges(bucket_emb)
 
             for local_idx, local_fid in enumerate(local_ids):
@@ -224,7 +224,7 @@ def find_super_connectors(
     # Global DYF and bridge analysis
     global_clf = DensityClassifier(embedding_dim=dim, num_bits=global_num_bits, seed=seed)
     global_clf.fit(embeddings)
-    global_buckets = np.array(global_clf.get_bucket_ids())
+    global_buckets = global_clf.get_bucket_ids()
     global_bridge = global_clf.analyze_bridges(embeddings)
 
     # Compute global centrality
@@ -1059,8 +1059,8 @@ def main():
         print(f"  Medium edges: {sum(1 for x in medium_x if x is None)} paths")
         print(f"  Heavy edges: {sum(1 for x in heavy_x if x is None)} paths")
 
-        centroid_similarities = np.array(classifier.get_centroid_similarities())
-        bucket_sizes = np.array(classifier.get_bucket_sizes())
+        centroid_similarities = classifier.get_centroid_similarities()
+        bucket_sizes = classifier.get_bucket_sizes()
 
         print("Creating visualization...")
         fig = create_visualization(

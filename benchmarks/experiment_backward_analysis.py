@@ -111,8 +111,8 @@ def main():
         clf = DensityClassifier(embedding_dim=EMBEDDING_DIM, num_bits=num_bits,
                                 seed=SEED, skip_isolation=True)
         clf.fit(embeddings)
-        bucket_ids = np.array(clf.get_bucket_ids())
-        hyperplanes = np.array(clf.get_hyperplanes(), dtype=np.float32)
+        bucket_ids = clf.get_bucket_ids()
+        hyperplanes = clf.get_hyperplanes()
         n_buckets = len(np.unique(bucket_ids))
 
         # Bridge data

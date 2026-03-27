@@ -62,8 +62,8 @@ def main():
     clf = DensityClassifier(embedding_dim=EMBEDDING_DIM, num_bits=num_bits,
                             seed=SEED, skip_isolation=True)
     clf.fit(embeddings)
-    dc_hp = np.array(clf.get_hyperplanes(), dtype=np.float32)  # (num_bits, dim)
-    dc_bids = np.array(clf.get_bucket_ids())
+    dc_hp = clf.get_hyperplanes()  # (num_bits, dim)
+    dc_bids = clf.get_bucket_ids()
 
     # Raw PCA directions for comparison
     pca_hp = pca.components_[:num_bits].astype(np.float32)
@@ -252,7 +252,7 @@ def main():
         clf_nb = DensityClassifier(embedding_dim=EMBEDDING_DIM, num_bits=nb,
                                    seed=SEED, skip_isolation=True)
         clf_nb.fit(embeddings)
-        bids_nb = np.array(clf_nb.get_bucket_ids())
+        bids_nb = clf_nb.get_bucket_ids()
         n_buckets = len(np.unique(bids_nb))
 
         coloc_rates = []

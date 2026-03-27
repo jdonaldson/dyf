@@ -109,7 +109,7 @@ def main():
     clf = RustClassifier(
         embedding_dim=embeddings_all.shape[1], num_bits=12, seed=42)
     clf.fit(embeddings_all)
-    bucket_ids = np.asarray(clf.get_bucket_ids())
+    bucket_ids = clf.get_bucket_ids()
     dedup_mask = deduplicate_chunks(bucket_ids, np.asarray(titles_all))
 
     embeddings = embeddings_all[dedup_mask]

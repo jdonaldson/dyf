@@ -153,8 +153,8 @@ def main():
     clf = DensityClassifier(embedding_dim=EMBEDDING_DIM, num_bits=num_bits,
                             seed=SEED, skip_isolation=True)
     clf.fit(embeddings)
-    dc_hp = np.array(clf.get_hyperplanes(), dtype=np.float32)
-    dc_bids = np.array(clf.get_bucket_ids())
+    dc_hp = clf.get_hyperplanes()
+    dc_bids = clf.get_bucket_ids()
 
     # 2. Raw PCA
     pca = PCA(n_components=num_bits)

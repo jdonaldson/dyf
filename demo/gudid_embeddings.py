@@ -278,7 +278,7 @@ def natmerge_clustering(embeddings, classifier, categories, sim_threshold=0.4, m
     """
     from collections import defaultdict, Counter
 
-    bucket_ids = np.array(classifier.get_bucket_ids())
+    bucket_ids = classifier.get_bucket_ids()
 
     bucket_to_indices = defaultdict(list)
     for i, bid in enumerate(bucket_ids):

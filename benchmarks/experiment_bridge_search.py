@@ -87,8 +87,8 @@ def build_flat_index(embeddings, num_bits=9, seed=42):
                             seed=seed, skip_isolation=True)
     clf.fit(embeddings)
     return {
-        'bucket_ids': np.array(clf.get_bucket_ids()),
-        'hyperplanes': np.array(clf.get_hyperplanes(), dtype=np.float32),
+        'bucket_ids': clf.get_bucket_ids(),
+        'hyperplanes': clf.get_hyperplanes(),
         'num_bits': num_bits,
     }
 
@@ -104,8 +104,8 @@ def build_hierarchical_index(embeddings, coarse_bits=3, fine_bits=6,
     coarse_clf = DensityClassifier(embedding_dim=dim, num_bits=coarse_bits,
                                    seed=seed, skip_isolation=True)
     coarse_clf.fit(embeddings)
-    coarse_bids = np.array(coarse_clf.get_bucket_ids())
-    coarse_hp = np.array(coarse_clf.get_hyperplanes(), dtype=np.float32)
+    coarse_bids = coarse_clf.get_bucket_ids()
+    coarse_hp = coarse_clf.get_hyperplanes()
 
     # Bridge persistence at coarse level
     bp = coarse_clf.bridge_persistence(embeddings, relative_threshold=bridge_threshold)
@@ -143,8 +143,8 @@ def build_hierarchical_index(embeddings, coarse_bits=3, fine_bits=6,
                                      seed=seed + int(cbid) + 1,
                                      skip_isolation=True)
         fine_clf.fit(subset)
-        fine_bids = np.array(fine_clf.get_bucket_ids())
-        fine_hp = np.array(fine_clf.get_hyperplanes(), dtype=np.float32)
+        fine_bids = fine_clf.get_bucket_ids()
+        fine_hp = fine_clf.get_hyperplanes()
 
         fine_data[int(cbid)] = {
             'indices': indices,

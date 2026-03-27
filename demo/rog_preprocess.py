@@ -46,7 +46,7 @@ def compute_density_knn(embeddings: np.ndarray, num_bits: int = 12, min_k: int =
     # Step 1: Get bucket densities from dyf
     clf = DensityClassifier(embedding_dim=embeddings.shape[1], num_bits=num_bits, seed=42)
     clf.fit(embeddings.astype(np.float32))
-    bucket_sizes = np.array(clf.get_bucket_sizes())
+    bucket_sizes = clf.get_bucket_sizes()
 
     # Step 2: Map bucket size → local k (inverse: sparse → high k, dense → low k)
     log_sizes = np.log1p(bucket_sizes)
@@ -98,7 +98,7 @@ def suggest_n_neighbors(embeddings: np.ndarray, num_bits: int = 12,
 
     clf = DensityClassifier(embedding_dim=embeddings.shape[1], num_bits=num_bits, seed=42)
     clf.fit(embeddings.astype(np.float32))
-    bucket_sizes = np.array(clf.get_bucket_sizes())
+    bucket_sizes = clf.get_bucket_sizes()
 
     # Set k to the mean LSH bucket size: each point should be able to
     # "see" its full bucket of natural peers in the neighbor graph.
@@ -135,7 +135,7 @@ def load_data(path: str, sample: int | None = None,
 
         clf = RustClassifier(embedding_dim=embeddings.shape[1], num_bits=12, seed=42)
         clf.fit(embeddings.astype(np.float32))
-        bucket_ids = np.asarray(clf.get_bucket_ids())
+        bucket_ids = clf.get_bucket_ids()
         dedup_mask = deduplicate_chunks(bucket_ids, np.asarray(titles))
 
         n_before = len(titles)

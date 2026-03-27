@@ -301,7 +301,7 @@ def instrumented_refine_clusters(
     try:
         clf = DensityClassifier(embedding_dim=dim, num_bits=num_bits, seed=seed_offset)
         clf.fit(ejected_emb)
-        bucket_ids = np.array(clf.get_bucket_ids())
+        bucket_ids = clf.get_bucket_ids()
     except Exception:
         bucket_ids = np.zeros(len(ejected_indices), dtype=int)
 

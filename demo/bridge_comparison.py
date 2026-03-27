@@ -78,7 +78,7 @@ def main():
     clf = RustClassifier(
         embedding_dim=embeddings_all.shape[1], num_bits=12, seed=42)
     clf.fit(embeddings_all)
-    bucket_ids = np.asarray(clf.get_bucket_ids())
+    bucket_ids = clf.get_bucket_ids()
     dedup_mask = deduplicate_chunks(bucket_ids, np.asarray(titles_all))
 
     titles = [t for t, keep in zip(titles_all, dedup_mask) if keep]
@@ -92,7 +92,7 @@ def main():
     clf2 = RustClassifier(
         embedding_dim=embeddings.shape[1], num_bits=12, seed=42)
     clf2.fit(embeddings)
-    centroid_sims = np.array(clf2.get_centroid_similarities())
+    centroid_sims = clf2.get_centroid_similarities()
     # Rank ascending = lowest similarity first = strongest bridges
     simple_rank = np.argsort(centroid_sims)
 

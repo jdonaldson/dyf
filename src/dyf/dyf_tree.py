@@ -63,8 +63,8 @@ def _build_dyf_tree(embeddings, point_indices, depth, num_bits, min_leaf_size,
             clf.fit_raw_pca(subset)
         else:
             clf.fit(subset)
-        bucket_ids = np.array(clf.get_bucket_ids())
-        centroid_sims = np.array(clf.get_centroid_similarities())
+        bucket_ids = clf.get_bucket_ids()
+        centroid_sims = clf.get_centroid_similarities()
     except Exception:
         return {
             'children': [],
@@ -83,15 +83,14 @@ def _build_dyf_tree(embeddings, point_indices, depth, num_bits, min_leaf_size,
 
     # Capture hyperplanes from the fitted classifier
     try:
-        raw_hp = clf.get_hyperplanes()
-        node_hyperplanes = np.array(raw_hp, dtype=np.float32) if raw_hp is not None else None
+        node_hyperplanes = clf.get_hyperplanes()
     except Exception:
         node_hyperplanes = None
 
     # Capture eigenvalues
     try:
         ev = clf.get_eigenvalues()
-        node_eigenvalues = np.array(ev, dtype=np.float32) if ev else None
+        node_eigenvalues = ev if len(ev) > 0 else None
     except Exception:
         node_eigenvalues = None
 
@@ -355,8 +354,8 @@ def _try_resplit(indices, embeddings, num_bits, seed):
     try:
         clf = DensityClassifier(embedding_dim=dim, num_bits=num_bits, seed=seed, skip_isolation=True)
         clf.fit(subset)
-        bucket_ids = np.array(clf.get_bucket_ids())
-        centroid_sims = np.array(clf.get_centroid_similarities())
+        bucket_ids = clf.get_bucket_ids()
+        centroid_sims = clf.get_centroid_similarities()
     except Exception:
         return None
 
@@ -614,7 +613,7 @@ def refine_clusters(labels, embeddings, min_coherence=None,
         clf = DensityClassifier(embedding_dim=dim, num_bits=num_bits,
                                 seed=seed_offset, skip_isolation=True)
         clf.fit(ejected_emb)
-        bucket_ids = np.array(clf.get_bucket_ids())
+        bucket_ids = clf.get_bucket_ids()
     except Exception:
         # Fallback: assign all ejected to nearest coherent centroid
         bucket_ids = np.zeros(len(ejected_indices), dtype=int)

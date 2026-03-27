@@ -113,8 +113,8 @@ def run_bit_sweep(embeddings):
         clf = DensityClassifier(embedding_dim=dim, num_bits=num_bits,
                                 seed=SEED, skip_isolation=True)
         clf.fit(embeddings)
-        bucket_ids = np.array(clf.get_bucket_ids())
-        hyperplanes = np.array(clf.get_hyperplanes(), dtype=np.float32)
+        bucket_ids = clf.get_bucket_ids()
+        hyperplanes = clf.get_hyperplanes()
 
         n_buckets = len(np.unique(bucket_ids))
         bucket_sizes = Counter(bucket_ids.tolist())
@@ -224,8 +224,8 @@ def run_multi_table(embeddings):
                                     seed=SEED + t * 100, skip_isolation=True)
             clf.fit(embeddings)
             tables.append({
-                'bucket_ids': np.array(clf.get_bucket_ids()),
-                'hyperplanes': np.array(clf.get_hyperplanes(), dtype=np.float32),
+                'bucket_ids': clf.get_bucket_ids(),
+                'hyperplanes': clf.get_hyperplanes(),
             })
 
         recalls = []
@@ -354,8 +354,8 @@ def run_tree_depth_analysis(embeddings):
                         seed=SEED + d * 17 + qi % 100,  # vary by depth & query batch
                         skip_isolation=True)
                     clf.fit(subset)
-                    sub_bids = np.array(clf.get_bucket_ids())
-                    sub_hp = np.array(clf.get_hyperplanes(), dtype=np.float32)
+                    sub_bids = clf.get_bucket_ids()
+                    sub_hp = clf.get_hyperplanes()
 
                     # Route query
                     query_bid, _ = hash_query(query, sub_hp)

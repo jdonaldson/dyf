@@ -79,7 +79,7 @@ def load_and_dedup(parquet_path, sample=None, pre_labels=None, extra_cols=None):
 
     clf = DensityClassifier(embedding_dim=embeddings.shape[1], num_bits=12, seed=42)
     clf.fit(embeddings)
-    bucket_ids = np.asarray(clf.get_bucket_ids())
+    bucket_ids = clf.get_bucket_ids()
     dedup_mask = deduplicate_chunks(bucket_ids, np.asarray(titles))
 
     n_before = len(titles)
@@ -99,7 +99,7 @@ def suggest_n_neighbors(embeddings, num_bits=12, min_k=15, max_k=100):
 
     clf = DensityClassifier(embedding_dim=embeddings.shape[1], num_bits=num_bits, seed=42)
     clf.fit(embeddings)
-    bucket_sizes = np.array(clf.get_bucket_sizes())
+    bucket_sizes = clf.get_bucket_sizes()
     mean_size = bucket_sizes.mean()
     suggested = int(np.clip(mean_size, min_k, max_k))
     n_buckets = len(set(clf.get_bucket_ids()))
@@ -1361,7 +1361,8 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
                  bundled_edges_2d=None, bundled_edges_3d=None, edge_pairs=None,
                  logo_path=None, tour_narration=None, tour_audio=None,
                  tour_callouts=None, tour_title=None, subtitle_str="",
-                 multi_level_data=None, embeddings=None):
+                 multi_level_data=None, embeddings=None,
+                 dendro_data=None):
     """Build a pydeck 3D point cloud with HTML overlay labels."""
     import base64
     import pyarrow as pa
@@ -1677,6 +1678,10 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
             f'style="height:28px;margin-left:12px;vertical-align:middle;">'
         )
 
+    dendro_json = "null"
+    if dendro_data is not None:
+        dendro_json = json.dumps(dendro_data)
+
     overlay_html = build_pydeck_overlay(
         points_ipc_b64=points_ipc_b64,
         edges_2d_ipc_b64=edges_2d_ipc_b64,
@@ -1692,6 +1697,7 @@ def build_pydeck(coords, titles_arr, labels, rgb_map, title_str, out_path,
         client_logo_html=client_logo_html,
         tour_title=tour_title,
         cluster_meta_json=cluster_meta_json,
+        dendro_json=dendro_json,
     )
 
     html = html.replace("</html>", overlay_html + "\n</html>", 1)
@@ -1703,7 +1709,7 @@ def build_pydeck_overlay(*, points_ipc_b64, edges_2d_ipc_b64, edges_3d_ipc_b64,
                          label_json, levels_json, edge_pairs_json,
                          narration_json, callouts_json, audio_json,
                          title_str, subtitle_str, client_logo_html, tour_title,
-                         cluster_meta_json="null"):
+                         cluster_meta_json="null", dendro_json="null"):
     """Render the JS overlay template. Can be called standalone for patching."""
     dyf_logo_svg = (
         '<svg class="dyf-logo" viewBox="0 0 340 105" width="85" height="26">'
@@ -2077,6 +2083,7 @@ window.togglePanel = togglePanel;
         '<script>\n'
         'window.__DYF_DATA__ = {\n'
         f'  clusterMeta: {cluster_meta_json},\n'
+        f'  dendrogram: {dendro_json},\n'
         f'  pointsIpcB64: "{points_ipc_b64}",\n'
         f'  edges2dIpcB64: "{edges_2d_ipc_b64}",\n'
         f'  edges3dIpcB64: "{edges_3d_ipc_b64}",\n'
@@ -2616,6 +2623,37 @@ def _render_from_dyf(dyf_path, args):
     path_birch = str(outdir / "rog_3d_birch_clusters.html")
     subtitle = f"BIRCH — {n_birch} clusters, {n:,} pts (from .dyf)"
 
+    # Build dendrogram data for JS if Louvain metadata is present
+    dendro_data = None
+    louvain_meta = data['metadata'].get('louvain_dendrogram')
+    if louvain_meta:
+        dendro_raw = json.loads(louvain_meta)
+        community_ids = data['fields'].get('community_id')
+        dendro_data = {
+            "Z": dendro_raw.get("Z", []),
+            "naturalK": len(dendro_raw.get("community_names", {})),
+            "communityNames": {str(k): v for k, v in
+                               dendro_raw.get("community_names", {}).items()},
+            "communityColors": {str(k): v for k, v in
+                                dendro_raw.get("community_colors", {}).items()},
+            "communitySizes": {str(k): v for k, v in
+                               dendro_raw.get("community_sizes", {}).items()},
+        }
+        if community_ids is not None:
+            dendro_data["communityIds"] = (
+                community_ids.tolist()
+                if hasattr(community_ids, 'tolist')
+                else list(community_ids))
+        # Build leaf → community and leaf → items maps from metadata
+        leaf_comms = dendro_raw.get("leaf_to_community")
+        leaf_items = json.loads(data['metadata'].get('leaf_item_map', '{}'))
+        if leaf_comms:
+            dendro_data["leafToCommunity"] = {
+                str(k): v for k, v in leaf_comms.items()}
+        if leaf_items:
+            dendro_data["leafItemMap"] = {
+                str(k): v for k, v in leaf_items.items()}
+
     build_pydeck(
         coords, titles_arr, labels_birch, rgb_birch,
         display_title, path_birch,
@@ -2631,6 +2669,7 @@ def _render_from_dyf(dyf_path, args):
         subtitle_str=subtitle,
         multi_level_data=multi_level_data,
         embeddings=data['embeddings'],
+        dendro_data=dendro_data,
     )
     print(f"\nWrote {path_birch}")
     subprocess.run(["open", path_birch])

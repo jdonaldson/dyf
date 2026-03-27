@@ -244,7 +244,7 @@ class BridgeIndex:
             if verbose:
                 print(f"  Adding {self.include_sparse_points} sparse region points...")
 
-            bucket_sizes = np.array(clf.get_bucket_sizes())
+            bucket_sizes = clf.get_bucket_sizes()
             sparse_mask = bucket_sizes < np.percentile(bucket_sizes, 25)
             sparse_indices = np.where(sparse_mask)[0]
 
@@ -514,7 +514,7 @@ def find_super_connectors(
     # Global DYF and bridge analysis
     global_clf = DensityClassifier(embedding_dim=dim, num_bits=global_num_bits, seed=seed)
     global_clf.fit(embeddings)
-    global_buckets = np.array(global_clf.get_bucket_ids())
+    global_buckets = global_clf.get_bucket_ids()
     global_bridge = global_clf.analyze_bridges(embeddings)
 
     # Compute global centrality (number of buckets connected)
