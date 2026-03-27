@@ -159,6 +159,37 @@ h1 {
   padding-bottom: 0.3em;
 }
 
+// Landing page — subtle isoline behind title block (dark banner in both modes)
+.quarto-title-banner {
+  position: relative;
+  background: url('hero-bg.png') center/cover no-repeat !important;
+  background-color: $bg-dark !important;
+  color: #eee !important;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(30, 30, 30, 0.5);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .quarto-title, .quarto-categories {
+    position: relative;
+    z-index: 1;
+  }
+
+  h1.title {
+    color: #eee !important;
+    border-image: linear-gradient(to right, $coral-red, $golden-amber) 1;
+  }
+
+  .description {
+    color: #ccc !important;
+  }
+}
+
 // Landing page logo
 .quarto-title-block img {
   margin-bottom: 1em;

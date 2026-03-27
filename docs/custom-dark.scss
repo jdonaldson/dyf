@@ -151,6 +151,27 @@ body.quarto-dark {
     color: $fg-muted;
   }
 
+  // Landing page — subtle isoline behind title block
+  .quarto-title-banner {
+    position: relative;
+    background: url('hero-bg.png') center/cover no-repeat !important;
+    background-color: #1e1e1e !important;
+
+    &::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(30, 30, 30, 0.6);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .quarto-title, .quarto-categories {
+      position: relative;
+      z-index: 1;
+    }
+  }
+
   // Landing page logo
   .quarto-title-block img {
     margin-bottom: 1em;
