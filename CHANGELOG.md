@@ -2,7 +2,7 @@
 
 ## 0.8.0
 
-DYF3 chunked format, adaptive search, and embedding-optional indexes.
+DYF3 chunked format, adaptive search, embedding-optional indexes, and zero-copy numpy returns from Rust bindings.
 
 ### Added
 
@@ -14,6 +14,8 @@ DYF3 chunked format, adaptive search, and embedding-optional indexes.
 
 ### API Changes
 
+- **`dyf-rs` returns numpy arrays** — `get_bucket_ids()`, `get_bucket_sizes()`, `get_centroid_similarities()`, `get_isolation_scores()`, `get_stability_scores()`, `get_eigenvalues()` now return `numpy.ndarray` instead of Python lists. `get_hyperplanes()` returns a 2D numpy array. `louvain_from_centroids()` and `louvain_communities()` return numpy arrays for labels. Eliminates redundant `np.array()` wrappers at all call sites.
+- Requires `dyf-rs>=0.7.0`
 - `search()` `nprobe` parameter accepts `int`, `"auto"`, or `AdaptiveProbeConfig`
 - `write_lazy_index()` gains `format_version` (1/2/3) and `embedding_dim` parameters
 - `rewrite_lazy_index()` gains `drop_embeddings` and `format_version` parameters
