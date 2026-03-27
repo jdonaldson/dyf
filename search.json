@@ -1700,7 +1700,7 @@
     "href": "index.html",
     "title": "DYF — Density Yields Features",
     "section": "",
-    "text": "DYF discovers structure in embedding spaces using density-based LSH. Every item gets classified as Dense (core), Bridge (connector), or Orphan (unique) — no k to pick, no hyperparameters to tune.\nGitHub | PyPI | How It Works | API Reference"
+    "text": "DYF discovers structure in embedding spaces using density-based LSH. Every item gets classified as Dense (core), Bridge (connector), or Orphan (unique) — no k to pick, no hyperparameters to tune.\nGitHub | PyPI | How It Works | API Reference |"
   },
   {
     "objectID": "index.html#quick-start",
@@ -1743,62 +1743,6 @@
     "title": "DYF — Density Yields Features",
     "section": "Installation",
     "text": "Installation\npip install dyf          # core\npip install dyf[io]      # + serialization\npip install dyf[full]    # + embedding generation, LLM labeling"
-  },
-  {
-    "objectID": "getting-started.html",
-    "href": "getting-started.html",
-    "title": "Getting Started",
-    "section": "",
-    "text": "This guide walks through the core DYF workflow: fitting a classifier, inspecting results, and integrating with DataFrames."
-  },
-  {
-    "objectID": "getting-started.html#basic-usage",
-    "href": "getting-started.html#basic-usage",
-    "title": "Getting Started",
-    "section": "Basic Usage",
-    "text": "Basic Usage\nThe fastest way to get started is with DensityClassifier (Rust-accelerated):\nimport numpy as np\nfrom dyf import DensityClassifier\n\n# Load or generate embeddings\nembeddings = np.random.randn(10000, 384).astype(np.float32)\n\n# Create classifier and fit\nclassifier = DensityClassifier(embedding_dim=384)\nclassifier.fit(embeddings)\n\n# Inspect the report\nreport = classifier.report()\nprint(report)\nThe report shows how items distribute across Dense, Bridge, and Orphan categories.\n\nRetrieving Items\n# Get item indices by category\ndense_items = classifier.get_dense()\nbridge_items = classifier.get_bridge()\norphan_items = classifier.get_orphans()\n\n# Get per-item metrics\nbucket_ids = classifier.get_bucket_ids()\nbucket_sizes = classifier.get_bucket_sizes()\nisolation_scores = classifier.get_isolation_scores()"
-  },
-  {
-    "objectID": "getting-started.html#full-featured-classifier",
-    "href": "getting-started.html#full-featured-classifier",
-    "title": "Getting Started",
-    "section": "Full-Featured Classifier",
-    "text": "Full-Featured Classifier\nDensityClassifierFull wraps the Rust core with embedding generation, DataFrame I/O, and LLM-based labeling:\nfrom dyf import DensityClassifierFull, EmbedderConfig, LabelerConfig\n\n# From raw texts (auto-generates TF-IDF embeddings)\nclassifier = DensityClassifierFull.from_texts(\n    texts=[\"document one\", \"document two\", ...],\n    categories=[\"cat_a\", \"cat_b\", ...],\n)\n\n# Label buckets with a local LLM\nlabels = classifier.label_buckets(**LabelerConfig.MEDIUM.as_kwargs())\n\nDataFrame Integration\nCreate classifiers directly from Polars or Pandas DataFrames:\nimport polars as pl\n\ndf = pl.DataFrame({\n    \"text\": [\"doc1\", \"doc2\", ...],\n    \"embedding\": [emb1, emb2, ...],  # list of numpy arrays\n    \"category\": [\"a\", \"b\", ...],\n})\n\n# From Polars\nclassifier = DensityClassifierFull.from_polars(\n    df,\n    embedding_col=\"embedding\",\n    category_col=\"category\",\n    text_col=\"text\",\n)\n\n# Export results back to Polars\nresults_df = classifier.to_polars()\nPandas works the same way via from_pandas() / to_pandas()."
-  },
-  {
-    "objectID": "getting-started.html#building-searching-indexes",
-    "href": "getting-started.html#building-searching-indexes",
-    "title": "Getting Started",
-    "section": "Building & Searching Indexes",
-    "text": "Building & Searching Indexes\nBuild a .dyf index file for fast, memory-mapped search:\nfrom dyf import build_dyf_tree, write_lazy_index, LazyIndex\n\n# Build a DYF tree\ntree = build_dyf_tree(embeddings, max_depth=4, num_bits=3, min_leaf_size=8)\n\n# Write to disk\nwrite_lazy_index(tree, embeddings, \"index.dyf\",\n                 quantization=\"float16\", compression=\"zstd\",\n                 stored_fields={\"title\": titles},\n                 metadata={\"model\": \"nomic-embed-text-v1.5\"})\n\n# Search (instant open, zero startup cost)\nwith LazyIndex(\"index.dyf\") as idx:\n    result = idx.search(query_embedding, k=10, nprobe=3)\n    print(result.indices, result.scores)\n    print(result.fields[\"title\"])\n\nAdaptive Probing\nQueries near decision boundaries automatically probe more leaves:\nfrom dyf import LazyIndex, AdaptiveProbeConfig\n\nwith LazyIndex(\"index.dyf\") as idx:\n    # Auto mode — margin-based probe count\n    result = idx.search(query, k=10, nprobe=\"auto\", return_routing=True)\n    print(result.routing[\"adaptive_nprobe\"])\n\n    # Custom thresholds\n    cfg = AdaptiveProbeConfig(margin_lo=0.005, margin_hi=0.2,\n                              min_probes=1, max_probes=8)\n    result = idx.search(query, k=10, nprobe=cfg)"
-  },
-  {
-    "objectID": "getting-started.html#tree-methods",
-    "href": "getting-started.html#tree-methods",
-    "title": "Getting Started",
-    "section": "Tree Methods",
-    "text": "Tree Methods\nBuild hierarchical structure from embeddings for multi-resolution analysis:\nfrom dyf import build_pca_tree, cut_tree_to_labels\n\n# Build a PCA-based binary tree\ntree = build_pca_tree(embeddings, max_depth=8)\n\n# Cut to get cluster labels\nlabels = cut_tree_to_labels(tree, max_depth=8, n_points=len(embeddings), n_clusters=25)"
-  },
-  {
-    "objectID": "getting-started.html#bridge-aware-retrieval-rag",
-    "href": "getting-started.html#bridge-aware-retrieval-rag",
-    "title": "Getting Started",
-    "section": "Bridge-Aware Retrieval (RAG)",
-    "text": "Bridge-Aware Retrieval (RAG)\nUse BridgeIndex for structure-aware approximate nearest neighbor search:\nfrom dyf import BridgeIndex\n\n# Build index\nindex = BridgeIndex(n_anchors=1000)\nindex.fit(embeddings)\n\n# Query\nquery = np.random.randn(384).astype(np.float32)\nindices, scores = index.query(query, k=10)"
-  },
-  {
-    "objectID": "getting-started.html#re-ranking",
-    "href": "getting-started.html#re-ranking",
-    "title": "Getting Started",
-    "section": "Re-ranking",
-    "text": "Re-ranking\nApply diversity-aware re-ranking to search results:\nfrom dyf import rerank_mmr, rerank_bridge_mmr\n\n# Standard MMR re-ranking\nreranked = rerank_mmr(query_emb, candidate_indices, embeddings_normed, top_k=10)\n\n# Bridge-aware MMR (boosts items that span clusters)\nreranked = rerank_bridge_mmr(\n    query_emb, candidate_indices, embeddings_normed,\n    bridge_scores, cluster_labels, top_k=10,\n)"
-  },
-  {
-    "objectID": "getting-started.html#next-steps",
-    "href": "getting-started.html#next-steps",
-    "title": "Getting Started",
-    "section": "Next Steps",
-    "text": "Next Steps\nSee the API Reference for complete documentation of all classes and functions."
   },
   {
     "objectID": "how-it-works.html",
@@ -1862,6 +1806,132 @@
     "title": "How DYF Works",
     "section": "Next Steps",
     "text": "Next Steps\n\nGetting Started — hands-on code recipes\nAPI Reference — full documentation for all classes and functions"
+  },
+  {
+    "objectID": "getting-started.html",
+    "href": "getting-started.html",
+    "title": "Getting Started",
+    "section": "",
+    "text": "This guide walks through the core DYF workflow: fitting a classifier, inspecting results, and integrating with DataFrames."
+  },
+  {
+    "objectID": "getting-started.html#basic-usage",
+    "href": "getting-started.html#basic-usage",
+    "title": "Getting Started",
+    "section": "Basic Usage",
+    "text": "Basic Usage\nThe fastest way to get started is with DensityClassifier (Rust-accelerated):\nimport numpy as np\nfrom dyf import DensityClassifier\n\n# Load or generate embeddings\nembeddings = np.random.randn(10000, 384).astype(np.float32)\n\n# Create classifier and fit\nclassifier = DensityClassifier(embedding_dim=384)\nclassifier.fit(embeddings)\n\n# Inspect the report\nreport = classifier.report()\nprint(report)\nThe report shows how items distribute across Dense, Bridge, and Orphan categories.\n\nRetrieving Items\n# Get item indices by category\ndense_items = classifier.get_dense()\nbridge_items = classifier.get_bridge()\norphan_items = classifier.get_orphans()\n\n# Get per-item metrics\nbucket_ids = classifier.get_bucket_ids()\nbucket_sizes = classifier.get_bucket_sizes()\nisolation_scores = classifier.get_isolation_scores()"
+  },
+  {
+    "objectID": "getting-started.html#full-featured-classifier",
+    "href": "getting-started.html#full-featured-classifier",
+    "title": "Getting Started",
+    "section": "Full-Featured Classifier",
+    "text": "Full-Featured Classifier\nDensityClassifierFull wraps the Rust core with embedding generation, DataFrame I/O, and LLM-based labeling:\nfrom dyf import DensityClassifierFull, EmbedderConfig, LabelerConfig\n\n# From raw texts (auto-generates TF-IDF embeddings)\nclassifier = DensityClassifierFull.from_texts(\n    texts=[\"document one\", \"document two\", ...],\n    categories=[\"cat_a\", \"cat_b\", ...],\n)\n\n# Label buckets with a local LLM\nlabels = classifier.label_buckets(**LabelerConfig.MEDIUM.as_kwargs())\n\nDataFrame Integration\nCreate classifiers directly from Polars or Pandas DataFrames:\nimport polars as pl\n\ndf = pl.DataFrame({\n    \"text\": [\"doc1\", \"doc2\", ...],\n    \"embedding\": [emb1, emb2, ...],  # list of numpy arrays\n    \"category\": [\"a\", \"b\", ...],\n})\n\n# From Polars\nclassifier = DensityClassifierFull.from_polars(\n    df,\n    embedding_col=\"embedding\",\n    category_col=\"category\",\n    text_col=\"text\",\n)\n\n# Export results back to Polars\nresults_df = classifier.to_polars()\nPandas works the same way via from_pandas() / to_pandas()."
+  },
+  {
+    "objectID": "getting-started.html#building-searching-indexes",
+    "href": "getting-started.html#building-searching-indexes",
+    "title": "Getting Started",
+    "section": "Building & Searching Indexes",
+    "text": "Building & Searching Indexes\nBuild a .dyf index file for fast, memory-mapped search:\nfrom dyf import build_dyf_tree, write_lazy_index, LazyIndex\n\n# Build a DYF tree\ntree = build_dyf_tree(embeddings, max_depth=4, num_bits=3, min_leaf_size=8)\n\n# Write to disk\nwrite_lazy_index(tree, embeddings, \"index.dyf\",\n                 quantization=\"float16\", compression=\"zstd\",\n                 stored_fields={\"title\": titles},\n                 metadata={\"model\": \"nomic-embed-text-v1.5\"})\n\n# Search (instant open, zero startup cost)\nwith LazyIndex(\"index.dyf\") as idx:\n    result = idx.search(query_embedding, k=10, nprobe=3)\n    print(result.indices, result.scores)\n    print(result.fields[\"title\"])\n\nAdaptive Probing\nQueries near decision boundaries automatically probe more leaves:\nfrom dyf import LazyIndex, AdaptiveProbeConfig\n\nwith LazyIndex(\"index.dyf\") as idx:\n    # Auto mode — margin-based probe count\n    result = idx.search(query, k=10, nprobe=\"auto\", return_routing=True)\n    print(result.routing[\"adaptive_nprobe\"])\n\n    # Custom thresholds\n    cfg = AdaptiveProbeConfig(margin_lo=0.005, margin_hi=0.2,\n                              min_probes=1, max_probes=8)\n    result = idx.search(query, k=10, nprobe=cfg)"
+  },
+  {
+    "objectID": "getting-started.html#tree-methods",
+    "href": "getting-started.html#tree-methods",
+    "title": "Getting Started",
+    "section": "Tree Methods",
+    "text": "Tree Methods\nBuild hierarchical structure from embeddings for multi-resolution analysis:\nfrom dyf import build_pca_tree, cut_tree_to_labels\n\n# Build a PCA-based binary tree\ntree = build_pca_tree(embeddings, max_depth=8)\n\n# Cut to get cluster labels\nlabels = cut_tree_to_labels(tree, max_depth=8, n_points=len(embeddings), n_clusters=25)"
+  },
+  {
+    "objectID": "getting-started.html#bridge-aware-retrieval-rag",
+    "href": "getting-started.html#bridge-aware-retrieval-rag",
+    "title": "Getting Started",
+    "section": "Bridge-Aware Retrieval (RAG)",
+    "text": "Bridge-Aware Retrieval (RAG)\nUse BridgeIndex for structure-aware approximate nearest neighbor search:\nfrom dyf import BridgeIndex\n\n# Build index\nindex = BridgeIndex(n_anchors=1000)\nindex.fit(embeddings)\n\n# Query\nquery = np.random.randn(384).astype(np.float32)\nindices, scores = index.query(query, k=10)"
+  },
+  {
+    "objectID": "getting-started.html#re-ranking",
+    "href": "getting-started.html#re-ranking",
+    "title": "Getting Started",
+    "section": "Re-ranking",
+    "text": "Re-ranking\nApply diversity-aware re-ranking to search results:\nfrom dyf import rerank_mmr, rerank_bridge_mmr\n\n# Standard MMR re-ranking\nreranked = rerank_mmr(query_emb, candidate_indices, embeddings_normed, top_k=10)\n\n# Bridge-aware MMR (boosts items that span clusters)\nreranked = rerank_bridge_mmr(\n    query_emb, candidate_indices, embeddings_normed,\n    bridge_scores, cluster_labels, top_k=10,\n)"
+  },
+  {
+    "objectID": "getting-started.html#next-steps",
+    "href": "getting-started.html#next-steps",
+    "title": "Getting Started",
+    "section": "Next Steps",
+    "text": "Next Steps\nSee the API Reference for complete documentation of all classes and functions."
+  },
+  {
+    "objectID": "notebooks/quickstart.html",
+    "href": "notebooks/quickstart.html",
+    "title": "DYF Quickstart — Density Yields Features",
+    "section": "",
+    "text": "Open In Colab\nDYF discovers structure in embedding spaces using density-based LSH. Every item gets classified as Dense (core), Bridge (connector), or Orphan (unique) — no k to pick, no hyperparameters to tune.\nThis notebook walks through: 1. Embedding real text data (AG News headlines) 2. Density classification — what’s core, what’s bridging, what’s unique? 3. Building a .dyf search index 4. Searching with adaptive probing"
+  },
+  {
+    "objectID": "notebooks/quickstart.html#install-dependencies",
+    "href": "notebooks/quickstart.html#install-dependencies",
+    "title": "DYF Quickstart — Density Yields Features",
+    "section": "1. Install dependencies",
+    "text": "1. Install dependencies\n\n!pip install -q dyf[io] datasets sentence-transformers"
+  },
+  {
+    "objectID": "notebooks/quickstart.html#load-ag-news",
+    "href": "notebooks/quickstart.html#load-ag-news",
+    "title": "DYF Quickstart — Density Yields Features",
+    "section": "2. Load AG News",
+    "text": "2. Load AG News\nAG News has 4 categories: World, Sports, Business, Sci/Tech. We grab 5,000 headlines for speed.\n\nfrom datasets import load_dataset\n\nds = load_dataset(\"ag_news\", split=\"train[:5000]\")\n\nAG_LABELS = {0: \"World\", 1: \"Sports\", 2: \"Business\", 3: \"Sci/Tech\"}\ntexts = ds[\"text\"]\ncategories = [AG_LABELS[l] for l in ds[\"label\"]]\n\nprint(f\"{len(texts)} headlines loaded\")\nprint(f\"Example: {texts[0][:100]}...\")"
+  },
+  {
+    "objectID": "notebooks/quickstart.html#embed-with-sentence-transformers",
+    "href": "notebooks/quickstart.html#embed-with-sentence-transformers",
+    "title": "DYF Quickstart — Density Yields Features",
+    "section": "3. Embed with sentence-transformers",
+    "text": "3. Embed with sentence-transformers\nall-MiniLM-L6-v2 produces 384-d embeddings and runs fast on CPU.\n\nfrom sentence_transformers import SentenceTransformer\nimport numpy as np\n\nmodel = SentenceTransformer(\"all-MiniLM-L6-v2\")\nembeddings = model.encode(texts, show_progress_bar=True, convert_to_numpy=True)\n\nprint(f\"Embeddings shape: {embeddings.shape}\")"
+  },
+  {
+    "objectID": "notebooks/quickstart.html#density-classification",
+    "href": "notebooks/quickstart.html#density-classification",
+    "title": "DYF Quickstart — Density Yields Features",
+    "section": "4. Density classification",
+    "text": "4. Density classification\nDYF’s DensityClassifier buckets items via PCA-based LSH, then computes per-item density metrics. No k to choose, no cluster count to guess.\n\nfrom dyf import DensityClassifier\n\nclassifier = DensityClassifier(\n    embedding_dim=384,\n    num_bits=14,\n    num_stability_seeds=3,\n)\nclassifier.fit(embeddings)\n\nprint(classifier.report())"
+  },
+  {
+    "objectID": "notebooks/quickstart.html#inspect-dense-bridge-and-orphan-items",
+    "href": "notebooks/quickstart.html#inspect-dense-bridge-and-orphan-items",
+    "title": "DYF Quickstart — Density Yields Features",
+    "section": "5. Inspect Dense, Bridge, and Orphan items",
+    "text": "5. Inspect Dense, Bridge, and Orphan items\n\nDense: High centroid similarity — the item sits squarely in a well-populated region\nBridge: Low centroid similarity — the item connects different semantic regions\nOrphan: Small bucket — the item has few semantic neighbors\n\nWe use analyze_bridges() to find bridge items and their connections.\n\n# Get per-item metrics (returned as lists, convert to arrays)centroid_sims = np.array(classifier.get_centroid_similarities())bucket_sizes = np.array(classifier.get_bucket_sizes())# Simple classification from raw metricsis_orphan = bucket_sizes &lt;= 2is_bridge = (~is_orphan) & (centroid_sims &lt; 0.5)is_dense = (~is_orphan) & (centroid_sims &gt;= 0.5)n = len(texts)print(f\"Dense:  {is_dense.sum():&gt;5} ({is_dense.sum()/n:.1%}) — core items\")print(f\"Bridge: {is_bridge.sum():&gt;5} ({is_bridge.sum()/n:.1%}) — connectors\")print(f\"Orphan: {is_orphan.sum():&gt;5} ({is_orphan.sum()/n:.1%}) — unique items\")print(\"\\n--- Example Dense headlines (high centroid similarity) ---\")dense_idx = np.where(is_dense)[0]for i in dense_idx[:3]:    print(f\"  [{categories[i]}] sim={centroid_sims[i]:.3f}  {texts[i][:90]}\")print(\"\\n--- Example Orphan headlines (tiny buckets) ---\")orphan_idx = np.where(is_orphan)[0]for i in orphan_idx[:3]:    print(f\"  [{categories[i]}] bucket_size={bucket_sizes[i]}  {texts[i][:90]}\")\n\n\n# Bridge analysis — which regions do bridges connect?\nanalysis = classifier.analyze_bridges(embeddings, bridge_threshold=0.5)\nprint(analysis)\n\nprint(\"\\nTop connected bucket pairs:\")\nfor bucket_a, bucket_b, count in analysis.top_connected_pairs(5):\n    print(f\"  Bucket {bucket_a} &lt;-&gt; Bucket {bucket_b}: {count} bridges\")\n\n# Show a few bridge headlines\nprint(\"\\n--- Example Bridge headlines ---\")\nfor i in analysis.bridge_indices[:5]:\n    print(f\"  [{categories[i]}] sim={centroid_sims[i]:.3f}  {texts[i][:90]}\")"
+  },
+  {
+    "objectID": "notebooks/quickstart.html#build-a-.dyf-search-index",
+    "href": "notebooks/quickstart.html#build-a-.dyf-search-index",
+    "title": "DYF Quickstart — Density Yields Features",
+    "section": "6. Build a .dyf search index",
+    "text": "6. Build a .dyf search index\nA .dyf file is a memory-mapped index with zero startup cost. We store the headline text and category alongside the embeddings.\n\nfrom dyf import build_dyf_tree, write_lazy_index\n\ntree = build_dyf_tree(embeddings, max_depth=4, num_bits=3, min_leaf_size=8)\n\nwrite_lazy_index(\n    tree, embeddings, \"ag_news.dyf\",\n    quantization=\"float16\",\n    stored_fields={\"title\": texts, \"category\": categories},\n    metadata={\"model\": \"all-MiniLM-L6-v2\", \"dataset\": \"ag_news\"},\n)\n\nprint(\"Index written to ag_news.dyf\")"
+  },
+  {
+    "objectID": "notebooks/quickstart.html#search-the-index",
+    "href": "notebooks/quickstart.html#search-the-index",
+    "title": "DYF Quickstart — Density Yields Features",
+    "section": "7. Search the index",
+    "text": "7. Search the index\nOpen the .dyf file and search with a query embedding. Stored fields come back with results.\n\nfrom dyf import LazyIndex\n\nquery = model.encode(\"stock market crash\")\n\nwith LazyIndex(\"ag_news.dyf\") as idx:\n    print(f\"Index: {idx.total_items} items, {idx.embedding_dim}d embeddings\")\n    print(f\"Stored fields: {idx.stored_field_names}\\n\")\n\n    result = idx.search(query, k=10)\n\n    print('Query: \"stock market crash\"\\n')\n    for i, (score, title, cat) in enumerate(\n        zip(result.scores, result.fields[\"title\"], result.fields[\"category\"])\n    ):\n        print(f\"  {i+1:2d}. [{cat}] {score:.3f}  {title[:80]}\")"
+  },
+  {
+    "objectID": "notebooks/quickstart.html#adaptive-probing",
+    "href": "notebooks/quickstart.html#adaptive-probing",
+    "title": "DYF Quickstart — Density Yields Features",
+    "section": "8. Adaptive probing",
+    "text": "8. Adaptive probing\nWith nprobe=\"auto\", DYF decides how many tree leaves to search based on how confident the routing is. Unambiguous queries probe fewer leaves (faster); ambiguous queries probe more (better recall).\n\nqueries = [\n    \"NBA playoffs basketball\",          # clearly Sports\n    \"new iPhone release\",               # clearly Sci/Tech\n    \"tech companies report earnings\",   # Sci/Tech + Business overlap\n]\n\nwith LazyIndex(\"ag_news.dyf\") as idx:\n    for q in queries:\n        qvec = model.encode(q)\n        result = idx.search(qvec, k=5, nprobe=\"auto\", return_routing=True)\n\n        r = result.routing\n        print(f'Query: \"{q}\"')\n        print(f\"  Leaves probed: {len(r['leaves_probed'])}  \"\n              f\"Candidates scored: {r['candidates_scored']}  \"\n              f\"Min margin: {r['min_margin']:.4f}  \"\n              f\"Elapsed: {r['elapsed_ms']:.1f}ms\")\n        print(f\"  Top result: [{result.fields['category'][0]}] \"\n              f\"{result.fields['title'][0][:70]}\")\n        print()"
+  },
+  {
+    "objectID": "notebooks/quickstart.html#next-steps",
+    "href": "notebooks/quickstart.html#next-steps",
+    "title": "DYF Quickstart — Density Yields Features",
+    "section": "Next steps",
+    "text": "Next steps\n\nHow It Works — the PCA-LSH algorithm, density metrics, and Krapivin hash density\nAPI Reference — full docs for DensityClassifier, LazyIndex, and more\nGitHub — source, issues, and examples"
   },
   {
     "objectID": "reference/neighbor_coherence.html",
