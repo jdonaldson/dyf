@@ -10,7 +10,7 @@ Every item gets classified as **Dense** (core), **Bridge** (connector), or **Orp
 pip install dyf
 ```
 
-**[GitHub](https://github.com/jdonaldson/dyf)** | **[PyPI](https://pypi.org/project/dyf/)** | **[How It Works](how-it-works.html)** | **[API Reference](reference/index.html)**
+**[GitHub](https://github.com/jdonaldson/dyf)** | **[PyPI](https://pypi.org/project/dyf/)** | **[How It Works](how-it-works.html)** | **[API Reference](reference/index.html)** | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/jdonaldson/dyf/blob/main/docs/notebooks/quickstart.ipynb)
 
 ## Quick start
 
