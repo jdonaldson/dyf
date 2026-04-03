@@ -14,18 +14,15 @@ Key concepts:
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
-from itertools import product as itertools_product
-from typing import Optional
-
 import math
 from collections import Counter
+from dataclasses import dataclass, field
+from itertools import product as itertools_product
 
 import numpy as np
 
 from .categorical import CategoryGraph
 from .splits import tokenize
-
 
 # ── Dataclasses ──────────────────────────────────────────────────────────
 
@@ -944,7 +941,7 @@ class CatalogSpace:
         query_embs: np.ndarray,
         top_k: int = 5,
         coherence_weight: float = 0.3,
-        query_labels: Optional[list[str]] = None,
+        query_labels: list[str] | None = None,
         query_texts: list[str] | None = None,
     ) -> list[JointMatchResult]:
         """Match query embeddings across all catalogs with coherence.

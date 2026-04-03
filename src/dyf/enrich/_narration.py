@@ -57,7 +57,7 @@ def _generate_narration(cluster_names, titles, labels, coords,
     if ollama_ok:
         print(f"\n  Generating narration via Ollama ({model})...")
     else:
-        print(f"\n  Ollama not available — using sample-title narration")
+        print("\n  Ollama not available — using sample-title narration")
 
     narration = {}
     tasks = []

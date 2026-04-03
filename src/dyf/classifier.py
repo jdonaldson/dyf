@@ -19,18 +19,22 @@ Configs:
     >>> labeler = LabelerConfig.LOW       # phi3:mini
 """
 
+import logging
+from typing import TYPE_CHECKING
+
 import numpy as np
-from typing import List, Dict, Optional, Tuple, TYPE_CHECKING
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    import polars as pl
     import pandas as pd
-from dataclasses import dataclass
+    import polars as pl
 from collections import Counter, defaultdict
+from dataclasses import dataclass
+
 from sklearn.decomposition import PCA
 
 from .configs import EmbedderConfig, LabelerConfig, list_configs  # noqa: F401
-
 
 # =============================================================================
 # Data Classes
@@ -57,7 +61,7 @@ class DensityReport:
     pca_variance_explained: float
 
     # Category breakdown (if provided)
-    category_counts: List[Tuple[str, int]]
+    category_counts: list[tuple[str, int]]
 
     def __str__(self):
         lines = [
@@ -144,19 +148,19 @@ class DensityClassifier:
         self.num_stability_seeds = num_stability_seeds
 
         # Populated during fit()
-        self.embeddings: Optional[np.ndarray] = None
-        self.categories: Optional[List[str]] = None
-        self.texts: Optional[List[str]] = None
+        self.embeddings: np.ndarray | None = None
+        self.categories: list[str] | None = None
+        self.texts: list[str] | None = None
 
         # Per-record metrics
-        self._bucket_ids: Optional[np.ndarray] = None
-        self._bucket_sizes: Optional[np.ndarray] = None
-        self._centroid_similarities: Optional[np.ndarray] = None
-        self._isolation_scores: Optional[np.ndarray] = None
-        self._stability_scores: Optional[np.ndarray] = None
+        self._bucket_ids: np.ndarray | None = None
+        self._bucket_sizes: np.ndarray | None = None
+        self._centroid_similarities: np.ndarray | None = None
+        self._isolation_scores: np.ndarray | None = None
+        self._stability_scores: np.ndarray | None = None
 
         # Stats
-        self._report: Optional[DensityReport] = None
+        self._report: DensityReport | None = None
         self._pca_variance: float = 0.0
         self._fitted = False
 
@@ -165,19 +169,19 @@ class DensityClassifier:
         self._svd = None
 
         # Polars integration
-        self._source_df: Optional['pl.DataFrame'] = None
-        self._embedding_col: Optional[str] = None
+        self._source_df: pl.DataFrame | None = None
+        self._embedding_col: str | None = None
 
         # Pandas integration
-        self._source_pandas_df: Optional['pd.DataFrame'] = None
+        self._source_pandas_df: pd.DataFrame | None = None
 
     @classmethod
     def from_polars(
         cls,
         df: 'pl.DataFrame',
         embedding_col: str,
-        category_col: Optional[str] = None,
-        text_col: Optional[str] = None,
+        category_col: str | None = None,
+        text_col: str | None = None,
         **kwargs
     ) -> 'DensityClassifier':
         """
@@ -202,7 +206,6 @@ class DensityClassifier:
             ... )
             >>> result = classifier.to_polars()
         """
-        import polars as pl
 
         # Extract embeddings
         embeddings = np.array(df[embedding_col].to_list(), dtype=np.float32)
@@ -266,8 +269,8 @@ class DensityClassifier:
         cls,
         df: 'pd.DataFrame',
         embedding_col: str,
-        category_col: Optional[str] = None,
-        text_col: Optional[str] = None,
+        category_col: str | None = None,
+        text_col: str | None = None,
         **kwargs
     ) -> 'DensityClassifier':
         """
@@ -355,13 +358,13 @@ class DensityClassifier:
     @classmethod
     def from_texts(
         cls,
-        texts: List[str],
-        categories: Optional[List[str]] = None,
+        texts: list[str],
+        categories: list[str] | None = None,
         embedding_dim: int = 128,
         max_features: int = 10000,
         min_df: int = 2,
         max_df: float = 0.95,
-        ngram_range: Tuple[int, int] = (1, 2),
+        ngram_range: tuple[int, int] = (1, 2),
         num_bits: int = 12,
         verbose: bool = True,
         **kwargs
@@ -392,11 +395,11 @@ class DensityClassifier:
             >>> classifier = DensityClassifier.from_texts(texts, categories=cats)
             >>> print(classifier.report())
         """
-        from sklearn.feature_extraction.text import TfidfVectorizer
         from sklearn.decomposition import TruncatedSVD
+        from sklearn.feature_extraction.text import TfidfVectorizer
 
         if verbose:
-            print(f"Building TF-IDF matrix ({len(texts):,} documents)...")
+            logger.info(f"Building TF-IDF matrix ({len(texts):,} documents)...")
 
         # Build TF-IDF matrix
         vectorizer = TfidfVectorizer(
@@ -409,20 +412,20 @@ class DensityClassifier:
         tfidf_matrix = vectorizer.fit_transform(texts)
 
         if verbose:
-            print(f"  Vocabulary size: {len(vectorizer.vocabulary_):,}")
-            print(f"  Matrix shape: {tfidf_matrix.shape}")
+            logger.debug(f"  Vocabulary size: {len(vectorizer.vocabulary_):,}")
+            logger.debug(f"  Matrix shape: {tfidf_matrix.shape}")
 
         # Reduce to dense embeddings with SVD
         n_components = min(embedding_dim, tfidf_matrix.shape[1] - 1, len(texts) - 1)
 
         if verbose:
-            print(f"Applying SVD ({n_components} components)...")
+            logger.info(f"Applying SVD ({n_components} components)...")
 
         svd = TruncatedSVD(n_components=n_components, random_state=kwargs.get('seed', 31))
         embeddings = svd.fit_transform(tfidf_matrix).astype(np.float32)
 
         if verbose:
-            print(f"  Variance explained: {svd.explained_variance_ratio_.sum():.1%}")
+            logger.debug(f"  Variance explained: {svd.explained_variance_ratio_.sum():.1%}")
 
         # Create and fit classifier
         classifier = cls(
@@ -442,8 +445,8 @@ class DensityClassifier:
     def fit(
         self,
         embeddings: np.ndarray,
-        categories: Optional[List[str]] = None,
-        texts: Optional[List[str]] = None,
+        categories: list[str] | None = None,
+        texts: list[str] | None = None,
         normalize: bool = True,
         verbose: bool = True
     ) -> 'DensityClassifier':
@@ -475,11 +478,11 @@ class DensityClassifier:
         d = embeddings.shape[1]
 
         if verbose:
-            print(f"Corpus size: {n:,}, dim: {d}")
+            logger.info(f"Corpus size: {n:,}, dim: {d}")
 
         # Stage 1: Random hash → Centroids → PCA on centroids → Re-hash
         if verbose:
-            print(f"\nPCA-based LSH ({self.num_bits} bits)...")
+            logger.info(f"PCA-based LSH ({self.num_bits} bits)...")
 
         # Step 1a: Random hash
         rng = np.random.default_rng(self.seed)
@@ -507,8 +510,8 @@ class DensityClassifier:
         centroids = np.array(centroids, dtype=np.float32)
 
         if verbose:
-            print(f"  Random hash: {len(random_bucket_to_indices):,} buckets")
-            print(f"  Centroids for PCA: {len(centroids):,}")
+            logger.debug(f"  Random hash: {len(random_bucket_to_indices):,} buckets")
+            logger.debug(f"  Centroids for PCA: {len(centroids):,}")
 
         # Step 1c: PCA on centroids
         n_components = min(self.num_bits, len(centroids) - 1)
@@ -518,7 +521,7 @@ class DensityClassifier:
         self._pca_variance = float(pca.explained_variance_ratio_.sum())
 
         if verbose:
-            print(f"  Centroid PCA variance: {self._pca_variance:.1%}")
+            logger.debug(f"  Centroid PCA variance: {self._pca_variance:.1%}")
 
         # Step 1d: Re-hash with PCA hyperplanes
         signs = (embeddings @ hp.T) >= 0
@@ -560,21 +563,21 @@ class DensityClassifier:
 
         # Compute isolation scores
         if verbose:
-            print(f"  Computing isolation scores...")
+            logger.debug("  Computing isolation scores...")
         self._compute_isolation_scores()
 
         # Compute stability scores
         if verbose:
-            print(f"  Computing stability scores ({self.num_stability_seeds} seeds)...")
+            logger.debug(f"  Computing stability scores ({self.num_stability_seeds} seeds)...")
         self._compute_stability_scores(hp)
 
         # Build report
         self._build_report(num_buckets)
 
         if verbose:
-            print(f"  Buckets: {num_buckets:,}")
-            print(f"  Mean bucket size: {self._report.mean_bucket_size:.1f}")
-            print(f"  Mean isolation score: {self._report.mean_isolation_score:.4f}")
+            logger.debug(f"  Buckets: {num_buckets:,}")
+            logger.debug(f"  Mean bucket size: {self._report.mean_bucket_size:.1f}")
+            logger.debug(f"  Mean isolation score: {self._report.mean_isolation_score:.4f}")
 
         self._fitted = True
         return self
@@ -759,7 +762,7 @@ class DensityClassifier:
         max_text_len: int = 200,
         min_bucket_size: int = 5,
         verbose: bool = True
-    ) -> Dict[int, Dict]:
+    ) -> dict[int, dict]:
         """
         Generate descriptive labels for buckets using a local LLM.
 
@@ -793,7 +796,7 @@ class DensityClassifier:
 
         client = OpenAI(base_url=base_url, api_key="not-needed")
 
-        def get_label(samples: List[str]) -> str:
+        def get_label(samples: list[str]) -> str:
             """Get label from LLM for a set of samples."""
             samples_text = "\n".join(f"- {s[:max_text_len]}" for s in samples)
             prompt = f"""These are sample texts from a document cluster:
@@ -812,9 +815,10 @@ Label:"""
                 )
                 return response.choices[0].message.content.strip()
             except Exception as e:
+                logger.debug("LLM labeling failed: %s", e)
                 return f"[Error: {e}]"
 
-        def sample_from_indices(indices: List[int]) -> List[str]:
+        def sample_from_indices(indices: list[int]) -> list[str]:
             """Get representative samples closest to centroid."""
             if len(indices) <= samples_per_bucket:
                 return [self.texts[i] for i in indices]
@@ -838,7 +842,7 @@ Label:"""
         ]
 
         if verbose:
-            print(f"Labeling {len(buckets_to_label)} buckets...")
+            logger.info(f"Labeling {len(buckets_to_label)} buckets...")
 
         results = {}
         for i, (bucket_id, indices) in enumerate(buckets_to_label):
@@ -850,10 +854,10 @@ Label:"""
                 'samples': samples
             }
             if verbose and (i + 1) % 10 == 0:
-                print(f"  {i + 1}/{len(buckets_to_label)} buckets labeled")
+                logger.info(f"  {i + 1}/{len(buckets_to_label)} buckets labeled")
 
         if verbose:
-            print("Done.")
+            logger.info("Done.")
 
         return results
 
@@ -861,10 +865,10 @@ Label:"""
         self,
         top_k: int = 3,
         min_bucket_size: int = 5,
-        stopwords: Optional[set] = None,
+        stopwords: set | None = None,
         min_word_len: int = 3,
         use_tfidf: bool = True
-    ) -> Dict[int, Dict]:
+    ) -> dict[int, dict]:
         """
         Generate labels for buckets using keyword extraction (no LLM required).
 
@@ -885,8 +889,8 @@ Label:"""
             >>> print(labels[1234]['label'])
             'neural network training'
         """
-        import re
         import math
+        import re
 
         if not self._fitted:
             raise ValueError("Must call fit() first")
@@ -922,12 +926,12 @@ Label:"""
         }
         stops = stopwords if stopwords is not None else default_stopwords
 
-        def tokenize(text: str) -> List[str]:
+        def tokenize(text: str) -> list[str]:
             text = text.lower()
             words = re.findall(r'\b[a-z]+\b', text)
             return [w for w in words if len(w) >= min_word_len and w not in stops]
 
-        def get_keywords(indices: List[int], corpus_freqs: Counter) -> List[Tuple[str, float]]:
+        def get_keywords(indices: list[int], corpus_freqs: Counter) -> list[tuple[str, float]]:
             bucket_words = []
             for idx in indices:
                 bucket_words.extend(tokenize(self.texts[idx]))

@@ -1,6 +1,7 @@
 """Bottom-up tree labeling via LLM."""
 
 import json
+import logging
 from collections import defaultdict
 from pathlib import Path
 
@@ -9,6 +10,8 @@ import numpy as np
 from dyf.lazy_index import LazyIndex, rewrite_lazy_index
 
 from ._ollama import _call_ollama
+
+logger = logging.getLogger(__name__)
 
 
 def _collect_descendant_indices(node_id, children_of, leaf_batches):
@@ -28,7 +31,6 @@ def label_tree_bottomup(idx, titles, model="gpt-oss:20b", target_depth=3,
                         samples_per_child=8, min_child_size=20,
                         cache_file=None, cache_data=None):
     """Label tree nodes bottom-up using the DYF tree hierarchy."""
-    from concurrent.futures import ThreadPoolExecutor, as_completed
 
     tree = idx.get_tree_structure()
     by_id = {n['node_id']: n for n in tree}
@@ -47,14 +49,14 @@ def label_tree_bottomup(idx, titles, model="gpt-oss:20b", target_depth=3,
     target_nodes = [n for n in tree if n['depth'] == target_depth]
     target_nodes.sort(key=lambda n: -n['num_items'])
 
-    print(f"  Tree labeling: {len(target_nodes)} branches at depth {target_depth}")
+    logger.info(f"  Tree labeling: {len(target_nodes)} branches at depth {target_depth}")
 
     # Check cache
     _cache_key = f"tree_depth_{target_depth}"
     if cache_data is not None:
         cached = cache_data.get(_cache_key, {})
         if cached.get("branch_labels") and cached.get("child_labels"):
-            print(f"  Loaded tree labels from cache")
+            logger.info("  Loaded tree labels from cache")
             return cached
     elif cache_file:
         cache_path = Path(cache_file)
@@ -62,7 +64,7 @@ def label_tree_bottomup(idx, titles, model="gpt-oss:20b", target_depth=3,
             file_cache = json.loads(cache_path.read_text())
             cached = file_cache.get(_cache_key, {})
             if cached.get("branch_labels") and cached.get("child_labels"):
-                print(f"  Loaded tree labels from cache")
+                logger.info("  Loaded tree labels from cache")
                 return cached
 
     rng = np.random.default_rng(42)
@@ -159,12 +161,12 @@ def label_tree_bottomup(idx, titles, model="gpt-oss:20b", target_depth=3,
         hierarchy[nid] = sorted(k_labels.keys())
 
         n_kids = len(k_labels)
-        print(f"    [{i+1}/{len(target_nodes)}] {b_label:<35s} "
-              f"({node['num_items']:>6,} items, {n_kids} children)")
+        logger.info(f"    [{i+1}/{len(target_nodes)}] {b_label:<35s} "
+                    f"({node['num_items']:>6,} items, {n_kids} children)")
         for kid_id, kid_label in sorted(k_labels.items(),
                                          key=lambda x: -by_id[x[0]]['num_items']):
             kn = by_id[kid_id]
-            print(f"      └─ {kid_label:<30s} ({kn['num_items']:>5,} items)")
+            logger.debug(f"      └─ {kid_label:<30s} ({kn['num_items']:>5,} items)")
 
     result = {
         'branch_labels': {str(k): v for k, v in branch_labels.items()},
@@ -179,7 +181,7 @@ def label_tree_bottomup(idx, titles, model="gpt-oss:20b", target_depth=3,
             file_cache = json.loads(cache_path.read_text())
         file_cache[_cache_key] = result
         cache_path.write_text(json.dumps(file_cache, indent=2))
-        print(f"  Saved tree labels to cache ({cache_file})")
+        logger.info(f"  Saved tree labels to cache ({cache_file})")
 
     return result
 
@@ -187,13 +189,13 @@ def label_tree_bottomup(idx, titles, model="gpt-oss:20b", target_depth=3,
 def enrich_tree(dyf_path, model="gpt-oss:20b", target_depth=3,
                 samples_per_child=8, output_path=None):
     """Add tree-based hierarchical labels to a .dyf file."""
-    print(f"\n=== Tree Labeling (depth={target_depth}) ===")
-    print(f"  Input: {dyf_path}")
+    logger.info(f"\n=== Tree Labeling (depth={target_depth}) ===")
+    logger.info(f"  Input: {dyf_path}")
 
     with LazyIndex(dyf_path) as idx:
         sf_names = idx.stored_field_names
         if 'title' not in sf_names:
-            print("  ERROR: No 'title' stored field found.")
+            logger.warning("  No 'title' stored field found.")
             return
 
         data = idx.extract_all_fields()
@@ -201,7 +203,7 @@ def enrich_tree(dyf_path, model="gpt-oss:20b", target_depth=3,
 
         label_cache_data = json.loads(data['metadata'].get('_label_cache', '{}'))
         if label_cache_data:
-            print(f"  Loaded {len(label_cache_data)} label cache entries from .dyf")
+            logger.info(f"  Loaded {len(label_cache_data)} label cache entries from .dyf")
 
         result = label_tree_bottomup(
             idx, titles, model=model, target_depth=target_depth,
@@ -215,6 +217,6 @@ def enrich_tree(dyf_path, model="gpt-oss:20b", target_depth=3,
     }
 
     out = output_path or dyf_path
-    print(f"\n  Writing labels to: {out}")
+    logger.info(f"\n  Writing labels to: {out}")
     rewrite_lazy_index(dyf_path, new_metadata=new_meta, output_path=out)
-    print(f"  Done. Tree labels at depth {target_depth} stored.")
+    logger.info(f"  Done. Tree labels at depth {target_depth} stored.")

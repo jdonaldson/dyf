@@ -1,6 +1,7 @@
 """Level 0 → 1: UMAP projection enrichment."""
 
 import json
+import logging
 import time
 from pathlib import Path
 
@@ -9,8 +10,10 @@ import numpy as np
 from dyf.lazy_index import LazyIndex, rewrite_lazy_index
 from dyf.provenance import create_provenance, provenance_to_dict
 
+logger = logging.getLogger(__name__)
 
-def suggest_n_neighbors(embeddings, num_bits=12, min_k=15, max_k=100):
+
+def suggest_n_neighbors(embeddings: np.ndarray, num_bits: int = 12, min_k: int = 15, max_k: int = 100) -> int:
     """Use DYF LSH bucket density to suggest UMAP n_neighbors."""
     from dyf_rs import DensityClassifier
 
@@ -21,18 +24,18 @@ def suggest_n_neighbors(embeddings, num_bits=12, min_k=15, max_k=100):
     mean_size = bucket_sizes.mean()
     suggested = int(np.clip(mean_size, min_k, max_k))
     n_buckets = len(set(clf.get_bucket_ids()))
-    print(f"  DYF: {n_buckets} buckets, mean_size={mean_size:.0f}, "
-          f"suggested n_neighbors={suggested}")
+    logger.info(f"  DYF: {n_buckets} buckets, mean_size={mean_size:.0f}, "
+                f"suggested n_neighbors={suggested}")
     return suggested
 
 
-def run_umap(embeddings, n_neighbors=15, n_components=3, densmap=False):
+def run_umap(embeddings: np.ndarray, n_neighbors: int = 15, n_components: int = 3, densmap: bool = False) -> np.ndarray:
     """Run UMAP and return median-centered, MAD-scaled coords."""
     import umap
     from sklearn.neighbors import NearestNeighbors
 
     label = "densMAP" if densmap else "UMAP"
-    print(f"  Running {label} (n_neighbors={n_neighbors}, {n_components}D)...")
+    logger.info(f"  Running {label} (n_neighbors={n_neighbors}, {n_components}D)...")
     t0 = time.time()
     reducer = umap.UMAP(
         n_components=n_components,
@@ -47,7 +50,7 @@ def run_umap(embeddings, n_neighbors=15, n_components=3, densmap=False):
 
     nan_mask = np.isnan(coords).any(axis=1)
     if nan_mask.any():
-        print(f"    Replacing {nan_mask.sum()} NaN coords")
+        logger.warning(f"    Replacing {nan_mask.sum()} NaN coords")
         nn = NearestNeighbors(n_neighbors=1, metric='cosine')
         nn.fit(embeddings[~nan_mask])
         _, idx = nn.kneighbors(embeddings[nan_mask])
@@ -57,11 +60,11 @@ def run_umap(embeddings, n_neighbors=15, n_components=3, densmap=False):
     mad = np.nanmedian(np.abs(coords - median), axis=0)
     scale = float(np.fmax(np.nanmax(mad), 1e-8))
     coords = (coords - median) / scale
-    print(f"    Done in {time.time() - t0:.1f}s")
+    logger.info(f"    Done in {time.time() - t0:.1f}s")
     return coords
 
 
-def orient_landscape(coords):
+def orient_landscape(coords: np.ndarray) -> np.ndarray:
     """Rotate XY plane so the widest spread aligns with the X axis."""
     xy = coords[:, :2]
     cov = np.cov(xy, rowvar=False)
@@ -75,8 +78,8 @@ def orient_landscape(coords):
     out[:, :2] = rot
     xr = np.ptp(out[:, 0])
     yr = np.ptp(out[:, 1])
-    print(f"    Landscape orient: rotated {np.degrees(theta):.1f}°, "
-          f"spread X={xr:.2f} Y={yr:.2f} (ratio {xr / yr:.2f})")
+    logger.info(f"    Landscape orient: rotated {np.degrees(theta):.1f}°, "
+                f"spread X={xr:.2f} Y={yr:.2f} (ratio {xr / yr:.2f})")
     return out
 
 
@@ -84,16 +87,16 @@ def enrich_project(dyf_path, n_components=3, densmap=False, output_path=None,
                    fisher_col=None, fisher_parquet=None,
                    diagnose_parquet=None):
     """Add UMAP coordinates to a .dyf file (Level 0 → 1)."""
-    print(f"\n=== Level 1: UMAP Projection ===")
-    print(f"  Input: {dyf_path}")
+    logger.info("=== Level 1: UMAP Projection ===")
+    logger.info(f"  Input: {dyf_path}")
 
     with LazyIndex(dyf_path) as idx:
         level = idx.detect_enrichment_level()
         if level >= 1:
-            print(f"  Already at level {level} (has UMAP coords), skipping.")
+            logger.info(f"  Already at level {level} (has UMAP coords), skipping.")
             return
         n = idx.total_items
-        print(f"  {n:,} items, dim={idx.embedding_dim}")
+        logger.info(f"  {n:,} items, dim={idx.embedding_dim}")
 
     # Extract embeddings
     with LazyIndex(dyf_path) as idx:
@@ -103,36 +106,38 @@ def enrich_project(dyf_path, n_components=3, densmap=False, output_path=None,
     # Optional Fisher dimension weighting
     fisher_weights = None
     if fisher_col:
-        from dyf.fisher import compute_fisher_weights, apply_fisher_weights
-        from dyf.categorical import coarsen
         import polars as pl
+
+        from dyf.categorical import coarsen
+        from dyf.fisher import apply_fisher_weights, compute_fisher_weights
 
         if fisher_parquet:
             df = pl.read_parquet(fisher_parquet)
             if fisher_col in df.columns:
                 raw_vals = df[fisher_col].to_list()
             else:
-                print(f"  WARNING: column '{fisher_col}' not in {fisher_parquet}, "
-                      f"skipping Fisher weighting")
+                logger.warning(f"  column '{fisher_col}' not in {fisher_parquet}, "
+                               f"skipping Fisher weighting")
                 raw_vals = None
         elif fisher_col in data.get('fields', {}):
             raw_vals = data['fields'][fisher_col]
         else:
-            print(f"  WARNING: fisher_col='{fisher_col}' not found, "
-                  f"skipping Fisher weighting")
+            logger.warning(f"  fisher_col='{fisher_col}' not found, "
+                           f"skipping Fisher weighting")
             raw_vals = None
 
         if raw_vals is not None:
             fisher_labels = coarsen(raw_vals)
             fisher_weights = compute_fisher_weights(embeddings, fisher_labels)
             embeddings = apply_fisher_weights(embeddings, fisher_weights)
-            print(f"  Fisher weighting applied ({fisher_col}): "
-                  f"top-5 dims {np.argsort(fisher_weights)[-5:][::-1]}")
+            logger.info(f"  Fisher weighting applied ({fisher_col}): "
+                        f"top-5 dims {np.argsort(fisher_weights)[-5:][::-1]}")
 
     # Optional axis diagnostics sanity check
     if diagnose_parquet:
         import polars as pl
-        from dyf.categorical import discover_categorical_columns, diagnose_axes
+
+        from dyf.categorical import diagnose_axes, discover_categorical_columns
 
         diag_path = Path(diagnose_parquet)
         if diag_path.exists():
@@ -140,17 +145,17 @@ def enrich_project(dyf_path, n_components=3, densmap=False, output_path=None,
             label_cols = discover_categorical_columns(diag_df, text_col="text")
             if label_cols:
                 diags = diagnose_axes(embeddings, label_cols)
-                print(f"  Axis diagnostics ({len(diags)} axes):")
+                logger.info(f"  Axis diagnostics ({len(diags)} axes):")
                 for d in diags:
-                    flag = " ⚠ UNDER-SERVED" if d.lift < 3.0 else ""
-                    print(f"    {d.name}: lift={d.lift:.1f}x  "
-                          f"purity={d.knn_purity:.3f}{flag}")
+                    flag = " UNDER-SERVED" if d.lift < 3.0 else ""
+                    logger.info(f"    {d.name}: lift={d.lift:.1f}x  "
+                                f"purity={d.knn_purity:.3f}{flag}")
                 under = [d for d in diags if d.lift < 3.0]
                 if under:
-                    print(f"  WARNING: {len(under)} axis(es) under-served. "
-                          f"Consider re-embedding with --diagnose in gudid_embeddings.py")
+                    logger.warning(f"  {len(under)} axis(es) under-served. "
+                                   f"Consider re-embedding with --diagnose in gudid_embeddings.py")
         else:
-            print(f"  WARNING: --diagnose-parquet={diag_path} not found, skipping")
+            logger.warning(f"  --diagnose-parquet={diag_path} not found, skipping")
 
     # Compute UMAP
     dyf_k = suggest_n_neighbors(embeddings)
@@ -189,7 +194,7 @@ def enrich_project(dyf_path, n_components=3, densmap=False, output_path=None,
     ))
 
     out = output_path or dyf_path
-    print(f"  Writing enriched file: {out}")
+    logger.info(f"  Writing enriched file: {out}")
     rewrite_lazy_index(dyf_path, new_stored_fields=new_sf,
                        new_metadata=new_meta, output_path=out)
-    print(f"  Done. Level 0 → 1")
+    logger.info("  Done. Level 0 → 1")

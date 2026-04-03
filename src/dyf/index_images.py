@@ -14,11 +14,14 @@ Requires: pip install "dyf[vision]"
 import argparse
 import base64
 import io
+import logging
 import sys
 import time
 from pathlib import Path
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 from .dyf_tree import build_dyf_tree
 from .lazy_index import write_lazy_index
@@ -108,7 +111,7 @@ def embed_images(
 
         done = min(i + batch_size, len(images))
         if done % 32 == 0 or done == len(images):
-            print(f"  Embedded {done}/{len(images)}")
+            logger.info(f"  Embedded {done}/{len(images)}")
 
     return np.concatenate(all_embeddings, axis=0).astype(np.float32)
 
@@ -135,27 +138,27 @@ def index_images(
     """Index images into a .dyf file."""
     from PIL import Image
 
-    print(f"Indexing images")
-    print(f"  Source: {source_dir}")
-    print(f"  Output: {output}")
-    print(f"  Model:  {model}")
+    logger.info("Indexing images")
+    logger.info(f"  Source: {source_dir}")
+    logger.info(f"  Output: {output}")
+    logger.info(f"  Model:  {model}")
 
     # Scan for images
     t0 = time.time()
     image_paths = scan_images(source_dir)
     if not image_paths:
-        print("No images found.")
+        logger.error("No images found.")
         sys.exit(1)
-    print(f"\nFound {len(image_paths)} images in {time.time()-t0:.1f}s")
+    logger.info(f"Found {len(image_paths)} images in {time.time()-t0:.1f}s")
 
     # Load vision model
-    print(f"\nLoading vision model...")
+    logger.info("Loading vision model...")
     t0 = time.time()
     processor, vision_model, device = load_vision_model(model)
-    print(f"  Model loaded on {device} in {time.time()-t0:.1f}s")
+    logger.info(f"  Model loaded on {device} in {time.time()-t0:.1f}s")
 
     # Load images, generate thumbnails, collect metadata
-    print(f"\nLoading images and generating thumbnails...")
+    logger.info("Loading images and generating thumbnails...")
     t0 = time.time()
     images = []
     titles = []
@@ -180,26 +183,26 @@ def index_images(
             heights.append(img.height)
             valid_paths.append(path)
         except Exception as e:
-            print(f"  Skipping {path.name}: {e}")
+            logger.warning("Skipping %s: %s", path.name, e)
 
     if not images:
-        print("No valid images could be loaded.")
+        logger.error("No valid images could be loaded.")
         sys.exit(1)
 
-    print(f"  Loaded {len(images)} images in {time.time()-t0:.1f}s")
+    logger.info(f"  Loaded {len(images)} images in {time.time()-t0:.1f}s")
 
     # Embed
-    print(f"\nEmbedding images...")
+    logger.info("Embedding images...")
     t0 = time.time()
     embeddings = embed_images(images, processor, vision_model, device, batch_size)
-    print(f"  {embeddings.shape} in {time.time()-t0:.1f}s")
+    logger.info(f"  {embeddings.shape} in {time.time()-t0:.1f}s")
 
     # Normalize
     norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
     embeddings = embeddings / np.where(norms > 0, norms, 1)
 
     # Build DYF tree
-    print("\nBuilding DYF tree...")
+    logger.info("Building DYF tree...")
     t0 = time.time()
     tree = build_dyf_tree(
         embeddings,
@@ -209,10 +212,10 @@ def index_images(
         seed=seed,
         fit_method="itq",
     )
-    print(f"  Tree built in {time.time()-t0:.1f}s")
+    logger.info(f"  Tree built in {time.time()-t0:.1f}s")
 
     # Write .dyf
-    print("\nWriting .dyf...")
+    logger.info("Writing .dyf...")
     t0 = time.time()
     write_lazy_index(
         tree,
@@ -241,8 +244,8 @@ def index_images(
         },
     )
     size_mb = output.stat().st_size / (1024 * 1024)
-    print(f"  Written {output.name} ({size_mb:.1f} MB) in {time.time()-t0:.1f}s")
-    print(f"\nDone. {len(images)} images indexed.")
+    logger.info(f"  Written {output.name} ({size_mb:.1f} MB) in {time.time()-t0:.1f}s")
+    logger.info(f"Done. {len(images)} images indexed.")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -292,7 +295,7 @@ def main(argv: list[str] | None = None) -> int:
 
     source_dir = args.source_dir.resolve()
     if not source_dir.is_dir():
-        print(f"Error: {source_dir} is not a directory")
+        logger.error(f"Error: {source_dir} is not a directory")
         return 1
 
     output = args.output

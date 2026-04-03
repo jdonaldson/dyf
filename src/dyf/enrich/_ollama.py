@@ -1,7 +1,13 @@
 """Shared Ollama LLM helpers for the enrich pipeline."""
 
 import json
+import logging
+import os
 import urllib.request
+
+logger = logging.getLogger(__name__)
+
+OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
 
 
 def _make_domain_context(domain):
@@ -23,7 +29,7 @@ def _call_ollama(model, prompt, timeout=300):
         "stream": False,
     }).encode()
     req = urllib.request.Request(
-        "http://localhost:11434/api/generate",
+        f"{OLLAMA_BASE_URL}/api/generate",
         data=payload,
         headers={"Content-Type": "application/json"},
     )
@@ -32,7 +38,7 @@ def _call_ollama(model, prompt, timeout=300):
             data = json.loads(resp.read().decode())
             return data.get("response", "").strip()
     except Exception as e:
-        print(f"    Ollama error: {e}")
+        logger.warning("Ollama error: %s", e)
         return ""
 
 
@@ -44,7 +50,7 @@ def _call_ollama_chat(prompt, model="gpt-oss:20b", timeout=30):
         "stream": False,
     }).encode()
     req = urllib.request.Request(
-        "http://localhost:11434/api/chat",
+        f"{OLLAMA_BASE_URL}/api/chat",
         data=payload,
         headers={"Content-Type": "application/json"},
     )
@@ -52,5 +58,6 @@ def _call_ollama_chat(prompt, model="gpt-oss:20b", timeout=30):
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             body = json.loads(resp.read())
             return body.get("message", {}).get("content", "").strip()
-    except Exception:
+    except Exception as e:
+        logger.warning("Ollama chat error: %s", e)
         return None

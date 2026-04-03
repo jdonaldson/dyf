@@ -14,6 +14,7 @@ Requires: pip install "dyf[source]"
 """
 
 import argparse
+import logging
 import sys
 import time
 from pathlib import Path
@@ -23,6 +24,8 @@ import requests
 
 from .dyf_tree import build_dyf_tree
 from .lazy_index import write_lazy_index
+
+logger = logging.getLogger(__name__)
 
 
 DEFAULT_OLLAMA_URL = "http://localhost:11434/api/embed"
@@ -260,7 +263,7 @@ def embed_batch(
         all_embeddings.extend(embs)
 
         if (i + batch_size) % 128 == 0 or i + batch_size >= len(texts):
-            print(f"  Embedded {min(i + batch_size, len(texts))}/{len(texts)}")
+            logger.info(f"  Embedded {min(i + batch_size, len(texts))}/{len(texts)}")
 
     return np.array(all_embeddings, dtype=np.float32)
 
@@ -276,10 +279,10 @@ def index_source(
     seed: int = 42,
 ) -> None:
     """Index source code into a .dyf file."""
-    print(f"Indexing source code")
-    print(f"  Source: {source_dir}")
-    print(f"  Output: {output}")
-    print(f"  Model:  {model}")
+    logger.info("Indexing source code")
+    logger.info(f"  Source: {source_dir}")
+    logger.info(f"  Output: {output}")
+    logger.info(f"  Model:  {model}")
 
     # Chunk all supported source files
     t0 = time.time()
@@ -292,28 +295,28 @@ def index_source(
             all_chunks.extend(chunks)
             if chunks:
                 langs_seen.add(chunks[0]["language"])
-                print(f"  {src_file.relative_to(source_dir)}: {len(chunks)} chunks")
+                logger.debug(f"  {src_file.relative_to(source_dir)}: {len(chunks)} chunks")
 
     if not all_chunks:
-        print("No source chunks found.")
+        logger.warning("No source chunks found.")
         sys.exit(1)
 
     langs_str = ", ".join(sorted(langs_seen))
-    print(f"\nTotal: {len(all_chunks)} chunks ({langs_str}) in {time.time()-t0:.1f}s")
+    logger.info(f"Total: {len(all_chunks)} chunks ({langs_str}) in {time.time()-t0:.1f}s")
 
     # Embed
-    print(f"\nEmbedding with {model}...")
+    logger.info(f"Embedding with {model}...")
     t0 = time.time()
     texts = [c["text"] for c in all_chunks]
     embeddings = embed_batch(texts, ollama_url=ollama_url, model=model)
-    print(f"  {embeddings.shape} in {time.time()-t0:.1f}s")
+    logger.info(f"  {embeddings.shape} in {time.time()-t0:.1f}s")
 
     # Normalize
     norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
     embeddings = embeddings / np.where(norms > 0, norms, 1)
 
     # Build DYF tree
-    print("\nBuilding DYF tree...")
+    logger.info("Building DYF tree...")
     t0 = time.time()
     tree = build_dyf_tree(
         embeddings,
@@ -323,10 +326,10 @@ def index_source(
         seed=seed,
         fit_method="itq",
     )
-    print(f"  Tree built in {time.time()-t0:.1f}s")
+    logger.info(f"  Tree built in {time.time()-t0:.1f}s")
 
     # Write .dyf
-    print("\nWriting .dyf...")
+    logger.info("Writing .dyf...")
     t0 = time.time()
     titles = [c["title"] for c in all_chunks]
     files = [c["file"] for c in all_chunks]
@@ -361,8 +364,8 @@ def index_source(
         },
     )
     size_mb = output.stat().st_size / (1024 * 1024)
-    print(f"  Written {output.name} ({size_mb:.1f} MB) in {time.time()-t0:.1f}s")
-    print(f"\nDone. {len(all_chunks)} chunks indexed.")
+    logger.info(f"  Written {output.name} ({size_mb:.1f} MB) in {time.time()-t0:.1f}s")
+    logger.info(f"Done. {len(all_chunks)} chunks indexed.")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -413,7 +416,7 @@ def main(argv: list[str] | None = None) -> int:
 
     source_dir = args.source_dir.resolve()
     if not source_dir.is_dir():
-        print(f"Error: {source_dir} is not a directory")
+        logger.warning(f"Error: {source_dir} is not a directory")
         return 1
 
     output = args.output

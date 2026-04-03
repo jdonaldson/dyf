@@ -1,24 +1,23 @@
 """Level 1 → 2: Louvain clustering enrichment."""
 
 import json
-import re
+import logging
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 from dyf.colors import spatial_rgb_map
 from dyf.lazy_index import LazyIndex, rewrite_lazy_index
 from dyf.provenance import create_provenance, provenance_to_dict
 
 from ._labeling import (
-    annotate_cluster_names,
     label_clusters,
-    transfer_labels_majority_vote,
 )
 
 
-def fit_birch(data, target_k, max_iters=10):
+def fit_birch(data: np.ndarray, target_k: int, max_iters: int = 10):
     """Fit BIRCH with enough subclusters, then agglomerative merge."""
-    from scipy.cluster.hierarchy import linkage, fcluster
     from sklearn.cluster import Birch
 
     lo, hi = 1e-4, float(np.linalg.norm(data.max(axis=0) - data.min(axis=0)))
@@ -52,7 +51,7 @@ def fit_birch(data, target_k, max_iters=10):
     return birch
 
 
-def merge_tiny_clusters(labels, coords, min_pct=0.005):
+def merge_tiny_clusters(labels: np.ndarray, coords: np.ndarray, min_pct: float = 0.005) -> np.ndarray:
     """Merge clusters smaller than min_pct into nearest large neighbor."""
     from collections import Counter
     min_size = max(10, int(len(labels) * min_pct))
@@ -73,7 +72,7 @@ def merge_tiny_clusters(labels, coords, min_pct=0.005):
         dists = {c: np.linalg.norm(cent - v) for c, v in centroids.items()}
         nearest = min(dists, key=dists.get)
         labels[mask] = nearest
-        print(f"    Merged cluster {tcid} ({counts[tcid]} pts) → {nearest}")
+        logger.info(f"    Merged cluster {tcid} ({counts[tcid]} pts) → {nearest}")
 
     old_ids = sorted(set(labels.tolist()))
     id_map = {old: new for new, old in enumerate(old_ids)}
@@ -85,18 +84,18 @@ def enrich_cluster(dyf_path, model="gpt-oss:20b",
                    output_path=None, force=False, domain=None,
                    resolution=1.0):
     """Add Louvain cluster labels + dendrogram to a .dyf file (Level 1 → 2)."""
-    print(f"\n=== Level 2: Louvain Clustering (dendrogram) ===")
-    print(f"  Input: {dyf_path}")
+    logger.info("=== Level 2: Louvain Clustering (dendrogram) ===")
+    logger.info(f"  Input: {dyf_path}")
 
     with LazyIndex(dyf_path) as idx:
         level = idx.detect_enrichment_level()
         if level < 1:
-            print(f"  ERROR: Need level 1 (UMAP coords), got level {level}. "
-                  f"Run 'project' first.")
+            logger.warning(f"  Need level 1 (UMAP coords), got level {level}. "
+                          f"Run 'project' first.")
             return
         if level >= 2 and not force:
-            print(f"  Already at level {level} (has clusters), skipping. "
-                  f"Use --force to re-run.")
+            logger.info(f"  Already at level {level} (has clusters), skipping. "
+                       f"Use --force to re-run.")
             return
 
     # Extract data
@@ -117,28 +116,28 @@ def enrich_cluster(dyf_path, model="gpt-oss:20b",
     if domain is None:
         domain = data['metadata'].get('domain')
     if domain:
-        print(f"  Domain: {domain}")
+        logger.info(f"  Domain: {domain}")
 
     label_cache_data = json.loads(data['metadata'].get('_label_cache', '{}'))
     if label_cache_data:
-        print(f"  Loaded {len(label_cache_data)} label cache entries from .dyf")
+        logger.info(f"  Loaded {len(label_cache_data)} label cache entries from .dyf")
 
     split_kw_json = data['metadata'].get('split_keywords')
     split_kw_data = None
     if split_kw_json:
         split_kw_data = json.loads(split_kw_json)
         n_splits = len(split_kw_data.get('splits', {}))
-        print(f"  Using split keywords ({n_splits} splits) for label context")
+        logger.info(f"  Using split keywords ({n_splits} splits) for label context")
 
     tree_maps = None
     if split_kw_data:
         try:
             from dyf.splits import build_tree_maps
             with LazyIndex(dyf_path) as idx_tree:
-                tree_maps = build_tree_maps(idx_tree)
-            print(f"  Loaded tree structure for cluster-tree DAG")
+                tree_maps = build_tree_maps(idx_tree)  # noqa: F841
+            logger.info("  Loaded tree structure for cluster-tree DAG")
         except Exception as e:
-            print(f"  WARNING: Could not load tree structure: {e}")
+            logger.warning("Could not load tree structure: %s", e)
 
     # Check text diversity
     from dyf.splits import assess_text_diversity, label_clusters_frequency
@@ -146,30 +145,30 @@ def enrich_cluster(dyf_path, model="gpt-oss:20b",
     diversity = assess_text_diversity(title_list)
     use_frequency_labels = not diversity.is_diverse
     if use_frequency_labels:
-        print(f"  LOW TEXT DIVERSITY: {diversity.reason}")
-        print(f"    ({diversity.unique_token_count} unique tokens, "
-              f"token/item={diversity.token_item_ratio:.6f}, "
-              f"title ratio={diversity.unique_title_ratio:.4f})")
-        print(f"    Using frequency-based labeling (no LLM)")
+        logger.info(f"  LOW TEXT DIVERSITY: {diversity.reason}")
+        logger.info(f"    ({diversity.unique_token_count} unique tokens, "
+                    f"token/item={diversity.token_item_ratio:.6f}, "
+                    f"title ratio={diversity.unique_title_ratio:.4f})")
+        logger.info("    Using frequency-based labeling (no LLM)")
 
     new_sf = {}
     new_meta = {}
 
     # ── Louvain: natural communities with dendrogram ──
-    print(f"\n  Computing Louvain communities from tree leaves...")
+    logger.info("  Computing Louvain communities from tree leaves...")
     from dyf.agglomerate import compute_louvain_hierarchy
     with LazyIndex(dyf_path) as idx_agg:
         hierarchy = compute_louvain_hierarchy(idx_agg, coords, embeddings,
                                                  resolution=resolution)
 
     if hierarchy is None:
-        print("    Skipped: tree has fewer than 2 leaves")
+        logger.info("    Skipped: tree has fewer than 2 leaves")
     else:
         point_labels = hierarchy['point_labels']
         natural_k = hierarchy['natural_k']
-        print(f"    Natural k = {natural_k}")
+        logger.info(f"    Natural k = {natural_k}")
 
-        print(f"  Labeling {natural_k} communities...")
+        logger.info(f"  Labeling {natural_k} communities...")
         if use_frequency_labels:
             community_names = label_clusters_frequency(
                 title_list, point_labels)
@@ -233,16 +232,16 @@ def enrich_cluster(dyf_path, model="gpt-oss:20b",
                 hierarchy['community_embedding_centroids'])}
         new_meta['louvain_dendrogram'] = json.dumps(dendro_extra)
 
-        print(f"    Stored dendrogram metadata "
-              f"(Z: {len(hierarchy['Z'])} merges, "
-              f"{len(hierarchy['leaf_item_map'])} leaves)")
-        print(f"    Stored per-point fields: community_id, "
-              f"centroid_dist, nearest_other_dist")
+        logger.info(f"    Stored dendrogram metadata "
+                    f"(Z: {len(hierarchy['Z'])} merges, "
+                    f"{len(hierarchy['leaf_item_map'])} leaves)")
+        logger.info("    Stored per-point fields: community_id, "
+                    "centroid_dist, nearest_other_dist")
 
     # ── LSH tree-leaf agglomeration (50-bucket layer) ──
     from dyf.colors import tree_rgb_map
 
-    print("\n  Computing agglomerated DYF tree buckets...")
+    logger.info("  Computing agglomerated DYF tree buckets...")
     from dyf.agglomerate import agglomerate_tree_leaves
     with LazyIndex(dyf_path) as idx_agg:
         lsh_labels, lsh_names, lsh_label_data, item_leaf_map, tree_struct = \
@@ -250,9 +249,9 @@ def enrich_cluster(dyf_path, model="gpt-oss:20b",
 
     if lsh_labels is not None:
         n_lsh = len(set(lsh_labels.tolist()))
-        print(f"    {n_lsh} agglomerated buckets")
+        logger.info(f"    {n_lsh} agglomerated buckets")
 
-        print("  Labeling agglomerated buckets...")
+        logger.info("  Labeling agglomerated buckets...")
         if use_frequency_labels:
             bucket_names = label_clusters_frequency(title_list, lsh_labels)
         else:
@@ -284,16 +283,16 @@ def enrich_cluster(dyf_path, model="gpt-oss:20b",
         new_meta['lsh_bucket_colors'] = json.dumps(
             {str(k): v for k, v in lsh_colors.items()})
 
-        print(f"    Stored LSH bucket IDs, names, centroids, and colors")
+        logger.info("    Stored LSH bucket IDs, names, centroids, and colors")
     else:
-        print("    Skipped: tree has fewer than 2 leaves")
+        logger.info("    Skipped: tree has fewer than 2 leaves")
 
     # Strip stale level 3 metadata when re-clustering
     if force and level >= 3:
         for stale_key in ['edge_pairs', 'edge_paths_2d', 'tour_narration',
                           '_provenance_level_3']:
             new_meta[stale_key] = None
-        print("  Stripped stale level 3 metadata (re-run 'viz' to regenerate)")
+        logger.info("  Stripped stale level 3 metadata (re-run 'viz' to regenerate)")
 
     new_meta['_label_cache'] = json.dumps(label_cache_data)
 
@@ -319,11 +318,11 @@ def enrich_cluster(dyf_path, model="gpt-oss:20b",
             new_meta[key] = None
 
     if stale_fields:
-        print(f"  Dropping stale fields: {sorted(stale_fields)}")
+        logger.info(f"  Dropping stale fields: {sorted(stale_fields)}")
 
     out = output_path or dyf_path
-    print(f"\n  Writing enriched file: {out}")
+    logger.info(f"  Writing enriched file: {out}")
     rewrite_lazy_index(dyf_path, new_stored_fields=new_sf,
                        new_metadata=new_meta, output_path=out,
                        drop_fields=stale_fields)
-    print(f"  Done. Level 1 → 2 (dual 2D/3D)")
+    logger.info("  Done. Level 1 → 2 (dual 2D/3D)")

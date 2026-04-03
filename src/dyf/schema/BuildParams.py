@@ -4,9 +4,10 @@
 
 import flatbuffers
 from flatbuffers.compat import import_numpy
+
 np = import_numpy()
 
-class BuildParams(object):
+class BuildParams:
     __slots__ = ['_tab']
 
     @classmethod

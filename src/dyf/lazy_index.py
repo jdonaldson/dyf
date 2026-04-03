@@ -23,8 +23,8 @@ import json
 import mmap
 import struct
 from collections import deque
-from dataclasses import dataclass, field
 from collections.abc import Mapping, Sequence, Set
+from dataclasses import dataclass, field
 from typing import TypedDict
 
 import numpy as np
@@ -420,12 +420,21 @@ def write_lazy_index(
     """
     import flatbuffers
     import pyarrow as pa
+
+    from dyf.schema import (
+        BatchDescriptor as FBBatch,
+    )
+    from dyf.schema import (
+        BuildParams as FBBuildParams,
+    )
     from dyf.schema import (
         Index as FBIndex,
-        Node as FBNode,
-        BatchDescriptor as FBBatch,
-        BuildParams as FBBuildParams,
+    )
+    from dyf.schema import (
         KeyValue as FBKeyValue,
+    )
+    from dyf.schema import (
+        Node as FBNode,
     )
 
     has_embeddings = embeddings is not None
@@ -1516,7 +1525,6 @@ class LazyIndex:
         if hasattr(self, '_centroid_matrix'):
             return self._centroid_matrix, self._centroid_batch_indices
 
-        dim = self.embedding_dim
         centroids = []
         batch_indices = []
 
@@ -2415,7 +2423,7 @@ def rewrite_lazy_index(
         and output_path is None
     ):
         try:
-            from dyf_rs import DyfFile as RustDyfFile
+            from dyf_rs import DyfFile as RustDyfFile  # noqa: F401
             _append_fields_v2(path, new_stored_fields)
             return
         except ImportError:

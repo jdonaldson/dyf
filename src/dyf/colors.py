@@ -9,7 +9,7 @@ import colorsys
 import numpy as np
 
 
-def _hue_order_from_embeddings(labels, embeddings):
+def _hue_order_from_embeddings(labels: list[int] | np.ndarray, embeddings: np.ndarray) -> list[int]:
     """Order cluster labels by angular position of their embedding centroids.
 
     Projects cluster centroids onto PCA-2D, computes polar angle from the
@@ -48,7 +48,7 @@ def _hue_order_from_embeddings(labels, embeddings):
     return [unique[i] for i in order]
 
 
-def spatial_rgb_map(labels, embeddings):
+def spatial_rgb_map(labels: list[int] | np.ndarray, embeddings: np.ndarray) -> dict[int, list[int]]:
     """Return dict mapping label -> [r, g, b] with spatially coherent hues.
 
     Clusters that are close in embedding space get similar colors.
@@ -65,7 +65,7 @@ def spatial_rgb_map(labels, embeddings):
     return cmap
 
 
-def spatial_color_map(labels, embeddings):
+def spatial_color_map(labels: list[int] | np.ndarray, embeddings: np.ndarray) -> dict[int, str]:
     """Return dict mapping label -> hex color with spatially coherent hues."""
     ordered = _hue_order_from_embeddings(labels, embeddings)
     n = len(ordered)
@@ -77,7 +77,7 @@ def spatial_color_map(labels, embeddings):
     return cmap
 
 
-def tree_rgb_map(labels, tree_structure, item_leaf_map):
+def tree_rgb_map(labels: list[int] | np.ndarray, tree_structure: list[dict], item_leaf_map: np.ndarray) -> dict[int, list[int]]:
     """Assign colors by DFS leaf order of the DYF tree.
 
     Leaves adjacent in DFS share subtree ancestry, so they get similar hues.

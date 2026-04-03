@@ -37,14 +37,16 @@ IVF Initialization:
     >>> init_centroids = get_kmeans_init(embeddings, nlist=1000)
 """
 
-from dataclasses import dataclass, field
-from typing import Optional, List, Dict, Tuple
+import logging
 from collections import defaultdict
+from dataclasses import dataclass, field
 
 import numpy as np
 
+logger = logging.getLogger(__name__)
+
 try:
-    from dyf_rs import DensityClassifier, BridgeAnalysis
+    from dyf_rs import BridgeAnalysis, DensityClassifier  # noqa: F401
     _HAS_RUST = True
 except ImportError:
     _HAS_RUST = False
@@ -158,12 +160,12 @@ class BridgeIndex:
     seed: int = 42
 
     # Fitted state (populated by fit())
-    _embeddings: Optional[np.ndarray] = field(default=None, repr=False)
-    _anchor_indices: Optional[np.ndarray] = field(default=None, repr=False)
-    _anchor_embeddings: Optional[np.ndarray] = field(default=None, repr=False)
-    _neighborhoods: Optional[Dict[int, np.ndarray]] = field(default=None, repr=False)
-    _super_connectors: Optional[SuperConnectorResult] = field(default=None, repr=False)
-    _bridge_indices: Optional[np.ndarray] = field(default=None, repr=False)
+    _embeddings: np.ndarray | None = field(default=None, repr=False)
+    _anchor_indices: np.ndarray | None = field(default=None, repr=False)
+    _anchor_embeddings: np.ndarray | None = field(default=None, repr=False)
+    _neighborhoods: dict[int, np.ndarray] | None = field(default=None, repr=False)
+    _super_connectors: SuperConnectorResult | None = field(default=None, repr=False)
+    _bridge_indices: np.ndarray | None = field(default=None, repr=False)
     _fitted: bool = field(default=False, repr=False)
 
     def fit(self, embeddings: np.ndarray, verbose: bool = True) -> 'BridgeIndex':
@@ -187,11 +189,11 @@ class BridgeIndex:
         n_points, dim = embeddings.shape
 
         if verbose:
-            print(f"Building BridgeIndex: {n_points:,} points, dim={dim}")
+            logger.info(f"Building BridgeIndex: {n_points:,} points, dim={dim}")
 
         # Step 1: Find super connectors
         if verbose:
-            print("  Finding super connectors...")
+            logger.info("  Finding super connectors...")
         self._super_connectors = find_super_connectors(
             embeddings,
             global_num_bits=self.global_num_bits,
@@ -202,7 +204,7 @@ class BridgeIndex:
         )
 
         if verbose:
-            print(f"    {self._super_connectors.summary()}")
+            logger.info(f"    {self._super_connectors.summary()}")
 
         # Step 2: Get all bridge indices
         clf = DensityClassifier(embedding_dim=dim, num_bits=self.global_num_bits, seed=self.seed)
@@ -211,18 +213,18 @@ class BridgeIndex:
         self._bridge_indices = np.array(bridge_analysis.bridge_indices)
 
         if verbose:
-            print(f"    Total bridges: {len(self._bridge_indices):,}")
+            logger.info(f"    Total bridges: {len(self._bridge_indices):,}")
 
         # Step 3: Select orthogonal anchors
         if verbose:
-            print(f"  Selecting {self.n_anchors} orthogonal anchors...")
+            logger.info(f"  Selecting {self.n_anchors} orthogonal anchors...")
 
         # If we have bridges, use them as candidates; otherwise fall back to all points
         if len(self._bridge_indices) > 0:
             candidate_indices = self._bridge_indices
         else:
             if verbose:
-                print("    No bridges found, using all points as candidates")
+                logger.warning("    No bridges found, using all points as candidates")
             candidate_indices = None  # Will default to all points
 
         # If we have super connectors, use them as seeds; otherwise use None
@@ -242,7 +244,7 @@ class BridgeIndex:
         # Step 4: Add sparse region points if requested
         if self.include_sparse_points > 0:
             if verbose:
-                print(f"  Adding {self.include_sparse_points} sparse region points...")
+                logger.info(f"  Adding {self.include_sparse_points} sparse region points...")
 
             bucket_sizes = clf.get_bucket_sizes()
             sparse_mask = bucket_sizes < np.percentile(bucket_sizes, 25)
@@ -263,11 +265,11 @@ class BridgeIndex:
         self._anchor_embeddings = embeddings[self._anchor_indices]
 
         if verbose:
-            print(f"    Final anchors: {len(self._anchor_indices):,}")
+            logger.info(f"    Final anchors: {len(self._anchor_indices):,}")
 
         # Step 5: Precompute neighborhoods for each anchor
         if verbose:
-            print(f"  Precomputing {self.expansion_k}-NN neighborhoods...")
+            logger.info(f"  Precomputing {self.expansion_k}-NN neighborhoods...")
 
         self._neighborhoods = {}
         for anchor_idx in self._anchor_indices:
@@ -280,7 +282,7 @@ class BridgeIndex:
 
         if verbose:
             storage_mb = self._estimate_storage_mb()
-            print(f"  Index built: {storage_mb:.1f} MB")
+            logger.info(f"  Index built: {storage_mb:.1f} MB")
 
         return self
 
@@ -288,9 +290,9 @@ class BridgeIndex:
         self,
         query: np.ndarray,
         k: int = 10,
-        n_query_anchors: Optional[int] = None,
+        n_query_anchors: int | None = None,
         return_scores: bool = True
-    ) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+    ) -> tuple[np.ndarray, np.ndarray | None]:
         """
         Retrieve top-k candidates for a query embedding.
 
@@ -348,8 +350,8 @@ class BridgeIndex:
         self,
         queries: np.ndarray,
         k: int = 10,
-        n_query_anchors: Optional[int] = None
-    ) -> List[Tuple[np.ndarray, np.ndarray]]:
+        n_query_anchors: int | None = None
+    ) -> list[tuple[np.ndarray, np.ndarray]]:
         """
         Batch query for multiple embeddings.
 
@@ -421,7 +423,7 @@ class BridgeIndex:
         n_queries: int = 100,
         k: int = 10,
         seed: int = 42
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """
         Evaluate recall against brute-force search.
 
@@ -551,8 +553,8 @@ def find_super_connectors(
             for i in range(len(facet_bridge.bridge_indices)):
                 local_idx, _, neighbors = facet_bridge.get_bridge_connections(i)
                 local_centrality[indices[local_idx]] = len(neighbors) + 1
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Facet bridge analysis failed for bucket: %s", e)
 
     # Compute thresholds from non-zero values
     global_nonzero = global_centrality[global_centrality > 0]
@@ -587,8 +589,8 @@ def find_super_connectors(
 def select_orthogonal_anchors(
     embeddings: np.ndarray,
     k: int,
-    seed_indices: Optional[np.ndarray] = None,
-    candidate_indices: Optional[np.ndarray] = None,
+    seed_indices: np.ndarray | None = None,
+    candidate_indices: np.ndarray | None = None,
     use_bridges: bool = True,
     global_num_bits: int = 12,
     seed: int = 42
@@ -861,12 +863,12 @@ def get_kmeans_init(
     embeddings = embeddings / np.where(norms > 0, norms, 1)
 
     if verbose:
-        print(f"Computing bridge-seeded k-means initialization (nlist={nlist})...")
+        logger.info(f"Computing bridge-seeded k-means initialization (nlist={nlist})...")
 
     # Find candidate bridges
     if use_stable_bridges and num_stability_seeds > 1:
         if verbose:
-            print(f"  Finding stable bridges ({num_stability_seeds} seeds)...")
+            logger.info(f"  Finding stable bridges ({num_stability_seeds} seeds)...")
 
         # Count bridge appearances across seeds
         bridge_counts = np.zeros(n_points, dtype=np.int32)
@@ -889,7 +891,7 @@ def get_kmeans_init(
 
         if verbose:
             total_bridges = (bridge_counts > 0).sum()
-            print(f"    Total bridges: {total_bridges}, stable: {len(stable_bridges)}")
+            logger.info(f"    Total bridges: {total_bridges}, stable: {len(stable_bridges)}")
 
         if len(stable_bridges) >= nlist:
             candidate_indices = stable_bridges
@@ -904,17 +906,17 @@ def get_kmeans_init(
         candidate_indices = np.array(bridge_analysis.bridge_indices)
 
         if verbose:
-            print(f"  Found {len(candidate_indices)} bridges")
+            logger.info(f"  Found {len(candidate_indices)} bridges")
 
     # Fall back to all points if not enough candidates
     if len(candidate_indices) < nlist:
         if verbose:
-            print(f"  Not enough candidates ({len(candidate_indices)}), using all points")
+            logger.warning(f"  Not enough candidates ({len(candidate_indices)}), using all points")
         candidate_indices = np.arange(n_points)
 
     # Select orthogonal anchors
     if verbose:
-        print(f"  Selecting {nlist} orthogonal anchors...")
+        logger.info(f"  Selecting {nlist} orthogonal anchors...")
 
     anchor_result = select_orthogonal_anchors(
         embeddings,
@@ -930,7 +932,7 @@ def get_kmeans_init(
     # Pad if we didn't get enough anchors
     if len(init_centroids) < nlist:
         if verbose:
-            print(f"  Padding from {len(init_centroids)} to {nlist} centroids")
+            logger.warning(f"  Padding from {len(init_centroids)} to {nlist} centroids")
         rng = np.random.default_rng(seed)
         remaining = nlist - len(init_centroids)
         existing_set = set(anchor_result.indices)
@@ -939,6 +941,6 @@ def get_kmeans_init(
         init_centroids = np.vstack([init_centroids, embeddings[extra]])
 
     if verbose:
-        print(f"  Done. Returned {len(init_centroids)} initial centroids")
+        logger.info(f"  Done. Returned {len(init_centroids)} initial centroids")
 
     return init_centroids.astype(np.float32)

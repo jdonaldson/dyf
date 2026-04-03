@@ -8,9 +8,12 @@ individual points to their nearest bucket centroid to clean up impure leaves.
 
 from __future__ import annotations
 
+import logging
 from typing import TypedDict
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 class LouvainHierarchy(TypedDict):
@@ -124,8 +127,8 @@ def _reassign_points(point_labels, embeddings):
         if changed == 0:
             break
 
-    print(f"    Point reassignment: {_iter + 1} iterations, "
-          f"{changed} changed in last round")
+    logger.info(f"    Point reassignment: {_iter + 1} iterations, "
+                f"{changed} changed in last round")
     return point_labels
 
 
@@ -166,7 +169,7 @@ def merge_to_max_k(point_labels, embeddings, max_k=12):
     Returns:
         int32 array (N,) of merged cluster IDs (0-based contiguous).
     """
-    from scipy.cluster.hierarchy import linkage, fcluster
+    from scipy.cluster.hierarchy import fcluster, linkage
 
     unique_ids = sorted(set(point_labels.tolist()))
     current_k = len(unique_ids)
@@ -199,7 +202,7 @@ def merge_to_max_k(point_labels, embeddings, max_k=12):
     merged = _reassign_points(merged, embeddings)
 
     n_merged = len(set(merged.tolist()))
-    print(f"    Merged {current_k} → {n_merged} communities (max_k={max_k})")
+    logger.info(f"    Merged {current_k} → {n_merged} communities (max_k={max_k})")
     return merged
 
 
@@ -298,8 +301,8 @@ def compute_louvain_hierarchy(idx, coords, embeddings, leaf_k=10,
         labels_arr, n_communities = louvain_from_centroids(
             centroids_normed, k=k, resolution=resolution)
         leaf_labels = labels_arr.astype(np.int32)
-        print(f"    Louvain (Rust) found {n_communities} communities "
-              f"from {len(leaves)} leaves (k={k}, res={resolution})")
+        logger.info(f"    Louvain (Rust) found {n_communities} communities "
+                    f"from {len(leaves)} leaves (k={k}, res={resolution})")
     except ImportError:
         # Fall back to NetworkX Louvain
         import networkx as nx
@@ -336,8 +339,8 @@ def compute_louvain_hierarchy(idx, coords, embeddings, leaf_k=10,
                 next_id += 1
 
         n_communities = len(set(leaf_labels.tolist()))
-        print(f"    Louvain (NetworkX) found {n_communities} communities "
-              f"from {len(leaves)} leaves (k={k}, res={resolution})")
+        logger.info(f"    Louvain (NetworkX) found {n_communities} communities "
+                    f"from {len(leaves)} leaves (k={k}, res={resolution})")
 
     # Map points -> leaf -> community
     point_labels = np.full(n_points, -1, dtype=np.int32)
@@ -453,7 +456,7 @@ def agglomerate_tree_leaves(idx, coords, embeddings, n_groups=50):
         Returns ``(None, {}, [], None, tree)`` when the tree has fewer than
         two leaves.
     """
-    from scipy.cluster.hierarchy import linkage, fcluster
+    from scipy.cluster.hierarchy import fcluster, linkage
 
     result = _collect_leaf_data(idx)
     if result is None:
@@ -583,8 +586,8 @@ def louvain_cluster_leaves(idx, coords, embeddings, leaf_k=10,
             next_id += 1
 
     n_communities = len(set(leaf_labels.tolist()))
-    print(f"    Louvain found {n_communities} communities "
-          f"from {len(leaves)} leaves (k={k}, res={resolution})")
+    logger.info(f"    Louvain found {n_communities} communities "
+                f"from {len(leaves)} leaves (k={k}, res={resolution})")
 
     # Map points -> leaf -> community (initial assignment)
     point_labels = np.full(n_points, -1, dtype=np.int32)

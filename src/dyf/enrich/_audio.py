@@ -3,8 +3,11 @@
 import base64
 import io
 import json
+import logging
 
 from dyf.lazy_index import LazyIndex, rewrite_lazy_index
+
+logger = logging.getLogger(__name__)
 
 
 def generate_tour_audio(dyf_path, voice="bf_emma", speed=1.0, output_path=None):
@@ -20,8 +23,8 @@ def generate_tour_audio(dyf_path, voice="bf_emma", speed=1.0, output_path=None):
         import soundfile as sf
         from kokoro import KPipeline
     except ImportError as e:
-        print(f"Error: Kokoro TTS not available ({e})")
-        print("  Install with: pip install kokoro soundfile")
+        logger.warning(f"Kokoro TTS not available ({e})")
+        logger.warning("  Install with: pip install kokoro soundfile")
         raise SystemExit(1)
 
     idx = LazyIndex(dyf_path)
@@ -29,14 +32,14 @@ def generate_tour_audio(dyf_path, voice="bf_emma", speed=1.0, output_path=None):
 
     narration_json = meta.get("tour_narration")
     if not narration_json:
-        print(f"Error: No tour_narration metadata in {dyf_path}")
-        print("  Run 'dyf enrich viz' first to generate narration text.")
+        logger.warning(f"No tour_narration metadata in {dyf_path}")
+        logger.warning("  Run 'dyf enrich viz' first to generate narration text.")
         raise SystemExit(1)
 
     narration = json.loads(narration_json)
-    print(f"\n=== Generating tour audio ===")
-    print(f"  Voice: {voice}, Speed: {speed}")
-    print(f"  Narration keys: {len(narration)} ({', '.join(sorted(narration.keys()))})")
+    logger.info("=== Generating tour audio ===")
+    logger.info(f"  Voice: {voice}, Speed: {speed}")
+    logger.info(f"  Narration keys: {len(narration)} ({', '.join(sorted(narration.keys()))})")
 
     # Initialize Kokoro pipeline
     lang_code = 'b' if voice.startswith('b') else 'a'
@@ -59,19 +62,19 @@ def generate_tour_audio(dyf_path, voice="bf_emma", speed=1.0, output_path=None):
                 }
                 break  # Only need first chunk
         except Exception as e:
-            print(f"  [TTS] Failed for key '{cid}': {e}")
+            logger.warning("TTS failed for key '%s': %s", cid, e)
 
         done += 1
         if done % 5 == 0 or done == len(narration):
-            print(f"  Rendered {done}/{len(narration)} clips...")
+            logger.info(f"  Rendered {done}/{len(narration)} clips...")
 
-    print(f"  Total audio entries: {len(audio_data)}")
+    logger.info(f"  Total audio entries: {len(audio_data)}")
     total_bytes = sum(len(v["data"]) for v in audio_data.values())
-    print(f"  Total base64 size: {total_bytes / 1024 / 1024:.1f} MB")
+    logger.info(f"  Total base64 size: {total_bytes / 1024 / 1024:.1f} MB")
 
     out = output_path or dyf_path
-    print(f"  Writing tour_audio to: {out}")
+    logger.info(f"  Writing tour_audio to: {out}")
     rewrite_lazy_index(dyf_path, new_metadata={
         "tour_audio": json.dumps(audio_data),
     }, output_path=out)
-    print("  Done.")
+    logger.info("  Done.")

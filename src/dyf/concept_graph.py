@@ -25,13 +25,16 @@ from __future__ import annotations
 import argparse
 import glob as glob_mod
 import json
+import logging
 import os
 import re
 import time
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from difflib import SequenceMatcher
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     import numpy as np
@@ -49,7 +52,7 @@ class MarkdownChunk:
     text: str
     source: str
     line: int
-    metadata: Dict = field(default_factory=dict)
+    metadata: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -58,14 +61,14 @@ class ConceptNode:
     header: str
     source: str
     line: int
-    metadata: Dict = field(default_factory=dict)
-    neighbors: List[Dict] = field(default_factory=list)
+    metadata: dict = field(default_factory=dict)
+    neighbors: list[dict] = field(default_factory=list)
 
 
 @dataclass
 class ConceptGraphConfig:
     """Configuration for building and querying the concept graph."""
-    sources: List[str] = field(default_factory=lambda: [
+    sources: list[str] = field(default_factory=lambda: [
         "~/.claude/CLAUDE.md",
         "~/.claude/projects/*/memory/MEMORY.md",
         "~/Projects/CLAUDE.md",
@@ -78,7 +81,7 @@ class ConceptGraphConfig:
     similarity_threshold: float = 0.2
 
     @classmethod
-    def load(cls, path: Optional[str] = None) -> "ConceptGraphConfig":
+    def load(cls, path: str | None = None) -> ConceptGraphConfig:
         """Load config from JSON file, falling back to defaults."""
         if path is None:
             path = os.path.expanduser("~/.config/dyf/concept_graph.json")
@@ -89,7 +92,7 @@ class ConceptGraphConfig:
             return cls(**data)
         return cls()
 
-    def expand_sources(self) -> List[Path]:
+    def expand_sources(self) -> list[Path]:
         """Expand glob patterns and tilde in source paths."""
         paths = []
         for pattern in self.sources:
@@ -123,7 +126,7 @@ def chunk_markdown(
     source: str,
     min_length: int = 20,
     header_level: int = 2,
-) -> List[MarkdownChunk]:
+) -> list[MarkdownChunk]:
     """Split markdown into chunks at the given header level.
 
     Args:
@@ -141,7 +144,7 @@ def chunk_markdown(
 
     chunks = []
     current_header = None
-    current_lines: List[str] = []
+    current_lines: list[str] = []
     current_start_line = 1
     line_num = 0
 
@@ -189,11 +192,11 @@ def chunk_markdown(
 # ---------------------------------------------------------------------------
 
 def build_concept_graph(
-    chunks: List[MarkdownChunk],
+    chunks: list[MarkdownChunk],
     top_k: int = 5,
     threshold: float = 0.2,
     embedder_name: str = "low",
-) -> Tuple[Dict[str, ConceptNode], np.ndarray]:
+) -> tuple[dict[str, ConceptNode], np.ndarray]:
     """Embed chunks and build a cosine-similarity neighbor graph.
 
     Lazy-imports EmbedderConfig so that fuzzy_match stays dependency-free.
@@ -202,6 +205,7 @@ def build_concept_graph(
         (graph dict mapping chunk_id -> ConceptNode, embeddings array)
     """
     import numpy as np
+
     from dyf import EmbedderConfig
 
     embedder = getattr(EmbedderConfig, embedder_name.upper())
@@ -212,7 +216,7 @@ def build_concept_graph(
     norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
     cos_matrix = (embeddings @ embeddings.T) / (norms @ norms.T + 1e-10)
 
-    graph: Dict[str, ConceptNode] = {}
+    graph: dict[str, ConceptNode] = {}
     for i, chunk in enumerate(chunks):
         sims = cos_matrix[i]
         ranked = np.argsort(-sims)
@@ -247,7 +251,7 @@ def build_concept_graph(
 # Serialization
 # ---------------------------------------------------------------------------
 
-def save_graph(graph: Dict[str, ConceptNode], path: str) -> None:
+def save_graph(graph: dict[str, ConceptNode], path: str) -> None:
     """Save concept graph to JSON."""
     path = os.path.expanduser(path)
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -258,7 +262,7 @@ def save_graph(graph: Dict[str, ConceptNode], path: str) -> None:
         json.dump(data, f, indent=2)
 
 
-def load_graph(path: str) -> Dict[str, ConceptNode]:
+def load_graph(path: str) -> dict[str, ConceptNode]:
     """Load concept graph from JSON."""
     path = os.path.expanduser(path)
     with open(path) as f:
@@ -275,9 +279,9 @@ def load_graph(path: str) -> Dict[str, ConceptNode]:
 
 def fuzzy_match(
     query: str,
-    graph: Dict[str, ConceptNode],
+    graph: dict[str, ConceptNode],
     threshold: float = 0.4,
-) -> Tuple[Optional[str], float]:
+) -> tuple[str | None, float]:
     """Match query to node headers using string similarity.
 
     No model or heavy dependencies needed — uses SequenceMatcher.
@@ -313,16 +317,17 @@ def fuzzy_match(
 
 def semantic_search(
     query: str,
-    graph: Dict[str, ConceptNode],
+    graph: dict[str, ConceptNode],
     embeddings_cache_path: str = "~/.dyf/concept_embeddings.npz",
     embedder_name: str = "low",
     top_k: int = 5,
-) -> List[Tuple[str, float]]:
+) -> list[tuple[str, float]]:
     """Search by embedding similarity. Returns list of (node_id, score).
 
     Lazy-imports numpy and EmbedderConfig.
     """
     import numpy as np
+
     from dyf import EmbedderConfig
 
     cache_path = os.path.expanduser(embeddings_cache_path)
@@ -397,7 +402,7 @@ def _format_node(node: ConceptNode) -> str:
 # CLI
 # ---------------------------------------------------------------------------
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """CLI entry point for `dyf concepts`."""
     parser = argparse.ArgumentParser(
         prog="dyf concepts",
@@ -451,9 +456,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     return 1
 
 
-def _cmd_build(config: ConceptGraphConfig, extra_sources: List[str]) -> int:
+def _cmd_build(config: ConceptGraphConfig, extra_sources: list[str]) -> int:
     """Build the concept graph from configured sources."""
-    all_chunks: List[MarkdownChunk] = []
+    all_chunks: list[MarkdownChunk] = []
 
     source_paths = config.expand_sources()
     for extra in extra_sources:
@@ -462,14 +467,14 @@ def _cmd_build(config: ConceptGraphConfig, extra_sources: List[str]) -> int:
             source_paths.append(p)
 
     for source_path in source_paths:
-        print(f"Reading {source_path}")
+        logger.info("Reading %s", source_path)
         text = source_path.read_text()
         chunks = chunk_markdown(text, str(source_path))
-        print(f"  -> {len(chunks)} chunks")
+        logger.debug("  -> %d chunks", len(chunks))
         all_chunks.extend(chunks)
 
     if not all_chunks:
-        print("No chunks found!")
+        logger.warning("No chunks found!")
         return 1
 
     # Deduplicate by id
@@ -480,10 +485,10 @@ def _cmd_build(config: ConceptGraphConfig, extra_sources: List[str]) -> int:
             seen.add(c.id)
             deduped.append(c)
         else:
-            print(f"  Skipping duplicate: {c.id}")
+            logger.debug("  Skipping duplicate: %s", c.id)
     all_chunks = deduped
 
-    print(f"\nTotal: {len(all_chunks)} unique concept chunks")
+    logger.info("Total: %d unique concept chunks", len(all_chunks))
 
     graph, embeddings = build_concept_graph(
         all_chunks,
@@ -496,8 +501,8 @@ def _cmd_build(config: ConceptGraphConfig, extra_sources: List[str]) -> int:
     output_path = config.expand_path("output_path")
     save_graph(graph, output_path)
     total_edges = sum(len(n.neighbors) for n in graph.values())
-    print(f"\nGraph saved to {output_path}")
-    print(f"  {len(graph)} nodes, {total_edges} edges")
+    logger.info("Graph saved to %s", output_path)
+    logger.info("  %d nodes, %d edges", len(graph), total_edges)
 
     # Save embeddings cache
     import numpy as np
@@ -505,7 +510,7 @@ def _cmd_build(config: ConceptGraphConfig, extra_sources: List[str]) -> int:
     os.makedirs(os.path.dirname(cache_path), exist_ok=True)
     node_ids = list(graph.keys())
     np.savez(cache_path, embeddings=embeddings, ids=np.array(node_ids))
-    print(f"  Embeddings cached to {cache_path}")
+    logger.debug("  Embeddings cached to %s", cache_path)
 
     return 0
 
@@ -513,10 +518,10 @@ def _cmd_build(config: ConceptGraphConfig, extra_sources: List[str]) -> int:
 def _cmd_check(config: ConceptGraphConfig) -> int:
     """Check if graph is stale."""
     if check_staleness(config):
-        print("STALE - run `dyf concepts build`")
+        logger.warning("STALE - run `dyf concepts build`")
         return 1
     else:
-        print("OK - graph is current")
+        logger.info("OK - graph is current")
         return 0
 
 
@@ -529,7 +534,7 @@ def _cmd_query(
     """Query the concept graph."""
     graph_path = config.expand_path("output_path")
     if not os.path.exists(graph_path):
-        print("No graph found. Run: dyf concepts build")
+        logger.warning("No graph found. Run: dyf concepts build")
         return 1
 
     t0 = time.time()
@@ -543,18 +548,17 @@ def _cmd_query(
             top_k=top_k,
         )
         elapsed = time.time() - t0
-        print(f'## Semantic search: "{query_text}"\n')
+        logger.info('Semantic search: "%s"', query_text)
         for node_id, score in results:
             node = graph[node_id]
-            print(f"   {score:.3f}  {node.header}")
-            print(f"          {node.source}:{node.line}")
+            logger.info("   %0.3f  %s", score, node.header)
+            logger.debug("          %s:%d", node.source, node.line)
             if node.neighbors:
                 neighbor_headers = ", ".join(
                     n["header"] for n in node.neighbors[:3]
                 )
-                print(f"          -> neighbors: {neighbor_headers}")
-            print()
-        print(f"   ({elapsed:.3f}s)")
+                logger.info("          -> neighbors: %s", neighbor_headers)
+        logger.debug("   (%.3fs)", elapsed)
         return 0
 
     # Fuzzy match first
@@ -563,13 +567,13 @@ def _cmd_query(
 
     if node_id:
         node = graph[node_id]
-        print(_format_node(node))
-        print(f"\n   (matched '{node_id}' score={score:.2f}, {elapsed*1000:.1f}ms)")
+        logger.info(_format_node(node))
+        logger.debug("   (matched '%s' score=%.2f, %.1fms)", node_id, score, elapsed * 1000)
         return 0
 
     # Fall back to semantic
-    print(f'No header match for "{query_text}" (best={score:.2f})')
-    print("Falling back to semantic search...\n")
+    logger.info('No header match for "%s" (best=%.2f)', query_text, score)
+    logger.info("Falling back to semantic search...")
     results = semantic_search(
         query_text, graph,
         embeddings_cache_path=config.expand_path("embeddings_cache_path"),
@@ -579,9 +583,9 @@ def _cmd_query(
     elapsed = time.time() - t0
     for node_id, sim_score in results:
         node = graph[node_id]
-        print(f"   {sim_score:.3f}  {node.header}")
-        print(f"          {node.source}:{node.line}")
-    print(f"\n   ({elapsed:.3f}s)")
+        logger.info("   %0.3f  %s", sim_score, node.header)
+        logger.debug("          %s:%d", node.source, node.line)
+    logger.debug("   (%.3fs)", elapsed)
     return 0
 
 
@@ -589,18 +593,15 @@ def _cmd_list(config: ConceptGraphConfig, verbose: bool) -> int:
     """List all nodes in the graph."""
     graph_path = config.expand_path("output_path")
     if not os.path.exists(graph_path):
-        print("No graph found. Run: dyf concepts build")
+        logger.warning("No graph found. Run: dyf concepts build")
         return 1
 
     graph = load_graph(graph_path)
     for node_id, node in graph.items():
-        print(f"  {node_id}  [{node.header}]")
-        print(f"    {node.source}:{node.line}")
+        logger.info("  %s  [%s]", node_id, node.header)
+        logger.debug("    %s:%d", node.source, node.line)
         if verbose and node.neighbors:
             for n in node.neighbors:
-                print(f"      {n['similarity']:.3f}  {n['header']}")
-        if verbose:
-            print()
-
-    print(f"\n{len(graph)} nodes total")
+                logger.info("      %0.3f  %s", n['similarity'], n['header'])
+    logger.info("%d nodes total", len(graph))
     return 0

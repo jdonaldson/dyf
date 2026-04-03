@@ -12,11 +12,13 @@ def enrich_splits(dyf_path, max_depth=3, bigram_check=False, output_path=None,
                   use_embeddings=True):
     """Compute tree split keywords and store in .dyf metadata."""
     from dyf.splits import (
-        build_tree_maps, compute_domain_stopwords, compute_embedding_keywords,
+        build_tree_maps,
+        compute_domain_stopwords,
+        compute_embedding_keywords,
         compute_split_keywords,
     )
 
-    print(f"\n=== Split Keywords ===")
+    print("\n=== Split Keywords ===")
     print(f"  Input: {dyf_path}")
 
     hyperplanes = None
@@ -52,8 +54,8 @@ def enrich_splits(dyf_path, max_depth=3, bigram_check=False, output_path=None,
         )
     else:
         if use_embeddings:
-            print(f"  No hyperplanes found, falling back to TF-IDF")
-        print(f"  Using TF-IDF keyword extraction")
+            print("  No hyperplanes found, falling back to TF-IDF")
+        print("  Using TF-IDF keyword extraction")
         result = compute_split_keywords(
             titles, tree, leaf_batches, children_map,
             max_depth_from_root=max_depth,
@@ -99,4 +101,4 @@ def enrich_splits(dyf_path, max_depth=3, bigram_check=False, output_path=None,
     out = output_path or dyf_path
     print(f"  Writing enriched file: {out}")
     rewrite_lazy_index(dyf_path, new_metadata=new_meta, output_path=out)
-    print(f"  Done.")
+    print("  Done.")

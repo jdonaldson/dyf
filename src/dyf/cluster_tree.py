@@ -17,8 +17,7 @@ from collections import Counter, defaultdict
 import numpy as np
 
 from dyf.categorical import CategoryGraph
-from dyf.splits import tokenize, collect_descendant_indices
-
+from dyf.splits import collect_descendant_indices, tokenize
 
 # ── DAG construction ──────────────────────────────────────────────────
 

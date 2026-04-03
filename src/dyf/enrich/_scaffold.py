@@ -8,8 +8,11 @@ Stored as metadata key 'llm_scaffold'.
 """
 
 import json
+import logging
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 def _group_label_from_names(member_names, member_sizes=None):
@@ -376,17 +379,17 @@ def render_scaffold(scaffold_data):
 
 def enrich_scaffold(dyf_path, output_path=None):
     """Compute and store the LLM scaffold in a .dyf file."""
-    from dyf.lazy_index import LazyIndex, rewrite_lazy_index
+    from dyf.lazy_index import rewrite_lazy_index
 
-    print(f"Computing LLM scaffold for {dyf_path}...")
+    logger.info(f"Computing LLM scaffold for {dyf_path}...")
 
     scaffold_data = compute_scaffold(dyf_path)
     scaffold_text = render_scaffold(scaffold_data)
 
-    print(f"  Scaffold: {len(scaffold_data['communities'])} communities, "
-          f"{len(scaffold_data['groups'])} groups, "
-          f"{len(scaffold_data['analogies'])} analogies")
-    print(f"  Rendered: {len(scaffold_text)} chars (~{len(scaffold_text)//4} tokens)")
+    logger.info(f"  Scaffold: {len(scaffold_data['communities'])} communities, "
+                f"{len(scaffold_data['groups'])} groups, "
+                f"{len(scaffold_data['analogies'])} analogies")
+    logger.info(f"  Rendered: {len(scaffold_text)} chars (~{len(scaffold_text)//4} tokens)")
 
     # Store both structured data and rendered text
     out = output_path or dyf_path
@@ -398,4 +401,4 @@ def enrich_scaffold(dyf_path, output_path=None):
         },
         output_path=out,
     )
-    print(f"  Written to {out}")
+    logger.info(f"  Written to {out}")

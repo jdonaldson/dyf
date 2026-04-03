@@ -12,14 +12,17 @@ Requires: pip install "dyf[video]"
 """
 
 import argparse
+import logging
 import sys
 import time
 from pathlib import Path
 
 import numpy as np
 
+logger = logging.getLogger(__name__)
+
 from .dyf_tree import build_dyf_tree
-from .index_images import embed_images, load_vision_model, make_thumbnail, DEFAULT_MODEL
+from .index_images import DEFAULT_MODEL, embed_images, load_vision_model, make_thumbnail
 from .lazy_index import write_lazy_index
 
 
@@ -37,7 +40,7 @@ def _format_timestamp(seconds: float) -> str:
 def _load_scenedetect():
     """Lazy-load scenedetect and return (open_video, SceneManager, ContentDetector)."""
     try:
-        from scenedetect import open_video, SceneManager
+        from scenedetect import SceneManager, open_video
         from scenedetect.detectors import ContentDetector
         return open_video, SceneManager, ContentDetector
     except ImportError:
@@ -162,49 +165,49 @@ def index_video(
     batch_size: int = 16,
 ) -> None:
     """Index video keyframes into a .dyf file."""
-    print(f"Indexing video")
-    print(f"  Video:  {video_path}")
-    print(f"  Output: {output}")
-    print(f"  Model:  {model}")
+    logger.info("Indexing video")
+    logger.info(f"  Video:  {video_path}")
+    logger.info(f"  Output: {output}")
+    logger.info(f"  Model:  {model}")
 
     # Detect scenes
-    print(f"\nDetecting scenes (threshold={threshold})...")
+    logger.info(f"Detecting scenes (threshold={threshold})...")
     t0 = time.time()
     scenes = detect_scenes(video_path, threshold=threshold, min_scene_len=min_scene_len)
-    print(f"  {len(scenes)} scenes in {time.time()-t0:.1f}s")
+    logger.info(f"  {len(scenes)} scenes in {time.time()-t0:.1f}s")
 
     # Extract keyframes
-    print(f"\nExtracting keyframes...")
+    logger.info("Extracting keyframes...")
     t0 = time.time()
     raw_images = extract_keyframes(video_path, scenes)
-    print(f"  Extracted in {time.time()-t0:.1f}s")
+    logger.info(f"  Extracted in {time.time()-t0:.1f}s")
 
     # Filter out failed extractions
     valid = [(s, img) for s, img in zip(scenes, raw_images) if img is not None]
     if not valid:
-        print("No keyframes could be extracted.")
+        logger.warning("No keyframes could be extracted.")
         sys.exit(1)
 
     scenes_valid, images = zip(*valid)
     scenes_valid = list(scenes_valid)
     images = list(images)
-    print(f"  {len(images)} valid keyframes")
+    logger.info(f"  {len(images)} valid keyframes")
 
     # Load vision model
-    print(f"\nLoading vision model...")
+    logger.info("Loading vision model...")
     t0 = time.time()
     processor, vision_model, device = load_vision_model(model)
-    print(f"  Model loaded on {device} in {time.time()-t0:.1f}s")
+    logger.info(f"  Model loaded on {device} in {time.time()-t0:.1f}s")
 
     # Generate thumbnails
-    print(f"\nGenerating thumbnails...")
+    logger.info("Generating thumbnails...")
     thumbnails = [make_thumbnail(img) for img in images]
 
     # Embed
-    print(f"\nEmbedding keyframes...")
+    logger.info("Embedding keyframes...")
     t0 = time.time()
     embeddings = embed_images(images, processor, vision_model, device, batch_size)
-    print(f"  {embeddings.shape} in {time.time()-t0:.1f}s")
+    logger.info(f"  {embeddings.shape} in {time.time()-t0:.1f}s")
 
     # Normalize
     norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
@@ -221,7 +224,7 @@ def index_video(
     durations = [s["duration"] for s in scenes_valid]
 
     # Build DYF tree
-    print("\nBuilding DYF tree...")
+    logger.info("Building DYF tree...")
     t0 = time.time()
     tree = build_dyf_tree(
         embeddings,
@@ -231,10 +234,10 @@ def index_video(
         seed=seed,
         fit_method="itq",
     )
-    print(f"  Tree built in {time.time()-t0:.1f}s")
+    logger.info(f"  Tree built in {time.time()-t0:.1f}s")
 
     # Write .dyf
-    print("\nWriting .dyf...")
+    logger.info("Writing .dyf...")
     t0 = time.time()
     write_lazy_index(
         tree,
@@ -266,8 +269,8 @@ def index_video(
         },
     )
     size_mb = output.stat().st_size / (1024 * 1024)
-    print(f"  Written {output.name} ({size_mb:.1f} MB) in {time.time()-t0:.1f}s")
-    print(f"\nDone. {len(images)} keyframes indexed.")
+    logger.info(f"  Written {output.name} ({size_mb:.1f} MB) in {time.time()-t0:.1f}s")
+    logger.info(f"Done. {len(images)} keyframes indexed.")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -325,7 +328,7 @@ def main(argv: list[str] | None = None) -> int:
 
     video_path = args.video_file.resolve()
     if not video_path.is_file():
-        print(f"Error: {video_path} is not a file")
+        logger.warning(f"Error: {video_path} is not a file")
         return 1
 
     output = args.output

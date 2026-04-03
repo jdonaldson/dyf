@@ -18,10 +18,13 @@ Public API:
     boundary_persistence_scores — convenience: depth-weighted score array
 """
 
+import logging
 from collections import defaultdict
 
 import numpy as np
 from sklearn.cluster import AgglomerativeClustering
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -65,7 +68,8 @@ def _build_dyf_tree(embeddings, point_indices, depth, num_bits, min_leaf_size,
             clf.fit(subset)
         bucket_ids = clf.get_bucket_ids()
         centroid_sims = clf.get_centroid_similarities()
-    except Exception:
+    except Exception as e:
+        logger.debug("Tree split failed at depth %d: %s", depth, e)
         return {
             'children': [],
             'indices': point_indices,
@@ -84,14 +88,16 @@ def _build_dyf_tree(embeddings, point_indices, depth, num_bits, min_leaf_size,
     # Capture hyperplanes from the fitted classifier
     try:
         node_hyperplanes = clf.get_hyperplanes()
-    except Exception:
+    except Exception as e:
+        logger.debug("Could not extract hyperplanes: %s", e)
         node_hyperplanes = None
 
     # Capture eigenvalues
     try:
         ev = clf.get_eigenvalues()
         node_eigenvalues = ev if len(ev) > 0 else None
-    except Exception:
+    except Exception as e:
+        logger.debug("Could not extract eigenvalues: %s", e)
         node_eigenvalues = None
 
     # Group by bucket
@@ -356,7 +362,8 @@ def _try_resplit(indices, embeddings, num_bits, seed):
         clf.fit(subset)
         bucket_ids = clf.get_bucket_ids()
         centroid_sims = clf.get_centroid_similarities()
-    except Exception:
+    except Exception as e:
+        logger.debug("Resplit failed: %s", e)
         return None
 
     unique_buckets = sorted(set(bucket_ids.tolist()))
@@ -614,7 +621,8 @@ def refine_clusters(labels, embeddings, min_coherence=None,
                                 seed=seed_offset, skip_isolation=True)
         clf.fit(ejected_emb)
         bucket_ids = clf.get_bucket_ids()
-    except Exception:
+    except Exception as e:
+        logger.debug("Ejected re-split failed, falling back to zeros: %s", e)
         # Fallback: assign all ejected to nearest coherent centroid
         bucket_ids = np.zeros(len(ejected_indices), dtype=int)
 
@@ -702,9 +710,9 @@ def refine_clusters(labels, embeddings, min_coherence=None,
     remap = {old: new for new, old in enumerate(unique_final)}
     labels = np.array([remap[l] for l in labels], dtype=int)
 
-    print(f"  refine_clusters: ejected {n_ejected} pts from "
-          f"{n_ejected_clusters} clusters, "
-          f"{n_merged_together} small merged together, "
-          f"{n_merged_into_large} merged into large")
+    logger.info(f"  refine_clusters: ejected {n_ejected} pts from "
+                f"{n_ejected_clusters} clusters, "
+                f"{n_merged_together} small merged together, "
+                f"{n_merged_into_large} merged into large")
 
     return labels

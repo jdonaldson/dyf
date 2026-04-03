@@ -32,5 +32,8 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[dev,full,io,lazy]"
 
+      - name: Lint
+        run: ruff check src/dyf/ && ruff format --check src/dyf/
+
       - name: Run tests
-        run: pytest tests/ -v --tb=short
+        run: pytest tests/ -v --tb=short --cov=dyf --cov-report=term-missing

@@ -26,9 +26,9 @@ Full-Featured Usage:
 # Fast Rust implementation (core classifier)
 try:
     from dyf_rs import (
+        BridgeAnalysis,
         DensityClassifier,
         DensityReport,
-        BridgeAnalysis,
     )
     _HAS_RUST = True
 except ImportError:
@@ -38,17 +38,6 @@ except ImportError:
     BridgeAnalysis = None
 
 # Embedding and labeling configs
-from .configs import (
-    EmbedderConfig,
-    LabelerConfig,
-    list_configs,
-)
-
-# Python wrapper with full features
-from .classifier import (
-    DensityClassifier as DensityClassifierFull,
-)
-
 # Chunk analysis
 from .chunks import (
     DocSpread,
@@ -59,31 +48,50 @@ from .chunks import (
     neighbor_coherence,
 )
 
-# PCA tree
-from .pca_tree import (
-    build_pca_tree,
-    extract_boundary_persistence,
-    boundary_persistence_scores,
-    cut_tree_to_labels,
+# Python wrapper with full features
+from .classifier import (
+    DensityClassifier as DensityClassifierFull,
+)
+from .configs import (
+    EmbedderConfig,
+    LabelerConfig,
+    list_configs,
 )
 
 # DYF tree (recursive k-ary LSH splits)
 from .dyf_tree import (
     build_dyf_tree,
-    refine_dyf_tree,
     cut_dyf_tree_to_labels,
     refine_clusters,
+    refine_dyf_tree,
 )
+
+# PCA tree
+from .pca_tree import (
+    boundary_persistence_scores,
+    build_pca_tree,
+    cut_tree_to_labels,
+    extract_boundary_persistence,
+)
+
 # Also available: dyf_tree.extract_boundary_persistence,
 #                 dyf_tree.boundary_persistence_scores
 
 # Lazy index (FlatBuffers + Arrow IPC)
 try:
     from .lazy_index import (
-        LazyIndex, write_lazy_index, rewrite_lazy_index, split_dyf3,
-        from_faiss, SearchResult, AdaptiveProbeConfig,
-        ExtractedData, StoredFieldValue, StoredFieldInput, TreeNode,
+        AdaptiveProbeConfig,
+        ExtractedData,
+        LazyIndex,
+        SearchResult,
+        StoredFieldInput,
+        StoredFieldValue,
+        TreeNode,
         detect_dyf_version,
+        from_faiss,
+        rewrite_lazy_index,
+        split_dyf3,
+        write_lazy_index,
     )
     _HAS_LAZY = True
 except ImportError:
@@ -101,10 +109,19 @@ except ImportError:
     TreeNode = None
 
 # Fisher dimension weighting
-from .fisher import (
-    compute_fisher_weights,
-    apply_fisher_weights,
+import logging
+
+# CatalogSpace — available via dyf.catalog (not re-exported)
+# Pipeline DAG runner — available via dyf.pipeline (not re-exported)
+# Concept graph — available via dyf.concept_graph (not re-exported)
+from . import (
+    catalog,  # noqa: F401
+    concept_graph,  # noqa: F401
+    pipeline,  # noqa: F401
 )
+
+# Tree-leaf agglomeration
+from .agglomerate import agglomerate_tree_leaves, louvain_cluster_leaves, merge_to_max_k
 
 # Categorical DAG
 from .categorical import (
@@ -115,13 +132,73 @@ from .categorical import (
     diagnostics_to_metadata,
     discover_categorical_columns,
     embed_with_diagnostics,
+    load_category_graphs,
     multi_level_fisher_weights,
     store_category_graph,
-    load_category_graphs,
 )
 
-# CatalogSpace — available via dyf.catalog (not re-exported)
-from . import catalog  # noqa: F401
+# Cluster-tree DAG
+from .cluster_tree import (
+    build_cluster_tree_dag,
+    compute_sibling_keywords,
+    derive_path_labels,
+    format_cluster_context,
+)
+
+# Spatial cluster coloring
+from .colors import spatial_color_map, spatial_rgb_map, tree_rgb_map
+from .fisher import (
+    apply_fisher_weights,
+    compute_fisher_weights,
+)
+
+# Ontology (DAG taxonomy extraction)
+from .ontology import (
+    DAGChain,
+    DAGMiningResult,
+    DAGTaxonomy,
+    HubScoreResult,
+    ROGLayer,
+    ROGResult,
+    UnifiedOntologyResult,
+    build_dag_taxonomy,
+    build_rog_ontology,
+    build_unified_ontology,
+    compute_hub_score,
+    compute_neighbor_diversity,
+    mine_dag_chains,
+)
+
+# Provenance tracking
+from .provenance import (
+    Provenance,
+    check_compatible,
+    create_provenance,
+    file_hash,
+    params_hash,
+    provenance_from_dict,
+    provenance_to_dict,
+)
+
+# RAG index
+from .rag import (
+    BridgeIndex,
+    FacetDiverseResult,
+    OrthogonalAnchorResult,
+    SuperConnectorResult,
+    diversify_by_facet,
+    find_super_connectors,
+    get_kmeans_init,
+    select_orthogonal_anchors,
+)
+
+# Re-ranking
+from .rerank import (
+    rerank_bridge_boost,
+    rerank_bridge_mmr,
+    rerank_mmr,
+    rerank_standard,
+)
 
 # Split-based tree keywords
 from .splits import (
@@ -137,75 +214,10 @@ from .splits import (
     tokenize,
 )
 
-# Cluster-tree DAG
-from .cluster_tree import (
-    build_cluster_tree_dag,
-    compute_sibling_keywords,
-    derive_path_labels,
-    format_cluster_context,
-)
-
-# Tree-leaf agglomeration
-from .agglomerate import agglomerate_tree_leaves, louvain_cluster_leaves, merge_to_max_k
-
-# Spatial cluster coloring
-from .colors import spatial_rgb_map, spatial_color_map, tree_rgb_map
-
-# Pipeline DAG runner — available via dyf.pipeline (not re-exported)
-from . import pipeline  # noqa: F401
-
-# Provenance tracking
-from .provenance import (
-    Provenance,
-    file_hash,
-    params_hash,
-    create_provenance,
-    check_compatible,
-    provenance_to_dict,
-    provenance_from_dict,
-)
-
-# Concept graph — available via dyf.concept_graph (not re-exported)
-from . import concept_graph  # noqa: F401
-
-# Re-ranking
-from .rerank import (
-    rerank_standard,
-    rerank_mmr,
-    rerank_bridge_boost,
-    rerank_bridge_mmr,
-)
-
-# RAG index
-from .rag import (
-    BridgeIndex,
-    SuperConnectorResult,
-    OrthogonalAnchorResult,
-    FacetDiverseResult,
-    find_super_connectors,
-    select_orthogonal_anchors,
-    diversify_by_facet,
-    get_kmeans_init,
-)
-
-# Ontology (DAG taxonomy extraction)
-from .ontology import (
-    DAGChain,
-    DAGMiningResult,
-    DAGTaxonomy,
-    UnifiedOntologyResult,
-    ROGLayer,
-    ROGResult,
-    HubScoreResult,
-    compute_neighbor_diversity,
-    compute_hub_score,
-    mine_dag_chains,
-    build_dag_taxonomy,
-    build_unified_ontology,
-    build_rog_ontology,
-)
+logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 from importlib.metadata import version as _get_version
+
 __version__ = _get_version("dyf")
 __all__ = [
     # Fast Rust core

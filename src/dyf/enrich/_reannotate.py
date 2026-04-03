@@ -11,7 +11,7 @@ from ._labeling import annotate_cluster_names, transfer_labels_majority_vote
 
 def reannotate(dyf_path, output_path=None):
     """Re-run glyph annotations on existing cluster names without re-clustering."""
-    print(f"\n=== Reannotate Cluster Glyphs ===")
+    print("\n=== Reannotate Cluster Glyphs ===")
     print(f"  Input: {dyf_path}")
 
     with LazyIndex(dyf_path) as idx:

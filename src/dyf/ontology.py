@@ -22,11 +22,13 @@ Example:
     >>> print(result.summary())
 """
 
-from dataclasses import dataclass
-from typing import Optional, List, Dict, Tuple
+import logging
 from collections import defaultdict
+from dataclasses import dataclass
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 # ============================================================
@@ -71,9 +73,9 @@ class DAGMiningResult:
         parent_child_edges: List of (parent, child, similarity, gap) tuples
         n_components: Number of connected components in the DAG
     """
-    chains: List[DAGChain]
+    chains: list[DAGChain]
     diversity: np.ndarray
-    parent_child_edges: List[Tuple[int, int, float, float]]
+    parent_child_edges: list[tuple[int, int, float, float]]
     n_components: int
 
     def __len__(self) -> int:
@@ -98,11 +100,11 @@ class DAGMiningResult:
             f"  Parent-child edges: {len(self.parent_child_edges)}"
         )
 
-    def get_chains_by_length(self, min_length: int = 3) -> List[DAGChain]:
+    def get_chains_by_length(self, min_length: int = 3) -> list[DAGChain]:
         """Return chains with at least min_length nodes."""
         return [c for c in self.chains if len(c) >= min_length]
 
-    def get_chains_by_coherence(self, min_coherence: float = 0.65) -> List[DAGChain]:
+    def get_chains_by_coherence(self, min_coherence: float = 0.65) -> list[DAGChain]:
         """Return chains with at least min_coherence."""
         return [c for c in self.chains if c.coherence >= min_coherence]
 
@@ -110,7 +112,7 @@ class DAGMiningResult:
 def compute_neighbor_diversity(
     embeddings: np.ndarray,
     k: int = 15,
-    neighbors: Optional[np.ndarray] = None,
+    neighbors: np.ndarray | None = None,
 ) -> np.ndarray:
     """
     Compute neighbor diversity for each point.
@@ -202,8 +204,8 @@ def compute_hub_score(
     embeddings: np.ndarray,
     k: int = 30,
     n_iterations: int = 30,
-    neighbors: Optional[np.ndarray] = None,
-    similarities: Optional[np.ndarray] = None,
+    neighbors: np.ndarray | None = None,
+    similarities: np.ndarray | None = None,
 ) -> HubScoreResult:
     """
     Compute hub score for each point in the embedding space.
@@ -341,11 +343,11 @@ def mine_dag_chains(
     n_points, dim = embeddings.shape
 
     if verbose:
-        print(f"Mining DAG chains: {n_points:,} points, dim={dim}")
+        logger.info("Mining DAG chains: %s points, dim=%d", f"{n_points:,}", dim)
 
     # Build k-NN graph
     if verbose:
-        print("  Building k-NN graph...")
+        logger.info("Building k-NN graph...")
     nn = NearestNeighbors(n_neighbors=k_neighbors + 1, metric='cosine')
     nn.fit(embeddings)
     distances, neighbors = nn.kneighbors(embeddings)
@@ -353,15 +355,15 @@ def mine_dag_chains(
 
     # Compute neighbor diversity
     if verbose:
-        print("  Computing neighbor diversity...")
+        logger.info("Computing neighbor diversity...")
     diversity = compute_neighbor_diversity(embeddings, k=15, neighbors=neighbors)
 
     if verbose:
-        print(f"    Diversity range: {diversity.min():.3f} to {diversity.max():.3f}")
+        logger.debug("Diversity range: %.3f to %.3f", diversity.min(), diversity.max())
 
     # Find parent-child pairs based on diversity gradient
     if verbose:
-        print("  Finding parent-child pairs...")
+        logger.info("Finding parent-child pairs...")
 
     parent_child_edges = []
 
@@ -382,7 +384,7 @@ def mine_dag_chains(
                 parent_child_edges.append((j, i, float(sim), float(-gap)))
 
     if verbose:
-        print(f"    Found {len(parent_child_edges)} parent-child pairs")
+        logger.debug("Found %d parent-child pairs", len(parent_child_edges))
 
     # Build adjacency lists
     children = defaultdict(list)
@@ -417,11 +419,11 @@ def mine_dag_chains(
     n_components = len(components)
 
     if verbose:
-        print(f"    Found {n_components} non-trivial components")
+        logger.debug("Found %d non-trivial components", n_components)
 
     # Extract chains from components
     if verbose:
-        print("  Extracting chains...")
+        logger.info("Extracting chains...")
 
     def extract_chains_from_component(component_nodes):
         """Extract maximal chains from a connected component."""
@@ -481,10 +483,10 @@ def mine_dag_chains(
     chains.sort(key=lambda x: x.coherence * len(x), reverse=True)
 
     if verbose:
-        print(f"    Extracted {len(chains)} chains (length >= {min_chain_length})")
+        logger.info("Extracted %d chains (length >= %d)", len(chains), min_chain_length)
         if chains:
             clean = [c for c in chains if c.coherence >= 0.65 and len(c) >= 4]
-            print(f"    Clean hierarchies (coh >= 0.65, len >= 4): {len(clean)}")
+            logger.debug("Clean hierarchies (coh >= 0.65, len >= 4): %d", len(clean))
 
     return DAGMiningResult(
         chains=chains,
@@ -538,10 +540,10 @@ class DAGTaxonomy:
     """
     n_nodes: int
     diversity: np.ndarray
-    children: Dict[int, List[Tuple[int, float, float]]]
-    parents: Dict[int, List[Tuple[int, float, float]]]
-    roots: List[int]
-    leaves: List[int]
+    children: dict[int, list[tuple[int, float, float]]]
+    parents: dict[int, list[tuple[int, float, float]]]
+    roots: list[int]
+    leaves: list[int]
 
     def __len__(self) -> int:
         """Number of nodes with edges."""
@@ -565,11 +567,11 @@ class DAGTaxonomy:
             f"  Max children: {max_children}"
         )
 
-    def get_children(self, node: int) -> List[int]:
+    def get_children(self, node: int) -> list[int]:
         """Get direct children of a node."""
         return [c for c, _, _ in self.children.get(node, [])]
 
-    def get_parents(self, node: int) -> List[int]:
+    def get_parents(self, node: int) -> list[int]:
         """Get direct parents of a node."""
         return [p for p, _, _ in self.parents.get(node, [])]
 
@@ -646,7 +648,7 @@ class DAGTaxonomy:
         ancestors_b = self.get_ancestors(node_b, max_depth)
         return ancestors_a & ancestors_b
 
-    def get_lowest_common_ancestors(self, node_a: int, node_b: int, max_depth: int = 10) -> List[int]:
+    def get_lowest_common_ancestors(self, node_a: int, node_b: int, max_depth: int = 10) -> list[int]:
         """
         Find lowest common ancestors (LCAs) of two nodes.
 
@@ -675,7 +677,7 @@ class DAGTaxonomy:
 
         return lcas
 
-    def get_convergence_points(self, min_parents: int = 5) -> List[Tuple[int, int]]:
+    def get_convergence_points(self, min_parents: int = 5) -> list[tuple[int, int]]:
         """
         Find convergence points (nodes with many incoming edges).
 
@@ -695,7 +697,7 @@ class DAGTaxonomy:
         convergence.sort(key=lambda x: x[1], reverse=True)
         return convergence
 
-    def get_divergence_points(self, min_children: int = 5) -> List[Tuple[int, int]]:
+    def get_divergence_points(self, min_children: int = 5) -> list[tuple[int, int]]:
         """
         Find divergence points (nodes with many outgoing edges).
 
@@ -715,7 +717,7 @@ class DAGTaxonomy:
         divergence.sort(key=lambda x: x[1], reverse=True)
         return divergence
 
-    def get_diamond_patterns(self, limit: int = 100) -> List[Tuple[int, int, int, int]]:
+    def get_diamond_patterns(self, limit: int = 100) -> list[tuple[int, int, int, int]]:
         """
         Find diamond patterns (A → B, A → C, B → D, C → D).
 
@@ -745,7 +747,7 @@ class DAGTaxonomy:
 
         return diamonds
 
-    def get_path(self, start: int, end: int, max_depth: int = 10) -> Optional[List[int]]:
+    def get_path(self, start: int, end: int, max_depth: int = 10) -> list[int] | None:
         """
         Find a path from start to end (following parent→child direction).
 
@@ -778,7 +780,7 @@ class DAGTaxonomy:
 
         return None
 
-    def get_all_paths(self, start: int, end: int, max_depth: int = 10) -> List[List[int]]:
+    def get_all_paths(self, start: int, end: int, max_depth: int = 10) -> list[list[int]]:
         """
         Find all paths from start to end.
 
@@ -797,7 +799,7 @@ class DAGTaxonomy:
 
         paths = []
 
-        def dfs(current: int, path: List[int]):
+        def dfs(current: int, path: list[int]):
             if len(path) > max_depth:
                 return
             if current == end:
@@ -893,11 +895,11 @@ def build_dag_taxonomy(
     n_points, dim = embeddings.shape
 
     if verbose:
-        print(f"Building DAG taxonomy: {n_points:,} points, dim={dim}")
+        logger.info("Building DAG taxonomy: %s points, dim=%d", f"{n_points:,}", dim)
 
     # Build k-NN graph
     if verbose:
-        print("  Building k-NN graph...")
+        logger.info("Building k-NN graph...")
     nn = NearestNeighbors(n_neighbors=k_neighbors + 1, metric='cosine')
     nn.fit(embeddings)
     distances, neighbors = nn.kneighbors(embeddings)
@@ -905,15 +907,15 @@ def build_dag_taxonomy(
 
     # Compute neighbor diversity
     if verbose:
-        print("  Computing neighbor diversity...")
+        logger.info("Computing neighbor diversity...")
     diversity = compute_neighbor_diversity(embeddings, k=15, neighbors=neighbors)
 
     # Find parent-child pairs
     if verbose:
-        print("  Finding parent-child relationships...")
+        logger.info("Finding parent-child relationships...")
 
-    children: Dict[int, List[Tuple[int, float, float]]] = defaultdict(list)
-    parents: Dict[int, List[Tuple[int, float, float]]] = defaultdict(list)
+    children: dict[int, list[tuple[int, float, float]]] = defaultdict(list)
+    parents: dict[int, list[tuple[int, float, float]]] = defaultdict(list)
 
     for i in range(n_points):
         for j_idx, j in enumerate(neighbors[i, 1:16]):
@@ -945,9 +947,9 @@ def build_dag_taxonomy(
     if verbose:
         n_edges = sum(len(v) for v in children.values())
         n_multi = sum(1 for v in parents.values() if len(v) > 1)
-        print(f"    Nodes: {len(all_nodes)}, Edges: {n_edges}")
-        print(f"    Roots: {len(roots)}, Leaves: {len(leaves)}")
-        print(f"    Multi-parent nodes: {n_multi} ({100*n_multi/max(len(all_nodes),1):.1f}%)")
+        logger.debug("Nodes: %d, Edges: %d", len(all_nodes), n_edges)
+        logger.debug("Roots: %d, Leaves: %d", len(roots), len(leaves))
+        logger.debug("Multi-parent nodes: %d (%.1f%%)", n_multi, 100 * n_multi / max(len(all_nodes), 1))
 
     return DAGTaxonomy(
         n_nodes=n_points,
@@ -1065,11 +1067,11 @@ def build_unified_ontology(
     n_points, dim = embeddings.shape
 
     if verbose:
-        print(f"Building unified ontology: {n_points:,} points, dim={dim}")
+        logger.info("Building unified ontology: %s points, dim=%d", f"{n_points:,}", dim)
 
     # Step 1: Build main ontology
     if verbose:
-        print(f"\n1. Building main ontology (sim≥{main_similarity_threshold})...")
+        logger.info("1. Building main ontology (sim>=%.2f)...", main_similarity_threshold)
 
     main_ont = build_dag_taxonomy(
         embeddings,
@@ -1083,12 +1085,12 @@ def build_unified_ontology(
     main_outlier_indices = list(set(range(n_points)) - main_connected)
 
     if verbose:
-        print(f"   Main: {len(main_connected)} nodes, {sum(len(v) for v in main_ont.children.values())} edges")
-        print(f"   Outliers: {len(main_outlier_indices)} nodes")
+        logger.debug("Main: %d nodes, %d edges", len(main_connected), sum(len(v) for v in main_ont.children.values()))
+        logger.debug("Outliers: %d nodes", len(main_outlier_indices))
 
     # Step 2: Build outlier ontology
     if verbose:
-        print(f"\n2. Building outlier ontology (sim≥{outlier_similarity_threshold})...")
+        logger.info("2. Building outlier ontology (sim>=%.2f)...", outlier_similarity_threshold)
 
     if len(main_outlier_indices) > 0:
         outlier_embeddings = embeddings[main_outlier_indices]
@@ -1107,8 +1109,8 @@ def build_unified_ontology(
         outlier_to_global = {i: main_outlier_indices[i] for i in range(len(main_outlier_indices))}
 
         if verbose:
-            print(f"   Outlier ontology: {len(outlier_connected)} nodes, {sum(len(v) for v in outlier_ont.children.values())} edges")
-            print(f"   Double outliers: {len(double_outlier_local)}")
+            logger.debug("Outlier ontology: %d nodes, %d edges", len(outlier_connected), sum(len(v) for v in outlier_ont.children.values()))
+            logger.debug("Double outliers: %d", len(double_outlier_local))
     else:
         outlier_ont = None
         outlier_connected = set()
@@ -1117,10 +1119,10 @@ def build_unified_ontology(
 
     # Step 3: Build unified structure
     if verbose:
-        print("\n3. Merging into unified ontology...")
+        logger.info("3. Merging into unified ontology...")
 
-    children: Dict[int, List[Tuple[int, float, float]]] = defaultdict(list)
-    parents: Dict[int, List[Tuple[int, float, float]]] = defaultdict(list)
+    children: dict[int, list[tuple[int, float, float]]] = defaultdict(list)
+    parents: dict[int, list[tuple[int, float, float]]] = defaultdict(list)
 
     # Add main ontology edges
     for parent, child_list in main_ont.children.items():
@@ -1139,7 +1141,7 @@ def build_unified_ontology(
 
     # Step 4: Add bridge edges
     if verbose:
-        print("\n4. Adding bridge edges...")
+        logger.info("4. Adding bridge edges...")
 
     bridge_edges = 0
     if len(outlier_connected) > 0:
@@ -1165,7 +1167,7 @@ def build_unified_ontology(
                         bridge_edges += 1
 
     if verbose:
-        print(f"   Bridge edges added: {bridge_edges}")
+        logger.debug("Bridge edges added: %d", bridge_edges)
 
     # Convert to regular dicts
     children = dict(children)
@@ -1194,12 +1196,12 @@ def build_unified_ontology(
     if verbose:
         n_edges = sum(len(v) for v in children.values())
         n_multi = sum(1 for v in parents.values() if len(v) > 1)
-        print(f"\n" + "="*60)
-        print(f"Unified ontology complete:")
-        print(f"  Coverage: {len(all_nodes)}/{n_points} ({100*len(all_nodes)/n_points:.1f}%)")
-        print(f"  Edges: {n_edges} (main={sum(len(v) for v in main_ont.children.values())}, outlier={sum(len(v) for v in outlier_ont.children.values()) if outlier_ont else 0}, bridge={bridge_edges})")
-        print(f"  Multi-parent: {n_multi} ({100*n_multi/max(len(all_nodes),1):.1f}%)")
-        print(f"  Excluded: {len(excluded_nodes)} double outliers")
+        outlier_edges = sum(len(v) for v in outlier_ont.children.values()) if outlier_ont else 0
+        logger.info("Unified ontology complete:")
+        logger.info("  Coverage: %d/%d (%.1f%%)", len(all_nodes), n_points, 100 * len(all_nodes) / n_points)
+        logger.info("  Edges: %d (main=%d, outlier=%d, bridge=%d)", n_edges, sum(len(v) for v in main_ont.children.values()), outlier_edges, bridge_edges)
+        logger.info("  Multi-parent: %d (%.1f%%)", n_multi, 100 * n_multi / max(len(all_nodes), 1))
+        logger.info("  Excluded: %d double outliers", len(excluded_nodes))
 
     return UnifiedOntologyResult(
         ontology=unified,
@@ -1257,7 +1259,7 @@ class ROGResult:
         bridge_edges: Edges connecting different layers
     """
     ontology: DAGTaxonomy
-    layers: List[ROGLayer]
+    layers: list[ROGLayer]
     excluded_nodes: np.ndarray
     total_coverage: float
     bridge_edges: int
@@ -1268,13 +1270,13 @@ class ROGResult:
     def summary(self) -> str:
         """Return summary statistics."""
         lines = [
-            f"ROGResult (Recursive Ontological Generation):",
+            "ROGResult (Recursive Ontological Generation):",
             f"  Total coverage: {self.total_coverage*100:.1f}%",
             f"  Layers: {len(self.layers)}",
             f"  Bridge edges: {self.bridge_edges}",
             f"  Excluded: {len(self.excluded_nodes)}",
-            f"",
-            f"  Layer breakdown:",
+            "",
+            "  Layer breakdown:",
         ]
         for layer in self.layers:
             lines.append(
@@ -1283,7 +1285,7 @@ class ROGResult:
             )
         return "\n".join(lines)
 
-    def get_layer_for_node(self, node_idx: int) -> Optional[int]:
+    def get_layer_for_node(self, node_idx: int) -> int | None:
         """Return which layer a node belongs to, or None if excluded."""
         for layer in self.layers:
             if node_idx in set(layer.node_indices):
@@ -1356,10 +1358,10 @@ def build_rog_ontology(
     n_points, dim = embeddings.shape
 
     if verbose:
-        print(f"ROG: Recursive Ontological Generation")
-        print(f"  Points: {n_points:,}, dim={dim}")
-        print(f"  Target coverage: {target_coverage*100:.0f}%")
-        print(f"  Threshold range: {initial_threshold:.2f} → {min_threshold:.2f}")
+        logger.info("ROG: Recursive Ontological Generation")
+        logger.info("  Points: %s, dim=%d", f"{n_points:,}", dim)
+        logger.info("  Target coverage: %.0f%%", target_coverage * 100)
+        logger.info("  Threshold range: %.2f -> %.2f", initial_threshold, min_threshold)
 
     # Build k-NN once for the full dataset
     nn = NearestNeighbors(n_neighbors=k_neighbors + 1, metric='cosine')
@@ -1371,9 +1373,9 @@ def build_rog_ontology(
     diversity = compute_neighbor_diversity(embeddings, k=15, neighbors=neighbors)
 
     # Recursive layer building
-    layers: List[ROGLayer] = []
-    all_children: Dict[int, List[Tuple[int, float, float]]] = defaultdict(list)
-    all_parents: Dict[int, List[Tuple[int, float, float]]] = defaultdict(list)
+    layers: list[ROGLayer] = []
+    all_children: dict[int, list[tuple[int, float, float]]] = defaultdict(list)
+    all_parents: dict[int, list[tuple[int, float, float]]] = defaultdict(list)
 
     remaining_indices = set(range(n_points))
     threshold = initial_threshold
@@ -1386,12 +1388,12 @@ def build_rog_ontology(
         and len(remaining_indices) > 10
     ):
         if verbose:
-            print(f"\n  Layer {depth}: threshold={threshold:.3f}, candidates={len(remaining_indices)}")
+            logger.info("Layer %d: threshold=%.3f, candidates=%d", depth, threshold, len(remaining_indices))
 
         # Build ontology for remaining nodes at current threshold
         remaining_list = list(remaining_indices)
-        layer_children: Dict[int, List[Tuple[int, float, float]]] = defaultdict(list)
-        layer_parents: Dict[int, List[Tuple[int, float, float]]] = defaultdict(list)
+        layer_children: dict[int, list[tuple[int, float, float]]] = defaultdict(list)
+        layer_parents: dict[int, list[tuple[int, float, float]]] = defaultdict(list)
 
         # Find edges among remaining nodes
         remaining_set = set(remaining_list)
@@ -1442,8 +1444,8 @@ def build_rog_ontology(
 
             if verbose:
                 total_connected = len(set(all_children.keys()) | set(all_parents.keys()))
-                print(f"    Connected: {len(connected)}, edges: {n_edges}")
-                print(f"    Total coverage: {total_connected}/{n_points} ({100*total_connected/n_points:.1f}%)")
+                logger.debug("Connected: %d, edges: %d", len(connected), n_edges)
+                logger.debug("Total coverage: %d/%d (%.1f%%)", total_connected, n_points, 100 * total_connected / n_points)
 
             # Update remaining
             remaining_indices -= connected
@@ -1454,7 +1456,7 @@ def build_rog_ontology(
 
     # Add bridge edges between layers
     if verbose:
-        print(f"\n  Adding bridge edges...")
+        logger.info("Adding bridge edges...")
 
     bridge_edges = 0
     all_connected = set(all_children.keys()) | set(all_parents.keys())
@@ -1489,7 +1491,7 @@ def build_rog_ontology(
                 bridge_edges += 1
 
     if verbose:
-        print(f"    Bridge edges: {bridge_edges}")
+        logger.debug("Bridge edges: %d", bridge_edges)
 
     # Build final ontology
     children = dict(all_children)
@@ -1513,11 +1515,11 @@ def build_rog_ontology(
 
     if verbose:
         n_multi = sum(1 for v in parents.values() if len(v) > 1)
-        print(f"\n  ROG complete:")
-        print(f"    Layers: {len(layers)}")
-        print(f"    Coverage: {len(all_nodes)}/{n_points} ({total_coverage*100:.1f}%)")
-        print(f"    Excluded: {len(excluded)}")
-        print(f"    Multi-parent: {n_multi} ({100*n_multi/max(len(all_nodes),1):.1f}%)")
+        logger.info("ROG complete:")
+        logger.info("  Layers: %d", len(layers))
+        logger.info("  Coverage: %d/%d (%.1f%%)", len(all_nodes), n_points, total_coverage * 100)
+        logger.info("  Excluded: %d", len(excluded))
+        logger.info("  Multi-parent: %d (%.1f%%)", n_multi, 100 * n_multi / max(len(all_nodes), 1))
 
     return ROGResult(
         ontology=ontology,

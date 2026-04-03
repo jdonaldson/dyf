@@ -53,3 +53,9 @@ demo/*.png
 demo/*.svg
 demo/archive/
 demo/hf_space/
+
+# Generated site
+demo/site/
+
+# Sibling projects
+turnstyle/

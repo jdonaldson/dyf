@@ -10,9 +10,9 @@ Example:
     >>> labeler_kwargs = LabelerConfig.MEDIUM.as_kwargs()
 """
 
-import numpy as np
-from typing import List, Dict
 from dataclasses import dataclass
+
+import numpy as np
 
 
 @dataclass
@@ -39,7 +39,7 @@ class EmbedderConfig:
     provider: str  # 'tfidf', 'sentence-transformers', 'openai'
     description: str = ""
 
-    def embed(self, texts: List[str], batch_size: int = 32, verbose: bool = True) -> np.ndarray:
+    def embed(self, texts: list[str], batch_size: int = 32, verbose: bool = True) -> np.ndarray:
         """Generate embeddings for texts using this config."""
         if self.provider == 'tfidf':
             return self._embed_tfidf(texts, verbose)
@@ -52,10 +52,10 @@ class EmbedderConfig:
         else:
             raise ValueError(f"Unknown provider: {self.provider}")
 
-    def _embed_tfidf(self, texts: List[str], verbose: bool) -> np.ndarray:
+    def _embed_tfidf(self, texts: list[str], verbose: bool) -> np.ndarray:
         """TF-IDF + SVD embeddings."""
-        from sklearn.feature_extraction.text import TfidfVectorizer
         from sklearn.decomposition import TruncatedSVD
+        from sklearn.feature_extraction.text import TfidfVectorizer
 
         if verbose:
             print(f"Building TF-IDF embeddings ({len(texts):,} texts)...")
@@ -75,11 +75,11 @@ class EmbedderConfig:
 
         return embeddings
 
-    def _embed_bm25(self, texts: List[str], verbose: bool) -> np.ndarray:
+    def _embed_bm25(self, texts: list[str], verbose: bool) -> np.ndarray:
         """BM25-weighted + SVD embeddings (saturated term frequencies)."""
-        from sklearn.feature_extraction.text import CountVectorizer
-        from sklearn.decomposition import TruncatedSVD
         from scipy import sparse
+        from sklearn.decomposition import TruncatedSVD
+        from sklearn.feature_extraction.text import CountVectorizer
 
         if verbose:
             print(f"Building BM25 embeddings ({len(texts):,} texts)...")
@@ -134,7 +134,7 @@ class EmbedderConfig:
 
         return embeddings
 
-    def _embed_sentence_transformers(self, texts: List[str], batch_size: int, verbose: bool) -> np.ndarray:
+    def _embed_sentence_transformers(self, texts: list[str], batch_size: int, verbose: bool) -> np.ndarray:
         """Sentence-transformers embeddings."""
         from sentence_transformers import SentenceTransformer
 
@@ -149,10 +149,11 @@ class EmbedderConfig:
         )
         return embeddings.astype(np.float32)
 
-    def _embed_openai(self, texts: List[str], batch_size: int, verbose: bool) -> np.ndarray:
+    def _embed_openai(self, texts: list[str], batch_size: int, verbose: bool) -> np.ndarray:
         """OpenAI API embeddings."""
-        from openai import OpenAI
         import os
+
+        from openai import OpenAI
 
         client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
         all_embeddings = []
@@ -229,7 +230,7 @@ class LabelerConfig:
     base_url: str = "http://localhost:11434/v1"
     description: str = ""
 
-    def as_kwargs(self, use_mlx: bool = False) -> Dict:
+    def as_kwargs(self, use_mlx: bool = False) -> dict:
         """Get kwargs for label_buckets() method."""
         if self.provider == 'keywords':
             return {'_use_keywords': True}

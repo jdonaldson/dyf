@@ -9,11 +9,11 @@ from __future__ import annotations
 
 import json
 from collections import deque
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional, Union
+from typing import Any
 
 import numpy as np
-
 
 # ── CategoryGraph ────────────────────────────────────────────────────────
 
@@ -376,7 +376,7 @@ class CategoryGraph:
 
 def coarsen(
     values: list | np.ndarray,
-    strategy: Union[str, Callable] = "first_term",
+    strategy: str | Callable = "first_term",
 ) -> np.ndarray:
     """General label extraction / coarsening.
 
@@ -647,8 +647,8 @@ def diagnose_axes(
 def store_category_graph(
     graph: CategoryGraph,
     name: str,
-    field_mapping: Optional[dict[str, str]] = None,
-    existing_metadata: Optional[dict[str, str]] = None,
+    field_mapping: dict[str, str] | None = None,
+    existing_metadata: dict[str, str] | None = None,
 ) -> dict[str, str]:
     """Serialize a CategoryGraph for .dyf metadata.
 

@@ -30,10 +30,13 @@ Example usage::
 from __future__ import annotations
 
 import json
+import logging
 import pickle
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable
+
+logger = logging.getLogger(__name__)
 
 from .provenance import (
     Provenance,
@@ -160,8 +163,8 @@ class Pipeline:
                     raw_str = meta.get("_provenance")
                     if raw_str:
                         return provenance_from_dict(json.loads(raw_str))
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Could not read provenance from %s: %s", path, e)
 
         return None
 
@@ -220,11 +223,11 @@ class Pipeline:
         for name in order:
             st = self._stage_status(name)
             if st == "fresh":
-                print(f"  [{name}] fresh — skipping")
+                logger.info(f"  [{name}] fresh — skipping")
                 continue
 
             stage = self.stages[name]
-            print(f"  [{name}] {st} — {'would rebuild' if dry_run else 'rebuilding'}...")
+            logger.info(f"  [{name}] {st} — {'would rebuild' if dry_run else 'rebuilding'}...")
 
             if not dry_run:
                 stage.build_fn()

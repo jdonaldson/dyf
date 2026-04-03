@@ -4,9 +4,10 @@
 
 import flatbuffers
 from flatbuffers.compat import import_numpy
+
 np = import_numpy()
 
-class Index(object):
+class Index:
     __slots__ = ['_tab']
 
     @classmethod

@@ -12,11 +12,14 @@ Public API:
     cut_tree_to_labels          — cut the tree into flat cluster labels
 """
 
+import logging
 from collections import defaultdict
 
 import numpy as np
 from scipy.cluster.hierarchy import fcluster
 from sklearn.decomposition import PCA
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -41,7 +44,8 @@ def _build_pca_tree(embeddings, point_indices, depth, min_leaf_size=2):
     try:
         pca = PCA(n_components=1)
         projections = pca.fit_transform(subset).ravel()
-    except Exception:
+    except Exception as e:
+        logger.debug("PCA split failed at depth %d: %s", depth, e)
         return {
             'left': None, 'right': None,
             'indices': point_indices, 'depth': depth,

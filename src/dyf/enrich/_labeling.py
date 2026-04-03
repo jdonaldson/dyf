@@ -1,6 +1,7 @@
 """Shared cluster labeling helpers for the enrich pipeline."""
 
 import json
+import logging
 import math
 import re
 from collections import Counter, defaultdict
@@ -10,8 +11,10 @@ import numpy as np
 
 from ._ollama import _call_ollama, _make_domain_context
 
+logger = logging.getLogger(__name__)
 
-def _compute_tfidf_keywords(titles, labels, n_clusters, top_k=10, min_df=1):
+
+def _compute_tfidf_keywords(titles: list[str], labels: np.ndarray, n_clusters: int, top_k: int = 10, min_df: int = 1) -> dict[int, list[tuple[str, float]]]:
     """TF-IDF keywords per cluster for contrastive labeling."""
     stop_words = {
         'the', 'a', 'an', 'of', 'in', 'on', 'at', 'to', 'for', 'and', 'or',
@@ -165,7 +168,7 @@ def label_clusters(titles, coords, labels, embeddings, model="gpt-oss:20b",
         cached = cache_data.get(_cache_key, {})
         if cached and len(cached) == len(unique_labels):
             cluster_names = {int(k): v for k, v in cached.items()}
-            print(f"  Loaded {len(cluster_names)} labels from cache")
+            logger.info(f"  Loaded {len(cluster_names)} labels from cache")
             return cluster_names
     elif cache_file:
         cache_path = Path(cache_file)
@@ -174,7 +177,7 @@ def label_clusters(titles, coords, labels, embeddings, model="gpt-oss:20b",
             cached = file_cache.get(_cache_key, {})
             if cached and len(cached) == len(unique_labels):
                 cluster_names = {int(k): v for k, v in cached.items()}
-                print(f"  Loaded {len(cluster_names)} labels from cache")
+                logger.info(f"  Loaded {len(cluster_names)} labels from cache")
                 return cluster_names
 
     n_clusters = len(unique_labels)
@@ -197,7 +200,7 @@ def label_clusters(titles, coords, labels, embeddings, model="gpt-oss:20b",
             cent /= norm
         hd_centroids[cid_to_idx[cid]] = cent
 
-    print(f"  Labeling {n_clusters} clusters with contrastive LLM ({model})...")
+    logger.info(f"  Labeling {n_clusters} clusters with contrastive LLM ({model})...")
 
     tasks = []
     for cid in unique_labels:
@@ -284,7 +287,7 @@ def label_clusters(titles, coords, labels, embeddings, model="gpt-oss:20b",
             cluster_names[cid] = label
             completed += 1
             if completed % 5 == 0 or completed == len(tasks):
-                print(f"    Labeled {completed}/{len(tasks)}...", flush=True)
+                logger.info(f"    Labeled {completed}/{len(tasks)}...")
 
     # Re-label duplicates with sibling context
     label_counts = Counter(cluster_names.values())
@@ -292,7 +295,7 @@ def label_clusters(titles, coords, labels, embeddings, model="gpt-oss:20b",
     if duplicates:
         dup_cids = [c for c in unique_labels if cluster_names[c] in duplicates]
         taken = sorted(set(cluster_names.values()))
-        print(f"    Re-labeling {len(dup_cids)} duplicates...")
+        logger.info(f"    Re-labeling {len(dup_cids)} duplicates...")
         dup_tasks = []
         for cid in dup_cids:
             pts = cluster_points[cid]
@@ -328,7 +331,7 @@ def label_clusters(titles, coords, labels, embeddings, model="gpt-oss:20b",
 
     for cid in unique_labels:
         n_pts = len(cluster_points[cid])
-        print(f"    [{cid:2d}] {cluster_names[cid]:<35s} ({n_pts} pts)")
+        logger.info(f"    [{cid:2d}] {cluster_names[cid]:<35s} ({n_pts} pts)")
 
     # Save to cache (only write file if cache_file was used, not cache_data)
     if cache_file and cache_data is None:
@@ -340,7 +343,7 @@ def label_clusters(titles, coords, labels, embeddings, model="gpt-oss:20b",
             str(k): v for k, v in cluster_names.items()
         }
         cache_path.write_text(json.dumps(file_cache, indent=2))
-        print(f"  Saved labels to cache ({cache_file})")
+        logger.info(f"  Saved labels to cache ({cache_file})")
 
     return cluster_names
 
@@ -384,10 +387,10 @@ def annotate_cluster_names(names, labels, embeddings,
 
     n_capitals = int(np.sum(size_vals > size_threshold))
     n_impure = int(np.sum(purity_vals < pur_threshold))
-    print(f"    Size: mean={size_mean:.0f}, σ={size_std:.0f}, "
-          f"threshold={size_threshold:.0f} → {n_capitals} capitals")
-    print(f"    Purity: mean={pur_mean:.3f}, σ={pur_std:.3f}, "
-          f"threshold={pur_threshold:.3f} → {n_impure} impure")
+    logger.info(f"    Size: mean={size_mean:.0f}, σ={size_std:.0f}, "
+                f"threshold={size_threshold:.0f} → {n_capitals} capitals")
+    logger.info(f"    Purity: mean={pur_mean:.3f}, σ={pur_std:.3f}, "
+                f"threshold={pur_threshold:.3f} → {n_impure} impure")
 
     clean_names = {}
     glyphs_dict = {}
@@ -406,7 +409,7 @@ def annotate_cluster_names(names, labels, embeddings,
 
     n_flagged = sum(1 for g in glyphs_dict.values()
                     if g['size'] or g['purity'])
-    print(f"    Flagged {n_flagged}/{len(cluster_ids)} clusters with glyphs")
+    logger.info(f"    Flagged {n_flagged}/{len(cluster_ids)} clusters with glyphs")
     return clean_names, glyphs_dict
 
 

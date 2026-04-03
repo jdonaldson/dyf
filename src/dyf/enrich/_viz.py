@@ -1,6 +1,7 @@
 """Level 2 → 3: Bridge edges + narration enrichment."""
 
 import json
+import logging
 import re
 from collections import defaultdict
 
@@ -9,15 +10,16 @@ import numpy as np
 from dyf.lazy_index import LazyIndex, rewrite_lazy_index
 from dyf.provenance import create_provenance, provenance_to_dict
 
-from ._labeling import _sample_spatial
 from ._narration import _generate_narration
+
+logger = logging.getLogger(__name__)
 
 
 def compute_bridge_edges(coords, embeddings, labels, n_clusters):
     """Compute cross-cluster bridge edges using ROG ontology."""
     import dyf
 
-    print("  Building ROG ontology for bridge detection...")
+    logger.info("  Building ROG ontology for bridge detection...")
     result = dyf.build_rog_ontology(
         embeddings, initial_threshold=0.55, min_threshold=0.35,
         target_coverage=0.95, verbose=False)
@@ -32,7 +34,7 @@ def compute_bridge_edges(coords, embeddings, labels, n_clusters):
                 pair_counts[pair] += 1
 
     cross = sum(pair_counts.values())
-    print(f"  {len(pair_counts)} cluster pairs, {cross:,} cross-cluster edges")
+    logger.info(f"  {len(pair_counts)} cluster pairs, {cross:,} cross-cluster edges")
 
     centroids = np.zeros((n_clusters, coords.shape[1]), dtype=np.float32)
     for c in range(n_clusters):
@@ -73,25 +75,25 @@ def compute_bridge_edges(coords, embeddings, labels, n_clusters):
     if current_path:
         edge_paths_2d.append(current_path)
 
-    print(f"  Bundled {len(edge_paths_2d)} 2D edge paths")
+    logger.info(f"  Bundled {len(edge_paths_2d)} 2D edge paths")
     return edge_pairs, edge_paths_2d
 
 
 def enrich_viz(dyf_path, cluster_level=None, model="gpt-oss:20b",
                title=None, output_path=None, force=False, domain=None):
     """Add bridge edges and tour narration (Level 2 → 3)."""
-    print(f"\n=== Level 3: Viz Enrichment ===")
-    print(f"  Input: {dyf_path}")
+    logger.info("=== Level 3: Viz Enrichment ===")
+    logger.info(f"  Input: {dyf_path}")
 
     with LazyIndex(dyf_path) as idx:
         level = idx.detect_enrichment_level()
         if level < 2:
-            print(f"  ERROR: Need level 2 (clusters), got level {level}. "
-                  f"Run 'cluster' first.")
+            logger.warning(f"  Need level 2 (clusters), got level {level}. "
+                          f"Run 'cluster' first.")
             return
         if level >= 3 and not force:
-            print(f"  Already at level {level} (viz-ready), skipping. "
-                  f"Use --force to re-run.")
+            logger.info(f"  Already at level {level} (viz-ready), skipping. "
+                       f"Use --force to re-run.")
             return
 
     with LazyIndex(dyf_path) as idx:
@@ -108,7 +110,7 @@ def enrich_viz(dyf_path, cluster_level=None, model="gpt-oss:20b",
     if domain is None:
         domain = data['metadata'].get('domain')
     if domain:
-        print(f"  Domain: {domain}")
+        logger.info(f"  Domain: {domain}")
 
     # Resolve cluster labels and names
     use_louvain = ('community_id' in data['fields']
@@ -120,7 +122,7 @@ def enrich_viz(dyf_path, cluster_level=None, model="gpt-oss:20b",
         dendro = json.loads(data['metadata']['louvain_dendrogram'])
         cluster_names = {int(k): v
                          for k, v in dendro['community_names'].items()}
-        print(f"  Using community_id ({n_clusters} communities)")
+        logger.info(f"  Using community_id ({n_clusters} communities)")
     else:
         if cluster_level is None:
             available = [
@@ -131,7 +133,7 @@ def enrich_viz(dyf_path, cluster_level=None, model="gpt-oss:20b",
                 cluster_level = min(
                     int(re.match(r'cluster_(\d+)', f).group(1))
                     for f in available)
-                print(f"  Auto-detected cluster_level={cluster_level}")
+                logger.info(f"  Auto-detected cluster_level={cluster_level}")
             else:
                 available_bare = [
                     f for f in data['fields']
@@ -141,10 +143,10 @@ def enrich_viz(dyf_path, cluster_level=None, model="gpt-oss:20b",
                     cluster_level = min(
                         int(re.match(r'cluster_(\d+)', f).group(1))
                         for f in available_bare)
-                    print(f"  Auto-detected cluster_level={cluster_level} "
-                          f"(bare)")
+                    logger.info(f"  Auto-detected cluster_level={cluster_level} "
+                               f"(bare)")
                 else:
-                    print("  ERROR: No cluster fields found in .dyf file.")
+                    logger.warning("  No cluster fields found in .dyf file.")
                     return
 
         cluster_field_2d = f'cluster_{cluster_level}_2d'
@@ -158,8 +160,8 @@ def enrich_viz(dyf_path, cluster_level=None, model="gpt-oss:20b",
         else:
             available = [f for f in data['fields']
                          if f.startswith('cluster_')]
-            print(f"  ERROR: cluster_{cluster_level} not found. "
-                  f"Available: {available}")
+            logger.warning(f"  cluster_{cluster_level} not found. "
+                          f"Available: {available}")
             return
         labels = data['fields'][cluster_field]
         n_clusters = len(set(labels.tolist()))
@@ -168,7 +170,7 @@ def enrich_viz(dyf_path, cluster_level=None, model="gpt-oss:20b",
                          for k, v in json.loads(names_json).items()}
 
     # Bridge edges
-    print(f"\n  Computing bridge edges for {n_clusters} clusters...")
+    logger.info(f"  Computing bridge edges for {n_clusters} clusters...")
     edge_pairs, edge_paths_2d = compute_bridge_edges(
         coords, embeddings, labels, n_clusters)
 
@@ -197,6 +199,6 @@ def enrich_viz(dyf_path, cluster_level=None, model="gpt-oss:20b",
     ))
 
     out = output_path or dyf_path
-    print(f"\n  Writing enriched file: {out}")
+    logger.info(f"  Writing enriched file: {out}")
     rewrite_lazy_index(dyf_path, new_metadata=new_meta, output_path=out)
-    print(f"  Done. Level 2 → 3")
+    logger.info("  Done. Level 2 → 3")
