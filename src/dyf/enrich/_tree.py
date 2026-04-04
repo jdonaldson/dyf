@@ -27,6 +27,94 @@ def _collect_descendant_indices(node_id, children_of, leaf_batches):
     ])
 
 
+def _label_branch(node, children_of, by_id, leaf_batches, titles, model, rng,
+                   samples_per_child, min_child_size):
+    """Label a single tree branch by sampling child groups and querying the LLM.
+
+    Returns (node_id, branch_label, kid_labels_dict).
+    """
+    nid = node['node_id']
+    kids = children_of[nid]
+    kids_sorted = sorted(kids, key=lambda k: -by_id[k]['num_items'])
+
+    child_samples = {}
+    for kid_id in kids_sorted:
+        kn = by_id[kid_id]
+        if kn['num_items'] < min_child_size:
+            continue
+        all_idx = _collect_descendant_indices(
+            kid_id, children_of, leaf_batches)
+        if len(all_idx) < 3:
+            continue
+
+        n_sample = min(samples_per_child, len(all_idx))
+        sample_idx = rng.choice(all_idx, size=n_sample, replace=False)
+        sample_titles = [titles[j][:120] for j in sample_idx]
+
+        seen = set()
+        unique = []
+        for t in sample_titles:
+            if t not in seen:
+                seen.add(t)
+                unique.append(t)
+        child_samples[kid_id] = (kn['num_items'], unique)
+
+    if not child_samples:
+        return nid, f"Group {nid}", {}
+
+    prompt_parts = [
+        "You are labeling groups in an embedding-space tree. Below are "
+        "sample titles from each child group within a branch.\n"
+    ]
+    child_ids_ordered = list(child_samples.keys())
+    for i, kid_id in enumerate(child_ids_ordered):
+        count, samples = child_samples[kid_id]
+        prompt_parts.append(f"--- Group {i+1} ({count} items) ---")
+        for t in samples:
+            prompt_parts.append(f"  - {t}")
+        prompt_parts.append("")
+
+    prompt_parts.append(
+        "For each group, give a SHORT (2-5 word) descriptive label that "
+        "captures what makes it distinctive FROM THE OTHER GROUPS.\n"
+        "Then give ONE summary label (2-5 words) for the entire branch.\n\n"
+        "BAD labels (too vague): 'General Items', 'Miscellaneous', "
+        "'Various Topics'\n"
+        "GOOD labels (specific): 'Marine Biology', 'European Monarchs', "
+        "'Spinal Fixation Screws', 'Video Game Consoles'\n\n"
+        "Reply in this EXACT format (one line per group, then summary):\n"
+    )
+    for i in range(len(child_ids_ordered)):
+        prompt_parts.append(f"Group {i+1}: <label>")
+    prompt_parts.append("Branch: <summary label>")
+
+    prompt = "\n".join(prompt_parts)
+    response = _call_ollama(model, prompt)
+
+    kid_labels = {}
+    branch_label = f"Branch {nid}"
+    for line in response.split('\n'):
+        line = line.strip()
+        if not line:
+            continue
+        if line.lower().startswith('branch:'):
+            branch_label = line.split(':', 1)[1].strip().strip('"\'')[:50]
+        else:
+            for i, kid_id in enumerate(child_ids_ordered):
+                prefix = f"Group {i+1}:"
+                if line.startswith(prefix) or line.lower().startswith(
+                        prefix.lower()):
+                    label = line.split(':', 1)[1].strip().strip('"\'')[:50]
+                    kid_labels[kid_id] = label
+                    break
+
+    for kid_id in child_ids_ordered:
+        if kid_id not in kid_labels:
+            kid_labels[kid_id] = f"Subgroup {kid_id}"
+
+    return nid, branch_label, kid_labels
+
+
 def label_tree_bottomup(idx, titles, model="gpt-oss:20b", target_depth=3,
                         samples_per_child=8, min_child_size=20,
                         cache_file=None, cache_data=None):
@@ -72,90 +160,10 @@ def label_tree_bottomup(idx, titles, model="gpt-oss:20b", target_depth=3,
     child_labels = {}
     hierarchy = {}
 
-    def _label_branch(node):
-        nid = node['node_id']
-        kids = children_of[nid]
-        kids_sorted = sorted(kids, key=lambda k: -by_id[k]['num_items'])
-
-        child_samples = {}
-        for kid_id in kids_sorted:
-            kn = by_id[kid_id]
-            if kn['num_items'] < min_child_size:
-                continue
-            all_idx = _collect_descendant_indices(
-                kid_id, children_of, leaf_batches)
-            if len(all_idx) < 3:
-                continue
-
-            n_sample = min(samples_per_child, len(all_idx))
-            sample_idx = rng.choice(all_idx, size=n_sample, replace=False)
-            sample_titles = [titles[j][:120] for j in sample_idx]
-
-            seen = set()
-            unique = []
-            for t in sample_titles:
-                if t not in seen:
-                    seen.add(t)
-                    unique.append(t)
-            child_samples[kid_id] = (kn['num_items'], unique)
-
-        if not child_samples:
-            return nid, f"Group {nid}", {}
-
-        prompt_parts = [
-            "You are labeling groups in an embedding-space tree. Below are "
-            "sample titles from each child group within a branch.\n"
-        ]
-        child_ids_ordered = list(child_samples.keys())
-        for i, kid_id in enumerate(child_ids_ordered):
-            count, samples = child_samples[kid_id]
-            prompt_parts.append(f"--- Group {i+1} ({count} items) ---")
-            for t in samples:
-                prompt_parts.append(f"  - {t}")
-            prompt_parts.append("")
-
-        prompt_parts.append(
-            "For each group, give a SHORT (2-5 word) descriptive label that "
-            "captures what makes it distinctive FROM THE OTHER GROUPS.\n"
-            "Then give ONE summary label (2-5 words) for the entire branch.\n\n"
-            "BAD labels (too vague): 'General Items', 'Miscellaneous', "
-            "'Various Topics'\n"
-            "GOOD labels (specific): 'Marine Biology', 'European Monarchs', "
-            "'Spinal Fixation Screws', 'Video Game Consoles'\n\n"
-            "Reply in this EXACT format (one line per group, then summary):\n"
-        )
-        for i in range(len(child_ids_ordered)):
-            prompt_parts.append(f"Group {i+1}: <label>")
-        prompt_parts.append("Branch: <summary label>")
-
-        prompt = "\n".join(prompt_parts)
-        response = _call_ollama(model, prompt)
-
-        kid_labels = {}
-        branch_label = f"Branch {nid}"
-        for line in response.split('\n'):
-            line = line.strip()
-            if not line:
-                continue
-            if line.lower().startswith('branch:'):
-                branch_label = line.split(':', 1)[1].strip().strip('"\'')[:50]
-            else:
-                for i, kid_id in enumerate(child_ids_ordered):
-                    prefix = f"Group {i+1}:"
-                    if line.startswith(prefix) or line.lower().startswith(
-                            prefix.lower()):
-                        label = line.split(':', 1)[1].strip().strip('"\'')[:50]
-                        kid_labels[kid_id] = label
-                        break
-
-        for kid_id in child_ids_ordered:
-            if kid_id not in kid_labels:
-                kid_labels[kid_id] = f"Subgroup {kid_id}"
-
-        return nid, branch_label, kid_labels
-
     for i, node in enumerate(target_nodes):
-        nid, b_label, k_labels = _label_branch(node)
+        nid, b_label, k_labels = _label_branch(
+            node, children_of, by_id, leaf_batches, titles, model, rng,
+            samples_per_child, min_child_size)
         branch_labels[nid] = b_label
         child_labels.update(k_labels)
         hierarchy[nid] = sorted(k_labels.keys())

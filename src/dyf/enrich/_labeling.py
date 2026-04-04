@@ -152,21 +152,15 @@ def _get_cluster_path_context(point_indices, split_keywords, titles,
     return ' → '.join(path_steps)
 
 
-def label_clusters(titles, coords, labels, embeddings, model="gpt-oss:20b",
-                   n_samples=20, cache_file=None, cache_key=None,
-                   cache_data=None, split_keywords=None,
-                   path_labels=None, sibling_keywords=None,
-                   domain=None):
-    """Label clusters via contrastive TF-IDF + local Ollama LLM."""
-    from concurrent.futures import ThreadPoolExecutor, as_completed
+def _check_label_cache(cache_data, cache_file, cache_key, n_expected):
+    """Check in-memory cache_data then on-disk cache_file for cluster labels.
 
-    unique_labels = sorted(set(int(l) for l in labels))
-
-    # Check cache: cache_data (in-memory) → cache_file (on-disk)
+    Returns cached cluster_names dict if cache hit, else None.
+    """
     _cache_key = cache_key or "default"
     if cache_data is not None:
         cached = cache_data.get(_cache_key, {})
-        if cached and len(cached) == len(unique_labels):
+        if cached and len(cached) == n_expected:
             cluster_names = {int(k): v for k, v in cached.items()}
             logger.info(f"  Loaded {len(cluster_names)} labels from cache")
             return cluster_names
@@ -175,21 +169,24 @@ def label_clusters(titles, coords, labels, embeddings, model="gpt-oss:20b",
         if cache_path.exists():
             file_cache = json.loads(cache_path.read_text())
             cached = file_cache.get(_cache_key, {})
-            if cached and len(cached) == len(unique_labels):
+            if cached and len(cached) == n_expected:
                 cluster_names = {int(k): v for k, v in cached.items()}
                 logger.info(f"  Loaded {len(cluster_names)} labels from cache")
                 return cluster_names
+    return None
 
-    n_clusters = len(unique_labels)
-    label_arr = np.asarray(labels)
 
-    cluster_points = defaultdict(list)
-    for i, cid in enumerate(label_arr):
-        cluster_points[int(cid)].append(i)
+def _prepare_labeling_tasks(unique_labels, cluster_points, titles, coords,
+                            embeddings, n_samples, model, path_labels,
+                            sibling_keywords, split_keywords, domain):
+    """Build LLM prompts for each cluster.
 
-    # High-D centroids
+    Returns list of (cid, prompt) tuples.
+    """
+    # High-D centroids for fallback nearest-neighbor keywords
     norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
     emb_n = embeddings / np.maximum(norms, 1e-10)
+    n_clusters = len(unique_labels)
     hd_centroids = np.zeros((n_clusters, embeddings.shape[1]), dtype=np.float32)
     cid_to_idx = {cid: idx for idx, cid in enumerate(unique_labels)}
     for cid in unique_labels:
@@ -199,8 +196,6 @@ def label_clusters(titles, coords, labels, embeddings, model="gpt-oss:20b",
         if norm > 1e-10:
             cent /= norm
         hd_centroids[cid_to_idx[cid]] = cent
-
-    logger.info(f"  Labeling {n_clusters} clusters with contrastive LLM ({model})...")
 
     tasks = []
     for cid in unique_labels:
@@ -270,6 +265,97 @@ def label_clusters(titles, coords, labels, embeddings, model="gpt-oss:20b",
         )
         tasks.append((cid, prompt))
 
+    return tasks
+
+
+def _relabel_duplicates(cluster_names, unique_labels, cluster_points, titles,
+                        coords, n_samples, model):
+    """Detect duplicate labels and re-label them with sibling context.
+
+    Modifies cluster_names in place. Returns None.
+    """
+    label_counts = Counter(cluster_names.values())
+    duplicates = {lbl for lbl, cnt in label_counts.items() if cnt > 1}
+    if not duplicates:
+        return
+
+    def _label_one(task):
+        cid, prompt = task
+        resp = _call_ollama(model, prompt)
+        label = resp.split('\n')[0][:50].strip('"\'').strip()
+        return cid, label if label else f"Cluster {cid}"
+
+    dup_cids = [c for c in unique_labels if cluster_names[c] in duplicates]
+    taken = sorted(set(cluster_names.values()))
+    logger.info(f"    Re-labeling {len(dup_cids)} duplicates...")
+    dup_tasks = []
+    for cid in dup_cids:
+        pts = cluster_points[cid]
+        if not pts:
+            continue
+        sample_indices = _sample_spatial(pts, coords, n_samples * 3)
+        seen = set()
+        sample_titles = []
+        for idx in sample_indices:
+            t = titles[idx]
+            if t not in seen:
+                seen.add(t)
+                sample_titles.append(t)
+                if len(sample_titles) >= n_samples:
+                    break
+        siblings = [l for l in taken if l != cluster_names[cid]]
+        sibling_str = ", ".join(f'"{s}"' for s in siblings[:15])
+        prompt = (
+            f"You are labeling clusters in an embedding space. "
+            f"This cluster has {len(pts)} items.\n"
+            f"Sample items:\n"
+            + "\n".join(f"- {t}" for t in sample_titles) + "\n\n"
+            f"These labels are ALREADY TAKEN: {sibling_str}\n\n"
+            "Give a short (2-5 word) label DIFFERENT from all taken "
+            "labels. Reply with ONLY the label, nothing else."
+        )
+        dup_tasks.append((cid, prompt))
+
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    with ThreadPoolExecutor(max_workers=min(4, len(dup_tasks))) as executor:
+        futures = {executor.submit(_label_one, t): t for t in dup_tasks}
+        for future in as_completed(futures):
+            cid, label = future.result()
+            cluster_names[cid] = label
+
+
+def label_clusters(titles, coords, labels, embeddings, model="gpt-oss:20b",
+                   n_samples=20, cache_file=None, cache_key=None,
+                   cache_data=None, split_keywords=None,
+                   path_labels=None, sibling_keywords=None,
+                   domain=None):
+    """Label clusters via contrastive TF-IDF + local Ollama LLM."""
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    unique_labels = sorted(set(int(l) for l in labels))
+
+    # Check cache: cache_data (in-memory) → cache_file (on-disk)
+    _cache_key = cache_key or "default"
+    cached = _check_label_cache(cache_data, cache_file, _cache_key,
+                                len(unique_labels))
+    if cached is not None:
+        return cached
+
+    n_clusters = len(unique_labels)
+    label_arr = np.asarray(labels)
+
+    cluster_points = defaultdict(list)
+    for i, cid in enumerate(label_arr):
+        cluster_points[int(cid)].append(i)
+
+    logger.info(f"  Labeling {n_clusters} clusters with contrastive LLM ({model})...")
+
+    tasks = _prepare_labeling_tasks(
+        unique_labels, cluster_points, titles, coords, embeddings,
+        n_samples, model, path_labels, sibling_keywords, split_keywords,
+        domain)
+
     cluster_names = {cid: f"Cluster {cid}" for cid in unique_labels}
 
     def _label_one(task):
@@ -290,44 +376,8 @@ def label_clusters(titles, coords, labels, embeddings, model="gpt-oss:20b",
                 logger.info(f"    Labeled {completed}/{len(tasks)}...")
 
     # Re-label duplicates with sibling context
-    label_counts = Counter(cluster_names.values())
-    duplicates = {lbl for lbl, cnt in label_counts.items() if cnt > 1}
-    if duplicates:
-        dup_cids = [c for c in unique_labels if cluster_names[c] in duplicates]
-        taken = sorted(set(cluster_names.values()))
-        logger.info(f"    Re-labeling {len(dup_cids)} duplicates...")
-        dup_tasks = []
-        for cid in dup_cids:
-            pts = cluster_points[cid]
-            if not pts:
-                continue
-            sample_indices = _sample_spatial(pts, coords, n_samples * 3)
-            seen = set()
-            sample_titles = []
-            for idx in sample_indices:
-                t = titles[idx]
-                if t not in seen:
-                    seen.add(t)
-                    sample_titles.append(t)
-                    if len(sample_titles) >= n_samples:
-                        break
-            siblings = [l for l in taken if l != cluster_names[cid]]
-            sibling_str = ", ".join(f'"{s}"' for s in siblings[:15])
-            prompt = (
-                f"You are labeling clusters in an embedding space. "
-                f"This cluster has {len(pts)} items.\n"
-                f"Sample items:\n"
-                + "\n".join(f"- {t}" for t in sample_titles) + "\n\n"
-                f"These labels are ALREADY TAKEN: {sibling_str}\n\n"
-                "Give a short (2-5 word) label DIFFERENT from all taken "
-                "labels. Reply with ONLY the label, nothing else."
-            )
-            dup_tasks.append((cid, prompt))
-        with ThreadPoolExecutor(max_workers=min(4, len(dup_tasks))) as executor:
-            futures = {executor.submit(_label_one, t): t for t in dup_tasks}
-            for future in as_completed(futures):
-                cid, label = future.result()
-                cluster_names[cid] = label
+    _relabel_duplicates(cluster_names, unique_labels, cluster_points, titles,
+                        coords, n_samples, model)
 
     for cid in unique_labels:
         n_pts = len(cluster_points[cid])

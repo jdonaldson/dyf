@@ -37,6 +37,79 @@ def _approx_number_words(n):
         return f"about {thousands:,}"
 
 
+def _build_narration_prompts(cluster_names, cluster_points, titles, coords,
+                             sorted_cids, model, domain):
+    """Build per-cluster LLM prompts for narration.
+
+    Returns list of (cid, prompt, sample_titles) task tuples.
+    """
+    tasks = []
+    for cid in sorted_cids:
+        name = cluster_names[cid]
+        pts = cluster_points.get(cid, [])
+        n_pts = len(pts)
+        n_approx = _approx_number_words(n_pts)
+
+        sample_idx = _sample_spatial(pts, coords, 20)
+        seen = set()
+        sample_titles = []
+        for idx in sample_idx:
+            t = titles[idx] if hasattr(titles, '__getitem__') else str(idx)
+            if t not in seen:
+                seen.add(t)
+                sample_titles.append(t)
+                if len(sample_titles) >= 12:
+                    break
+
+        dc = _make_domain_context(domain)
+        items_str = "\n".join(f"  - {t}" for t in sample_titles)
+        prompt = (
+            f'You are narrating a guided tour of a '
+            f'{dc["landscape"]} for a general audience.\n\n'
+            f'Cluster name: "{name}"\n'
+            f'Size: {n_approx} {dc["items"]}\n\n'
+            f'Sample {dc["items"]}:\n{items_str}\n\n'
+            f'Write 2-3 sentences that:\n'
+            f'1. Start with "{name}."\n'
+            f'2. Explain in plain language what this category of '
+            f'{dc["items"]} represents\n'
+            f'3. Say roughly how many {dc["items"]} are in this '
+            f'group (use "{n_approx}")\n\n'
+            f'Style: calm British documentary narrator. '
+            f'Written for text-to-speech — spell out all numbers, '
+            f'no abbreviations, no special characters, no quotes. '
+            f'Do NOT list raw codes or model numbers.\n'
+        )
+        tasks.append((cid, prompt, sample_titles))
+
+    return tasks
+
+
+def _build_intro_outro(cluster_names, sorted_cids, total_pts, title):
+    """Generate intro and outro narration text.
+
+    Returns dict with 'intro' and 'outro' keys.
+    """
+    n_clusters = len(cluster_names)
+    n_words = _number_to_words(n_clusters)
+    top3 = [cluster_names[c] for c in sorted_cids[:3]]
+    total_words = _approx_number_words(total_pts)
+    display_title = title or "Embedding Landscape"
+    intro = (
+        f"{display_title}. {total_words} items organized into "
+        f"{n_words} clusters. The largest regions are {top3[0]}"
+        + (f", {top3[1]}" if len(top3) > 1 else "")
+        + (f", and {top3[2]}" if len(top3) > 2 else "")
+        + ". Let's take a look."
+    )
+    outro = (
+        "That completes our tour. Clusters nearby share deeper "
+        "similarities, and the bridges between them trace where one "
+        "category shades into the next."
+    )
+    return {"intro": intro, "outro": outro}
+
+
 def _generate_narration(cluster_names, titles, labels, coords,
                         model="gpt-oss:20b", title=None, domain=None):
     """Generate tour narration using Ollama, with sample-title fallback."""
@@ -60,47 +133,17 @@ def _generate_narration(cluster_names, titles, labels, coords,
         print("\n  Ollama not available — using sample-title narration")
 
     narration = {}
-    tasks = []
 
-    for cid in sorted_cids:
-        name = cluster_names[cid]
-        pts = cluster_points.get(cid, [])
-        n_pts = len(pts)
-        n_approx = _approx_number_words(n_pts)
-
-        sample_idx = _sample_spatial(pts, coords, 20)
-        seen = set()
-        sample_titles = []
-        for idx in sample_idx:
-            t = titles[idx] if hasattr(titles, '__getitem__') else str(idx)
-            if t not in seen:
-                seen.add(t)
-                sample_titles.append(t)
-                if len(sample_titles) >= 12:
-                    break
-
-        if ollama_ok:
-            dc = _make_domain_context(domain)
-            items_str = "\n".join(f"  - {t}" for t in sample_titles)
-            prompt = (
-                f'You are narrating a guided tour of a '
-                f'{dc["landscape"]} for a general audience.\n\n'
-                f'Cluster name: "{name}"\n'
-                f'Size: {n_approx} {dc["items"]}\n\n'
-                f'Sample {dc["items"]}:\n{items_str}\n\n'
-                f'Write 2-3 sentences that:\n'
-                f'1. Start with "{name}."\n'
-                f'2. Explain in plain language what this category of '
-                f'{dc["items"]} represents\n'
-                f'3. Say roughly how many {dc["items"]} are in this '
-                f'group (use "{n_approx}")\n\n'
-                f'Style: calm British documentary narrator. '
-                f'Written for text-to-speech — spell out all numbers, '
-                f'no abbreviations, no special characters, no quotes. '
-                f'Do NOT list raw codes or model numbers.\n'
-            )
-            tasks.append((cid, prompt, sample_titles))
-        else:
+    if ollama_ok:
+        tasks = _build_narration_prompts(
+            cluster_names, cluster_points, titles, coords, sorted_cids,
+            model, domain)
+    else:
+        tasks = []
+        for cid in sorted_cids:
+            name = cluster_names[cid]
+            pts = cluster_points.get(cid, [])
+            n_approx = _approx_number_words(len(pts))
             dc = _make_domain_context(domain)
             narration[cid] = (
                 f"{name}. {n_approx} {dc['items']} in this category.")
@@ -131,24 +174,11 @@ def _generate_narration(cluster_names, titles, labels, coords,
                     print(f"    Narrated {completed}/{len(tasks)} "
                           f"clusters...", flush=True)
 
-    # Intro
-    n_clusters = len(cluster_names)
-    n_words = _number_to_words(n_clusters)
-    top3 = [cluster_names[c] for c in sorted_cids[:3]]
-    total_words = _approx_number_words(total_pts)
-    display_title = title or "Embedding Landscape"
-    narration["intro"] = (
-        f"{display_title}. {total_words} items organized into "
-        f"{n_words} clusters. The largest regions are {top3[0]}"
-        + (f", {top3[1]}" if len(top3) > 1 else "")
-        + (f", and {top3[2]}" if len(top3) > 2 else "")
-        + ". Let's take a look."
-    )
-    narration["outro"] = (
-        "That completes our tour. Clusters nearby share deeper "
-        "similarities, and the bridges between them trace where one "
-        "category shades into the next."
-    )
+    # Intro and outro
+    bookends = _build_intro_outro(cluster_names, sorted_cids, total_pts,
+                                  title)
+    narration["intro"] = bookends["intro"]
+    narration["outro"] = bookends["outro"]
 
     # Preview
     for cid in sorted_cids[:3]:
