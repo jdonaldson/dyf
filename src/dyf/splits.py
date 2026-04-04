@@ -91,6 +91,19 @@ def collect_descendant_indices(
     ])
 
 
+def _compute_depth_from_root(tree, children_map):
+    """Compute depth-from-root for every node via BFS."""
+    root_id = next(n['node_id'] for n in tree if n['parent_id'] is None)
+    depth_from_root = {root_id: 0}
+    queue = [root_id]
+    while queue:
+        nid = queue.pop(0)
+        for child_id in children_map.get(nid, []):
+            depth_from_root[child_id] = depth_from_root[nid] + 1
+            queue.append(child_id)
+    return depth_from_root
+
+
 # ── Domain stopwords ──────────────────────────────────────────────────
 
 
@@ -291,6 +304,92 @@ def label_clusters_frequency(
 # ── Split keyword computation ─────────────────────────────────────────
 
 
+def _compute_child_tfidf(child_data, n_children, top_k, bigram_check):
+    """Compute TF-IDF unigrams (and optionally bigrams) for each child of a split node.
+
+    For each child, scores its terms against the cross-child IDF and returns
+    the top-k unigrams (and bigrams if requested).
+
+    Args:
+        child_data: {child_id: {'count': int, 'word_counts': Counter,
+            'total_words': int, 'bigram_counts': Counter, 'total_bigrams': int}}.
+        n_children: Number of children (for IDF denominator).
+        top_k: Number of top keywords to return per child.
+        bigram_check: Whether to compute bigram TF-IDF as well.
+
+    Returns:
+        dict mapping child_id -> {'count': int, 'unigrams': [...], 'bigrams': [...]}.
+    """
+    # Compute unigram document frequency across children
+    word_df: Counter = Counter()
+    for cdata in child_data.values():
+        for word in cdata['word_counts']:
+            word_df[word] += 1
+
+    # IDF: log(n_children / (1 + df))
+    idf = {
+        w: math.log(n_children / (1 + df))
+        for w, df in word_df.items()
+        if df < n_children  # skip words in ALL children (no discrimination)
+    }
+
+    # Compute TF-IDF per child for unigrams
+    children_result = {}
+    for cid, cdata in child_data.items():
+        total = cdata['total_words']
+        if total == 0:
+            children_result[cid] = {
+                'count': cdata['count'],
+                'unigrams': [],
+            }
+            if bigram_check:
+                children_result[cid]['bigrams'] = []
+            continue
+
+        scores = []
+        for word, count in cdata['word_counts'].items():
+            if word in idf:
+                tf = count / total
+                scores.append((word, tf * idf[word]))
+
+        scores.sort(key=lambda x: -x[1])
+        entry: dict = {
+            'count': cdata['count'],
+            'unigrams': [(w, round(s, 6)) for w, s in scores[:top_k]],
+        }
+
+        # Bigram TF-IDF if requested
+        if bigram_check:
+            bigram_df: Counter = Counter()
+            for cd in child_data.values():
+                for bg in cd['bigram_counts']:
+                    bigram_df[bg] += 1
+
+            bg_idf = {
+                bg: math.log(n_children / (1 + df))
+                for bg, df in bigram_df.items()
+                if df < n_children
+            }
+
+            bg_total = cdata['total_bigrams']
+            if bg_total > 0:
+                bg_scores = []
+                for bg, count in cdata['bigram_counts'].items():
+                    if bg in bg_idf:
+                        tf = count / bg_total
+                        bg_scores.append((bg, tf * bg_idf[bg]))
+                bg_scores.sort(key=lambda x: -x[1])
+                entry['bigrams'] = [
+                    (bg, round(s, 6)) for bg, s in bg_scores[:top_k]
+                ]
+            else:
+                entry['bigrams'] = []
+
+        children_result[cid] = entry
+
+    return children_result
+
+
 def compute_split_keywords(
     titles: list[str],
     tree: list[TreeNode],
@@ -334,18 +433,8 @@ def compute_split_keywords(
     """
     all_stopwords = _ENGLISH_STOP | (domain_stopwords or set())
 
-    # Find the root node (parent_id is None) and compute depth-from-root
-    # for each node. DYF trees may use either convention (root at max or
-    # min depth value), so we compute depth_from_root via BFS.
-    root_id = next(n['node_id'] for n in tree if n['parent_id'] is None)
-
-    depth_from_root: dict[int, int] = {root_id: 0}
-    queue = [root_id]
-    while queue:
-        nid = queue.pop(0)
-        for child_id in children_map.get(nid, []):
-            depth_from_root[child_id] = depth_from_root[nid] + 1
-            queue.append(child_id)
+    # Compute depth-from-root for each node via BFS.
+    depth_from_root = _compute_depth_from_root(tree, children_map)
 
     # Find internal nodes within depth range from root.
     internal_nodes = [
@@ -399,73 +488,8 @@ def compute_split_keywords(
             continue
 
         n_children = len(child_data)
-
-        # Compute unigram document frequency across children
-        word_df: Counter = Counter()
-        for cdata in child_data.values():
-            for word in cdata['word_counts']:
-                word_df[word] += 1
-
-        # IDF: log(n_children / (1 + df))
-        idf = {
-            w: math.log(n_children / (1 + df))
-            for w, df in word_df.items()
-            if df < n_children  # skip words in ALL children (no discrimination)
-        }
-
-        # Compute TF-IDF per child for unigrams
-        children_result = {}
-        for cid, cdata in child_data.items():
-            total = cdata['total_words']
-            if total == 0:
-                children_result[cid] = {
-                    'count': cdata['count'],
-                    'unigrams': [],
-                }
-                if bigram_check:
-                    children_result[cid]['bigrams'] = []
-                continue
-
-            scores = []
-            for word, count in cdata['word_counts'].items():
-                if word in idf:
-                    tf = count / total
-                    scores.append((word, tf * idf[word]))
-
-            scores.sort(key=lambda x: -x[1])
-            entry: dict = {
-                'count': cdata['count'],
-                'unigrams': [(w, round(s, 6)) for w, s in scores[:top_k]],
-            }
-
-            # Bigram TF-IDF if requested
-            if bigram_check:
-                bigram_df: Counter = Counter()
-                for cd in child_data.values():
-                    for bg in cd['bigram_counts']:
-                        bigram_df[bg] += 1
-
-                bg_idf = {
-                    bg: math.log(n_children / (1 + df))
-                    for bg, df in bigram_df.items()
-                    if df < n_children
-                }
-
-                bg_total = cdata['total_bigrams']
-                if bg_total > 0:
-                    bg_scores = []
-                    for bg, count in cdata['bigram_counts'].items():
-                        if bg in bg_idf:
-                            tf = count / bg_total
-                            bg_scores.append((bg, tf * bg_idf[bg]))
-                    bg_scores.sort(key=lambda x: -x[1])
-                    entry['bigrams'] = [
-                        (bg, round(s, 6)) for bg, s in bg_scores[:top_k]
-                    ]
-                else:
-                    entry['bigrams'] = []
-
-            children_result[cid] = entry
+        children_result = _compute_child_tfidf(
+            child_data, n_children, top_k, bigram_check)
 
         split_entry: dict = {
             'depth': depth_from_root.get(nid, 0),
@@ -483,6 +507,41 @@ def compute_split_keywords(
         'domain_stopwords': sorted(domain_stopwords or []),
         'splits': splits,
     }
+
+
+def _project_terms_onto_hyperplane(term_items, embeddings, hp, all_stopwords,
+                                   min_term_count):
+    """Project vocabulary terms onto a hyperplane and rank them by projection score.
+
+    Computes a "term embedding" for each term (centroid of item embeddings whose
+    titles contain that term), then projects onto the hyperplane direction.
+
+    Args:
+        term_items: {term: [item_index, ...]} mapping terms to their item indices.
+        embeddings: (n, dim) embedding array.
+        hp: (dim,) float64 normalized hyperplane direction.
+        all_stopwords: Set of stop words (unused here, kept for API clarity).
+        min_term_count: Minimum item count for a term to be included.
+
+    Returns:
+        dict mapping term -> float projection score, or empty dict if no terms qualify.
+    """
+    # Filter by min_term_count
+    filtered = {w: idxs for w, idxs in term_items.items()
+                if len(idxs) >= min_term_count}
+
+    if not filtered:
+        return {}
+
+    # Compute term embeddings (centroid of item embeddings containing each term)
+    # and project onto hyperplane
+    term_scores: dict[str, float] = {}
+    for word, idxs in filtered.items():
+        idx_arr = np.array(idxs)
+        term_centroid = embeddings[idx_arr].mean(axis=0).astype(np.float64)
+        term_scores[word] = float(term_centroid @ hp)
+
+    return term_scores
 
 
 def compute_embedding_keywords(
@@ -533,15 +592,8 @@ def compute_embedding_keywords(
     """
     all_stopwords = _ENGLISH_STOP | (domain_stopwords or set())
 
-    # Find root and compute depth_from_root via BFS
-    root_id = next(n['node_id'] for n in tree if n['parent_id'] is None)
-    depth_from_root: dict[int, int] = {root_id: 0}
-    queue = [root_id]
-    while queue:
-        nid = queue.pop(0)
-        for child_id in children_map.get(nid, []):
-            depth_from_root[child_id] = depth_from_root[nid] + 1
-            queue.append(child_id)
+    # Compute depth-from-root for each node via BFS.
+    depth_from_root = _compute_depth_from_root(tree, children_map)
 
     # Find internal nodes within depth range that have hyperplanes
     internal_nodes = [
@@ -578,20 +630,12 @@ def compute_embedding_keywords(
                     if w not in all_stopwords:
                         term_items[w].append(idx)
 
-        # Filter by min_term_count
-        term_items = {w: idxs for w, idxs in term_items.items()
-                      if len(idxs) >= min_term_count}
+        # Project terms onto hyperplane and rank by projection score
+        term_scores = _project_terms_onto_hyperplane(
+            term_items, embeddings, hp, all_stopwords, min_term_count)
 
-        if not term_items:
+        if not term_scores:
             continue
-
-        # Compute term embeddings (centroid of item embeddings containing each term)
-        # and project onto hyperplane
-        term_scores: dict[str, float] = {}
-        for word, idxs in term_items.items():
-            idx_arr = np.array(idxs)
-            term_centroid = embeddings[idx_arr].mean(axis=0).astype(np.float64)
-            term_scores[word] = float(term_centroid @ hp)
 
         # Compute child centroid projections onto hyperplane
         child_data: dict[int, dict] = {}

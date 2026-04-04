@@ -17,85 +17,30 @@ from collections import Counter, defaultdict
 import numpy as np
 
 from dyf.categorical import CategoryGraph
-from dyf.splits import collect_descendant_indices, tokenize
+from dyf.splits import _compute_depth_from_root, collect_descendant_indices, tokenize
 
 # ── DAG construction ──────────────────────────────────────────────────
 
 
-def build_cluster_tree_dag(
-    tree: list[dict],
-    children_map: dict[int, list[int]],
-    leaf_batches: dict[int, np.ndarray],
-    cluster_labels: np.ndarray,
-    n_clusters: int,
-    *,
-    straddle_threshold: float = 0.15,
-    max_tree_depth: int | None = None,
-) -> CategoryGraph:
-    """Build a DAG connecting BIRCH clusters to tree nodes they overlap with.
+def _compute_descendant_items(internal_nodes, children_map, leaf_batches):
+    """Compute descendant item sets for internal nodes and their children.
 
-    Parameters
-    ----------
-    tree : list[dict]
-        Tree structure from ``idx.get_tree_structure()``.
-    children_map : dict[int, list[int]]
-        ``{parent_id: [child_ids]}``.
-    leaf_batches : dict[int, np.ndarray]
-        ``{node_id: item_indices}`` for leaf nodes.
-    cluster_labels : (n,) int array
-        Per-item BIRCH cluster ID.
-    n_clusters : int
-        The cluster resolution (e.g. 25), used for node naming.
-    straddle_threshold : float
-        Minimum overlap fraction to create a cluster→tree edge.
-    max_tree_depth : int or None
-        If set, only consider tree nodes up to this depth from root.
+    Args:
+        internal_nodes: List of internal node IDs.
+        children_map: {parent_id: [child_ids]}.
+        leaf_batches: {node_id: item_indices} for leaf nodes.
 
-    Returns
-    -------
-    CategoryGraph
-        DAG with tree-internal edges and cluster-to-tree edges.
-        Node names: ``"tree_0"``, ``"tree_1"``, ... for tree nodes;
-        ``"cluster_25_0"``, ``"cluster_25_14"``, ... for clusters.
+    Returns:
+        (descendant_items, child_descendant_items) where:
+        - descendant_items: {node_id: set of item indices} for internal nodes.
+        - child_descendant_items: {node_id: set of item indices} for children
+          of internal nodes.
     """
-    cluster_labels = np.asarray(cluster_labels)
-
-    # Compute depth_from_root via BFS
-    root_id = next(n['node_id'] for n in tree if n['parent_id'] is None)
-    depth_from_root: dict[int, int] = {root_id: 0}
-    queue = [root_id]
-    while queue:
-        nid = queue.pop(0)
-        for child_id in children_map.get(nid, []):
-            depth_from_root[child_id] = depth_from_root[nid] + 1
-            queue.append(child_id)
-
-    # Identify internal nodes (have children) within depth limit
-    internal_nodes = []
-    for node in tree:
-        nid = node['node_id']
-        if not children_map.get(nid):
-            continue  # leaf
-        d = depth_from_root.get(nid, 999)
-        if max_tree_depth is not None and d >= max_tree_depth:
-            continue
-        internal_nodes.append(nid)
-
-    # Pre-compute descendant items for the *deepest* internal nodes.
-    # We want the most specific tree nodes that still have children.
-    # "Deepest internal" = internal nodes whose children are all leaves
-    # OR internal nodes at max_tree_depth - 1.
-    # Actually, the plan says "deepest internal level" — let's compute
-    # overlap at ALL internal nodes but only keep the deepest match.
-
-    # Pre-compute descendant item sets for each internal node
     descendant_items: dict[int, set[int]] = {}
     for nid in internal_nodes:
         desc = collect_descendant_indices(nid, children_map, leaf_batches)
         descendant_items[nid] = set(desc.tolist())
 
-    # Also compute descendants for children of internal nodes
-    # (needed to connect clusters to the right child, not the parent)
     child_descendant_items: dict[int, set[int]] = {}
     for nid in internal_nodes:
         for cid in children_map.get(nid, []):
@@ -103,16 +48,39 @@ def build_cluster_tree_dag(
                 desc = collect_descendant_indices(cid, children_map, leaf_batches)
                 child_descendant_items[cid] = set(desc.tolist())
 
-    # Pre-compute cluster item sets
-    unique_clusters = sorted(set(int(c) for c in cluster_labels))
-    cluster_items: dict[int, set[int]] = {}
-    for cid in unique_clusters:
-        cluster_items[cid] = set(np.where(cluster_labels == cid)[0].tolist())
+    return descendant_items, child_descendant_items
 
-    # Build edges
+
+def _build_cluster_tree_edges(unique_clusters, cluster_items, internal_nodes,
+                              descendant_items, child_descendant_items,
+                              depth_from_root, children_map, leaf_batches,
+                              n_clusters, straddle_threshold):
+    """Build edges connecting clusters to tree nodes based on item overlap.
+
+    Produces tree-internal edges (parent -> child) and cluster-to-tree edges
+    based on overlap fractions.
+
+    Args:
+        unique_clusters: Sorted list of unique cluster IDs.
+        cluster_items: {cluster_id: set of item indices}.
+        internal_nodes: List of internal node IDs.
+        descendant_items: {node_id: set of item indices} for internal nodes.
+        child_descendant_items: {node_id: set of item indices} for children.
+        depth_from_root: {node_id: depth} from BFS.
+        children_map: {parent_id: [child_ids]}.
+        leaf_batches: {node_id: item_indices} for leaf nodes.
+        n_clusters: Cluster resolution for naming.
+        straddle_threshold: Minimum overlap fraction for an edge.
+
+    Returns:
+        List of (parent_name, child_name, weight) edge tuples.
+    """
+    # Find root_id (depth 0)
+    root_id = next(nid for nid, d in depth_from_root.items() if d == 0)
+
     edges: list[tuple[str, str, float]] = []
 
-    # Tree-internal edges: parent → child
+    # Tree-internal edges: parent -> child
     for parent_nid in internal_nodes:
         for child_nid in children_map.get(parent_nid, []):
             edges.append((
@@ -121,11 +89,6 @@ def build_cluster_tree_dag(
                 1.0,
             ))
 
-    # Cluster → tree edges: connect each cluster to tree nodes at the
-    # deepest level where overlap exceeds threshold.
-    # Strategy: for each cluster, check overlap with all internal nodes'
-    # children. Connect to the deepest tree node with sufficient overlap.
-
     # Collect all tree node IDs that are children of internal nodes
     # (these are the "attachment points" for clusters)
     attachment_nodes: list[int] = []
@@ -133,7 +96,7 @@ def build_cluster_tree_dag(
         attachment_nodes.extend(children_map.get(nid, []))
     attachment_nodes = sorted(set(attachment_nodes))
 
-    # Sort by depth descending — prefer deeper matches
+    # Sort by depth descending -- prefer deeper matches
     attachment_by_depth = sorted(
         attachment_nodes,
         key=lambda nid: depth_from_root.get(nid, 0),
@@ -178,6 +141,78 @@ def build_cluster_tree_dag(
                 cluster_node_name,
                 1.0,
             ))
+
+    return edges
+
+
+def build_cluster_tree_dag(
+    tree: list[dict],
+    children_map: dict[int, list[int]],
+    leaf_batches: dict[int, np.ndarray],
+    cluster_labels: np.ndarray,
+    n_clusters: int,
+    *,
+    straddle_threshold: float = 0.15,
+    max_tree_depth: int | None = None,
+) -> CategoryGraph:
+    """Build a DAG connecting BIRCH clusters to tree nodes they overlap with.
+
+    Parameters
+    ----------
+    tree : list[dict]
+        Tree structure from ``idx.get_tree_structure()``.
+    children_map : dict[int, list[int]]
+        ``{parent_id: [child_ids]}``.
+    leaf_batches : dict[int, np.ndarray]
+        ``{node_id: item_indices}`` for leaf nodes.
+    cluster_labels : (n,) int array
+        Per-item BIRCH cluster ID.
+    n_clusters : int
+        The cluster resolution (e.g. 25), used for node naming.
+    straddle_threshold : float
+        Minimum overlap fraction to create a cluster→tree edge.
+    max_tree_depth : int or None
+        If set, only consider tree nodes up to this depth from root.
+
+    Returns
+    -------
+    CategoryGraph
+        DAG with tree-internal edges and cluster-to-tree edges.
+        Node names: ``"tree_0"``, ``"tree_1"``, ... for tree nodes;
+        ``"cluster_25_0"``, ``"cluster_25_14"``, ... for clusters.
+    """
+    cluster_labels = np.asarray(cluster_labels)
+
+    # Compute depth_from_root via BFS
+    depth_from_root = _compute_depth_from_root(tree, children_map)
+
+    # Identify internal nodes (have children) within depth limit
+    internal_nodes = []
+    for node in tree:
+        nid = node['node_id']
+        if not children_map.get(nid):
+            continue  # leaf
+        d = depth_from_root.get(nid, 999)
+        if max_tree_depth is not None and d >= max_tree_depth:
+            continue
+        internal_nodes.append(nid)
+
+    # Pre-compute descendant item sets for internal nodes and their children
+    descendant_items, child_descendant_items = _compute_descendant_items(
+        internal_nodes, children_map, leaf_batches)
+
+    # Pre-compute cluster item sets
+    unique_clusters = sorted(set(int(c) for c in cluster_labels))
+    cluster_items: dict[int, set[int]] = {}
+    for cid in unique_clusters:
+        cluster_items[cid] = set(np.where(cluster_labels == cid)[0].tolist())
+
+    # Build all edges (tree-internal and cluster-to-tree)
+    edges = _build_cluster_tree_edges(
+        unique_clusters, cluster_items, internal_nodes,
+        descendant_items, child_descendant_items,
+        depth_from_root, children_map, leaf_batches,
+        n_clusters, straddle_threshold)
 
     return CategoryGraph.from_edges(edges)
 

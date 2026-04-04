@@ -512,62 +512,26 @@ def refine_dyf_tree(tree, embeddings, min_coherence=None, num_bits=3,
     }
 
 
-def refine_clusters(labels, embeddings, min_coherence=None,
-                    min_cluster_size=None, num_bits=6, seed_offset=2000):
-    """Post-processing safety net: eject periphery from incoherent clusters.
+def _eject_periphery(labels, emb_normed, cluster_coherence, cluster_members,
+                     threshold):
+    """Find points far from their cluster centroid and mark them as ejected.
 
     For each cluster below the coherence threshold, keeps core points (above
-    median similarity to centroid) and ejects periphery into a shared pool.
-    The pool is re-split with a rotated LSH seed.  Small resulting clusters
-    are iteratively merged with their nearest neighbor until they reach
-    min_cluster_size, then any remaining runts are absorbed into the nearest
-    large cluster.
+    median similarity to centroid) and ejects periphery by setting labels to -1.
 
     Args:
-        labels: (n,) cluster label array.
-        embeddings: (n, d) array of embedding vectors.
-        min_coherence: Coherence threshold. If None, uses 25th percentile.
-        min_cluster_size: Minimum viable cluster size.  If None, uses
-            n_points / n_clusters / 3 (one-third of the expected median).
-        num_bits: LSH bits for re-splitting the ejected pool.
-        seed_offset: Seed for the re-split DensityClassifier.
+        labels: (n,) mutable cluster label array.
+        emb_normed: (n, d) L2-normalized embeddings.
+        cluster_coherence: {cluster_id: coherence_score}.
+        cluster_members: {cluster_id: np.ndarray of member indices}.
+        threshold: Coherence threshold below which clusters are ejected.
 
     Returns:
-        np.ndarray of shape (n,) with refined cluster labels.
+        (labels, ejected_indices) where labels is updated in-place and
+        ejected_indices is a np.ndarray of global indices that were ejected.
     """
-    from dyf_rs import DensityClassifier
-
-    labels = np.asarray(labels).copy()
-    embeddings = np.asarray(embeddings)
-
-    if min_cluster_size is None:
-        n_original = len(set(labels.tolist()))
-        min_cluster_size = max(10, len(labels) // max(n_original, 1) // 3)
-    norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
-    emb_normed = embeddings / np.maximum(norms, 1e-10)
-
-    # Per-cluster coherence
-    unique_labels = sorted(set(labels.tolist()))
-    cluster_coherence = {}
-    cluster_members = {}
-    for cid in unique_labels:
-        members = np.where(labels == cid)[0]
-        cluster_members[cid] = members
-        if len(members) >= 2:
-            cluster_coherence[cid] = _leaf_coherence(members, emb_normed)
-        else:
-            cluster_coherence[cid] = 1.0  # singleton is coherent
-
-    coh_values = np.array(list(cluster_coherence.values()))
-    if min_coherence is None:
-        threshold = float(np.percentile(coh_values, 25)) if len(coh_values) > 0 else 0.0
-    else:
-        threshold = float(min_coherence)
-
-    # Identify incoherent clusters and eject periphery
     ejected_indices = []
-    n_ejected_clusters = 0
-    for cid in unique_labels:
+    for cid in sorted(cluster_coherence.keys()):
         if cluster_coherence[cid] >= threshold:
             continue
         members = cluster_members[cid]
@@ -589,30 +553,26 @@ def refine_clusters(labels, embeddings, min_coherence=None,
         ejected_indices.extend(periphery.tolist())
         # Mark ejected points with -1 temporarily
         labels[periphery] = -1
-        n_ejected_clusters += 1
 
     if not ejected_indices:
-        return labels
+        return labels, np.array([], dtype=int)
+    return labels, np.array(ejected_indices)
 
-    ejected_indices = np.array(ejected_indices)
-    n_ejected = len(ejected_indices)
 
-    # Compute coherent cluster centroids (for fallback assignment)
-    next_label = max(unique_labels) + 1
-    coherent_centroids = {}
-    for cid in sorted(set(labels.tolist())):
-        if cid == -1:
-            continue
-        members = np.where(labels == cid)[0]
-        if len(members) == 0:
-            continue
-        cent = emb_normed[members].mean(axis=0)
-        norm = np.linalg.norm(cent)
-        if norm > 1e-10:
-            cent /= norm
-        coherent_centroids[cid] = cent
+def _resplit_ejected(ejected_indices, embeddings, num_bits, seed_offset):
+    """Re-split ejected points using DYF tree building.
 
-    # Re-split the ejected pool
+    Args:
+        ejected_indices: np.ndarray of global indices for ejected points.
+        embeddings: (n, d) full embedding array.
+        num_bits: LSH bits for the re-split.
+        seed_offset: Seed for the DensityClassifier.
+
+    Returns:
+        np.ndarray of bucket IDs, one per ejected point.
+    """
+    from dyf_rs import DensityClassifier
+
     ejected_emb = embeddings[ejected_indices]
     dim = ejected_emb.shape[1]
 
@@ -623,18 +583,26 @@ def refine_clusters(labels, embeddings, min_coherence=None,
         bucket_ids = clf.get_bucket_ids()
     except Exception as e:
         logger.debug("Ejected re-split failed, falling back to zeros: %s", e)
-        # Fallback: assign all ejected to nearest coherent centroid
         bucket_ids = np.zeros(len(ejected_indices), dtype=int)
 
-    # Assign each re-split bucket a temporary label
-    unique_buckets = sorted(set(bucket_ids.tolist()))
-    for bid in unique_buckets:
-        mask = bucket_ids == bid
-        global_indices = ejected_indices[np.where(mask)[0]]
-        labels[global_indices] = next_label
-        next_label += 1
+    return bucket_ids
 
-    # Identify large vs small clusters
+
+def _merge_small_clusters(labels, emb_normed, min_cluster_size):
+    """Merge small clusters into nearest large neighbor.
+
+    Phase 1: iteratively merge nearest small cluster pairs until all merged
+    groups reach min_cluster_size or only one small cluster remains.
+    Phase 2: merge remaining small clusters into nearest large cluster.
+
+    Args:
+        labels: (n,) mutable cluster label array.
+        emb_normed: (n, d) L2-normalized embeddings.
+        min_cluster_size: Minimum viable cluster size.
+
+    Returns:
+        (labels, n_merged_together, n_merged_into_large).
+    """
     all_cids = sorted(set(labels.tolist()))
     all_cids = [c for c in all_cids if c != -1]
     large_cids = []
@@ -704,6 +672,90 @@ def refine_clusters(labels, embeddings, min_coherence=None,
             nearest = large_cids[int(np.argmax(sims))]
             labels[labels == cid] = nearest
             n_merged_into_large += 1
+
+    return labels, n_merged_together, n_merged_into_large
+
+
+def refine_clusters(labels, embeddings, min_coherence=None,
+                    min_cluster_size=None, num_bits=6, seed_offset=2000):
+    """Post-processing safety net: eject periphery from incoherent clusters.
+
+    For each cluster below the coherence threshold, keeps core points (above
+    median similarity to centroid) and ejects periphery into a shared pool.
+    The pool is re-split with a rotated LSH seed.  Small resulting clusters
+    are iteratively merged with their nearest neighbor until they reach
+    min_cluster_size, then any remaining runts are absorbed into the nearest
+    large cluster.
+
+    Args:
+        labels: (n,) cluster label array.
+        embeddings: (n, d) array of embedding vectors.
+        min_coherence: Coherence threshold. If None, uses 25th percentile.
+        min_cluster_size: Minimum viable cluster size.  If None, uses
+            n_points / n_clusters / 3 (one-third of the expected median).
+        num_bits: LSH bits for re-splitting the ejected pool.
+        seed_offset: Seed for the re-split DensityClassifier.
+
+    Returns:
+        np.ndarray of shape (n,) with refined cluster labels.
+    """
+    labels = np.asarray(labels).copy()
+    embeddings = np.asarray(embeddings)
+
+    if min_cluster_size is None:
+        n_original = len(set(labels.tolist()))
+        min_cluster_size = max(10, len(labels) // max(n_original, 1) // 3)
+    norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+    emb_normed = embeddings / np.maximum(norms, 1e-10)
+
+    # Per-cluster coherence
+    unique_labels = sorted(set(labels.tolist()))
+    cluster_coherence = {}
+    cluster_members = {}
+    for cid in unique_labels:
+        members = np.where(labels == cid)[0]
+        cluster_members[cid] = members
+        if len(members) >= 2:
+            cluster_coherence[cid] = _leaf_coherence(members, emb_normed)
+        else:
+            cluster_coherence[cid] = 1.0  # singleton is coherent
+
+    coh_values = np.array(list(cluster_coherence.values()))
+    if min_coherence is None:
+        threshold = float(np.percentile(coh_values, 25)) if len(coh_values) > 0 else 0.0
+    else:
+        threshold = float(min_coherence)
+
+    # Eject periphery from incoherent clusters
+    labels, ejected_indices = _eject_periphery(
+        labels, emb_normed, cluster_coherence, cluster_members, threshold)
+
+    if len(ejected_indices) == 0:
+        return labels
+
+    n_ejected = len(ejected_indices)
+    n_ejected_clusters = sum(
+        1 for cid in unique_labels
+        if cluster_coherence[cid] < threshold
+        and len(cluster_members[cid]) >= 4
+    )
+
+    # Re-split the ejected pool
+    bucket_ids = _resplit_ejected(
+        ejected_indices, embeddings, num_bits, seed_offset)
+
+    # Assign each re-split bucket a temporary label
+    next_label = max(unique_labels) + 1
+    unique_buckets = sorted(set(bucket_ids.tolist()))
+    for bid in unique_buckets:
+        mask = bucket_ids == bid
+        global_indices = ejected_indices[np.where(mask)[0]]
+        labels[global_indices] = next_label
+        next_label += 1
+
+    # Merge small clusters
+    labels, n_merged_together, n_merged_into_large = _merge_small_clusters(
+        labels, emb_normed, min_cluster_size)
 
     # Compact labels to 0..k-1
     unique_final = sorted(set(labels.tolist()))
