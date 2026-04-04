@@ -80,25 +80,20 @@ def merge_tiny_clusters(labels: np.ndarray, coords: np.ndarray, min_pct: float =
     return labels
 
 
-def enrich_cluster(dyf_path, model="gpt-oss:20b",
-                   output_path=None, force=False, domain=None,
-                   resolution=1.0):
-    """Add Louvain cluster labels + dendrogram to a .dyf file (Level 1 → 2)."""
-    logger.info("=== Level 2: Louvain Clustering (dendrogram) ===")
-    logger.info(f"  Input: {dyf_path}")
+def _extract_cluster_inputs(dyf_path, domain):
+    """Extract data, fields, caches, and text diversity info from a .dyf file.
 
-    with LazyIndex(dyf_path) as idx:
-        level = idx.detect_enrichment_level()
-        if level < 1:
-            logger.warning(f"  Need level 1 (UMAP coords), got level {level}. "
-                          f"Run 'project' first.")
-            return
-        if level >= 2 and not force:
-            logger.info(f"  Already at level {level} (has clusters), skipping. "
-                       f"Use --force to re-run.")
-            return
+    Args:
+        dyf_path: Path to the .dyf file.
+        domain: Optional domain string (overrides metadata if provided).
 
-    # Extract data
+    Returns:
+        dict with keys: n, coords, titles, embeddings, domain,
+        label_cache_data, split_kw_data, use_frequency_labels, data,
+        title_list.
+    """
+    from dyf.splits import assess_text_diversity
+
     with LazyIndex(dyf_path) as idx:
         data = idx.extract_all_fields()
     n = len(data['embeddings'])
@@ -129,7 +124,7 @@ def enrich_cluster(dyf_path, model="gpt-oss:20b",
         n_splits = len(split_kw_data.get('splits', {}))
         logger.info(f"  Using split keywords ({n_splits} splits) for label context")
 
-    tree_maps = None
+    tree_maps = None  # noqa: F841
     if split_kw_data:
         try:
             from dyf.splits import build_tree_maps
@@ -140,7 +135,6 @@ def enrich_cluster(dyf_path, model="gpt-oss:20b",
             logger.warning("Could not load tree structure: %s", e)
 
     # Check text diversity
-    from dyf.splits import assess_text_diversity, label_clusters_frequency
     title_list = titles if isinstance(titles, list) else list(titles)
     diversity = assess_text_diversity(title_list)
     use_frequency_labels = not diversity.is_diverse
@@ -151,10 +145,44 @@ def enrich_cluster(dyf_path, model="gpt-oss:20b",
                     f"title ratio={diversity.unique_title_ratio:.4f})")
         logger.info("    Using frequency-based labeling (no LLM)")
 
-    new_sf = {}
-    new_meta = {}
+    return {
+        'n': n,
+        'coords': coords,
+        'titles': titles,
+        'embeddings': embeddings,
+        'domain': domain,
+        'label_cache_data': label_cache_data,
+        'split_kw_data': split_kw_data,
+        'use_frequency_labels': use_frequency_labels,
+        'data': data,
+        'title_list': title_list,
+    }
 
-    # ── Louvain: natural communities with dendrogram ──
+
+def _run_louvain_phase(dyf_path, coords, embeddings, titles, title_list,
+                       model, domain, label_cache_data, split_kw_data,
+                       use_frequency_labels, resolution, new_sf, new_meta):
+    """Run Louvain community detection, label communities, and populate metadata.
+
+    Modifies new_sf, new_meta, and label_cache_data dicts in place.
+
+    Args:
+        dyf_path: Path to the .dyf file.
+        coords: (N, 3) UMAP coordinates.
+        embeddings: (N, D) embedding matrix.
+        titles: Titles array/list.
+        title_list: Titles as a plain list.
+        model: LLM model name for labeling.
+        domain: Optional domain string.
+        label_cache_data: Mutable label cache dict.
+        split_kw_data: Split keywords data or None.
+        use_frequency_labels: Whether to use frequency-based labeling.
+        resolution: Louvain resolution parameter.
+        new_sf: Mutable dict for new stored fields.
+        new_meta: Mutable dict for new metadata.
+    """
+    from dyf.splits import label_clusters_frequency
+
     logger.info("  Computing Louvain communities from tree leaves...")
     from dyf.agglomerate import compute_louvain_hierarchy
     with LazyIndex(dyf_path) as idx_agg:
@@ -163,83 +191,106 @@ def enrich_cluster(dyf_path, model="gpt-oss:20b",
 
     if hierarchy is None:
         logger.info("    Skipped: tree has fewer than 2 leaves")
+        return
+
+    point_labels = hierarchy['point_labels']
+    natural_k = hierarchy['natural_k']
+    logger.info(f"    Natural k = {natural_k}")
+
+    logger.info(f"  Labeling {natural_k} communities...")
+    if use_frequency_labels:
+        community_names = label_clusters_frequency(
+            title_list, point_labels)
     else:
-        point_labels = hierarchy['point_labels']
-        natural_k = hierarchy['natural_k']
-        logger.info(f"    Natural k = {natural_k}")
+        community_names = label_clusters(
+            titles, coords, point_labels, embeddings,
+            model=model, cache_data=label_cache_data,
+            cache_key="louvain_communities",
+            split_keywords=split_kw_data,
+            domain=domain)
+    label_cache_data["louvain_communities"] = {
+        str(k): v for k, v in community_names.items()}
 
-        logger.info(f"  Labeling {natural_k} communities...")
-        if use_frequency_labels:
-            community_names = label_clusters_frequency(
-                title_list, point_labels)
-        else:
-            community_names = label_clusters(
-                titles, coords, point_labels, embeddings,
-                model=model, cache_data=label_cache_data,
-                cache_key="louvain_communities",
-                split_keywords=split_kw_data,
-                domain=domain)
-        label_cache_data["louvain_communities"] = {
-            str(k): v for k, v in community_names.items()}
+    rgb = spatial_rgb_map(point_labels.tolist(), embeddings)
 
-        rgb = spatial_rgb_map(point_labels.tolist(), embeddings)
+    community_centroids = {}
+    for cid in sorted(set(point_labels.tolist())):
+        mask = point_labels == cid
+        cent = coords[mask].mean(axis=0)
+        community_centroids[str(cid)] = [
+            round(float(cent[0]), 4),
+            round(float(cent[1]), 4),
+            round(float(cent[2]), 4) if coords.shape[1] > 2 else 0.0]
 
-        community_centroids = {}
-        for cid in sorted(set(point_labels.tolist())):
-            mask = point_labels == cid
-            cent = coords[mask].mean(axis=0)
-            community_centroids[str(cid)] = [
-                round(float(cent[0]), 4),
-                round(float(cent[1]), 4),
-                round(float(cent[2]), 4) if coords.shape[1] > 2 else 0.0]
-
-        new_meta['louvain_leaf_communities'] = json.dumps({
-            'leaf_to_community': {
-                str(k): v for k, v in
-                hierarchy['leaf_to_community'].items()},
-            'natural_k': natural_k,
-            'resolution': hierarchy['resolution'],
-        })
-
-        new_meta['louvain_dendrogram'] = json.dumps({
-            'Z': hierarchy['Z'].tolist(),
-            'community_names': {
-                str(k): v for k, v in community_names.items()},
-            'community_colors': {
-                str(k): v for k, v in rgb.items()},
-            'community_centroids': community_centroids,
-            'community_sizes': {
-                str(k): v for k, v in
-                hierarchy['community_sizes'].items()},
-        })
-
-        new_meta['leaf_item_map'] = json.dumps({
+    new_meta['louvain_leaf_communities'] = json.dumps({
+        'leaf_to_community': {
             str(k): v for k, v in
-            hierarchy['leaf_item_map'].items()
-        })
+            hierarchy['leaf_to_community'].items()},
+        'natural_k': natural_k,
+        'resolution': hierarchy['resolution'],
+    })
 
-        new_sf['community_id'] = hierarchy['point_labels'].astype(np.int32)
-        new_sf['centroid_dist'] = hierarchy['centroid_dist']
-        new_sf['nearest_other_dist'] = hierarchy['nearest_other_dist']
+    new_meta['louvain_dendrogram'] = json.dumps({
+        'Z': hierarchy['Z'].tolist(),
+        'community_names': {
+            str(k): v for k, v in community_names.items()},
+        'community_colors': {
+            str(k): v for k, v in rgb.items()},
+        'community_centroids': community_centroids,
+        'community_sizes': {
+            str(k): v for k, v in
+            hierarchy['community_sizes'].items()},
+    })
 
-        dendro_extra = json.loads(new_meta['louvain_dendrogram'])
-        dendro_extra['community_cohesion'] = {
-            str(k): round(v, 6) for k, v in
-            hierarchy['community_cohesion'].items()}
-        dendro_extra['community_embedding_centroids'] = {
-            str(k): v.tolist() for k, v in zip(
-                hierarchy['unique_community_ids'],
-                hierarchy['community_embedding_centroids'])}
-        new_meta['louvain_dendrogram'] = json.dumps(dendro_extra)
+    new_meta['leaf_item_map'] = json.dumps({
+        str(k): v for k, v in
+        hierarchy['leaf_item_map'].items()
+    })
 
-        logger.info(f"    Stored dendrogram metadata "
-                    f"(Z: {len(hierarchy['Z'])} merges, "
-                    f"{len(hierarchy['leaf_item_map'])} leaves)")
-        logger.info("    Stored per-point fields: community_id, "
-                    "centroid_dist, nearest_other_dist")
+    new_sf['community_id'] = hierarchy['point_labels'].astype(np.int32)
+    new_sf['centroid_dist'] = hierarchy['centroid_dist']
+    new_sf['nearest_other_dist'] = hierarchy['nearest_other_dist']
 
-    # ── LSH tree-leaf agglomeration (50-bucket layer) ──
+    dendro_extra = json.loads(new_meta['louvain_dendrogram'])
+    dendro_extra['community_cohesion'] = {
+        str(k): round(v, 6) for k, v in
+        hierarchy['community_cohesion'].items()}
+    dendro_extra['community_embedding_centroids'] = {
+        str(k): v.tolist() for k, v in zip(
+            hierarchy['unique_community_ids'],
+            hierarchy['community_embedding_centroids'])}
+    new_meta['louvain_dendrogram'] = json.dumps(dendro_extra)
+
+    logger.info(f"    Stored dendrogram metadata "
+                f"(Z: {len(hierarchy['Z'])} merges, "
+                f"{len(hierarchy['leaf_item_map'])} leaves)")
+    logger.info("    Stored per-point fields: community_id, "
+                "centroid_dist, nearest_other_dist")
+
+
+def _run_lsh_agglomeration_phase(dyf_path, coords, embeddings, titles,
+                                 title_list, model, domain,
+                                 label_cache_data, use_frequency_labels,
+                                 new_sf, new_meta):
+    """Run LSH tree-leaf agglomeration, label buckets, and populate metadata.
+
+    Modifies new_sf, new_meta, and label_cache_data dicts in place.
+
+    Args:
+        dyf_path: Path to the .dyf file.
+        coords: (N, 3) UMAP coordinates.
+        embeddings: (N, D) embedding matrix.
+        titles: Titles array/list.
+        title_list: Titles as a plain list.
+        model: LLM model name for labeling.
+        domain: Optional domain string.
+        label_cache_data: Mutable label cache dict.
+        use_frequency_labels: Whether to use frequency-based labeling.
+        new_sf: Mutable dict for new stored fields.
+        new_meta: Mutable dict for new metadata.
+    """
     from dyf.colors import tree_rgb_map
+    from dyf.splits import label_clusters_frequency
 
     logger.info("  Computing agglomerated DYF tree buckets...")
     from dyf.agglomerate import agglomerate_tree_leaves
@@ -286,6 +337,49 @@ def enrich_cluster(dyf_path, model="gpt-oss:20b",
         logger.info("    Stored LSH bucket IDs, names, centroids, and colors")
     else:
         logger.info("    Skipped: tree has fewer than 2 leaves")
+
+
+def enrich_cluster(dyf_path, model="gpt-oss:20b",
+                   output_path=None, force=False, domain=None,
+                   resolution=1.0):
+    """Add Louvain cluster labels + dendrogram to a .dyf file (Level 1 → 2)."""
+    logger.info("=== Level 2: Louvain Clustering (dendrogram) ===")
+    logger.info(f"  Input: {dyf_path}")
+
+    with LazyIndex(dyf_path) as idx:
+        level = idx.detect_enrichment_level()
+        if level < 1:
+            logger.warning(f"  Need level 1 (UMAP coords), got level {level}. "
+                          f"Run 'project' first.")
+            return
+        if level >= 2 and not force:
+            logger.info(f"  Already at level {level} (has clusters), skipping. "
+                       f"Use --force to re-run.")
+            return
+
+    inputs = _extract_cluster_inputs(dyf_path, domain)
+    n = inputs['n']
+    coords = inputs['coords']
+    embeddings = inputs['embeddings']
+    titles = inputs['titles']
+    title_list = inputs['title_list']
+    domain = inputs['domain']
+    label_cache_data = inputs['label_cache_data']
+    split_kw_data = inputs['split_kw_data']
+    use_frequency_labels = inputs['use_frequency_labels']
+    data = inputs['data']
+
+    new_sf = {}
+    new_meta = {}
+
+    _run_louvain_phase(dyf_path, coords, embeddings, titles, title_list,
+                       model, domain, label_cache_data, split_kw_data,
+                       use_frequency_labels, resolution, new_sf, new_meta)
+
+    _run_lsh_agglomeration_phase(dyf_path, coords, embeddings, titles,
+                                 title_list, model, domain,
+                                 label_cache_data, use_frequency_labels,
+                                 new_sf, new_meta)
 
     # Strip stale level 3 metadata when re-clustering
     if force and level >= 3:

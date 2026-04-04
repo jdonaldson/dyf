@@ -243,69 +243,36 @@ def _compute_community_linkage(point_labels, embeddings):
     return Z, unique_ids, centroids
 
 
-def compute_louvain_hierarchy(idx, coords, embeddings, leaf_k=10,
-                               similarity_threshold=0.5, resolution=1.0) -> LouvainHierarchy | None:
-    """Compute Louvain communities with dendrogram for continuous cluster slider.
+def _run_louvain_on_centroids(centroids_normed, k, resolution,
+                              similarity_threshold):
+    """Run Louvain community detection on L2-normalized leaf centroids.
 
-    Returns the three artifacts needed for the dendrogram-based slider:
-    1. leaf_communities: mapping from Louvain community → leaf indices
-    2. dendrogram Z: scipy linkage matrix over community centroids
-    3. leaf_item_map: mapping from tree leaf → item indices
+    Tries the Rust implementation first (faster, weighted, deterministic),
+    falling back to NetworkX Louvain if dyf_rs is not available.
 
     Args:
-        idx: An open ``LazyIndex`` handle.
-        coords: (N, 2-or-3) UMAP coordinates for every item.
-        embeddings: (N, D) embedding matrix (float32).
-        leaf_k: Number of nearest neighbors per leaf centroid (default 10).
-        similarity_threshold: Minimum cosine similarity to keep an edge
-            (default 0.5).
-        resolution: Louvain resolution parameter (default 1.0).
+        centroids_normed: (L, D) float32 array of L2-normalized leaf centroids.
+        k: Number of nearest neighbors per centroid.
+        resolution: Louvain resolution parameter.
+        similarity_threshold: Minimum cosine similarity to keep a KNN edge
+            (only used by the NetworkX fallback).
 
     Returns:
-        Dict with keys:
-            ``point_labels``: int32 array (N,) of community IDs (0-based).
-            ``leaf_to_community``: dict {leaf_idx: community_id}.
-            ``community_sizes``: dict {community_id: int}.
-            ``Z``: (k-1, 4) linkage matrix.
-            ``unique_community_ids``: sorted list of community IDs.
-            ``leaf_item_map``: dict {leaf_idx: list of item indices}.
-            ``natural_k``: int, number of natural communities.
-            ``resolution``: float, Louvain resolution used.
-
-        Returns ``None`` when the tree has fewer than two leaves.
+        Tuple of (leaf_labels, n_communities) where leaf_labels is an int32
+        array (L,) and n_communities is the count of distinct communities.
     """
-    from sklearn.neighbors import NearestNeighbors
-
-    result = _collect_leaf_data(idx)
-    if result is None:
-        return None
-
-    leaves, leaf_centroids, leaf_point_indices, _tree = result
-    n_points = coords.shape[0]
-
-    centroids = np.vstack(leaf_centroids).astype(np.float32)
-
-    # L2-normalize centroids for cosine similarity
-    norms = np.linalg.norm(centroids, axis=1, keepdims=True)
-    norms[norms == 0] = 1.0
-    centroids_normed = centroids / norms
-
-    # KNN on normalized centroids
-    k = min(leaf_k, len(centroids_normed) - 1)
-    if k < 1:
-        k = 1
-
-    # Try Rust Louvain first (faster, weighted, deterministic)
     try:
         from dyf_rs import louvain_from_centroids
         labels_arr, n_communities = louvain_from_centroids(
             centroids_normed, k=k, resolution=resolution)
         leaf_labels = labels_arr.astype(np.int32)
         logger.info(f"    Louvain (Rust) found {n_communities} communities "
-                    f"from {len(leaves)} leaves (k={k}, res={resolution})")
+                    f"from {len(centroids_normed)} leaves (k={k}, res={resolution})")
     except ImportError:
         # Fall back to NetworkX Louvain
         import networkx as nx
+        from sklearn.neighbors import NearestNeighbors
+
         nn = NearestNeighbors(n_neighbors=k + 1, metric='cosine')
         nn.fit(centroids_normed)
         distances, indices = nn.kneighbors(centroids_normed)
@@ -340,7 +307,113 @@ def compute_louvain_hierarchy(idx, coords, embeddings, leaf_k=10,
 
         n_communities = len(set(leaf_labels.tolist()))
         logger.info(f"    Louvain (NetworkX) found {n_communities} communities "
-                    f"from {len(leaves)} leaves (k={k}, res={resolution})")
+                    f"from {len(centroids_normed)} leaves (k={k}, res={resolution})")
+
+    return leaf_labels, n_communities
+
+
+def _compute_point_metrics(point_labels, embeddings, community_centroids_emb,
+                           unique_ids):
+    """Compute per-point cosine distances and per-community cohesion.
+
+    Args:
+        point_labels: int32 array (N,) of community IDs.
+        embeddings: (N, D) embedding matrix (float32).
+        community_centroids_emb: (k, D) float32 array of community centroids.
+        unique_ids: sorted list of unique community IDs.
+
+    Returns:
+        Tuple of (centroid_dist, nearest_other_dist, community_cohesion)
+        where centroid_dist and nearest_other_dist are float32 arrays (N,)
+        and community_cohesion is a dict {community_id: float}.
+    """
+    # Normalize embeddings and centroids for cosine via dot product
+    emb_norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+    emb_norms[emb_norms == 0] = 1.0
+    emb_normed = embeddings / emb_norms
+
+    cen_norms = np.linalg.norm(community_centroids_emb, axis=1, keepdims=True)
+    cen_norms[cen_norms == 0] = 1.0
+    cen_normed = community_centroids_emb / cen_norms
+
+    # (N, k) cosine similarity matrix
+    sim_matrix = emb_normed @ cen_normed.T
+
+    id_to_idx = {gid: i for i, gid in enumerate(unique_ids)}
+    own_idx = np.array([id_to_idx[int(c)] for c in point_labels], dtype=np.int32)
+
+    # Cosine distance to own centroid
+    own_sim = sim_matrix[np.arange(len(point_labels)), own_idx]
+    centroid_dist = (1.0 - own_sim).astype(np.float32)
+
+    # Nearest OTHER centroid distance
+    # Mask own centroid with -inf, then take max similarity
+    masked_sim = sim_matrix.copy()
+    masked_sim[np.arange(len(point_labels)), own_idx] = -np.inf
+    nearest_other_sim = masked_sim.max(axis=1)
+    nearest_other_dist = (1.0 - nearest_other_sim).astype(np.float32)
+
+    # Community cohesion: mean centroid_dist per community
+    community_cohesion = {}
+    for cid in unique_ids:
+        mask = point_labels == cid
+        community_cohesion[cid] = float(centroid_dist[mask].mean())
+
+    return centroid_dist, nearest_other_dist, community_cohesion
+
+
+def compute_louvain_hierarchy(idx, coords, embeddings, leaf_k=10,
+                               similarity_threshold=0.5, resolution=1.0) -> LouvainHierarchy | None:
+    """Compute Louvain communities with dendrogram for continuous cluster slider.
+
+    Returns the three artifacts needed for the dendrogram-based slider:
+    1. leaf_communities: mapping from Louvain community → leaf indices
+    2. dendrogram Z: scipy linkage matrix over community centroids
+    3. leaf_item_map: mapping from tree leaf → item indices
+
+    Args:
+        idx: An open ``LazyIndex`` handle.
+        coords: (N, 2-or-3) UMAP coordinates for every item.
+        embeddings: (N, D) embedding matrix (float32).
+        leaf_k: Number of nearest neighbors per leaf centroid (default 10).
+        similarity_threshold: Minimum cosine similarity to keep an edge
+            (default 0.5).
+        resolution: Louvain resolution parameter (default 1.0).
+
+    Returns:
+        Dict with keys:
+            ``point_labels``: int32 array (N,) of community IDs (0-based).
+            ``leaf_to_community``: dict {leaf_idx: community_id}.
+            ``community_sizes``: dict {community_id: int}.
+            ``Z``: (k-1, 4) linkage matrix.
+            ``unique_community_ids``: sorted list of community IDs.
+            ``leaf_item_map``: dict {leaf_idx: list of item indices}.
+            ``natural_k``: int, number of natural communities.
+            ``resolution``: float, Louvain resolution used.
+
+        Returns ``None`` when the tree has fewer than two leaves.
+    """
+    result = _collect_leaf_data(idx)
+    if result is None:
+        return None
+
+    leaves, leaf_centroids, leaf_point_indices, _tree = result
+    n_points = coords.shape[0]
+
+    centroids = np.vstack(leaf_centroids).astype(np.float32)
+
+    # L2-normalize centroids for cosine similarity
+    norms = np.linalg.norm(centroids, axis=1, keepdims=True)
+    norms[norms == 0] = 1.0
+    centroids_normed = centroids / norms
+
+    # KNN on normalized centroids
+    k = min(leaf_k, len(centroids_normed) - 1)
+    if k < 1:
+        k = 1
+
+    leaf_labels, n_communities = _run_louvain_on_centroids(
+        centroids_normed, k, resolution, similarity_threshold)
 
     # Map points -> leaf -> community
     point_labels = np.full(n_points, -1, dtype=np.int32)
@@ -378,37 +451,9 @@ def compute_louvain_hierarchy(idx, coords, embeddings, leaf_k=10,
         point_labels, embeddings)
 
     # Per-point metrics: cosine distance to own centroid and nearest other
-    # Normalize embeddings and centroids for cosine via dot product
-    emb_norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
-    emb_norms[emb_norms == 0] = 1.0
-    emb_normed = embeddings / emb_norms
-
-    cen_norms = np.linalg.norm(community_centroids_emb, axis=1, keepdims=True)
-    cen_norms[cen_norms == 0] = 1.0
-    cen_normed = community_centroids_emb / cen_norms
-
-    # (N, k) cosine similarity matrix
-    sim_matrix = emb_normed @ cen_normed.T
-
-    id_to_idx = {gid: i for i, gid in enumerate(unique_ids)}
-    own_idx = np.array([id_to_idx[int(c)] for c in point_labels], dtype=np.int32)
-
-    # Cosine distance to own centroid
-    own_sim = sim_matrix[np.arange(len(point_labels)), own_idx]
-    centroid_dist = (1.0 - own_sim).astype(np.float32)
-
-    # Nearest OTHER centroid distance
-    # Mask own centroid with -inf, then take max similarity
-    masked_sim = sim_matrix.copy()
-    masked_sim[np.arange(len(point_labels)), own_idx] = -np.inf
-    nearest_other_sim = masked_sim.max(axis=1)
-    nearest_other_dist = (1.0 - nearest_other_sim).astype(np.float32)
-
-    # Community cohesion: mean centroid_dist per community
-    community_cohesion = {}
-    for cid in unique_ids:
-        mask = point_labels == cid
-        community_cohesion[cid] = float(centroid_dist[mask].mean())
+    centroid_dist, nearest_other_dist, community_cohesion = \
+        _compute_point_metrics(point_labels, embeddings,
+                               community_centroids_emb, unique_ids)
 
     return {
         'point_labels': point_labels,
@@ -528,9 +573,6 @@ def louvain_cluster_leaves(idx, coords, embeddings, leaf_k=10,
         Returns ``(None, {}, [], None, tree)`` when the tree has fewer than
         two leaves.
     """
-    import networkx as nx
-    from sklearn.neighbors import NearestNeighbors
-
     result = _collect_leaf_data(idx)
     if result is None:
         tree = idx.get_tree_structure()
@@ -553,41 +595,9 @@ def louvain_cluster_leaves(idx, coords, embeddings, leaf_k=10,
     if k < 1:
         # Degenerate: only 2 leaves, put everything in one bucket
         k = 1
-    nn = NearestNeighbors(n_neighbors=k + 1, metric='cosine')
-    nn.fit(centroids_normed)
-    distances, indices = nn.kneighbors(centroids_normed)
 
-    # Build graph: edge if cosine similarity > threshold
-    G = nx.Graph()
-    G.add_nodes_from(range(len(centroids_normed)))
-    for i in range(len(centroids_normed)):
-        for j_pos in range(1, distances.shape[1]):  # skip self (pos 0)
-            j = indices[i, j_pos]
-            sim = 1.0 - distances[i, j_pos]  # cosine distance → similarity
-            if sim > similarity_threshold:
-                G.add_edge(i, j, weight=sim)
-
-    # Louvain community detection
-    communities = nx.community.louvain_communities(
-        G, weight='weight', resolution=resolution, seed=42)
-
-    # Map communities → leaf labels (0-based)
-    leaf_labels = np.full(len(centroids_normed), -1, dtype=np.int32)
-    for comm_id, members in enumerate(communities):
-        for leaf_idx in members:
-            leaf_labels[leaf_idx] = comm_id
-
-    # Handle isolated nodes (no edges above threshold)
-    isolated = leaf_labels == -1
-    if isolated.any():
-        next_id = leaf_labels.max() + 1
-        for i in np.where(isolated)[0]:
-            leaf_labels[i] = next_id
-            next_id += 1
-
-    n_communities = len(set(leaf_labels.tolist()))
-    logger.info(f"    Louvain found {n_communities} communities "
-                f"from {len(leaves)} leaves (k={k}, res={resolution})")
+    leaf_labels, _n_communities = _run_louvain_on_centroids(
+        centroids_normed, k, resolution, similarity_threshold)
 
     # Map points -> leaf -> community (initial assignment)
     point_labels = np.full(n_points, -1, dtype=np.int32)
