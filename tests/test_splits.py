@@ -1096,7 +1096,7 @@ class TestLabelClustersWithSplitContext:
                 if os.path.exists(p):
                     os.unlink(p)
 
-    def test_cluster_without_splits_still_works(self):
+    def test_cluster_without_splits_still_works(self):  # noqa: C901
         """Backward compat: cluster without prior splits uses contrastive TF-IDF."""
         from unittest.mock import patch
         from dyf import build_dyf_tree
@@ -1141,3 +1141,130 @@ class TestLabelClustersWithSplitContext:
             for p in (path, out_path):
                 if os.path.exists(p):
                     os.unlink(p)
+
+
+# ── Direct unit tests for extracted helpers ──────────────────────────
+
+
+class TestComputeDepthFromRoot:
+    """Tests for _compute_depth_from_root BFS."""
+
+    def test_simple_tree(self):
+        from dyf.splits import _compute_depth_from_root
+
+        tree = [
+            {'node_id': 0, 'parent_id': None},
+            {'node_id': 1, 'parent_id': 0},
+            {'node_id': 2, 'parent_id': 0},
+            {'node_id': 3, 'parent_id': 1},
+        ]
+        children_map = {0: [1, 2], 1: [3]}
+        depth = _compute_depth_from_root(tree, children_map)
+        assert depth[0] == 0
+        assert depth[1] == 1
+        assert depth[2] == 1
+        assert depth[3] == 2
+
+    def test_deep_chain(self):
+        from dyf.splits import _compute_depth_from_root
+
+        tree = [{'node_id': i, 'parent_id': (i - 1 if i > 0 else None)}
+                for i in range(5)]
+        children_map = {i: [i + 1] for i in range(4)}
+        depth = _compute_depth_from_root(tree, children_map)
+        for i in range(5):
+            assert depth[i] == i
+
+    def test_single_root(self):
+        from dyf.splits import _compute_depth_from_root
+
+        tree = [{'node_id': 0, 'parent_id': None}]
+        children_map = {}
+        depth = _compute_depth_from_root(tree, children_map)
+        assert depth == {0: 0}
+
+    def test_unreachable_nodes(self):
+        from dyf.splits import _compute_depth_from_root
+
+        tree = [
+            {'node_id': 0, 'parent_id': None},
+            {'node_id': 1, 'parent_id': 0},
+            {'node_id': 99, 'parent_id': 50},  # disconnected
+        ]
+        children_map = {0: [1]}
+        depth = _compute_depth_from_root(tree, children_map)
+        assert 0 in depth
+        assert 1 in depth
+        assert 99 not in depth
+
+
+class TestComputeChildTfidf:
+    """Tests for _compute_child_tfidf TF-IDF scoring."""
+
+    def test_distinct_vocabularies(self):
+        from collections import Counter
+        from dyf.splits import _compute_child_tfidf
+
+        child_data = {
+            0: {'count': 10, 'word_counts': Counter({'alpha': 5, 'beta': 3}),
+                'total_words': 8, 'bigram_counts': Counter(), 'total_bigrams': 0},
+            1: {'count': 10, 'word_counts': Counter({'gamma': 4, 'delta': 2}),
+                'total_words': 6, 'bigram_counts': Counter(), 'total_bigrams': 0},
+        }
+        result = _compute_child_tfidf(child_data, n_children=2, top_k=5,
+                                       bigram_check=False)
+        words_0 = [w for w, _ in result[0]['unigrams']]
+        words_1 = [w for w, _ in result[1]['unigrams']]
+        assert 'alpha' in words_0
+        assert 'gamma' in words_1
+        assert 'gamma' not in words_0
+
+    def test_empty_child(self):
+        from collections import Counter
+        from dyf.splits import _compute_child_tfidf
+
+        child_data = {
+            0: {'count': 10, 'word_counts': Counter({'alpha': 5}),
+                'total_words': 5, 'bigram_counts': Counter(), 'total_bigrams': 0},
+            1: {'count': 0, 'word_counts': Counter(),
+                'total_words': 0, 'bigram_counts': Counter(), 'total_bigrams': 0},
+        }
+        result = _compute_child_tfidf(child_data, n_children=2, top_k=5,
+                                       bigram_check=False)
+        assert result[1]['unigrams'] == []
+
+    def test_shared_vocab_excluded(self):
+        from collections import Counter
+        from dyf.splits import _compute_child_tfidf
+
+        child_data = {
+            0: {'count': 10, 'word_counts': Counter({'common': 5, 'unique_a': 3}),
+                'total_words': 8, 'bigram_counts': Counter(), 'total_bigrams': 0},
+            1: {'count': 10, 'word_counts': Counter({'common': 4, 'unique_b': 2}),
+                'total_words': 6, 'bigram_counts': Counter(), 'total_bigrams': 0},
+        }
+        result = _compute_child_tfidf(child_data, n_children=2, top_k=5,
+                                       bigram_check=False)
+        words_0 = [w for w, _ in result[0]['unigrams']]
+        assert 'common' not in words_0
+        assert 'unique_a' in words_0
+
+    def test_bigram_check(self):
+        from collections import Counter
+        from dyf.splits import _compute_child_tfidf
+
+        child_data = {
+            0: {'count': 10, 'word_counts': Counter({'alpha': 5}),
+                'total_words': 5,
+                'bigram_counts': Counter({'alpha beta': 3}),
+                'total_bigrams': 3},
+            1: {'count': 10, 'word_counts': Counter({'gamma': 4}),
+                'total_words': 4,
+                'bigram_counts': Counter({'gamma delta': 2}),
+                'total_bigrams': 2},
+        }
+        result = _compute_child_tfidf(child_data, n_children=2, top_k=5,
+                                       bigram_check=True)
+        assert 'bigrams' in result[0]
+        bigrams_0 = [bg for bg, _ in result[0]['bigrams']]
+        assert 'alpha beta' in bigrams_0

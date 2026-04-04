@@ -997,3 +997,154 @@ class TestAdaptiveProbing:
             assert isinstance(r['min_margin'], float)
             assert isinstance(r['adaptive_nprobe'], int)
             assert r['adaptive_nprobe'] >= 1
+
+
+# ── Direct unit tests for extracted helpers ──────────────────────────
+
+
+class TestMergeLeafResults:
+    """Tests for _merge_leaf_results dedup and concatenation."""
+
+    def test_basic_merge(self):
+        from dyf.lazy_index import _merge_leaf_results
+
+        idx1 = np.array([0, 1, 2])
+        idx2 = np.array([3, 4])
+        sc1 = np.array([0.9, 0.8, 0.7])
+        sc2 = np.array([0.6, 0.5])
+        fields = {'title': [['a', 'b', 'c'], ['d', 'e']]}
+
+        indices, scores, merged = _merge_leaf_results(
+            [idx1, idx2], [sc1, sc2], fields, ['title'])
+        assert len(indices) == 5
+        assert len(scores) == 5
+        assert merged['title'] == ['a', 'b', 'c', 'd', 'e']
+
+    def test_dedup_keeps_first(self):
+        from dyf.lazy_index import _merge_leaf_results
+
+        idx1 = np.array([0, 1])
+        idx2 = np.array([1, 2])
+        sc1 = np.array([0.9, 0.8])
+        sc2 = np.array([0.7, 0.6])
+
+        indices, scores, _ = _merge_leaf_results(
+            [idx1, idx2], [sc1, sc2], {}, [])
+        assert len(indices) == 3
+        # First occurrence of 1 (score 0.8) kept, not second (0.7)
+        pos_1 = np.where(indices == 1)[0][0]
+        assert scores[pos_1] == pytest.approx(0.8)
+
+    def test_empty_inputs(self):
+        from dyf.lazy_index import _merge_leaf_results
+
+        indices, scores, merged = _merge_leaf_results(
+            [np.array([], dtype=int)],
+            [np.array([], dtype=float)],
+            {}, [])
+        assert len(indices) == 0
+        assert len(scores) == 0
+
+    def test_numpy_fields(self):
+        from dyf.lazy_index import _merge_leaf_results
+
+        idx1 = np.array([0, 1])
+        idx2 = np.array([2, 3])
+        sc1 = np.array([0.9, 0.8])
+        sc2 = np.array([0.7, 0.6])
+        fields = {'score': [np.array([1.0, 2.0]), np.array([3.0, 4.0])]}
+
+        indices, scores, merged = _merge_leaf_results(
+            [idx1, idx2], [sc1, sc2], fields, ['score'])
+        assert isinstance(merged['score'], np.ndarray)
+        assert len(merged['score']) == 4
+        np.testing.assert_array_equal(merged['score'], [1.0, 2.0, 3.0, 4.0])
+
+
+class TestTopkWithFields:
+    """Tests for _topk_with_fields selection and sorting."""
+
+    def test_basic_topk(self):
+        from dyf.lazy_index import _topk_with_fields
+
+        indices = np.array([0, 1, 2, 3, 4])
+        scores = np.array([0.5, 0.9, 0.3, 0.7, 0.1])
+        fields = {'title': ['a', 'b', 'c', 'd', 'e']}
+
+        top_idx, top_sc, top_f = _topk_with_fields(
+            indices, scores, fields, ['title'], k=3)
+        assert len(top_idx) == 3
+        # Sorted descending by score
+        assert top_sc[0] == pytest.approx(0.9)
+        assert top_sc[1] == pytest.approx(0.7)
+        assert top_sc[2] == pytest.approx(0.5)
+        assert top_f['title'][0] == 'b'
+
+    def test_k_greater_than_n(self):
+        from dyf.lazy_index import _topk_with_fields
+
+        indices = np.array([0, 1])
+        scores = np.array([0.5, 0.9])
+        fields = {}
+
+        top_idx, top_sc, _ = _topk_with_fields(
+            indices, scores, fields, [], k=10)
+        assert len(top_idx) == 2
+        assert top_sc[0] == pytest.approx(0.9)
+
+    def test_single_element(self):
+        from dyf.lazy_index import _topk_with_fields
+
+        indices = np.array([42])
+        scores = np.array([0.99])
+        fields = {'label': np.array([7])}
+
+        top_idx, top_sc, top_f = _topk_with_fields(
+            indices, scores, fields, ['label'], k=5)
+        assert len(top_idx) == 1
+        assert top_idx[0] == 42
+        assert top_f['label'][0] == 7
+
+
+@lazy_deps
+class TestResolveArrowSchema:
+    """Tests for _resolve_arrow_schema schema construction."""
+
+    def test_no_embeddings(self):
+        import pyarrow as pa
+        from dyf.lazy_index import _resolve_arrow_schema
+
+        schema, sf_types, meta, pq = _resolve_arrow_schema(
+            has_embeddings=False, embeddings=None,
+            quantization='float32', embedding_dim=0,
+            metadata=None, stored_fields=None)
+        assert 'item_index' in schema.names
+        assert 'embedding' not in schema.names
+        assert meta['has_embeddings'] == 'false'
+        assert pq['is_pq'] is False
+
+    def test_float16(self):
+        import pyarrow as pa
+        from dyf.lazy_index import _resolve_arrow_schema
+
+        emb = np.random.default_rng(42).standard_normal((10, 8)).astype(np.float32)
+        schema, sf_types, meta, pq = _resolve_arrow_schema(
+            has_embeddings=True, embeddings=emb,
+            quantization='float16', embedding_dim=8,
+            metadata=None, stored_fields=None)
+        assert 'embedding' in schema.names
+        assert pq['q_embeddings'] is not None
+        assert pq['q_embeddings'].dtype == np.float16
+
+    def test_stored_fields_in_schema(self):
+        import pyarrow as pa
+        from dyf.lazy_index import _resolve_arrow_schema
+
+        emb = np.random.default_rng(42).standard_normal((10, 8)).astype(np.float32)
+        sf = {'label': np.array([0] * 10, dtype=np.int32)}
+        schema, sf_types, meta, pq = _resolve_arrow_schema(
+            has_embeddings=True, embeddings=emb,
+            quantization='float32', embedding_dim=8,
+            metadata=None, stored_fields=sf)
+        assert 'label' in schema.names
+        assert 'label' in sf_types
