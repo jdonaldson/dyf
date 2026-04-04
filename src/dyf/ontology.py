@@ -1350,17 +1350,29 @@ class ROGResult:
         return None
 
 
+@dataclass
+class _KNNData:
+    """Bundled k-NN graph arrays for ROG construction."""
+    neighbors: np.ndarray
+    similarities: np.ndarray
+    diversity: np.ndarray
+
+
+@dataclass
+class _ROGState:
+    """Mutable global state accumulated across ROG layers."""
+    all_children: dict[int, list[tuple[int, float, float]]]
+    all_parents: dict[int, list[tuple[int, float, float]]]
+
+
 def _build_rog_layer(
     remaining_indices: set[int],
-    neighbors: np.ndarray,
-    similarities: np.ndarray,
-    diversity: np.ndarray,
+    knn: _KNNData,
     threshold: float,
     diversity_gap_threshold: float,
     depth: int,
     n_points: int,
-    all_children: dict[int, list[tuple[int, float, float]]],
-    all_parents: dict[int, list[tuple[int, float, float]]],
+    state: _ROGState,
     verbose: bool = False,
 ) -> ROGLayer | None:
     """
@@ -1370,7 +1382,7 @@ def _build_rog_layer(
     global children/parents dicts, and returns the layer metadata.  Returns
     ``None`` when no nodes are connected at the current threshold.
 
-    Side effects: mutates *all_children*, *all_parents*, and
+    Side effects: mutates *state.all_children*, *state.all_parents*, and
     *remaining_indices* in place.
     """
     remaining_list = list(remaining_indices)
@@ -1379,17 +1391,17 @@ def _build_rog_layer(
 
     remaining_set = set(remaining_list)
     for i in remaining_list:
-        for j_idx in range(1, min(16, neighbors.shape[1])):
-            j = neighbors[i, j_idx]
+        for j_idx in range(1, min(16, knn.neighbors.shape[1])):
+            j = knn.neighbors[i, j_idx]
             if j not in remaining_set:
                 continue
 
-            sim = similarities[i, j_idx]
+            sim = knn.similarities[i, j_idx]
             if sim < threshold:
                 continue
 
-            div_i = diversity[i]
-            div_j = diversity[j]
+            div_i = knn.diversity[i]
+            div_j = knn.diversity[j]
             gap = div_i - div_j
 
             # Adjust gap threshold for deeper layers
@@ -1411,9 +1423,9 @@ def _build_rog_layer(
 
     # Add to global structure
     for parent, children_list in layer_children.items():
-        all_children[parent].extend(children_list)
+        state.all_children[parent].extend(children_list)
     for child, parents_list in layer_parents.items():
-        all_parents[child].extend(parents_list)
+        state.all_parents[child].extend(parents_list)
 
     layer = ROGLayer(
         depth=depth,
@@ -1425,7 +1437,7 @@ def _build_rog_layer(
     )
 
     if verbose:
-        total_connected = len(set(all_children.keys()) | set(all_parents.keys()))
+        total_connected = len(set(state.all_children.keys()) | set(state.all_parents.keys()))
         logger.debug("Connected: %d, edges: %d", len(connected), n_edges)
         logger.debug("Total coverage: %d/%d (%.1f%%)", total_connected, n_points, 100 * total_connected / n_points)
 
@@ -1436,11 +1448,8 @@ def _build_rog_layer(
 
 
 def _add_bridge_edges(
-    all_children: dict[int, list[tuple[int, float, float]]],
-    all_parents: dict[int, list[tuple[int, float, float]]],
-    neighbors: np.ndarray,
-    similarities: np.ndarray,
-    diversity: np.ndarray,
+    state: _ROGState,
+    knn: _KNNData,
     min_threshold: float,
     diversity_gap_threshold: float,
 ) -> int:
@@ -1450,39 +1459,39 @@ def _add_bridge_edges(
     Scans the k-NN graph for pairs of already-connected nodes that lack
     a direct edge and adds one when the diversity gap is sufficient.
 
-    Returns the number of bridge edges added.  Mutates *all_children* and
-    *all_parents* in place.
+    Returns the number of bridge edges added.  Mutates *state.all_children*
+    and *state.all_parents* in place.
     """
     bridge_edges = 0
-    all_connected = set(all_children.keys()) | set(all_parents.keys())
+    all_connected = set(state.all_children.keys()) | set(state.all_parents.keys())
 
     for i in all_connected:
-        for j_idx in range(1, min(16, neighbors.shape[1])):
-            j = neighbors[i, j_idx]
+        for j_idx in range(1, min(16, knn.neighbors.shape[1])):
+            j = knn.neighbors[i, j_idx]
             if j not in all_connected or j == i:
                 continue
 
             # Check if edge already exists
-            existing_children = {c for c, _, _ in all_children.get(i, [])}
-            existing_parents = {p for p, _, _ in all_parents.get(i, [])}
+            existing_children = {c for c, _, _ in state.all_children.get(i, [])}
+            existing_parents = {p for p, _, _ in state.all_parents.get(i, [])}
             if j in existing_children or j in existing_parents:
                 continue
 
-            sim = similarities[i, j_idx]
+            sim = knn.similarities[i, j_idx]
             if sim < min_threshold:
                 continue
 
-            div_i = diversity[i]
-            div_j = diversity[j]
+            div_i = knn.diversity[i]
+            div_j = knn.diversity[j]
             gap = div_i - div_j
 
             if abs(gap) > diversity_gap_threshold * 0.5:  # Looser for bridges
                 if gap > 0:
-                    all_children[i].append((j, float(sim), float(gap)))
-                    all_parents[j].append((i, float(sim), float(gap)))
+                    state.all_children[i].append((j, float(sim), float(gap)))
+                    state.all_parents[j].append((i, float(sim), float(gap)))
                 else:
-                    all_children[j].append((i, float(sim), float(-gap)))
-                    all_parents[i].append((j, float(sim), float(-gap)))
+                    state.all_children[j].append((i, float(sim), float(-gap)))
+                    state.all_parents[i].append((j, float(sim), float(-gap)))
                 bridge_edges += 1
 
     return bridge_edges
@@ -1556,11 +1565,15 @@ def build_rog_ontology(
     # Compute diversity once for full dataset
     diversity = compute_neighbor_diversity(embeddings, k=15, neighbors=neighbors)
 
+    # Bundle k-NN data and mutable state
+    knn = _KNNData(neighbors=neighbors, similarities=similarities, diversity=diversity)
+    state = _ROGState(
+        all_children=defaultdict(list),
+        all_parents=defaultdict(list),
+    )
+
     # Recursive layer building
     layers: list[ROGLayer] = []
-    all_children: dict[int, list[tuple[int, float, float]]] = defaultdict(list)
-    all_parents: dict[int, list[tuple[int, float, float]]] = defaultdict(list)
-
     remaining_indices = set(range(n_points))
     threshold = initial_threshold
     depth = 0
@@ -1575,9 +1588,9 @@ def build_rog_ontology(
             logger.info("Layer %d: threshold=%.3f, candidates=%d", depth, threshold, len(remaining_indices))
 
         layer = _build_rog_layer(
-            remaining_indices, neighbors, similarities, diversity,
+            remaining_indices, knn,
             threshold, diversity_gap_threshold, depth, n_points,
-            all_children, all_parents, verbose=verbose,
+            state, verbose=verbose,
         )
         if layer is not None:
             layers.append(layer)
@@ -1591,16 +1604,15 @@ def build_rog_ontology(
         logger.info("Adding bridge edges...")
 
     bridge_edges = _add_bridge_edges(
-        all_children, all_parents, neighbors, similarities,
-        diversity, min_threshold, diversity_gap_threshold,
+        state, knn, min_threshold, diversity_gap_threshold,
     )
 
     if verbose:
         logger.debug("Bridge edges: %d", bridge_edges)
 
     # Build final ontology
-    children = dict(all_children)
-    parents = dict(all_parents)
+    children = dict(state.all_children)
+    parents = dict(state.all_parents)
 
     all_nodes = set(children.keys()) | set(parents.keys())
     roots = [n for n in all_nodes if n not in parents]

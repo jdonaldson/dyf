@@ -3,6 +3,7 @@
 import json
 import logging
 from collections import defaultdict
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -12,6 +13,15 @@ from dyf.lazy_index import LazyIndex, rewrite_lazy_index
 from ._ollama import _call_ollama
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class _LabelingConfig:
+    """Configuration for tree branch labeling."""
+    model: str
+    rng: np.random.Generator
+    samples_per_child: int
+    min_child_size: int
 
 
 def _collect_descendant_indices(node_id, children_of, leaf_batches):
@@ -27,8 +37,8 @@ def _collect_descendant_indices(node_id, children_of, leaf_batches):
     ])
 
 
-def _label_branch(node, children_of, by_id, leaf_batches, titles, model, rng,
-                   samples_per_child, min_child_size):
+def _label_branch(node, children_of, by_id, leaf_batches, titles,
+                   config: _LabelingConfig):
     """Label a single tree branch by sampling child groups and querying the LLM.
 
     Returns (node_id, branch_label, kid_labels_dict).
@@ -40,15 +50,15 @@ def _label_branch(node, children_of, by_id, leaf_batches, titles, model, rng,
     child_samples = {}
     for kid_id in kids_sorted:
         kn = by_id[kid_id]
-        if kn['num_items'] < min_child_size:
+        if kn['num_items'] < config.min_child_size:
             continue
         all_idx = _collect_descendant_indices(
             kid_id, children_of, leaf_batches)
         if len(all_idx) < 3:
             continue
 
-        n_sample = min(samples_per_child, len(all_idx))
-        sample_idx = rng.choice(all_idx, size=n_sample, replace=False)
+        n_sample = min(config.samples_per_child, len(all_idx))
+        sample_idx = config.rng.choice(all_idx, size=n_sample, replace=False)
         sample_titles = [titles[j][:120] for j in sample_idx]
 
         seen = set()
@@ -89,7 +99,7 @@ def _label_branch(node, children_of, by_id, leaf_batches, titles, model, rng,
     prompt_parts.append("Branch: <summary label>")
 
     prompt = "\n".join(prompt_parts)
-    response = _call_ollama(model, prompt)
+    response = _call_ollama(config.model, prompt)
 
     kid_labels = {}
     branch_label = f"Branch {nid}"
@@ -155,15 +165,19 @@ def label_tree_bottomup(idx, titles, model="gpt-oss:20b", target_depth=3,
                 logger.info("  Loaded tree labels from cache")
                 return cached
 
-    rng = np.random.default_rng(42)
+    config = _LabelingConfig(
+        model=model,
+        rng=np.random.default_rng(42),
+        samples_per_child=samples_per_child,
+        min_child_size=min_child_size,
+    )
     branch_labels = {}
     child_labels = {}
     hierarchy = {}
 
     for i, node in enumerate(target_nodes):
         nid, b_label, k_labels = _label_branch(
-            node, children_of, by_id, leaf_batches, titles, model, rng,
-            samples_per_child, min_child_size)
+            node, children_of, by_id, leaf_batches, titles, config)
         branch_labels[nid] = b_label
         child_labels.update(k_labels)
         hierarchy[nid] = sorted(k_labels.keys())
