@@ -37,6 +37,129 @@ from sklearn.decomposition import PCA
 from .configs import EmbedderConfig, LabelerConfig, list_configs  # noqa: F401
 
 # =============================================================================
+# Module-level constants and helpers
+# =============================================================================
+
+_DEFAULT_ACADEMIC_STOPWORDS: frozenset[str] = frozenset({
+    'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+    'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'been',
+    'be', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would',
+    'could', 'should', 'may', 'might', 'must', 'shall', 'can', 'need',
+    'this', 'that', 'these', 'those', 'it', 'its', 'we', 'our', 'they',
+    'their', 'which', 'who', 'whom', 'what', 'where', 'when', 'why', 'how',
+    'all', 'each', 'every', 'both', 'few', 'more', 'most', 'other', 'some',
+    'such', 'no', 'not', 'only', 'same', 'so', 'than', 'too', 'very',
+    'just', 'also', 'now', 'here', 'there', 'then', 'once', 'if', 'any',
+    'about', 'into', 'through', 'during', 'before', 'after', 'above',
+    'below', 'between', 'under', 'over', 'out', 'up', 'down', 'off',
+    'paper', 'study', 'research', 'results', 'method', 'methods', 'approach',
+    'proposed', 'propose', 'show', 'shows', 'shown', 'using', 'used', 'use',
+    'based', 'problem', 'problems', 'work', 'new', 'novel', 'present',
+    'presented', 'demonstrate', 'demonstrates', 'experimental', 'experiments',
+    'however', 'therefore', 'thus', 'hence', 'moreover', 'furthermore',
+    'first', 'second', 'third', 'one', 'two', 'three', 'many', 'several',
+    'various', 'different', 'important', 'significant', 'provide', 'provides',
+    'consider', 'considers', 'introduce', 'introduces', 'existing', 'recent',
+    'previous', 'current', 'given', 'well', 'known', 'general', 'particular',
+    'specific', 'case', 'cases', 'example', 'examples', 'order', 'number',
+    'large', 'small', 'high', 'low', 'best', 'better', 'good', 'simple',
+    'following', 'related', 'similar', 'compared', 'performance', 'evaluate',
+    'evaluated', 'analysis', 'data', 'set', 'sets', 'model', 'models',
+})
+
+
+def _tfidf_keywords(
+    texts: list[str],
+    indices: list[int],
+    corpus_freqs: Counter,
+    stops: set[str] | frozenset[str],
+    min_word_len: int,
+    top_k: int,
+    use_tfidf: bool,
+) -> list[tuple[str, float]]:
+    """Extract top-k keywords from a bucket using TF-IDF or frequency.
+
+    Parameters
+    ----------
+    texts : list[str]
+        Full corpus texts (indexed by *indices*).
+    indices : list[int]
+        Row indices belonging to the bucket.
+    corpus_freqs : Counter
+        Document-frequency counts across the whole corpus.
+    stops : set[str] | frozenset[str]
+        Stopwords to exclude.
+    min_word_len : int
+        Minimum word length to keep.
+    top_k : int
+        Number of keywords to return.
+    use_tfidf : bool
+        Whether to apply TF-IDF weighting (vs raw frequency).
+    """
+    import math
+    import re
+
+    def _tokenize(text: str) -> list[str]:
+        text = text.lower()
+        words = re.findall(r'\b[a-z]+\b', text)
+        return [w for w in words if len(w) >= min_word_len and w not in stops]
+
+    bucket_words: list[str] = []
+    for idx in indices:
+        bucket_words.extend(_tokenize(texts[idx]))
+
+    if not bucket_words:
+        return []
+
+    word_counts = Counter(bucket_words)
+
+    if use_tfidf and corpus_freqs:
+        n_docs = len(texts)
+        scores: dict[str, float] = {}
+        for word, count in word_counts.items():
+            tf = count / len(bucket_words)
+            df = corpus_freqs.get(word, 1)
+            idf = math.log(n_docs / df)
+            scores[word] = tf * idf
+        return sorted(scores.items(), key=lambda x: -x[1])[:top_k]
+    else:
+        return word_counts.most_common(top_k)
+
+
+def _sample_near_centroid(
+    indices: list[int],
+    embeddings: np.ndarray,
+    texts: list[str],
+    k: int,
+    rng: np.random.Generator | None = None,
+) -> list[str]:
+    """Return up to *k* texts closest to the bucket centroid.
+
+    Parameters
+    ----------
+    indices : list[int]
+        Row indices belonging to the bucket.
+    embeddings : np.ndarray
+        Full embedding matrix (n, d).
+    texts : list[str]
+        Full corpus texts.
+    k : int
+        Maximum number of samples to return.
+    rng : np.random.Generator | None
+        Unused — kept for API symmetry with the original nested function.
+    """
+    if len(indices) <= k:
+        return [texts[i] for i in indices]
+
+    bucket_embs = embeddings[indices]
+    centroid = bucket_embs.mean(axis=0)
+    centroid = centroid / np.linalg.norm(centroid)
+    sims = bucket_embs @ centroid
+    top_local = np.argsort(sims)[-k:][::-1]
+    return [texts[indices[i]] for i in top_local]
+
+
+# =============================================================================
 # Data Classes
 # =============================================================================
 
@@ -480,54 +603,11 @@ class DensityClassifier:
         if verbose:
             logger.info(f"Corpus size: {n:,}, dim: {d}")
 
-        # Stage 1: Random hash → Centroids → PCA on centroids → Re-hash
+        # Stage 1: PCA-based LSH hashing
         if verbose:
             logger.info(f"PCA-based LSH ({self.num_bits} bits)...")
 
-        # Step 1a: Random hash
-        rng = np.random.default_rng(self.seed)
-        random_hp = rng.standard_normal((self.num_bits, d)).astype(np.float32)
-        random_hp = random_hp / np.linalg.norm(random_hp, axis=1, keepdims=True)
-
-        signs_random = (embeddings @ random_hp.T) >= 0
-        powers = 2 ** np.arange(self.num_bits)
-        hashes_random = (signs_random @ powers).astype(np.uint64)
-
-        # Step 1b: Compute bucket centroids
-        random_bucket_to_indices = defaultdict(list)
-        for idx, h in enumerate(hashes_random):
-            random_bucket_to_indices[int(h)].append(idx)
-
-        # Build centroid matrix (only for buckets with enough items)
-        centroids = []
-        for bid, indices in random_bucket_to_indices.items():
-            if len(indices) >= 2:
-                centroid = embeddings[indices].mean(axis=0)
-                norm = np.linalg.norm(centroid)
-                if norm > 0:
-                    centroids.append(centroid / norm)
-
-        centroids = np.array(centroids, dtype=np.float32)
-
-        if verbose:
-            logger.debug(f"  Random hash: {len(random_bucket_to_indices):,} buckets")
-            logger.debug(f"  Centroids for PCA: {len(centroids):,}")
-
-        # Step 1c: PCA on centroids
-        n_components = min(self.num_bits, len(centroids) - 1)
-        pca = PCA(n_components=n_components)
-        pca.fit(centroids)
-        hp = pca.components_.astype(np.float32)
-        self._pca_variance = float(pca.explained_variance_ratio_.sum())
-
-        if verbose:
-            logger.debug(f"  Centroid PCA variance: {self._pca_variance:.1%}")
-
-        # Step 1d: Re-hash with PCA hyperplanes
-        signs = (embeddings @ hp.T) >= 0
-        hashes = (signs @ powers[:len(hp)]).astype(np.uint64)
-
-        # Store bucket IDs
+        hashes, hp = self._pca_hash(embeddings, self.num_bits, self.seed, verbose)
         self._bucket_ids = hashes.copy()
 
         # Build bucket mapping
@@ -537,29 +617,8 @@ class DensityClassifier:
 
         num_buckets = len(bucket_to_indices)
 
-        # Compute density metrics
-        self._bucket_sizes = np.zeros(n, dtype=np.int32)
-        self._centroid_similarities = np.zeros(n, dtype=np.float32)
-
-        for bid, indices in bucket_to_indices.items():
-            bucket_size = len(indices)
-
-            # Store bucket size
-            for idx in indices:
-                self._bucket_sizes[idx] = bucket_size
-
-            # Compute centroid similarity
-            if bucket_size >= 2:
-                bucket_embs = embeddings[indices]
-                centroid = bucket_embs.mean(axis=0)
-                norm = np.linalg.norm(centroid)
-                if norm > 0:
-                    centroid = centroid / norm
-                    sims = bucket_embs @ centroid
-                    for local_idx, idx in enumerate(indices):
-                        self._centroid_similarities[idx] = float(sims[local_idx])
-            elif bucket_size == 1:
-                self._centroid_similarities[indices[0]] = 1.0
+        # Compute density metrics (bucket sizes + centroid similarities)
+        self._compute_density_metrics(embeddings, bucket_to_indices, n)
 
         # Compute isolation scores
         if verbose:
@@ -581,6 +640,103 @@ class DensityClassifier:
 
         self._fitted = True
         return self
+
+    def _pca_hash(
+        self,
+        embeddings: np.ndarray,
+        num_bits: int,
+        seed: int,
+        verbose: bool = False,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Two-stage PCA-based LSH hashing.
+
+        1. Random hyperplane hash to form initial buckets.
+        2. Compute bucket centroids, run PCA on them.
+        3. Re-hash using PCA components as hyperplanes.
+
+        Returns
+        -------
+        hashes : np.ndarray
+            (n,) uint64 hash codes.
+        hp : np.ndarray
+            (num_bits, d) PCA hyperplane matrix (needed for stability scoring).
+        """
+        d = embeddings.shape[1]
+
+        # Step 1a: Random hash
+        rng = np.random.default_rng(seed)
+        random_hp = rng.standard_normal((num_bits, d)).astype(np.float32)
+        random_hp = random_hp / np.linalg.norm(random_hp, axis=1, keepdims=True)
+
+        signs_random = (embeddings @ random_hp.T) >= 0
+        powers = 2 ** np.arange(num_bits)
+        hashes_random = (signs_random @ powers).astype(np.uint64)
+
+        # Step 1b: Compute bucket centroids
+        random_bucket_to_indices: dict[int, list[int]] = defaultdict(list)
+        for idx, h in enumerate(hashes_random):
+            random_bucket_to_indices[int(h)].append(idx)
+
+        centroids: list[np.ndarray] = []
+        for bid, indices in random_bucket_to_indices.items():
+            if len(indices) >= 2:
+                centroid = embeddings[indices].mean(axis=0)
+                norm = np.linalg.norm(centroid)
+                if norm > 0:
+                    centroids.append(centroid / norm)
+
+        centroids_arr = np.array(centroids, dtype=np.float32)
+
+        if verbose:
+            logger.debug(f"  Random hash: {len(random_bucket_to_indices):,} buckets")
+            logger.debug(f"  Centroids for PCA: {len(centroids_arr):,}")
+
+        # Step 1c: PCA on centroids
+        n_components = min(num_bits, len(centroids_arr) - 1)
+        pca = PCA(n_components=n_components)
+        pca.fit(centroids_arr)
+        hp = pca.components_.astype(np.float32)
+        self._pca_variance = float(pca.explained_variance_ratio_.sum())
+
+        if verbose:
+            logger.debug(f"  Centroid PCA variance: {self._pca_variance:.1%}")
+
+        # Step 1d: Re-hash with PCA hyperplanes
+        signs = (embeddings @ hp.T) >= 0
+        hashes = (signs @ powers[:len(hp)]).astype(np.uint64)
+
+        return hashes, hp
+
+    def _compute_density_metrics(
+        self,
+        embeddings: np.ndarray,
+        bucket_to_indices: dict[int, list[int]],
+        n: int,
+    ) -> None:
+        """Compute per-item bucket sizes and centroid similarities.
+
+        Populates ``self._bucket_sizes`` and ``self._centroid_similarities``.
+        """
+        self._bucket_sizes = np.zeros(n, dtype=np.int32)
+        self._centroid_similarities = np.zeros(n, dtype=np.float32)
+
+        for bid, indices in bucket_to_indices.items():
+            bucket_size = len(indices)
+
+            for idx in indices:
+                self._bucket_sizes[idx] = bucket_size
+
+            if bucket_size >= 2:
+                bucket_embs = embeddings[indices]
+                centroid = bucket_embs.mean(axis=0)
+                norm = np.linalg.norm(centroid)
+                if norm > 0:
+                    centroid = centroid / norm
+                    sims = bucket_embs @ centroid
+                    for local_idx, idx in enumerate(indices):
+                        self._centroid_similarities[idx] = float(sims[local_idx])
+            elif bucket_size == 1:
+                self._centroid_similarities[indices[0]] = 1.0
 
     def _compute_isolation_scores(self):
         """Compute isolation score for each item: top_k_mean - median."""
@@ -818,18 +974,6 @@ Label:"""
                 logger.debug("LLM labeling failed: %s", e)
                 return f"[Error: {e}]"
 
-        def sample_from_indices(indices: list[int]) -> list[str]:
-            """Get representative samples closest to centroid."""
-            if len(indices) <= samples_per_bucket:
-                return [self.texts[i] for i in indices]
-
-            bucket_embs = self.embeddings[indices]
-            centroid = bucket_embs.mean(axis=0)
-            centroid = centroid / np.linalg.norm(centroid)
-            sims = bucket_embs @ centroid
-            top_local = np.argsort(sims)[-samples_per_bucket:][::-1]
-            return [self.texts[indices[i]] for i in top_local]
-
         # Build bucket -> indices mapping
         bucket_to_indices = defaultdict(list)
         for idx, bucket_id in enumerate(self._bucket_ids):
@@ -846,7 +990,9 @@ Label:"""
 
         results = {}
         for i, (bucket_id, indices) in enumerate(buckets_to_label):
-            samples = sample_from_indices(indices)
+            samples = _sample_near_centroid(
+                indices, self.embeddings, self.texts, samples_per_bucket,
+            )
             label = get_label(samples)
             results[bucket_id] = {
                 'label': label,
@@ -889,7 +1035,6 @@ Label:"""
             >>> print(labels[1234]['label'])
             'neural network training'
         """
-        import math
         import re
 
         if not self._fitted:
@@ -897,67 +1042,18 @@ Label:"""
         if self.texts is None:
             raise ValueError("Texts required for labeling. Pass texts to fit().")
 
-        # Default stopwords
-        default_stopwords = {
-            'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
-            'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'been',
-            'be', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would',
-            'could', 'should', 'may', 'might', 'must', 'shall', 'can', 'need',
-            'this', 'that', 'these', 'those', 'it', 'its', 'we', 'our', 'they',
-            'their', 'which', 'who', 'whom', 'what', 'where', 'when', 'why', 'how',
-            'all', 'each', 'every', 'both', 'few', 'more', 'most', 'other', 'some',
-            'such', 'no', 'not', 'only', 'same', 'so', 'than', 'too', 'very',
-            'just', 'also', 'now', 'here', 'there', 'then', 'once', 'if', 'any',
-            'about', 'into', 'through', 'during', 'before', 'after', 'above',
-            'below', 'between', 'under', 'over', 'out', 'up', 'down', 'off',
-            'paper', 'study', 'research', 'results', 'method', 'methods', 'approach',
-            'proposed', 'propose', 'show', 'shows', 'shown', 'using', 'used', 'use',
-            'based', 'problem', 'problems', 'work', 'new', 'novel', 'present',
-            'presented', 'demonstrate', 'demonstrates', 'experimental', 'experiments',
-            'however', 'therefore', 'thus', 'hence', 'moreover', 'furthermore',
-            'first', 'second', 'third', 'one', 'two', 'three', 'many', 'several',
-            'various', 'different', 'important', 'significant', 'provide', 'provides',
-            'consider', 'considers', 'introduce', 'introduces', 'existing', 'recent',
-            'previous', 'current', 'given', 'well', 'known', 'general', 'particular',
-            'specific', 'case', 'cases', 'example', 'examples', 'order', 'number',
-            'large', 'small', 'high', 'low', 'best', 'better', 'good', 'simple',
-            'following', 'related', 'similar', 'compared', 'performance', 'evaluate',
-            'evaluated', 'analysis', 'data', 'set', 'sets', 'model', 'models'
-        }
-        stops = stopwords if stopwords is not None else default_stopwords
+        stops = stopwords if stopwords is not None else _DEFAULT_ACADEMIC_STOPWORDS
 
-        def tokenize(text: str) -> list[str]:
+        def _tokenize_local(text: str) -> list[str]:
             text = text.lower()
             words = re.findall(r'\b[a-z]+\b', text)
             return [w for w in words if len(w) >= min_word_len and w not in stops]
 
-        def get_keywords(indices: list[int], corpus_freqs: Counter) -> list[tuple[str, float]]:
-            bucket_words = []
-            for idx in indices:
-                bucket_words.extend(tokenize(self.texts[idx]))
-
-            if not bucket_words:
-                return []
-
-            word_counts = Counter(bucket_words)
-
-            if use_tfidf and corpus_freqs:
-                n_docs = len(self.texts)
-                scores = {}
-                for word, count in word_counts.items():
-                    tf = count / len(bucket_words)
-                    df = corpus_freqs.get(word, 1)
-                    idf = math.log(n_docs / df)
-                    scores[word] = tf * idf
-                return sorted(scores.items(), key=lambda x: -x[1])[:top_k]
-            else:
-                return word_counts.most_common(top_k)
-
         # Build corpus document frequencies
-        corpus_freqs = Counter()
+        corpus_freqs: Counter = Counter()
         if use_tfidf:
             for text in self.texts:
-                unique_words = set(tokenize(text))
+                unique_words = set(_tokenize_local(text))
                 corpus_freqs.update(unique_words)
 
         # Build bucket -> indices mapping
@@ -970,7 +1066,10 @@ Label:"""
             if len(indices) < min_bucket_size:
                 continue
 
-            keywords = get_keywords(indices, corpus_freqs)
+            keywords = _tfidf_keywords(
+                self.texts, indices, corpus_freqs, stops,
+                min_word_len, top_k, use_tfidf,
+            )
             label = ' '.join(kw for kw, _ in keywords) if keywords else '[no keywords]'
 
             results[bucket_id] = {

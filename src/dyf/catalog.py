@@ -627,86 +627,19 @@ class CatalogSpace:
         # Similarities to all nodes
         all_sims = embs @ query_emb
 
-        # Per-depth analysis: within-z and entropy
-        within_z: dict[int, float] = {}
-        depth_entropy: dict[int, float] = {}
-        depth_best_sim: dict[int, float] = {}
+        # Per-depth analysis
+        within_z, depth_entropy, depth_best_sim, best_depth = self._analyze_depths(
+            all_sims, fc.depth_masks, max_d,
+        )
 
-        for depth in range(1, max_d + 1):
-            mask = fc.depth_masks.get(depth)
-            if mask is None or mask.sum() < 2:
-                continue
-
-            depth_sims = all_sims[mask]
-            std = float(depth_sims.std())
-            if std > 0:
-                within_z[depth] = float((depth_sims.max() - depth_sims.mean()) / std)
-            else:
-                within_z[depth] = 0.0
-
-            depth_entropy[depth] = _compute_entropy(depth_sims)
-            depth_best_sim[depth] = float(depth_sims.max())
-
-        if not within_z:
+        if best_depth is None:
             return self._match_flat(fc, query_emb, top_k)
 
-        # Select depth with highest within-z (sharpest discrimination)
-        # Tiebreaker: prefer deeper level (principle of least power)
-        best_depth = max(within_z, key=lambda d: (within_z[d], d))
-
-        # Two-stage: if there's a parent level, constrain by parent match
+        # Two-stage parent constraint
         parent_depth = best_depth - 1
-        constrained_result = None
-
-        if parent_depth >= 1 and parent_depth in fc.depth_masks:
-            parent_mask = fc.depth_masks[parent_depth]
-            if parent_mask.sum() > 0:
-                # Bottom-up: pick parent whose best child scores highest
-                target_mask_bu = fc.depth_masks.get(best_depth)
-                parent_scores: dict[str, float] = {}
-                if target_mask_bu is not None:
-                    target_indices_bu = np.where(target_mask_bu)[0]
-                    for idx in target_indices_bu:
-                        child_id = str(config.node_ids[idx])
-                        child_sim = float(all_sims[idx])
-                        for pid in graph.get_parents(child_id):
-                            if pid in fc.id_to_idx and fc.node_depths[fc.id_to_idx[pid]] == parent_depth:
-                                if pid not in parent_scores or child_sim > parent_scores[pid]:
-                                    parent_scores[pid] = child_sim
-
-                # Term-affinity boost: when query text is provided,
-                # boost parents whose branch terms overlap with query tokens
-                if parent_scores and query_tokens and fc.branch_terms:
-                    for pid in parent_scores:
-                        hits = len(query_tokens & fc.branch_terms.get(pid, set()))
-                        if hits > 0:
-                            parent_scores[pid] += fc.term_boost * (hits / len(query_tokens))
-
-                if parent_scores:
-                    parent_best_id = max(parent_scores, key=lambda k: parent_scores[k])
-                else:
-                    # Fallback: class-embedding match (no children at target depth)
-                    parent_sims = all_sims[parent_mask]
-                    parent_indices = np.where(parent_mask)[0]
-                    parent_best_id = str(config.node_ids[parent_indices[np.argmax(parent_sims)]])
-
-                # Get descendants of the parent's best match at the target depth
-                descendants = graph.get_descendants(parent_best_id)
-                target_mask = fc.depth_masks.get(best_depth)
-                if target_mask is not None:
-                    target_indices = np.where(target_mask)[0]
-
-                    # Filter to descendants of the parent match
-                    constrained_indices = [
-                        idx for idx in target_indices
-                        if str(config.node_ids[idx]) in descendants
-                    ]
-
-                    if constrained_indices:
-                        constrained_sims = all_sims[constrained_indices]
-                        local_best = np.argmax(constrained_sims)
-                        best_idx = constrained_indices[local_best]
-                        constrained_result = (best_idx, float(constrained_sims[local_best]))
+        constrained_result = self._constrain_by_parent(
+            all_sims, fc, best_depth, parent_depth, query_tokens,
+        )
 
         # Determine final match
         target_mask = fc.depth_masks.get(best_depth)
@@ -760,6 +693,146 @@ class CatalogSpace:
             gap_detected=gap_detected,
             gap_score=round(gap_score, 4),
         )
+
+    def _analyze_depths(
+        self,
+        all_sims: np.ndarray,
+        depth_masks: dict[int, np.ndarray],
+        max_d: int,
+    ) -> tuple[dict[int, float], dict[int, float], dict[int, float], int | None]:
+        """Compute per-depth statistics and select the best depth.
+
+        Parameters
+        ----------
+        all_sims : np.ndarray
+            Cosine similarities of the query to every catalog node.
+        depth_masks : dict[int, np.ndarray]
+            Boolean masks keyed by depth level.
+        max_d : int
+            Maximum depth in the catalog hierarchy.
+
+        Returns
+        -------
+        within_z : dict[int, float]
+            Within-depth z-score per depth.
+        depth_entropy : dict[int, float]
+            Entropy of similarity distribution per depth.
+        depth_best_sim : dict[int, float]
+            Best similarity per depth.
+        best_depth : int | None
+            Depth with sharpest discrimination, or ``None`` if no valid depth.
+        """
+        within_z: dict[int, float] = {}
+        depth_entropy: dict[int, float] = {}
+        depth_best_sim: dict[int, float] = {}
+
+        for depth in range(1, max_d + 1):
+            mask = depth_masks.get(depth)
+            if mask is None or mask.sum() < 2:
+                continue
+
+            depth_sims = all_sims[mask]
+            std = float(depth_sims.std())
+            if std > 0:
+                within_z[depth] = float((depth_sims.max() - depth_sims.mean()) / std)
+            else:
+                within_z[depth] = 0.0
+
+            depth_entropy[depth] = _compute_entropy(depth_sims)
+            depth_best_sim[depth] = float(depth_sims.max())
+
+        if not within_z:
+            return within_z, depth_entropy, depth_best_sim, None
+
+        # Highest within-z; tiebreaker: prefer deeper (principle of least power)
+        best_depth = max(within_z, key=lambda d: (within_z[d], d))
+        return within_z, depth_entropy, depth_best_sim, best_depth
+
+    def _constrain_by_parent(
+        self,
+        all_sims: np.ndarray,
+        fc: _FittedCatalog,
+        best_depth: int,
+        parent_depth: int,
+        query_tokens: set[str] | None,
+    ) -> tuple[int, float] | None:
+        """Two-stage parent constraint: pick best child under best parent.
+
+        Parameters
+        ----------
+        all_sims : np.ndarray
+            Cosine similarities of the query to every catalog node.
+        fc : _FittedCatalog
+            Fitted catalog state.
+        best_depth : int
+            Selected target depth.
+        parent_depth : int
+            Depth of the parent level (``best_depth - 1``).
+        query_tokens : set[str] | None
+            Tokenised query text for term-affinity boosting.
+
+        Returns
+        -------
+        tuple[int, float] | None
+            ``(best_idx, best_sim)`` of the constrained match, or ``None``
+            if parent constraint could not be applied.
+        """
+        config = fc.config
+        graph = config.graph
+
+        if parent_depth < 1 or parent_depth not in fc.depth_masks:
+            return None
+
+        parent_mask = fc.depth_masks[parent_depth]
+        if parent_mask.sum() == 0:
+            return None
+
+        # Bottom-up: pick parent whose best child scores highest
+        target_mask_bu = fc.depth_masks.get(best_depth)
+        parent_scores: dict[str, float] = {}
+        if target_mask_bu is not None:
+            target_indices_bu = np.where(target_mask_bu)[0]
+            for idx in target_indices_bu:
+                child_id = str(config.node_ids[idx])
+                child_sim = float(all_sims[idx])
+                for pid in graph.get_parents(child_id):
+                    if pid in fc.id_to_idx and fc.node_depths[fc.id_to_idx[pid]] == parent_depth:
+                        if pid not in parent_scores or child_sim > parent_scores[pid]:
+                            parent_scores[pid] = child_sim
+
+        # Term-affinity boost
+        if parent_scores and query_tokens and fc.branch_terms:
+            for pid in parent_scores:
+                hits = len(query_tokens & fc.branch_terms.get(pid, set()))
+                if hits > 0:
+                    parent_scores[pid] += fc.term_boost * (hits / len(query_tokens))
+
+        if parent_scores:
+            parent_best_id = max(parent_scores, key=lambda k: parent_scores[k])
+        else:
+            # Fallback: class-embedding match (no children at target depth)
+            parent_sims = all_sims[parent_mask]
+            parent_indices = np.where(parent_mask)[0]
+            parent_best_id = str(config.node_ids[parent_indices[np.argmax(parent_sims)]])
+
+        # Get descendants of the parent's best match at the target depth
+        descendants = graph.get_descendants(parent_best_id)
+        target_mask = fc.depth_masks.get(best_depth)
+        if target_mask is not None:
+            target_indices = np.where(target_mask)[0]
+
+            constrained_indices = [
+                idx for idx in target_indices
+                if str(config.node_ids[idx]) in descendants
+            ]
+
+            if constrained_indices:
+                constrained_sims = all_sims[constrained_indices]
+                local_best = np.argmax(constrained_sims)
+                best_idx = constrained_indices[local_best]
+                return (best_idx, float(constrained_sims[local_best]))
+
+        return None
 
     def _match_flat(
         self,
@@ -1031,27 +1104,7 @@ class CatalogSpace:
             cname: cands[0] for cname, cands in candidates.items() if cands
         }
 
-        # Score all catalog pairs
-        pair_coherence: dict[str, float] = {}
-        all_coherent = True
-
-        for (ca, cb), mapping in self._mapping_lookup.items():
-            if ca not in independent_top1 or cb not in independent_top1:
-                continue
-            if ca >= cb:  # avoid double-counting
-                continue
-
-            idx_a = independent_top1[ca][0]
-            idx_b = independent_top1[cb][0]
-            id_a = str(self._fitted[ca].config.node_ids[idx_a])
-            id_b = str(self._fitted[cb].config.node_ids[idx_b])
-
-            # Check if (id_a, id_b) exists in the mapping
-            score = self._mapping_score(mapping, id_a, id_b)
-            pair_key = f"{ca}-{cb}"
-            pair_coherence[pair_key] = score
-            if score < 0.5:
-                all_coherent = False
+        pair_coherence, all_coherent = self._compute_pair_coherence(independent_top1)
 
         if all_coherent or not pair_coherence:
             # Top-1 independent choices are coherent
@@ -1110,17 +1163,7 @@ class CatalogSpace:
             )
 
         # Recompute coherence for final combo
-        final_coherence: dict[str, float] = {}
-        for (ca, cb), mapping in self._mapping_lookup.items():
-            if ca not in best_combo or cb not in best_combo:
-                continue
-            if ca >= cb:
-                continue
-            idx_a = best_combo[ca][0]
-            idx_b = best_combo[cb][0]
-            id_a = str(self._fitted[ca].config.node_ids[idx_a])
-            id_b = str(self._fitted[cb].config.node_ids[idx_b])
-            final_coherence[f"{ca}-{cb}"] = self._mapping_score(mapping, id_a, id_b)
+        final_coherence, _ = self._compute_pair_coherence(best_combo)
 
         overall = (
             float(np.mean(list(final_coherence.values())))
@@ -1135,6 +1178,48 @@ class CatalogSpace:
             reranked=True,
             reason=reason,
         )
+
+    def _compute_pair_coherence(
+        self,
+        catalog_choices: dict[str, tuple[int, float]],
+        threshold: float = 0.5,
+    ) -> tuple[dict[str, float], bool]:
+        """Score pairwise coherence for a set of catalog choices.
+
+        Parameters
+        ----------
+        catalog_choices : dict[str, tuple[int, float]]
+            Mapping of catalog_name -> (node_idx, similarity).
+        threshold : float
+            Minimum score to consider a pair coherent.
+
+        Returns
+        -------
+        pair_coherence : dict[str, float]
+            Mapping of ``"ca-cb"`` -> coherence score for each mapped pair.
+        all_coherent : bool
+            True if every scored pair meets the threshold.
+        """
+        pair_coherence: dict[str, float] = {}
+        all_coherent = True
+
+        for (ca, cb), mapping in self._mapping_lookup.items():
+            if ca not in catalog_choices or cb not in catalog_choices:
+                continue
+            if ca >= cb:  # avoid double-counting
+                continue
+
+            idx_a = catalog_choices[ca][0]
+            idx_b = catalog_choices[cb][0]
+            id_a = str(self._fitted[ca].config.node_ids[idx_a])
+            id_b = str(self._fitted[cb].config.node_ids[idx_b])
+
+            score = self._mapping_score(mapping, id_a, id_b)
+            pair_coherence[f"{ca}-{cb}"] = score
+            if score < threshold:
+                all_coherent = False
+
+        return pair_coherence, all_coherent
 
     def _rerank_joint(
         self,
