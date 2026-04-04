@@ -121,6 +121,89 @@ class AdaptiveProbeConfig:
     max_probes: int = 5
 
 
+def _build_flat_node(node_id, node, node_to_id, embeddings, embedding_dim, batch_idx):
+    """Build a single flat node dict from a tree node.
+
+    Args:
+        node_id: BFS index of this node.
+        node: Tree node dict with keys: children, indices, depth, etc.
+        node_to_id: Mapping from tree node id() to BFS index.
+        embeddings: (n, d) array of embedding vectors, or None.
+        embedding_dim: Embedding dimension (used when embeddings is None).
+        batch_idx: Current batch index for leaf assignment.
+
+    Returns:
+        Flat node dict with keys: children_ids, hyperplanes, num_bits,
+        bucket_ids_to_children, centroid, num_items, batch_index, depth,
+        is_leaf, indices, eigenvalues.
+    """
+    is_leaf = not node['children']
+
+    # Use pre-computed centroid if available, else compute from embeddings
+    indices = node['indices']
+    if node.get('centroid') is not None:
+        centroid = node['centroid']
+    elif embeddings is not None:
+        if len(indices) > 0:
+            centroid = embeddings[indices].mean(axis=0).astype(np.float32)
+            norm = np.linalg.norm(centroid)
+            if norm > 1e-10:
+                centroid /= norm
+        else:
+            centroid = np.zeros(embeddings.shape[1], dtype=np.float32)
+    else:
+        # No embeddings and no pre-computed centroid — use zero vector
+        dim = embedding_dim or 0
+        centroid = np.zeros(dim, dtype=np.float32)
+
+    # Get children IDs
+    children_ids = []
+    for child in node['children']:
+        children_ids.append(node_to_id[id(child)])
+
+    # Hyperplanes and bucket mapping
+    hp = node.get('hyperplanes')
+    bid_map = node.get('bucket_id_to_child')
+
+    if hp is not None:
+        num_bits = hp.shape[0]
+        hyperplanes_flat = hp.flatten().astype(np.float32)
+    else:
+        num_bits = 0
+        hyperplanes_flat = None
+
+    # Eigenvalues
+    ev = node.get('eigenvalues')
+    eigenvalues_flat = ev.astype(np.float32) if ev is not None else None
+
+    # Build bucket_ids_to_children parallel array
+    # For each child (in order), store the bucket_id that maps to it
+    bucket_ids_to_children = []
+    if bid_map is not None and children_ids:
+        # bid_map: {bucket_id: child_index_in_parent}
+        # We need parallel array: bucket_id for child 0, child 1, ...
+        reverse_map = {v: k for k, v in bid_map.items()}
+        for child_idx in range(len(children_ids)):
+            bucket_ids_to_children.append(reverse_map.get(child_idx, 0))
+
+    # Batch index for leaves
+    bi = batch_idx if is_leaf else -1
+
+    return {
+        'children_ids': children_ids,
+        'hyperplanes': hyperplanes_flat,
+        'num_bits': num_bits,
+        'bucket_ids_to_children': bucket_ids_to_children,
+        'centroid': centroid,
+        'num_items': len(indices),
+        'batch_index': bi,
+        'depth': node['depth'],
+        'is_leaf': is_leaf,
+        'indices': indices,
+        'eigenvalues': eigenvalues_flat,
+    }
+
+
 def _flatten_tree_bfs(tree, embeddings, embedding_dim=None):
     """Flatten tree to a BFS-ordered list of node dicts with computed fields.
 
@@ -159,76 +242,12 @@ def _flatten_tree_bfs(tree, embeddings, embedding_dim=None):
     leaf_batch_map = {}
 
     for node_id, node in enumerate(flat_nodes):
-        is_leaf = not node['children']
-
-        # Use pre-computed centroid if available, else compute from embeddings
-        indices = node['indices']
-        if node.get('centroid') is not None:
-            centroid = node['centroid']
-        elif embeddings is not None:
-            if len(indices) > 0:
-                centroid = embeddings[indices].mean(axis=0).astype(np.float32)
-                norm = np.linalg.norm(centroid)
-                if norm > 1e-10:
-                    centroid /= norm
-            else:
-                centroid = np.zeros(embeddings.shape[1], dtype=np.float32)
-        else:
-            # No embeddings and no pre-computed centroid — use zero vector
-            dim = embedding_dim or 0
-            centroid = np.zeros(dim, dtype=np.float32)
-
-        # Get children IDs
-        children_ids = []
-        for child in node['children']:
-            children_ids.append(node_to_id[id(child)])
-
-        # Hyperplanes and bucket mapping
-        hp = node.get('hyperplanes')
-        bid_map = node.get('bucket_id_to_child')
-
-        if hp is not None:
-            num_bits = hp.shape[0]
-            hyperplanes_flat = hp.flatten().astype(np.float32)
-        else:
-            num_bits = 0
-            hyperplanes_flat = None
-
-        # Eigenvalues
-        ev = node.get('eigenvalues')
-        eigenvalues_flat = ev.astype(np.float32) if ev is not None else None
-
-        # Build bucket_ids_to_children parallel array
-        # For each child (in order), store the bucket_id that maps to it
-        bucket_ids_to_children = []
-        if bid_map is not None and children_ids:
-            # bid_map: {bucket_id: child_index_in_parent}
-            # We need parallel array: bucket_id for child 0, child 1, ...
-            reverse_map = {v: k for k, v in bid_map.items()}
-            for child_idx in range(len(children_ids)):
-                bucket_ids_to_children.append(reverse_map.get(child_idx, 0))
-
-        # Batch index for leaves
-        if is_leaf:
-            bi = batch_idx
+        flat_node = _build_flat_node(
+            node_id, node, node_to_id, embeddings, embedding_dim, batch_idx)
+        if flat_node['is_leaf']:
             leaf_batch_map[node_id] = batch_idx
             batch_idx += 1
-        else:
-            bi = -1
-
-        result.append({
-            'children_ids': children_ids,
-            'hyperplanes': hyperplanes_flat,
-            'num_bits': num_bits,
-            'bucket_ids_to_children': bucket_ids_to_children,
-            'centroid': centroid,
-            'num_items': len(indices),
-            'batch_index': bi,
-            'depth': node['depth'],
-            'is_leaf': is_leaf,
-            'indices': indices,
-            'eigenvalues': eigenvalues_flat,
-        })
+        result.append(flat_node)
 
     return result, leaf_batch_map
 
@@ -383,78 +402,31 @@ def _infer_arrow_type(values):
         raise ValueError(f"Unsupported stored field dtype: {values.dtype}")
 
 
-def write_lazy_index(
-    tree: dict,
-    embeddings: np.ndarray | None,
-    path: str,
-    compression: str = 'none',
-    quantization: str = 'float16',
-    metadata: dict[str, str] | None = None,
-    build_params: dict[str, int] | None = None,
-    stored_fields: Mapping[str, StoredFieldInput] | None = None,
-    format_version: int = 1,
-    embedding_dim: int | None = None,
-) -> None:
-    """Write a DYF lazy index file (FlatBuffers tree + Arrow IPC leaf data).
+def _resolve_arrow_schema(has_embeddings, embeddings, quantization,
+                          embedding_dim, metadata, stored_fields):
+    """Build the Arrow schema and prepare PQ state for write_lazy_index.
 
     Args:
-        tree: Tree dict from build_dyf_tree() (must include hyperplanes/bucket
-            mapping from updated _build_dyf_tree).
-        embeddings: (n, d) array of embedding vectors, or None to write
-            a viz-only file without embeddings (requires embedding_dim).
-        path: Output file path (e.g. "index.dyf").
-        compression: "none", "zstd", or "lz4" (default: "none").
-        quantization: "float32", "float16", "int8", or "pq-M" where M is the
-            number of sub-quantizers (default: "float16"). For PQ, dim must
-            be divisible by M. Example: "pq-8" for 8 sub-quantizers.
-        metadata: Optional dict of string key-value pairs.
-        build_params: Optional dict with keys: max_depth, num_bits,
-            min_leaf_size, seed. Auto-detected from tree if not provided.
-        stored_fields: Optional dict mapping field name to array-like of
-            length n_items. Supported types: str/list[str] (Arrow utf8),
-            np.int32/int64/float32/float64 arrays, list[bytes] (Arrow binary).
-        format_version: 1 (DYF1, header-based) or 2 (DYF2, footer-based,
-            append-friendly). Default: 1.
-        embedding_dim: Embedding dimension. Required when embeddings is None.
-            Inferred from embeddings shape when provided.
+        has_embeddings: Whether embeddings are present.
+        embeddings: (n, d) float32 array, or None.
+        quantization: Quantization string (e.g. 'float16', 'pq-8').
+        embedding_dim: Embedding dimension.
+        metadata: Mutable metadata dict (may be modified in place).
+        stored_fields: Optional dict of stored field arrays.
+
+    Returns:
+        (arrow_schema, sf_types, metadata, pq_state) where pq_state is a dict
+        with keys: is_pq, all_codes, n_subquantizers, q_embeddings.
     """
-    import flatbuffers
     import pyarrow as pa
 
-    from dyf.schema import (
-        BatchDescriptor as FBBatch,
-    )
-    from dyf.schema import (
-        BuildParams as FBBuildParams,
-    )
-    from dyf.schema import (
-        Index as FBIndex,
-    )
-    from dyf.schema import (
-        KeyValue as FBKeyValue,
-    )
-    from dyf.schema import (
-        Node as FBNode,
-    )
-
-    has_embeddings = embeddings is not None
-    if has_embeddings:
-        embeddings = np.asarray(embeddings, dtype=np.float32)
-        n_items, embedding_dim = embeddings.shape
-    else:
-        if embedding_dim is None:
-            raise ValueError(
-                "embedding_dim is required when embeddings is None")
-        # Count items from tree leaves
-        n_items = len(tree['indices'])
-
-    # Flatten tree to BFS node list
-    flat_nodes, leaf_batch_map = _flatten_tree_bfs(
-        tree, embeddings, embedding_dim=embedding_dim)
-    n_leaves = sum(1 for n in flat_nodes if n['is_leaf'])
-
-    # Detect PQ quantization
     is_pq = has_embeddings and quantization.startswith('pq')
+    pq_state = {
+        'is_pq': is_pq,
+        'all_codes': None,
+        'n_subquantizers': 0,
+        'q_embeddings': None,
+    }
 
     if not has_embeddings:
         # No embeddings — schema has item_index + stored fields only
@@ -497,6 +469,8 @@ def write_lazy_index(
             ('item_index', pa.uint32()),
             ('embedding', pa.list_(pa.uint8(), n_subquantizers)),
         ])
+        pq_state['all_codes'] = all_codes
+        pq_state['n_subquantizers'] = n_subquantizers
     else:
         # Standard quantization path
         q_embeddings = _quantize_embeddings(embeddings, quantization)
@@ -505,6 +479,7 @@ def write_lazy_index(
             ('item_index', pa.uint32()),
             ('embedding', pa.list_(arrow_value_type, embedding_dim)),
         ])
+        pq_state['q_embeddings'] = q_embeddings
 
     # Process stored fields: detect types, extend schema, store metadata
     sf_types = {}  # field_name -> (pa_type, type_name)
@@ -519,7 +494,35 @@ def write_lazy_index(
         metadata['stored_fields'] = json.dumps(
             {fname: tname for fname, (_, tname) in sf_types.items()})
 
-    # Build Arrow IPC batches per leaf
+    return arrow_schema, sf_types, metadata, pq_state
+
+
+def _build_leaf_batches(flat_nodes, arrow_schema, has_embeddings, quantization,
+                        stored_fields, sf_types, pq_state, compression):
+    """Build Arrow IPC byte buffers for each leaf node.
+
+    Args:
+        flat_nodes: BFS-ordered list of flat node dicts.
+        arrow_schema: Arrow schema for the record batches.
+        has_embeddings: Whether embeddings are present.
+        quantization: Quantization string.
+        stored_fields: Optional dict of stored field arrays.
+        sf_types: Dict mapping field name to (pa_type, type_name).
+        pq_state: Dict with PQ state (is_pq, all_codes, n_subquantizers,
+            q_embeddings).
+        compression: Compression string ('none', 'zstd', 'lz4').
+
+    Returns:
+        List of Arrow IPC buffer bytes, one per leaf.
+    """
+    import pyarrow as pa
+
+    is_pq = pq_state['is_pq']
+    all_codes = pq_state['all_codes']
+    n_subquantizers = pq_state['n_subquantizers']
+    q_embeddings = pq_state['q_embeddings']
+    embedding_dim = arrow_schema.field('embedding').type.list_size if has_embeddings and not is_pq else 0
+
     ipc_options = None
     if compression == 'zstd':
         ipc_options = pa.ipc.IpcWriteOptions(
@@ -528,7 +531,6 @@ def write_lazy_index(
         ipc_options = pa.ipc.IpcWriteOptions(
             compression=pa.Codec('lz4'))
 
-    # Write each leaf batch to bytes, record offsets
     batch_buffers = []
     for node in flat_nodes:
         if not node['is_leaf']:
@@ -583,7 +585,48 @@ def write_lazy_index(
         writer.close()
         batch_buffers.append(sink.getvalue())
 
-    # Build FlatBuffer
+    return batch_buffers
+
+
+def _build_flatbuffer_index(flat_nodes, batch_buffers, metadata, build_params,
+                            tree, quantization, compression, embedding_dim,
+                            n_items, n_leaves, format_version):
+    """Build the FlatBuffer index bytes.
+
+    Args:
+        flat_nodes: BFS-ordered list of flat node dicts.
+        batch_buffers: List of Arrow IPC buffer bytes.
+        metadata: Dict of metadata key-value pairs, or None.
+        build_params: Dict of build parameters, or None.
+        tree: Original tree dict (for depth fallback).
+        quantization: Quantization string.
+        compression: Compression string.
+        embedding_dim: Embedding dimension.
+        n_items: Total number of items.
+        n_leaves: Number of leaf nodes.
+        format_version: File format version (1, 2, or 3).
+
+    Returns:
+        FlatBuffer bytes.
+    """
+    import flatbuffers
+
+    from dyf.schema import (
+        BatchDescriptor as FBBatch,
+    )
+    from dyf.schema import (
+        BuildParams as FBBuildParams,
+    )
+    from dyf.schema import (
+        Index as FBIndex,
+    )
+    from dyf.schema import (
+        KeyValue as FBKeyValue,
+    )
+    from dyf.schema import (
+        Node as FBNode,
+    )
+
     builder = flatbuffers.Builder(4096)
 
     # Pre-build all strings and vectors
@@ -734,9 +777,18 @@ def write_lazy_index(
     index_off = FBIndex.IndexEnd(builder)
 
     builder.Finish(index_off)
-    fb_bytes = bytes(builder.Output())
+    return bytes(builder.Output())
 
-    # Write file
+
+def _write_dyf_file(path, format_version, fb_bytes, batch_buffers):
+    """Write assembled DYF file in the specified format.
+
+    Args:
+        path: Output file path.
+        format_version: File format version (1, 2, or 3).
+        fb_bytes: Serialized FlatBuffer index bytes.
+        batch_buffers: List of Arrow IPC buffer bytes.
+    """
     fb_size = len(fb_bytes)
 
     if format_version == 2:
@@ -804,6 +856,77 @@ def write_lazy_index(
                 f.write(buf)
 
 
+def write_lazy_index(
+    tree: dict,
+    embeddings: np.ndarray | None,
+    path: str,
+    compression: str = 'none',
+    quantization: str = 'float16',
+    metadata: dict[str, str] | None = None,
+    build_params: dict[str, int] | None = None,
+    stored_fields: Mapping[str, StoredFieldInput] | None = None,
+    format_version: int = 1,
+    embedding_dim: int | None = None,
+) -> None:
+    """Write a DYF lazy index file (FlatBuffers tree + Arrow IPC leaf data).
+
+    Args:
+        tree: Tree dict from build_dyf_tree() (must include hyperplanes/bucket
+            mapping from updated _build_dyf_tree).
+        embeddings: (n, d) array of embedding vectors, or None to write
+            a viz-only file without embeddings (requires embedding_dim).
+        path: Output file path (e.g. "index.dyf").
+        compression: "none", "zstd", or "lz4" (default: "none").
+        quantization: "float32", "float16", "int8", or "pq-M" where M is the
+            number of sub-quantizers (default: "float16"). For PQ, dim must
+            be divisible by M. Example: "pq-8" for 8 sub-quantizers.
+        metadata: Optional dict of string key-value pairs.
+        build_params: Optional dict with keys: max_depth, num_bits,
+            min_leaf_size, seed. Auto-detected from tree if not provided.
+        stored_fields: Optional dict mapping field name to array-like of
+            length n_items. Supported types: str/list[str] (Arrow utf8),
+            np.int32/int64/float32/float64 arrays, list[bytes] (Arrow binary).
+        format_version: 1 (DYF1, header-based) or 2 (DYF2, footer-based,
+            append-friendly). Default: 1.
+        embedding_dim: Embedding dimension. Required when embeddings is None.
+            Inferred from embeddings shape when provided.
+    """
+    has_embeddings = embeddings is not None
+    if has_embeddings:
+        embeddings = np.asarray(embeddings, dtype=np.float32)
+        n_items, embedding_dim = embeddings.shape
+    else:
+        if embedding_dim is None:
+            raise ValueError(
+                "embedding_dim is required when embeddings is None")
+        # Count items from tree leaves
+        n_items = len(tree['indices'])
+
+    # Flatten tree to BFS node list
+    flat_nodes, _leaf_batch_map = _flatten_tree_bfs(
+        tree, embeddings, embedding_dim=embedding_dim)
+    n_leaves = sum(1 for n in flat_nodes if n['is_leaf'])
+
+    # Build Arrow schema and prepare PQ/quantization state
+    arrow_schema, sf_types, metadata, pq_state = _resolve_arrow_schema(
+        has_embeddings, embeddings, quantization, embedding_dim,
+        metadata, stored_fields)
+
+    # Build Arrow IPC batches per leaf
+    batch_buffers = _build_leaf_batches(
+        flat_nodes, arrow_schema, has_embeddings, quantization,
+        stored_fields, sf_types, pq_state, compression)
+
+    # Build FlatBuffer index
+    fb_bytes = _build_flatbuffer_index(
+        flat_nodes, batch_buffers, metadata, build_params, tree,
+        quantization, compression, embedding_dim, n_items, n_leaves,
+        format_version)
+
+    # Write file
+    _write_dyf_file(path, format_version, fb_bytes, batch_buffers)
+
+
 def split_dyf3(
     path: str,
     chunk_size: int = 95_000_000,
@@ -863,6 +986,81 @@ def split_dyf3(
         f.write(struct.pack('<H', n_chunks))
 
     return n_chunks
+
+
+def _merge_leaf_results(all_indices, all_scores, all_fields, sf_names):
+    """Concatenate and deduplicate results from multiple leaf batches.
+
+    Args:
+        all_indices: List of index arrays from each leaf.
+        all_scores: List of score arrays from each leaf.
+        all_fields: Dict mapping field name to list of value arrays/lists.
+        sf_names: List of stored field names.
+
+    Returns:
+        (deduped_indices, deduped_scores, merged_fields) with duplicates removed.
+    """
+    all_indices = np.concatenate(all_indices)
+    all_scores = np.concatenate(all_scores)
+    # Concatenate stored fields
+    merged_fields = {}
+    for fname in sf_names:
+        parts = all_fields[fname]
+        if isinstance(parts[0], list):
+            merged_fields[fname] = sum(parts, [])
+        else:
+            merged_fields[fname] = np.concatenate(parts)
+
+    # Deduplicate (same item may appear in overlapping leaves)
+    unique_mask = np.ones(len(all_indices), dtype=bool)
+    seen = set()
+    for i, idx in enumerate(all_indices):
+        idx_int = int(idx)
+        if idx_int in seen:
+            unique_mask[i] = False
+        else:
+            seen.add(idx_int)
+    all_indices = all_indices[unique_mask]
+    all_scores = all_scores[unique_mask]
+    for fname in sf_names:
+        vals = merged_fields[fname]
+        if isinstance(vals, np.ndarray):
+            merged_fields[fname] = vals[unique_mask]
+        else:
+            merged_fields[fname] = [v for v, m in zip(vals, unique_mask) if m]
+
+    return all_indices, all_scores, merged_fields
+
+
+def _topk_with_fields(all_indices, all_scores, merged_fields, sf_names, k):
+    """Select top-k results and slice stored fields to match.
+
+    Args:
+        all_indices: Deduplicated index array.
+        all_scores: Deduplicated score array.
+        merged_fields: Dict mapping field name to merged values.
+        sf_names: List of stored field names.
+        k: Number of top results to return.
+
+    Returns:
+        (top_indices, top_scores, result_fields) sorted by descending score.
+    """
+    if len(all_scores) <= k:
+        order = np.argsort(-all_scores)
+    else:
+        # Partial sort for efficiency
+        part_idx = np.argpartition(-all_scores, k)[:k]
+        order = part_idx[np.argsort(-all_scores[part_idx])]
+
+    result_fields = {}
+    for fname in sf_names:
+        vals = merged_fields[fname]
+        if isinstance(vals, np.ndarray):
+            result_fields[fname] = vals[order]
+        else:
+            result_fields[fname] = [vals[i] for i in order]
+
+    return all_indices[order], all_scores[order], result_fields
 
 
 class LazyIndex:
@@ -1455,50 +1653,10 @@ class LazyIndex:
                 result.routing = routing
             return result
 
-        all_indices = np.concatenate(all_indices)
-        all_scores = np.concatenate(all_scores)
-        # Concatenate stored fields
-        merged_fields = {}
-        for fname in sf_names:
-            parts = all_fields[fname]
-            if isinstance(parts[0], list):
-                merged_fields[fname] = sum(parts, [])
-            else:
-                merged_fields[fname] = np.concatenate(parts)
-
-        # Deduplicate (same item may appear in overlapping leaves)
-        unique_mask = np.ones(len(all_indices), dtype=bool)
-        seen = set()
-        for i, idx in enumerate(all_indices):
-            idx_int = int(idx)
-            if idx_int in seen:
-                unique_mask[i] = False
-            else:
-                seen.add(idx_int)
-        all_indices = all_indices[unique_mask]
-        all_scores = all_scores[unique_mask]
-        for fname in sf_names:
-            vals = merged_fields[fname]
-            if isinstance(vals, np.ndarray):
-                merged_fields[fname] = vals[unique_mask]
-            else:
-                merged_fields[fname] = [v for v, m in zip(vals, unique_mask) if m]
-
-        # Top-k
-        if len(all_scores) <= k:
-            order = np.argsort(-all_scores)
-        else:
-            # Partial sort for efficiency
-            part_idx = np.argpartition(-all_scores, k)[:k]
-            order = part_idx[np.argsort(-all_scores[part_idx])]
-
-        result_fields = {}
-        for fname in sf_names:
-            vals = merged_fields[fname]
-            if isinstance(vals, np.ndarray):
-                result_fields[fname] = vals[order]
-            else:
-                result_fields[fname] = [vals[i] for i in order]
+        all_indices, all_scores, merged_fields = _merge_leaf_results(
+            all_indices, all_scores, all_fields, sf_names)
+        top_indices, top_scores, result_fields = _topk_with_fields(
+            all_indices, all_scores, merged_fields, sf_names, k)
 
         routing_info = None
         if return_routing:
@@ -1512,8 +1670,7 @@ class LazyIndex:
                 routing_info['nprobe_mode'] = 'adaptive'
                 routing_info['adaptive_nprobe'] = len(candidate_leaves)
 
-        return SearchResult(
-            all_indices[order], all_scores[order], result_fields, routing_info)
+        return SearchResult(top_indices, top_scores, result_fields, routing_info)
 
     def _build_centroid_index(self):
         """Build a flat centroid matrix from all leaf nodes.
@@ -1610,50 +1767,12 @@ class LazyIndex:
                 np.array([], dtype=np.float32),
                 {fname: [] for fname in sf_names})
 
-        all_indices = np.concatenate(all_indices)
-        all_scores = np.concatenate(all_scores)
-        merged_fields = {}
-        for fname in sf_names:
-            parts = all_fields[fname]
-            if isinstance(parts[0], list):
-                merged_fields[fname] = sum(parts, [])
-            else:
-                merged_fields[fname] = np.concatenate(parts)
+        all_indices, all_scores, merged_fields = _merge_leaf_results(
+            all_indices, all_scores, all_fields, sf_names)
+        top_indices, top_scores, result_fields = _topk_with_fields(
+            all_indices, all_scores, merged_fields, sf_names, k)
 
-        # Deduplicate
-        unique_mask = np.ones(len(all_indices), dtype=bool)
-        seen = set()
-        for i, idx in enumerate(all_indices):
-            idx_int = int(idx)
-            if idx_int in seen:
-                unique_mask[i] = False
-            else:
-                seen.add(idx_int)
-        all_indices = all_indices[unique_mask]
-        all_scores = all_scores[unique_mask]
-        for fname in sf_names:
-            vals = merged_fields[fname]
-            if isinstance(vals, np.ndarray):
-                merged_fields[fname] = vals[unique_mask]
-            else:
-                merged_fields[fname] = [v for v, m in zip(vals, unique_mask) if m]
-
-        # Top-k
-        if len(all_scores) <= k:
-            order = np.argsort(-all_scores)
-        else:
-            part_idx = np.argpartition(-all_scores, k)[:k]
-            order = part_idx[np.argsort(-all_scores[part_idx])]
-
-        result_fields = {}
-        for fname in sf_names:
-            vals = merged_fields[fname]
-            if isinstance(vals, np.ndarray):
-                result_fields[fname] = vals[order]
-            else:
-                result_fields[fname] = [vals[i] for i in order]
-
-        return SearchResult(all_indices[order], all_scores[order], result_fields)
+        return SearchResult(top_indices, top_scores, result_fields)
 
     def _build_item_map(self):
         """Build mapping from item_index to (batch_index, row_index).
