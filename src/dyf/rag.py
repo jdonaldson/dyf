@@ -118,6 +118,33 @@ class OrthogonalAnchorResult:
         return len(self.indices)
 
 
+def _precompute_neighborhoods(
+    anchor_indices: np.ndarray,
+    embeddings: np.ndarray,
+    expansion_k: int,
+) -> dict[int, np.ndarray]:
+    """
+    Precompute k-nearest-neighbor neighborhoods for each anchor point.
+
+    For each anchor, computes cosine similarities against all embeddings
+    and stores the top-k nearest neighbor indices.
+
+    Args:
+        anchor_indices: Array of anchor point indices
+        embeddings: Normalized embeddings (n_points, dim)
+        expansion_k: Number of nearest neighbors per anchor
+
+    Returns:
+        Dict mapping each anchor index to its top-k neighbor indices
+    """
+    neighborhoods: dict[int, np.ndarray] = {}
+    for anchor_idx in anchor_indices:
+        sims = embeddings @ embeddings[anchor_idx]
+        top_k = np.argsort(sims)[-expansion_k:][::-1]
+        neighborhoods[anchor_idx] = top_k
+    return neighborhoods
+
+
 @dataclass
 class BridgeIndex:
     """
@@ -271,12 +298,9 @@ class BridgeIndex:
         if verbose:
             logger.info(f"  Precomputing {self.expansion_k}-NN neighborhoods...")
 
-        self._neighborhoods = {}
-        for anchor_idx in self._anchor_indices:
-            # Find k nearest neighbors
-            sims = embeddings @ embeddings[anchor_idx]
-            top_k = np.argsort(sims)[-self.expansion_k:][::-1]
-            self._neighborhoods[anchor_idx] = top_k
+        self._neighborhoods = _precompute_neighborhoods(
+            self._anchor_indices, embeddings, self.expansion_k
+        )
 
         self._fitted = True
 
@@ -479,6 +503,60 @@ class BridgeIndex:
         }
 
 
+def _compute_local_centrality(
+    embeddings: np.ndarray,
+    bucket_to_indices: dict[int, list[int]],
+    dense_bucket_ids: np.ndarray,
+    n_points: int,
+    dim: int,
+    facet_num_bits: int,
+    min_bucket_size: int,
+    seed: int,
+) -> np.ndarray:
+    """
+    Compute local (facet) bridge centrality within dense buckets.
+
+    For each dense bucket, runs a sub-LSH bridge analysis and counts
+    how many facets each point connects. Points that bridge multiple
+    facets within a dense region get higher local centrality scores.
+
+    Args:
+        embeddings: Normalized embeddings (n_points, dim)
+        bucket_to_indices: Mapping from bucket ID to list of point indices
+        dense_bucket_ids: Array of bucket IDs considered dense
+        n_points: Total number of points
+        dim: Embedding dimensionality
+        facet_num_bits: LSH bits for facet bucketing
+        min_bucket_size: Minimum bucket size for faceting
+        seed: Random seed
+
+    Returns:
+        Array of local centrality scores (n_points,)
+    """
+    local_centrality = np.zeros(n_points, dtype=np.int32)
+
+    for bid in dense_bucket_ids:
+        indices = np.array(bucket_to_indices[bid])
+        if len(indices) < min_bucket_size:
+            continue
+
+        bucket_emb = embeddings[indices]
+        bits = 6 if len(indices) < 100 else (8 if len(indices) < 500 else facet_num_bits)
+
+        try:
+            facet_clf = DensityClassifier(embedding_dim=dim, num_bits=bits, seed=seed)
+            facet_clf.fit(bucket_emb)
+            facet_bridge = facet_clf.analyze_bridges(bucket_emb)
+
+            for i in range(len(facet_bridge.bridge_indices)):
+                local_idx, _, neighbors = facet_bridge.get_bridge_connections(i)
+                local_centrality[indices[local_idx]] = len(neighbors) + 1
+        except Exception as e:
+            logger.debug("Facet bridge analysis failed for bucket: %s", e)
+
+    return local_centrality
+
+
 def find_super_connectors(
     embeddings: np.ndarray,
     global_num_bits: int = 12,
@@ -535,26 +613,10 @@ def find_super_connectors(
     dense_bucket_ids = np.where(bucket_counts > max(dense_threshold, min_bucket_size))[0]
 
     # Compute local centrality within dense buckets
-    local_centrality = np.zeros(n_points, dtype=np.int32)
-
-    for bid in dense_bucket_ids:
-        indices = np.array(bucket_to_indices[bid])
-        if len(indices) < min_bucket_size:
-            continue
-
-        bucket_emb = embeddings[indices]
-        bits = 6 if len(indices) < 100 else (8 if len(indices) < 500 else facet_num_bits)
-
-        try:
-            facet_clf = DensityClassifier(embedding_dim=dim, num_bits=bits, seed=seed)
-            facet_clf.fit(bucket_emb)
-            facet_bridge = facet_clf.analyze_bridges(bucket_emb)
-
-            for i in range(len(facet_bridge.bridge_indices)):
-                local_idx, _, neighbors = facet_bridge.get_bridge_connections(i)
-                local_centrality[indices[local_idx]] = len(neighbors) + 1
-        except Exception as e:
-            logger.debug("Facet bridge analysis failed for bucket: %s", e)
+    local_centrality = _compute_local_centrality(
+        embeddings, bucket_to_indices, dense_bucket_ids,
+        n_points, dim, facet_num_bits, min_bucket_size, seed,
+    )
 
     # Compute thresholds from non-zero values
     global_nonzero = global_centrality[global_centrality > 0]
@@ -802,6 +864,91 @@ def diversify_by_facet(
     )
 
 
+def _find_candidate_bridges(
+    embeddings: np.ndarray,
+    n_points: int,
+    dim: int,
+    use_stable_bridges: bool,
+    num_stability_seeds: int,
+    stability_threshold: int,
+    global_num_bits: int,
+    seed: int,
+    nlist: int,
+    verbose: bool = False,
+) -> np.ndarray:
+    """
+    Find candidate bridge points via stable-multi-seed or single-seed detection.
+
+    For stable bridges, runs LSH bridge detection across multiple seeds and
+    keeps points that appear in at least ``stability_threshold`` seeds. Falls
+    back to single-seed detection or all points if not enough candidates.
+
+    Args:
+        embeddings: Normalized embeddings (n_points, dim)
+        n_points: Number of points
+        dim: Embedding dimensionality
+        use_stable_bridges: If True, prefer bridges stable across multiple seeds
+        num_stability_seeds: Number of seeds for stability testing
+        stability_threshold: Minimum seeds a bridge must appear in
+        global_num_bits: LSH bits for bridge detection
+        seed: Random seed
+        nlist: Minimum number of candidates needed
+        verbose: Print progress
+
+    Returns:
+        Array of candidate bridge indices
+    """
+    if use_stable_bridges and num_stability_seeds > 1:
+        if verbose:
+            logger.info(f"  Finding stable bridges ({num_stability_seeds} seeds)...")
+
+        # Count bridge appearances across seeds
+        bridge_counts = np.zeros(n_points, dtype=np.int32)
+
+        for seed_idx in range(num_stability_seeds):
+            seed_offset = seed_idx * 1000
+            clf = DensityClassifier(
+                embedding_dim=dim,
+                num_bits=global_num_bits,
+                seed=seed + seed_offset
+            )
+            clf.fit(embeddings)
+            bridge_analysis = clf.analyze_bridges(embeddings)
+            for bridge_idx in bridge_analysis.bridge_indices:
+                bridge_counts[bridge_idx] += 1
+
+        # Select stable bridges
+        stable_mask = bridge_counts >= stability_threshold
+        stable_bridges = np.where(stable_mask)[0]
+
+        if verbose:
+            total_bridges = (bridge_counts > 0).sum()
+            logger.info(f"    Total bridges: {total_bridges}, stable: {len(stable_bridges)}")
+
+        if len(stable_bridges) >= nlist:
+            candidate_indices = stable_bridges
+        else:
+            # Fall back to all bridges
+            candidate_indices = np.where(bridge_counts > 0)[0]
+    else:
+        # Use single-seed bridges
+        clf = DensityClassifier(embedding_dim=dim, num_bits=global_num_bits, seed=seed)
+        clf.fit(embeddings)
+        bridge_analysis = clf.analyze_bridges(embeddings)
+        candidate_indices = np.array(bridge_analysis.bridge_indices)
+
+        if verbose:
+            logger.info(f"  Found {len(candidate_indices)} bridges")
+
+    # Fall back to all points if not enough candidates
+    if len(candidate_indices) < nlist:
+        if verbose:
+            logger.warning(f"  Not enough candidates ({len(candidate_indices)}), using all points")
+        candidate_indices = np.arange(n_points)
+
+    return candidate_indices
+
+
 def get_kmeans_init(
     embeddings: np.ndarray,
     nlist: int,
@@ -866,53 +1013,16 @@ def get_kmeans_init(
         logger.info(f"Computing bridge-seeded k-means initialization (nlist={nlist})...")
 
     # Find candidate bridges
-    if use_stable_bridges and num_stability_seeds > 1:
-        if verbose:
-            logger.info(f"  Finding stable bridges ({num_stability_seeds} seeds)...")
-
-        # Count bridge appearances across seeds
-        bridge_counts = np.zeros(n_points, dtype=np.int32)
-
-        for seed_idx in range(num_stability_seeds):
-            seed_offset = seed_idx * 1000
-            clf = DensityClassifier(
-                embedding_dim=dim,
-                num_bits=global_num_bits,
-                seed=seed + seed_offset
-            )
-            clf.fit(embeddings)
-            bridge_analysis = clf.analyze_bridges(embeddings)
-            for bridge_idx in bridge_analysis.bridge_indices:
-                bridge_counts[bridge_idx] += 1
-
-        # Select stable bridges
-        stable_mask = bridge_counts >= stability_threshold
-        stable_bridges = np.where(stable_mask)[0]
-
-        if verbose:
-            total_bridges = (bridge_counts > 0).sum()
-            logger.info(f"    Total bridges: {total_bridges}, stable: {len(stable_bridges)}")
-
-        if len(stable_bridges) >= nlist:
-            candidate_indices = stable_bridges
-        else:
-            # Fall back to all bridges
-            candidate_indices = np.where(bridge_counts > 0)[0]
-    else:
-        # Use single-seed bridges
-        clf = DensityClassifier(embedding_dim=dim, num_bits=global_num_bits, seed=seed)
-        clf.fit(embeddings)
-        bridge_analysis = clf.analyze_bridges(embeddings)
-        candidate_indices = np.array(bridge_analysis.bridge_indices)
-
-        if verbose:
-            logger.info(f"  Found {len(candidate_indices)} bridges")
-
-    # Fall back to all points if not enough candidates
-    if len(candidate_indices) < nlist:
-        if verbose:
-            logger.warning(f"  Not enough candidates ({len(candidate_indices)}), using all points")
-        candidate_indices = np.arange(n_points)
+    candidate_indices = _find_candidate_bridges(
+        embeddings, n_points, dim,
+        use_stable_bridges=use_stable_bridges,
+        num_stability_seeds=num_stability_seeds,
+        stability_threshold=stability_threshold,
+        global_num_bits=global_num_bits,
+        seed=seed,
+        nlist=nlist,
+        verbose=verbose,
+    )
 
     # Select orthogonal anchors
     if verbose:
