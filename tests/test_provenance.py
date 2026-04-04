@@ -4,14 +4,13 @@ import json
 
 from dyf.provenance import (
     Provenance,
+    check_compatible,
+    create_provenance,
     file_hash,
     params_hash,
-    create_provenance,
-    check_compatible,
-    provenance_to_dict,
     provenance_from_dict,
+    provenance_to_dict,
 )
-
 
 # ---------------------------------------------------------------------------
 # file_hash

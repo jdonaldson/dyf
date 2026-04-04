@@ -17,7 +17,6 @@ from dyf.categorical import (
     store_category_graph,
 )
 
-
 # ── CategoryGraph construction ───────────────────────────────────────────
 
 

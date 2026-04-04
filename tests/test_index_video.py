@@ -8,7 +8,6 @@ import pytest
 
 from dyf.index_video import _format_timestamp
 
-
 # ---------------------------------------------------------------------------
 # Tests: _format_timestamp
 # ---------------------------------------------------------------------------
@@ -132,8 +131,9 @@ class TestIndexVideoE2E:
         self, mock_thumb, mock_embed, mock_load_model,
         mock_extract, mock_detect, tmp_path
     ):
-        from dyf.index_video import index_video
         from PIL import Image
+
+        from dyf.index_video import index_video
 
         # Mock scenes
         mock_detect.return_value = [
@@ -172,9 +172,10 @@ class TestIndexVideoE2E:
         self, mock_thumb, mock_embed, mock_load_model,
         mock_extract, mock_detect, tmp_path
     ):
+        from PIL import Image
+
         from dyf.index_video import index_video
         from dyf.lazy_index import LazyIndex
-        from PIL import Image
 
         mock_detect.return_value = [
             {"scene_id": 0, "start_time": 0.0, "end_time": 5.0,
@@ -214,9 +215,10 @@ class TestIndexVideoE2E:
         self, mock_thumb, mock_embed, mock_load_model,
         mock_extract, mock_detect, tmp_path
     ):
+        from PIL import Image
+
         from dyf.index_video import index_video
         from dyf.lazy_index import LazyIndex
-        from PIL import Image
 
         mock_detect.return_value = [
             {"scene_id": 0, "start_time": 0.0, "end_time": 5.0,

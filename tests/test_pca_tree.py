@@ -4,10 +4,10 @@ import numpy as np
 import pytest
 
 from dyf.pca_tree import (
+    boundary_persistence_scores,
     build_pca_tree,
     cut_tree_to_labels,
     extract_boundary_persistence,
-    boundary_persistence_scores,
 )
 
 
@@ -27,7 +27,7 @@ def clustered_embeddings():
     # Add a few boundary points between clusters 0 and 1
     for _ in range(2):
         mid = (centers[0] + centers[1]) / 2
-        points.append((mid + rng.normal(size=(1, 8)) * 0.1))
+        points.append(mid + rng.normal(size=(1, 8)) * 0.1)
     points = np.vstack(points)
     # Pad to exactly 53 points — that's fine, doesn't need to be 50
     return points.astype(np.float64)

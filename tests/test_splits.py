@@ -14,8 +14,8 @@ pytestmark = pytest.mark.skipif(
 )
 
 try:
-    import pyarrow  # noqa: F401
     import flatbuffers  # noqa: F401
+    import pyarrow  # noqa: F401
     _HAS_LAZY_DEPS = True
 except ImportError:
     _HAS_LAZY_DEPS = False
@@ -246,7 +246,7 @@ class TestComputeSplitKeywords:
         tree, cmap, lbatch, titles = self._make_synthetic_tree()
 
         # Without domain stopwords
-        result_no_sw = compute_split_keywords(
+        compute_split_keywords(
             titles, tree, lbatch, cmap, max_depth_from_root=2)
 
         # With "cardiac" and "orthopedic" as domain stopwords
@@ -293,7 +293,8 @@ class TestFormatSplitPath:
 
     def test_returns_path_for_item(self):
         from dyf.splits import (
-            compute_split_keywords, format_split_path,
+            compute_split_keywords,
+            format_split_path,
         )
 
         # Build same synthetic tree
@@ -368,7 +369,7 @@ class TestBuildTreeMaps:
 
     def test_builds_maps_from_index(self):
         from dyf import build_dyf_tree
-        from dyf.lazy_index import write_lazy_index, LazyIndex
+        from dyf.lazy_index import LazyIndex, write_lazy_index
         from dyf.splits import build_tree_maps
 
         n = 200
@@ -412,10 +413,9 @@ class TestEnrichSplits:
 
     def test_stores_split_keywords_in_metadata(self):
         from dyf import build_dyf_tree
-        from dyf.lazy_index import write_lazy_index, LazyIndex
         from dyf.enrich._splits import enrich_splits
+        from dyf.lazy_index import LazyIndex, write_lazy_index
 
-        n = 200
         dim = 32
         rng = np.random.default_rng(42)
 
@@ -470,8 +470,8 @@ class TestEnrichSplits:
 
     def test_bigram_check_flag(self):
         from dyf import build_dyf_tree
-        from dyf.lazy_index import write_lazy_index, LazyIndex
         from dyf.enrich._splits import enrich_splits
+        from dyf.lazy_index import LazyIndex, write_lazy_index
 
         n = 200
         dim = 32
@@ -808,8 +808,8 @@ class TestLouvainClusterLeaves:
 
     def test_louvain_returns_correct_structure(self):
         from dyf import build_dyf_tree
-        from dyf.lazy_index import write_lazy_index, LazyIndex
         from dyf.agglomerate import louvain_cluster_leaves
+        from dyf.lazy_index import LazyIndex, write_lazy_index
 
         n = 200
         dim = 32
@@ -883,8 +883,8 @@ class TestLouvainClusterLeaves:
     def test_louvain_degenerate_tree(self):
         """Tree with < 2 leaves returns None tuple."""
         from dyf import build_dyf_tree
-        from dyf.lazy_index import write_lazy_index, LazyIndex
         from dyf.agglomerate import louvain_cluster_leaves
+        from dyf.lazy_index import LazyIndex, write_lazy_index
 
         # Very small dataset → might produce single leaf
         n = 5
@@ -944,7 +944,7 @@ class TestGetSplitHyperplanes:
 
     def test_returns_correct_shapes(self):
         from dyf import build_dyf_tree
-        from dyf.lazy_index import write_lazy_index, LazyIndex
+        from dyf.lazy_index import LazyIndex, write_lazy_index
 
         n = 200
         dim = 32
@@ -982,8 +982,7 @@ class TestGetSplitHyperplanes:
 
     def test_leaves_excluded(self):
         from dyf import build_dyf_tree
-        from dyf.lazy_index import write_lazy_index, LazyIndex
-        from dyf.splits import build_tree_maps
+        from dyf.lazy_index import LazyIndex, write_lazy_index
 
         n = 200
         dim = 32
@@ -1025,10 +1024,11 @@ class TestLabelClustersWithSplitContext:
     def test_split_context_in_prompt(self):
         """Verify split keywords affect the LLM prompt."""
         from unittest.mock import patch
+
         from dyf import build_dyf_tree
-        from dyf.lazy_index import write_lazy_index, LazyIndex
-        from dyf.enrich._splits import enrich_splits
         from dyf.enrich._cluster import enrich_cluster
+        from dyf.enrich._splits import enrich_splits
+        from dyf.lazy_index import write_lazy_index
 
         n = 200
         dim = 32
@@ -1099,9 +1099,10 @@ class TestLabelClustersWithSplitContext:
     def test_cluster_without_splits_still_works(self):  # noqa: C901
         """Backward compat: cluster without prior splits uses contrastive TF-IDF."""
         from unittest.mock import patch
+
         from dyf import build_dyf_tree
-        from dyf.lazy_index import write_lazy_index, LazyIndex
         from dyf.enrich._cluster import enrich_cluster
+        from dyf.lazy_index import LazyIndex, write_lazy_index
 
         n = 200
         dim = 32
@@ -1203,6 +1204,7 @@ class TestComputeChildTfidf:
 
     def test_distinct_vocabularies(self):
         from collections import Counter
+
         from dyf.splits import _compute_child_tfidf
 
         child_data = {
@@ -1221,6 +1223,7 @@ class TestComputeChildTfidf:
 
     def test_empty_child(self):
         from collections import Counter
+
         from dyf.splits import _compute_child_tfidf
 
         child_data = {
@@ -1235,6 +1238,7 @@ class TestComputeChildTfidf:
 
     def test_shared_vocab_excluded(self):
         from collections import Counter
+
         from dyf.splits import _compute_child_tfidf
 
         child_data = {
@@ -1251,6 +1255,7 @@ class TestComputeChildTfidf:
 
     def test_bigram_check(self):
         from collections import Counter
+
         from dyf.splits import _compute_child_tfidf
 
         child_data = {

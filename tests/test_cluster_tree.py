@@ -1,7 +1,6 @@
 """Tests for dyf.cluster_tree — cluster-tree DAG for hierarchical labeling."""
 
 import numpy as np
-import pytest
 
 from dyf.categorical import CategoryGraph
 from dyf.cluster_tree import (
@@ -11,7 +10,6 @@ from dyf.cluster_tree import (
     format_cluster_context,
 )
 from dyf.splits import compute_split_keywords
-
 
 # ── Synthetic tree fixture ────────────────────────────────────────────
 

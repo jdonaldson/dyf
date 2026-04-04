@@ -18,8 +18,8 @@ pytestmark = pytest.mark.skipif(
 )
 
 try:
-    import pyarrow  # noqa: F401
     import flatbuffers  # noqa: F401
+    import pyarrow  # noqa: F401
     _HAS_LAZY_DEPS = True
 except ImportError:
     _HAS_LAZY_DEPS = False
@@ -362,9 +362,10 @@ class TestEnrichClusterDual:
     def test_dual_cluster_fields_louvain(self):
         """Louvain mode: same labels for 2D and 3D, different centroids."""
         from unittest.mock import patch
+
         from dyf import build_dyf_tree
-        from dyf.lazy_index import write_lazy_index, LazyIndex
         from dyf.enrich._cluster import enrich_cluster
+        from dyf.lazy_index import LazyIndex, write_lazy_index
 
         n = 200
         embeddings = _make_clustered_embeddings(
@@ -419,9 +420,10 @@ class TestEnrichClusterDual:
     def test_louvain_force_rerun(self):
         """Force re-run on already-clustered file overwrites cleanly."""
         from unittest.mock import patch
+
         from dyf import build_dyf_tree
-        from dyf.lazy_index import write_lazy_index, LazyIndex
         from dyf.enrich._cluster import enrich_cluster
+        from dyf.lazy_index import LazyIndex, write_lazy_index
 
         n = 200
         embeddings = _make_clustered_embeddings(
@@ -472,7 +474,8 @@ class TestCallOllama:
     """Test _call_ollama with mocked urllib."""
 
     def test_successful_call(self):
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
+
         from dyf.enrich._ollama import _call_ollama
 
         mock_resp = MagicMock()
@@ -489,6 +492,7 @@ class TestCallOllama:
 
     def test_connection_error(self):
         from unittest.mock import patch
+
         from dyf.enrich._ollama import _call_ollama
 
         with patch('dyf.enrich._ollama.urllib.request.urlopen',
@@ -498,7 +502,8 @@ class TestCallOllama:
         assert result == ""
 
     def test_json_parse_error(self):
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
+
         from dyf.enrich._ollama import _call_ollama
 
         mock_resp = MagicMock()
@@ -518,10 +523,11 @@ class TestEnrichProject:
     """Test enrich_project with mocked UMAP."""
 
     def test_adds_umap_coords(self):
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
+
         from dyf import build_dyf_tree
-        from dyf.lazy_index import write_lazy_index, LazyIndex
         from dyf.enrich._project import enrich_project
+        from dyf.lazy_index import LazyIndex, write_lazy_index
 
         n = 60
         embeddings = _make_clustered_embeddings(
@@ -572,9 +578,10 @@ class TestEnrichCluster:
     def test_adds_cluster_fields(self):
         """Default Louvain mode produces cluster fields."""
         from unittest.mock import patch
+
         from dyf import build_dyf_tree
-        from dyf.lazy_index import write_lazy_index, LazyIndex
         from dyf.enrich._cluster import enrich_cluster
+        from dyf.lazy_index import LazyIndex, write_lazy_index
 
         n = 200
         embeddings = _make_clustered_embeddings(
@@ -632,9 +639,10 @@ class TestEnrichTree:
 
     def test_adds_tree_labels_metadata(self):
         from unittest.mock import patch
+
         from dyf import build_dyf_tree
-        from dyf.lazy_index import write_lazy_index, LazyIndex
         from dyf.enrich._tree import enrich_tree
+        from dyf.lazy_index import LazyIndex, write_lazy_index
 
         n = 200
         embeddings = _make_clustered_embeddings(
@@ -689,9 +697,10 @@ class TestLabelTreeBottomup:
 
     def test_returns_labels_structure(self):
         from unittest.mock import patch
+
         from dyf import build_dyf_tree
-        from dyf.lazy_index import write_lazy_index, LazyIndex
         from dyf.enrich._tree import label_tree_bottomup
+        from dyf.lazy_index import LazyIndex, write_lazy_index
 
         n = 200
         embeddings = _make_clustered_embeddings(
@@ -718,11 +727,10 @@ class TestLabelTreeBottomup:
                     return "\n".join(lines)
                 return "Fallback"
 
-            with patch('dyf.enrich._tree._call_ollama', side_effect=mock_ollama):
-                with LazyIndex(path) as idx:
-                    result = label_tree_bottomup(
-                        idx, titles, target_depth=3,
-                        samples_per_child=4, min_child_size=5)
+            with patch('dyf.enrich._tree._call_ollama', side_effect=mock_ollama), LazyIndex(path) as idx:
+                result = label_tree_bottomup(
+                    idx, titles, target_depth=3,
+                    samples_per_child=4, min_child_size=5)
 
             assert 'branch_labels' in result
             assert 'child_labels' in result

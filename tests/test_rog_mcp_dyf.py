@@ -24,8 +24,8 @@ pytestmark = pytest.mark.skipif(
 )
 
 try:
-    import pyarrow  # noqa: F401
     import flatbuffers  # noqa: F401
+    import pyarrow  # noqa: F401
     import websockets  # noqa: F401
     _HAS_LAZY_DEPS = True
 except ImportError:
@@ -373,6 +373,7 @@ class TestNoClustersLoading:
     def test_level1_loads_empty_clusters(self):
         """Level 1 file (UMAP only, no Louvain) loads with empty cluster_result."""
         import rog_mcp
+
         from dyf import build_dyf_tree
         from dyf.lazy_index import write_lazy_index
 

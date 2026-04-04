@@ -5,14 +5,14 @@ import pytest
 
 from dyf import (
     BridgeIndex,
-    SuperConnectorResult,
-    OrthogonalAnchorResult,
     FacetDiverseResult,
-    find_super_connectors,
-    select_orthogonal_anchors,
-    diversify_by_facet,
-    get_kmeans_init,
+    OrthogonalAnchorResult,
+    SuperConnectorResult,
     check_rust_available,
+    diversify_by_facet,
+    find_super_connectors,
+    get_kmeans_init,
+    select_orthogonal_anchors,
 )
 
 
@@ -593,12 +593,12 @@ class TestDAGMining:
 # Import DAG taxonomy functions
 from dyf import (
     DAGTaxonomy,
-    build_dag_taxonomy,
-    UnifiedOntologyResult,
-    build_unified_ontology,
     ROGLayer,
     ROGResult,
+    UnifiedOntologyResult,
+    build_dag_taxonomy,
     build_rog_ontology,
+    build_unified_ontology,
 )
 
 

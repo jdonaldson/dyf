@@ -1,12 +1,12 @@
 """Tests for tree-sitter-based multi-language source chunking."""
 
-import pytest
 from pathlib import Path
+
+import pytest
 
 pytest.importorskip("tree_sitter_language_pack", reason="requires dyf[source]")
 
-from dyf.index_source import chunk_source_file, LANG_CONFIG, _EXT_TO_LANG
-
+from dyf.index_source import _EXT_TO_LANG, LANG_CONFIG, chunk_source_file
 
 # ---------------------------------------------------------------------------
 # Fixtures: small source snippets per language
@@ -453,6 +453,6 @@ def test_text_truncated_at_2000(tmp_source):
     chunks = chunk_source_file(p)
     assert len(chunks) == 1
     # The embed text includes a prefix, then source truncated at 2000
-    source_part = chunks[0]["text"].split("\n", 1)[1] if "\n" in chunks[0]["text"] else ""
+    chunks[0]["text"].split("\n", 1)[1] if "\n" in chunks[0]["text"] else ""
     # Total text length should be bounded
     assert len(chunks[0]["text"]) < 2200

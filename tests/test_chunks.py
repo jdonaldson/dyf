@@ -96,21 +96,21 @@ class TestDeduplicateChunks:
         assert len(mask) == 15
 
         # First occurrence of each (bucket, doc) pair should be True
-        assert mask[0] == True   # (0, A) first
-        assert mask[1] == False  # (0, A) duplicate
-        assert mask[2] == True   # (1, A) first
-        assert mask[3] == True   # (2, B) first
-        assert mask[4] == False  # (2, B) duplicate
-        assert mask[5] == False  # (2, B) duplicate
-        assert mask[6] == True   # (3, C) first
-        assert mask[7] == True   # (0, D) first — different doc from A
-        assert mask[8] == False  # (0, D) duplicate
-        assert mask[9] == True   # (4, D) first
-        assert mask[10] == False # (4, D) duplicate
-        assert mask[11] == False # (4, D) duplicate
-        assert mask[12] == True  # (5, E) first
-        assert mask[13] == False # (5, E) duplicate
-        assert mask[14] == False # (5, E) duplicate
+        assert mask[0]   # (0, A) first
+        assert not mask[1]  # (0, A) duplicate
+        assert mask[2]   # (1, A) first
+        assert mask[3]   # (2, B) first
+        assert not mask[4]  # (2, B) duplicate
+        assert not mask[5]  # (2, B) duplicate
+        assert mask[6]   # (3, C) first
+        assert mask[7]   # (0, D) first — different doc from A
+        assert not mask[8]  # (0, D) duplicate
+        assert mask[9]   # (4, D) first
+        assert not mask[10] # (4, D) duplicate
+        assert not mask[11] # (4, D) duplicate
+        assert mask[12]  # (5, E) first
+        assert not mask[13] # (5, E) duplicate
+        assert not mask[14] # (5, E) duplicate
 
     def test_reduces_count(self, synthetic_data):
         bucket_ids, doc_ids = synthetic_data

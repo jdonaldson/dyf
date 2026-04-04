@@ -15,8 +15,8 @@ pytestmark = pytest.mark.skipif(
 )
 
 try:
-    import pyarrow  # noqa: F401
     import flatbuffers  # noqa: F401
+    import pyarrow  # noqa: F401
     _HAS_LAZY_DEPS = True
 except ImportError:
     _HAS_LAZY_DEPS = False
@@ -55,7 +55,7 @@ class TestWriteAndLoad:
     def index_data(self):
         """Build a DYF tree and write a lazy index file."""
         from dyf import build_dyf_tree
-        from dyf.lazy_index import write_lazy_index, LazyIndex
+        from dyf.lazy_index import write_lazy_index
 
         embeddings = _make_clustered_embeddings(
             n_clusters=5, points_per_cluster=40, dim=32, seed=42)
@@ -220,7 +220,7 @@ class TestCaching:
     def test_second_search_uses_cache(self):
         """Second search on same leaves should hit cache."""
         from dyf import build_dyf_tree
-        from dyf.lazy_index import write_lazy_index, LazyIndex
+        from dyf.lazy_index import LazyIndex, write_lazy_index
 
         embeddings = _make_clustered_embeddings(
             n_clusters=3, points_per_cluster=20, dim=16, seed=42)
@@ -239,13 +239,13 @@ class TestCaching:
                 t0 = time.perf_counter()
                 idx.search(query, k=5, nprobe=1)
                 t1 = time.perf_counter()
-                cold_time = t1 - t0
+                t1 - t0
 
                 # Second search: warm cache
                 t2 = time.perf_counter()
                 idx.search(query, k=5, nprobe=1)
                 t3 = time.perf_counter()
-                warm_time = t3 - t2
+                t3 - t2
 
                 # Cache should be populated
                 assert len(idx._batch_cache) > 0
@@ -261,7 +261,7 @@ class TestEdgeCases:
     def test_single_leaf_tree(self):
         """Tree with a single leaf (no splits)."""
         from dyf import build_dyf_tree
-        from dyf.lazy_index import write_lazy_index, LazyIndex
+        from dyf.lazy_index import LazyIndex, write_lazy_index
 
         # Small dataset that won't split
         rng = np.random.default_rng(42)
@@ -289,7 +289,7 @@ class TestEdgeCases:
     def test_nprobe_greater_than_leaves(self):
         """nprobe > num_leaves should still work."""
         from dyf import build_dyf_tree
-        from dyf.lazy_index import write_lazy_index, LazyIndex
+        from dyf.lazy_index import LazyIndex, write_lazy_index
 
         embeddings = _make_clustered_embeddings(
             n_clusters=2, points_per_cluster=20, dim=8, seed=42)
@@ -313,7 +313,7 @@ class TestEdgeCases:
     def test_no_compression(self):
         """Write and read with no compression."""
         from dyf import build_dyf_tree
-        from dyf.lazy_index import write_lazy_index, LazyIndex
+        from dyf.lazy_index import LazyIndex, write_lazy_index
 
         embeddings = _make_clustered_embeddings(
             n_clusters=2, points_per_cluster=20, dim=8, seed=42)
@@ -336,7 +336,7 @@ class TestEdgeCases:
     def test_query_dimension_mismatch(self):
         """Search with wrong-dimension query should raise."""
         from dyf import build_dyf_tree
-        from dyf.lazy_index import write_lazy_index, LazyIndex
+        from dyf.lazy_index import LazyIndex, write_lazy_index
 
         embeddings = _make_clustered_embeddings(
             n_clusters=2, points_per_cluster=20, dim=8, seed=42)
@@ -365,7 +365,7 @@ class TestMmap:
     def test_mmap_used(self):
         """LazyIndex should use mmap, not read full file."""
         from dyf import build_dyf_tree
-        from dyf.lazy_index import write_lazy_index, LazyIndex
+        from dyf.lazy_index import LazyIndex, write_lazy_index
 
         embeddings = _make_clustered_embeddings(
             n_clusters=5, points_per_cluster=100, dim=64, seed=42)
@@ -399,7 +399,7 @@ class TestExtractAllFields:
     def test_extract_embeddings(self):
         """Extracted embeddings match original (within float16 precision)."""
         from dyf import build_dyf_tree
-        from dyf.lazy_index import write_lazy_index, LazyIndex
+        from dyf.lazy_index import LazyIndex, write_lazy_index
 
         embeddings = _make_clustered_embeddings(
             n_clusters=3, points_per_cluster=20, dim=16, seed=42)
@@ -426,7 +426,7 @@ class TestExtractAllFields:
     def test_extract_with_stored_fields(self):
         """Stored fields are correctly extracted and sorted by item_index."""
         from dyf import build_dyf_tree
-        from dyf.lazy_index import write_lazy_index, LazyIndex
+        from dyf.lazy_index import LazyIndex, write_lazy_index
 
         n = 60
         embeddings = _make_clustered_embeddings(
@@ -475,7 +475,7 @@ class TestRewriteLazyIndex:
     def test_add_stored_fields(self):
         """Adding new stored fields preserves existing data."""
         from dyf import build_dyf_tree
-        from dyf.lazy_index import write_lazy_index, rewrite_lazy_index, LazyIndex
+        from dyf.lazy_index import LazyIndex, rewrite_lazy_index, write_lazy_index
 
         n = 60
         embeddings = _make_clustered_embeddings(
@@ -542,7 +542,7 @@ class TestRewriteLazyIndex:
     def test_rewrite_preserves_search(self):
         """Search quality is preserved after rewrite."""
         from dyf import build_dyf_tree
-        from dyf.lazy_index import write_lazy_index, rewrite_lazy_index, LazyIndex
+        from dyf.lazy_index import LazyIndex, rewrite_lazy_index, write_lazy_index
 
         n = 60
         embeddings = _make_clustered_embeddings(
@@ -591,9 +591,8 @@ class TestRewriteLazyIndex:
     def test_rewrite_in_place(self):
         """Rewrite without output_path overwrites the original file."""
         from dyf import build_dyf_tree
-        from dyf.lazy_index import write_lazy_index, rewrite_lazy_index, LazyIndex
+        from dyf.lazy_index import LazyIndex, rewrite_lazy_index, write_lazy_index
 
-        n = 60
         embeddings = _make_clustered_embeddings(
             n_clusters=3, points_per_cluster=20, dim=16, seed=42)
         tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2,
@@ -621,7 +620,7 @@ class TestRewriteLazyIndex:
     def test_rewrite_drop_fields(self):
         """drop_fields removes specified stored fields during rewrite."""
         from dyf import build_dyf_tree
-        from dyf.lazy_index import write_lazy_index, rewrite_lazy_index, LazyIndex
+        from dyf.lazy_index import LazyIndex, rewrite_lazy_index, write_lazy_index
 
         n = 60
         embeddings = _make_clustered_embeddings(
@@ -668,7 +667,7 @@ class TestRewriteLazyIndex:
     def test_rewrite_drop_and_add_fields(self):
         """drop_fields applies after merge so new fields can replace old."""
         from dyf import build_dyf_tree
-        from dyf.lazy_index import write_lazy_index, rewrite_lazy_index, LazyIndex
+        from dyf.lazy_index import LazyIndex, rewrite_lazy_index, write_lazy_index
 
         n = 60
         embeddings = _make_clustered_embeddings(
@@ -715,7 +714,7 @@ class TestDetectEnrichmentLevel:
     def test_level_0_base(self):
         """Base index (no enrichment) returns level 0."""
         from dyf import build_dyf_tree
-        from dyf.lazy_index import write_lazy_index, LazyIndex
+        from dyf.lazy_index import LazyIndex, write_lazy_index
 
         embeddings = _make_clustered_embeddings(
             n_clusters=2, points_per_cluster=20, dim=8, seed=42)
@@ -736,7 +735,7 @@ class TestDetectEnrichmentLevel:
     def test_level_1_projected(self):
         """Index with UMAP coords returns level 1."""
         from dyf import build_dyf_tree
-        from dyf.lazy_index import write_lazy_index, LazyIndex
+        from dyf.lazy_index import LazyIndex, write_lazy_index
 
         n = 40
         embeddings = _make_clustered_embeddings(
@@ -765,7 +764,7 @@ class TestDetectEnrichmentLevel:
     def test_level_2_clustered(self):
         """Index with cluster labels returns level 2."""
         from dyf import build_dyf_tree
-        from dyf.lazy_index import write_lazy_index, LazyIndex
+        from dyf.lazy_index import LazyIndex, write_lazy_index
 
         n = 40
         embeddings = _make_clustered_embeddings(
@@ -795,7 +794,7 @@ class TestDetectEnrichmentLevel:
     def test_level_2_community_id(self):
         """Index with community_id stored field returns level 2."""
         from dyf import build_dyf_tree
-        from dyf.lazy_index import write_lazy_index, LazyIndex
+        from dyf.lazy_index import LazyIndex, write_lazy_index
 
         n = 40
         embeddings = _make_clustered_embeddings(
@@ -826,7 +825,7 @@ class TestDetectEnrichmentLevel:
     def test_level_2_louvain_metadata(self):
         """Index with louvain_dendrogram metadata returns level 2."""
         from dyf import build_dyf_tree
-        from dyf.lazy_index import write_lazy_index, LazyIndex
+        from dyf.lazy_index import LazyIndex, write_lazy_index
 
         n = 40
         embeddings = _make_clustered_embeddings(
@@ -856,7 +855,7 @@ class TestDetectEnrichmentLevel:
     def test_level_3_viz_ready(self):
         """Index with viz metadata returns level 3."""
         from dyf import build_dyf_tree
-        from dyf.lazy_index import write_lazy_index, LazyIndex
+        from dyf.lazy_index import LazyIndex, write_lazy_index
 
         n = 40
         embeddings = _make_clustered_embeddings(
@@ -897,7 +896,7 @@ class TestAdaptiveProbing:
     def index_data(self):
         """Build a DYF tree and write a lazy index file."""
         from dyf import build_dyf_tree
-        from dyf.lazy_index import write_lazy_index, LazyIndex
+        from dyf.lazy_index import write_lazy_index
 
         embeddings = _make_clustered_embeddings(
             n_clusters=5, points_per_cluster=40, dim=32, seed=42)
@@ -965,7 +964,7 @@ class TestAdaptiveProbing:
 
     def test_adaptive_config_custom(self, index_data):
         """AdaptiveProbeConfig with custom thresholds works."""
-        from dyf.lazy_index import LazyIndex, AdaptiveProbeConfig
+        from dyf.lazy_index import AdaptiveProbeConfig, LazyIndex
 
         embeddings = index_data['embeddings']
         query = embeddings[0]
@@ -1111,7 +1110,6 @@ class TestResolveArrowSchema:
     """Tests for _resolve_arrow_schema schema construction."""
 
     def test_no_embeddings(self):
-        import pyarrow as pa
         from dyf.lazy_index import _resolve_arrow_schema
 
         schema, sf_types, meta, pq = _resolve_arrow_schema(
@@ -1124,7 +1122,7 @@ class TestResolveArrowSchema:
         assert pq['is_pq'] is False
 
     def test_float16(self):
-        import pyarrow as pa
+
         from dyf.lazy_index import _resolve_arrow_schema
 
         emb = np.random.default_rng(42).standard_normal((10, 8)).astype(np.float32)
@@ -1137,7 +1135,7 @@ class TestResolveArrowSchema:
         assert pq['q_embeddings'].dtype == np.float16
 
     def test_stored_fields_in_schema(self):
-        import pyarrow as pa
+
         from dyf.lazy_index import _resolve_arrow_schema
 
         emb = np.random.default_rng(42).standard_normal((10, 8)).astype(np.float32)

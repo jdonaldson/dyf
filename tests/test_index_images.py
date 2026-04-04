@@ -9,8 +9,7 @@ import pytest
 
 PIL = pytest.importorskip("PIL", reason="requires Pillow")
 
-from dyf.index_images import make_thumbnail, scan_images, IMAGE_EXTENSIONS
-
+from dyf.index_images import make_thumbnail, scan_images
 
 # ---------------------------------------------------------------------------
 # Helpers

@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from dyf import DensityClassifier, BridgeAnalysis, check_rust_available
+from dyf import DensityClassifier, check_rust_available
 
 
 @pytest.fixture

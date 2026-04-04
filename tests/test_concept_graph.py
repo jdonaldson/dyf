@@ -8,14 +8,13 @@ from dyf.concept_graph import (
     ConceptGraphConfig,
     ConceptNode,
     MarkdownChunk,
-    chunk_markdown,
     check_staleness,
+    chunk_markdown,
     fuzzy_match,
     load_graph,
     save_graph,
     slugify,
 )
-
 
 # ---------------------------------------------------------------------------
 # slugify

@@ -5,7 +5,6 @@ import pickle
 from dyf.pipeline import Pipeline, Stage
 from dyf.provenance import create_provenance, provenance_to_dict
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

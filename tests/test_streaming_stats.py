@@ -1,6 +1,5 @@
 """Tests for streaming_stats module."""
 
-import math
 
 import numpy as np
 import pytest
@@ -11,7 +10,6 @@ from dyf.streaming_stats import (
     TableProfile,
     WelfordStats,
 )
-
 
 # ---------------------------------------------------------------------------
 # WelfordStats
