@@ -1,0 +1,39 @@
+{
+  "model": "low",
+  "model_id": "all-MiniLM-L6-v2",
+  "dim": 384,
+  "include_assistant": false,
+  "n_questions": 500,
+  "recall_any@1": 0.806,
+  "recall_any@5": 0.966,
+  "recall_any@10": 0.982,
+  "recall_all@1": 0.27,
+  "recall_all@5": 0.85,
+  "recall_all@10": 0.932,
+  "per_type": {
+    "single-session-user": {
+      "recall_any@5": 0.9142857142857143,
+      "n": 70
+    },
+    "multi-session": {
+      "recall_any@5": 0.9924812030075187,
+      "n": 133
+    },
+    "single-session-preference": {
+      "recall_any@5": 0.9666666666666667,
+      "n": 30
+    },
+    "temporal-reasoning": {
+      "recall_any@5": 0.9473684210526315,
+      "n": 133
+    },
+    "knowledge-update": {
+      "recall_any@5": 1.0,
+      "n": 78
+    },
+    "single-session-assistant": {
+      "recall_any@5": 0.9642857142857143,
+      "n": 56
+    }
+  }
+}
