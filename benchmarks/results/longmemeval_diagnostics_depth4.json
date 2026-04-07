@@ -1,0 +1,51 @@
+{
+  "pool_size": 19143,
+  "n_questions": 500,
+  "hit_rate": 0.266,
+  "solo_aucs": {
+    "top1_flat_cos": 0.6392821290282928,
+    "top5_mean_cos": 0.5586240806375612,
+    "max_centroid_cos": 0.5232017373133105,
+    "leaf_size_np1": 0.4868677142447399,
+    "min_margin": 0.49046321525885556,
+    "candidates_scored": 0.44437729200385157
+  },
+  "correlations_with_top1": {
+    "top5_mean_cos": 0.8961198398639801,
+    "max_centroid_cos": 0.7707409892335838,
+    "leaf_size_np1": 0.09754805322506896,
+    "min_margin": 0.17969781720582503,
+    "candidates_scored": 0.14877997459287512
+  },
+  "logistic_regression": {
+    "baseline": {
+      "auc": 0.6392821290282928,
+      "coefs": {
+        "top1_flat_cos": 0.5731651237801608
+      },
+      "intercept": -1.0869292940473823
+    },
+    "dyf_only": {
+      "auc": 0.5844174468869722,
+      "coefs": {
+        "max_centroid_cos": 0.14217963977046003,
+        "leaf_size_np1": 0.2428546121399739,
+        "min_margin": -0.04974843374436576,
+        "candidates_scored": -0.4825165066181815
+      },
+      "intercept": -1.0462064049474753
+    },
+    "full": {
+      "auc": 0.7267009485566777,
+      "coefs": {
+        "top1_flat_cos": 1.3103845139591486,
+        "max_centroid_cos": -0.8472662397364895,
+        "leaf_size_np1": 0.2993118650921113,
+        "min_margin": -0.008029240558110665,
+        "candidates_scored": -0.7046877435306161
+      },
+      "intercept": -1.1659555228536298
+    },
+    "delta_auc": 0.08741881952838482
+  }
+}
