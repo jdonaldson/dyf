@@ -219,6 +219,20 @@ def run(args: argparse.Namespace) -> None:
     pool_embs = all_embs[:n_pool]
     query_embs = all_embs[n_pool:]
 
+    if args.pca > 0:
+        from sklearn.decomposition import PCA
+        print(f"\nPCA distillation: {pool_embs.shape[1]}d → {args.pca}d")
+        t0 = time.time()
+        pca = PCA(n_components=args.pca, random_state=42)
+        pool_embs = pca.fit_transform(pool_embs).astype(np.float32)
+        query_embs = pca.transform(query_embs).astype(np.float32)
+        # Re-normalize: PCA doesn't preserve unit norm
+        pool_embs = l2_normalize(pool_embs)
+        query_embs = l2_normalize(query_embs)
+        var_explained = float(pca.explained_variance_ratio_.sum())
+        print(f"  fit+transform: {time.time() - t0:.1f}s")
+        print(f"  variance retained: {var_explained:.4f}")
+
     # -------------------------------------------------------------------------
     # Flat features + gold labels
     # -------------------------------------------------------------------------
@@ -432,6 +446,7 @@ def run(args: argparse.Namespace) -> None:
                 "max_depth": args.max_depth,
                 "num_bits": args.num_bits,
                 "fit_method": args.fit_method,
+                "pca": args.pca,
                 "n_splits": 5,
                 "seed": 42,
             },
@@ -449,6 +464,7 @@ def main() -> None:
     p.add_argument("--max-depth", type=int, default=4)
     p.add_argument("--num-bits", type=int, default=3)
     p.add_argument("--fit-method", default="raw_pca", choices=["raw_pca", "pca", "itq"])
+    p.add_argument("--pca", type=int, default=0, help="PCA-distill pool embeddings to N dims (0 = off)")
     p.add_argument("--out", default=None)
     args = p.parse_args()
     run(args)
