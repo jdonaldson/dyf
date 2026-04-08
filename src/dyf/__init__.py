@@ -80,6 +80,9 @@ from .configs import (
     list_configs,
 )
 
+# Unified tree-cutting dispatcher (routes to the right impl per tree shape)
+from .cut import cut_tree_to_labels
+
 # DYF tree (recursive k-ary LSH splits)
 from .dyf_tree import (
     build_dyf_tree,
@@ -93,9 +96,6 @@ from .pca_tree import (
     build_pca_tree,
     extract_boundary_persistence,
 )
-
-# Unified tree-cutting dispatcher (routes to the right impl per tree shape)
-from .cut import cut_tree_to_labels
 
 # Also available: dyf_tree.extract_boundary_persistence,
 #                 dyf_tree.boundary_persistence_scores
