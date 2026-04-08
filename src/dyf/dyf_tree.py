@@ -12,10 +12,11 @@ captures multi-dimensional topic boundaries at each level.
 Public API:
     build_dyf_tree              — construct the tree from embeddings
     refine_dyf_tree             — re-split incoherent leaves with rotated seeds
-    cut_dyf_tree_to_labels      — cut the tree into flat cluster labels
     refine_clusters             — safety net on flat labels
     extract_boundary_persistence — find boundary points at multiple depths
     boundary_persistence_scores — convenience: depth-weighted score array
+
+For flat cluster labels, use the unified ``dyf.cut_tree_to_labels`` dispatcher.
 """
 
 import logging
@@ -66,7 +67,8 @@ def _build_dyf_tree(embeddings, point_indices, depth, num_bits, min_leaf_size,
             clf.fit_raw_pca(subset)
         else:
             clf.fit(subset)
-        bucket_ids = clf.get_bucket_ids()
+        # np.asarray: dyf-rs < 0.6.0 returned Python lists here
+        bucket_ids = np.asarray(clf.get_bucket_ids())
         centroid_sims = clf.get_centroid_similarities()
     except Exception as e:
         logger.debug("Tree split failed at depth %d: %s", depth, e)
@@ -277,15 +279,17 @@ def _collect_leaves(node):
     return leaves
 
 
-def cut_dyf_tree_to_labels(tree, n_points, n_clusters, embeddings):
+def _cut_dyf_tree_to_labels(tree, n_points, n_clusters, embeddings):
     """Cut DYF tree into flat cluster labels using agglomerative merge.
+
+    Internal impl — prefer the unified ``dyf.cut_tree_to_labels`` dispatcher.
 
     Collects leaf nodes, computes their cosine centroids, then merges
     leaves to n_clusters using agglomerative clustering with cosine
     distance and average linkage.
 
     Args:
-        tree: DYF tree dict from build_dyf_tree().
+        tree: DYF tree dict from build_dyf_tree() (has 'children' key).
         n_points: Total number of points.
         n_clusters: Desired number of clusters.
         embeddings: (n, d) array used for centroid computation.
@@ -360,7 +364,8 @@ def _try_resplit(indices, embeddings, num_bits, seed):
     try:
         clf = DensityClassifier(embedding_dim=dim, num_bits=num_bits, seed=seed, skip_isolation=True)
         clf.fit(subset)
-        bucket_ids = clf.get_bucket_ids()
+        # np.asarray: dyf-rs < 0.6.0 returned Python lists here
+        bucket_ids = np.asarray(clf.get_bucket_ids())
         centroid_sims = clf.get_centroid_similarities()
     except Exception as e:
         logger.debug("Resplit failed: %s", e)
@@ -580,7 +585,8 @@ def _resplit_ejected(ejected_indices, embeddings, num_bits, seed_offset):
         clf = DensityClassifier(embedding_dim=dim, num_bits=num_bits,
                                 seed=seed_offset, skip_isolation=True)
         clf.fit(ejected_emb)
-        bucket_ids = clf.get_bucket_ids()
+        # np.asarray: dyf-rs < 0.6.0 returned Python lists here
+        bucket_ids = np.asarray(clf.get_bucket_ids())
     except Exception as e:
         logger.debug("Ejected re-split failed, falling back to zeros: %s", e)
         bucket_ids = np.zeros(len(ejected_indices), dtype=int)
