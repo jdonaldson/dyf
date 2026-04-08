@@ -32,8 +32,9 @@ from sklearn.metrics import silhouette_score
 from sklearn.neighbors import NearestNeighbors
 from scipy.sparse.csgraph import connected_components
 
-from dyf.pca_tree import build_pca_tree, cut_tree_to_labels
-from dyf.dyf_tree import build_dyf_tree, cut_dyf_tree_to_labels
+from dyf import cut_tree_to_labels
+from dyf.pca_tree import build_pca_tree
+from dyf.dyf_tree import build_dyf_tree
 
 
 def load_and_dedup(parquet_path, sample=None):
@@ -360,7 +361,7 @@ def main():
           f"target_k={target_k}) ===")
     t0 = time.time()
     tree = build_pca_tree(embeddings, args.max_depth)
-    labels_pca = cut_tree_to_labels(tree, args.max_depth, n, target_k)
+    labels_pca = cut_tree_to_labels(tree, n, target_k, max_depth=args.max_depth)
     t_pca = time.time() - t0
     print(f"  {len(set(labels_pca))} clusters in {t_pca:.2f}s")
 
@@ -386,7 +387,7 @@ def main():
     t0 = time.time()
     dtree = build_dyf_tree(embeddings, max_depth=dyf_tree_depth,
                            num_bits=dyf_tree_bits, min_leaf_size=4)
-    labels_dtree = cut_dyf_tree_to_labels(dtree, n, target_k, embeddings)
+    labels_dtree = cut_tree_to_labels(dtree, n, target_k, embeddings=embeddings)
     t_dtree = time.time() - t0
     n_dtree = len(set(labels_dtree.tolist()))
     print(f"  {n_dtree} clusters in {t_dtree:.2f}s")

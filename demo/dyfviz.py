@@ -31,10 +31,10 @@ from sklearn.neighbors import NearestNeighbors
 
 from dyf.colors import spatial_rgb_map, spatial_color_map, tree_rgb_map
 from dyf.provenance import provenance_from_dict, check_compatible
+from dyf import cut_tree_to_labels
 from dyf.dyf_tree import (
     build_dyf_tree,
     refine_dyf_tree,
-    cut_dyf_tree_to_labels,
     refine_clusters,
 )
 
@@ -2831,7 +2831,7 @@ def main():
               f"{stats['coherence_after']:.3f}, "
               f"leaves {stats['n_leaves_before']} -> {stats['n_leaves_after']})")
 
-    labels_dyf = cut_dyf_tree_to_labels(tree, n, target_k, embeddings)
+    labels_dyf = cut_tree_to_labels(tree, n, target_k, embeddings=embeddings)
 
     if args.refine:
         labels_dyf = refine_clusters(labels_dyf, embeddings)

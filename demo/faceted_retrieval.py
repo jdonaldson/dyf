@@ -37,9 +37,9 @@ import numpy as np
 import polars as pl
 from sklearn.neighbors import NearestNeighbors
 
+from dyf import cut_tree_to_labels
 from dyf.pca_tree import (
     build_pca_tree,
-    cut_tree_to_labels,
     extract_boundary_persistence,
 )
 from dyf.rerank import (
@@ -131,7 +131,7 @@ def main():
     # ── Cluster assignment ───────────────────────────────────────────────
     print(f"\nCutting PCA tree to {args.n_clusters} clusters...")
     cluster_labels = cut_tree_to_labels(
-        tree, args.max_depth, n, args.n_clusters)
+        tree, n, args.n_clusters, max_depth=args.max_depth)
     n_actual = len(set(cluster_labels.tolist()))
     print(f"  Got {n_actual} clusters")
 

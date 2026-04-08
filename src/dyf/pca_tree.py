@@ -9,7 +9,8 @@ Public API:
     build_pca_tree              — construct the tree from embeddings
     extract_boundary_persistence — find boundary points at multiple depths
     boundary_persistence_scores — convenience: depth-weighted score array
-    cut_tree_to_labels          — cut the tree into flat cluster labels
+
+For flat cluster labels, use the unified ``dyf.cut_tree_to_labels`` dispatcher.
 """
 
 import logging
@@ -251,11 +252,13 @@ def _pca_tree_to_Z(tree, max_depth):
     return Z, leaf_points_list
 
 
-def cut_tree_to_labels(tree, max_depth, n_points, n_clusters):
+def _cut_pca_tree_to_labels(tree, max_depth, n_points, n_clusters):
     """Cut PCA tree at n_clusters and return point labels array.
 
+    Internal impl — prefer the unified ``dyf.cut_tree_to_labels`` dispatcher.
+
     Args:
-        tree: PCA tree dict from build_pca_tree().
+        tree: PCA tree dict from build_pca_tree() (has 'left'/'right' keys).
         max_depth: Depth used when building the tree.
         n_points: Total number of points.
         n_clusters: Desired number of clusters.

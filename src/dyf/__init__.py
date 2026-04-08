@@ -37,6 +37,28 @@ except ImportError:
     DensityReport = None
     BridgeAnalysis = None
 
+# Warn if dyf-rs is installed but below the documented floor.
+# The pyproject constraint (dyf-rs>=0.7.0) can be silently bypassed
+# by stale editable-install metadata.
+if _HAS_RUST:
+    import warnings as _warnings
+    _DYF_RS_FLOOR = (0, 7, 0)
+    _rs_ver_str = getattr(__import__("dyf_rs"), "__version__", None)
+    if _rs_ver_str:
+        try:
+            _rs_ver = tuple(int(x) for x in _rs_ver_str.split(".")[:3])
+            if _rs_ver < _DYF_RS_FLOOR:
+                _warnings.warn(
+                    f"dyf-rs {_rs_ver_str} is below the documented floor "
+                    f"{'.'.join(str(x) for x in _DYF_RS_FLOOR)}. "
+                    f"Run `uv pip install -e .` to refresh editable-install metadata.",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+        except (ValueError, TypeError):
+            pass
+    del _warnings, _DYF_RS_FLOOR, _rs_ver_str
+
 # Embedding and labeling configs
 # Chunk analysis
 from .chunks import (
@@ -61,7 +83,6 @@ from .configs import (
 # DYF tree (recursive k-ary LSH splits)
 from .dyf_tree import (
     build_dyf_tree,
-    cut_dyf_tree_to_labels,
     refine_clusters,
     refine_dyf_tree,
 )
@@ -70,9 +91,11 @@ from .dyf_tree import (
 from .pca_tree import (
     boundary_persistence_scores,
     build_pca_tree,
-    cut_tree_to_labels,
     extract_boundary_persistence,
 )
+
+# Unified tree-cutting dispatcher (routes to the right impl per tree shape)
+from .cut import cut_tree_to_labels
 
 # Also available: dyf_tree.extract_boundary_persistence,
 #                 dyf_tree.boundary_persistence_scores
@@ -263,12 +286,12 @@ __all__ = [
     "build_pca_tree",
     "extract_boundary_persistence",
     "boundary_persistence_scores",
-    "cut_tree_to_labels",
     # DYF tree
     "build_dyf_tree",
     "refine_dyf_tree",
-    "cut_dyf_tree_to_labels",
     "refine_clusters",
+    # Unified tree-cutting dispatcher
+    "cut_tree_to_labels",
     # Lazy index
     "LazyIndex",
     "write_lazy_index",

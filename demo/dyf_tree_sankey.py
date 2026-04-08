@@ -17,11 +17,11 @@ import numpy as np
 import polars as pl
 import plotly.graph_objects as go
 
+from dyf import cut_tree_to_labels
 from dyf.dyf_tree import (
     build_dyf_tree,
     refine_dyf_tree,
     _leaf_coherence,
-    cut_dyf_tree_to_labels,
 )
 from dyf_rs import DensityClassifier
 
@@ -417,7 +417,7 @@ def build_sankey(
           f"across {actual_levels} levels")
 
     # Column 8: Cut clusters
-    cut_labels = cut_dyf_tree_to_labels(tree, n_points, n_clusters, embeddings)
+    cut_labels = cut_tree_to_labels(tree, n_points, n_clusters, embeddings=embeddings)
     n_cut = len(set(cut_labels.tolist()))
     print(f"  Cut clusters: {n_cut}")
 

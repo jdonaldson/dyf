@@ -3,10 +3,10 @@
 import numpy as np
 import pytest
 
+from dyf import cut_tree_to_labels
 from dyf.pca_tree import (
     boundary_persistence_scores,
     build_pca_tree,
-    cut_tree_to_labels,
     extract_boundary_persistence,
 )
 

@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+### API Changes
+
+- **Unified `cut_tree_to_labels` dispatcher** — replaces the two previously
+  divergent cut functions (`pca_tree.cut_tree_to_labels` and
+  `dyf_tree.cut_dyf_tree_to_labels`). The new top-level
+  `dyf.cut_tree_to_labels(tree, n_points, n_clusters, *, max_depth=None, embeddings=None)`
+  detects tree shape from its keys (`'children'` → DYF, `'left'` → PCA) and
+  routes to the correct impl, raising a clear `ValueError` if the required
+  kwarg for the detected shape is missing. The old per-module functions are
+  now private (`_cut_pca_tree_to_labels`, `_cut_dyf_tree_to_labels`) — import
+  from `dyf` or `dyf.cut` instead.
+
+### Fixed
+
+- **Defensive `np.asarray` on `get_bucket_ids()` returns in `dyf_tree.py`**
+  — three sites (`_build_dyf_tree`, `_try_resplit`, `_resplit_ejected`) now
+  wrap the Rust binding's return, so dyf-py works against any
+  `dyf-rs >= 0.5.0` instead of hard-requiring the 0.6.0 numpy-return bindings.
+  Prevents stale-editable-install failures that surface as
+  `AttributeError: 'list' object has no attribute 'tolist'`.
+
 ## 0.8.0
 
 DYF3 chunked format, adaptive search, embedding-optional indexes, and zero-copy numpy returns from Rust bindings.
