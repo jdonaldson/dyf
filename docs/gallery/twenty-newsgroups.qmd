@@ -1,0 +1,10 @@
+---
+title: "20 Newsgroups"
+subtitle: "~18,000 posts, sentence embeddings, k=20 topics (hierarchical)."
+order: 4
+draft: true
+categories: [text, medium, embeddings, hierarchical]
+true-k: 20
+---
+
+*Coming soon.* Text instead of pixels, and the ground truth is *hierarchical* — `comp.sys.mac.hardware` sits under `comp`, `rec.sport.hockey` sits under `rec`. Good dataset to show DYF's tree recovering the topic/subtopic split without being told the hierarchy exists.

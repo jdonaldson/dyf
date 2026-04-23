@@ -20,6 +20,8 @@ website:
         text: Getting Started
       - href: how-it-works.qmd
         text: How It Works
+      - href: gallery/index.qmd
+        text: Gallery
       - href: reference/index.qmd
         text: API Reference
     right:

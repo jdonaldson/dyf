@@ -187,6 +187,34 @@ pre.quarto-appendix-bibtex {
   border-radius: 6px;
 }
 
+// Gallery notebooks — fluid image grid.
+// Stacks 1-col on narrow screens, tiles 2-3 col on wider ones via auto-fit.
+// Each figure block quarto emits as a <div class="cell"> so we grid those.
+.gallery-fluid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.25rem;
+  margin: 1.5rem 0;
+
+  // Kill bootstrap row/col padding inside each cell
+  > .cell, > figure {
+    margin: 0;
+  }
+
+  // Figures fill their grid cell
+  img, .figure-img {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  figcaption {
+    font-size: 0.9em;
+    color: $fg-muted-light;
+    margin-top: 0.4em;
+  }
+}
+
 // Links — understated underlines
 .content a:not(.nav-link):not(.sidebar-item-text) {
   color: $fg-light;

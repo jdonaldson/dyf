@@ -1,0 +1,10 @@
+---
+title: "MNIST"
+subtitle: "70,000 handwritten digits, 28×28 pixel vectors, k=10 ground truth."
+order: 2
+draft: true
+categories: [images, large, pixels]
+true-k: 10
+---
+
+*Coming soon.* The scaled-up version of the Digits notebook — same three lines, same comparison, but 70K samples at 784d. Tests whether DYF's parameter-free story survives a 40× jump in dataset size and a 12× jump in dimensionality.

@@ -1,0 +1,10 @@
+---
+title: "Fashion-MNIST"
+subtitle: "70,000 clothing images, 28×28, k=10 garment classes."
+order: 3
+draft: true
+categories: [images, large, pixels]
+true-k: 10
+---
+
+*Coming soon.* Same shape as MNIST but visually harder — pullovers vs. coats vs. shirts all look similar in 28×28 grayscale. Stress test for whether DYF's clusters track semantic class or just visual similarity.

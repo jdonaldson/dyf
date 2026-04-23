@@ -1,0 +1,10 @@
+---
+title: "Wine & Iris"
+subtitle: "Two classic tabular datasets (n<200), k=3. Honest-baseline sanity check."
+order: 7
+draft: true
+categories: [tabular, tiny, low-k]
+true-k: 3
+---
+
+*Coming soon.* The opposite end of the spectrum from MNIST: <200 points, 4–13 features, 3 classes. These are too small to justify DYF's tree-plus-Louvain machinery, but they're the honest sanity check — does DYF *over-partition* tiny data when there's nothing to find?

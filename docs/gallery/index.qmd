@@ -1,0 +1,63 @@
+---
+title: "Parameter-Free Clustering Gallery"
+subtitle: "The same three lines of DYF, across classic datasets with known latent k."
+listing:
+  id: gallery-listing
+  contents:
+    - digits.qmd
+    - mnist.qmd
+    - fashion-mnist.qmd
+    - twenty-newsgroups.qmd
+    - olivetti-faces.qmd
+    - cmu-mocap.qmd
+    - wine-iris.qmd
+  type: grid
+  grid-columns: 3
+  sort: "order"
+  fields: [image, title, subtitle, categories, true-k, recovered-k, nmi]
+  field-display-names:
+    true-k: "True k"
+    recovered-k: "Recovered k"
+    nmi: "NMI"
+  filter-ui: [categories]
+  sort-ui: false
+---
+
+Every clustering algorithm you've used asks you to pick a number.
+
+`k`, `min_cluster_size`, `eps`, `resolution`, `threshold` — they all amount to the same question: *how many groups are in your data?* Get it wrong and you split a natural cluster in half, or smear two clusters together.
+
+DYF doesn't ask. Build a tree, run Louvain on the leaf-centroid graph, and the number of communities emerges from the data itself.
+
+## The claim
+
+Across datasets with a known ground-truth `k` — handwritten digits, news topics, faces, motion capture sequences — DYF should recover something close to that `k` with **zero hyperparameter tuning**. Each notebook below runs the same three lines of code and reports three numbers:
+
+- **True k** — the ground truth (how many classes the dataset was labelled with).
+- **Recovered k** — what DYF found, unprompted.
+- **NMI** — Normalized Mutual Information against the ground truth (0 = random, 1 = perfect).
+
+## The notebooks
+
+:::{#gallery-listing}
+:::
+
+## How to read this
+
+A good parameter-free algorithm should:
+
+1. **Recover something close to true k** without being told. Off by ±20% is fine; off by 10× is a problem.
+2. **Score well on NMI** even when `recovered_k` differs from `true_k` — NMI rewards getting the *partitions* right even if the granularity is slightly off.
+3. **Work across domains** — image pixels, TF-IDF vectors, motion capture joints, sentence embeddings. The same call signature, no per-domain tuning.
+
+Where DYF fails these tests, the notebook says so. These are demonstrations, not marketing.
+
+## The comparison
+
+Each notebook also runs k-means and HDBSCAN for reference:
+
+- **k-means** gets *told* the true k (unfair advantage — it's the ceiling, not a fair comparison).
+- **HDBSCAN** runs with its defaults (fair — it's also parameter-light, but not parameter-free).
+- **DYF** runs with defaults.
+
+The question isn't "does DYF beat k-means-with-an-oracle?" — nobody beats that. The question is: *how close can you get without the oracle?*

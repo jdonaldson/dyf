@@ -1,0 +1,10 @@
+---
+title: "CMU MoCap"
+subtitle: "140,837 motion-capture frames, 62d joint angles, k≈87 movement types."
+order: 6
+draft: true
+categories: [motion, large, physical, no-embedding]
+true-k: "~87"
+---
+
+*Coming soon.* Not an embedding model in sight — just raw 62d joint-angle vectors from human motion capture. The ground truth "k" here is soft (movement types overlap), so the metric shifts from NMI-against-labels toward *sim-gap* (inter- vs intra-cluster similarity). Demonstrates DYF working directly on physical signal, no embedding detour.

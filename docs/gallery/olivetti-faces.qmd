@@ -1,0 +1,10 @@
+---
+title: "Olivetti Faces"
+subtitle: "400 face images, 64×64 grayscale, k=40 people."
+order: 5
+draft: true
+categories: [images, small, pixels, high-k]
+true-k: 40
+---
+
+*Coming soon.* A high-k / low-n stress test — 40 classes from only 10 examples each. Challenging for any clustering method. Included to show where DYF starts to struggle (too few points per latent cluster to build stable leaf centroids).
