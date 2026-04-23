@@ -106,28 +106,11 @@ span.edgeLabel p {
   font-weight: 600;
 }
 
-// Code blocks — same fixed isoline as hero for parallax continuity
+// Code blocks — plain neutral background, no isoline
 div.sourceCode {
-  position: relative;
-  background: url('hero-bg-light.png') top center / 100% auto no-repeat fixed !important;
   background-color: $bg-light !important;
   border: 1px solid rgba($golden-amber, 0.15);
   border-radius: 6px;
-
-  &::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: rgba(245, 245, 245, 0.55);
-    border-radius: inherit;
-    pointer-events: none;
-    z-index: 0;
-  }
-
-  pre.sourceCode {
-    position: relative;
-    z-index: 1;
-  }
 }
 
 // Inline code — neutral
