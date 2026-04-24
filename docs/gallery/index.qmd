@@ -1,13 +1,15 @@
 ---
 title: "Parameter-Free Clustering Gallery"
-subtitle: "The same three lines of DYF, across classic datasets with known latent k."
+subtitle: "DYF produces a partition hierarchy, not a single k. Here's what that buys you across eight classic datasets."
 listing:
   id: gallery-listing
   contents:
+    - synthetic-shapes.qmd
     - digits.qmd
     - mnist.qmd
     - fashion-mnist.qmd
     - twenty-newsgroups.qmd
+    - cifar10-clip.qmd
     - olivetti-faces.qmd
     - cmu-mocap.qmd
     - wine-iris.qmd
@@ -23,41 +25,50 @@ listing:
   sort-ui: false
 ---
 
-Every clustering algorithm you've used asks you to pick a number.
+Every other clustering algorithm asks you to pick a number.
 
-`k`, `min_cluster_size`, `eps`, `resolution`, `threshold` — they all amount to the same question: *how many groups are in your data?* Get it wrong and you split a natural cluster in half, or smear two clusters together.
+K-means wants `k`. HDBSCAN wants `min_cluster_size`. DBSCAN wants `eps`. Louvain wants `resolution`. Each is a commitment to a single granularity — make the wrong pick and you either split a natural cluster in half or blur two together.
 
-DYF doesn't ask. Build a tree, run Louvain on the leaf-centroid graph, and the number of communities emerges from the data itself.
+DYF's pitch is different. **Build the tree once, and you get the whole hierarchy.** At its finest leaves, DYF's Louvain step finds many fine-grained communities. Walk up the tree and those merge into progressively coarser partitions. You pick the resolution your downstream task needs — at query time, not at training time.
 
-## The claim
+## What the gallery shows
 
-Across datasets with a known ground-truth `k` — handwritten digits, news topics, faces, motion capture sequences — DYF should recover something close to that `k` with **zero hyperparameter tuning**. Each notebook below runs the same three lines of code and reports three numbers:
+Each notebook below runs the same three lines of DYF against a dataset with known class structure. The metric columns that matter are:
 
-- **True k** — the ground truth (how many classes the dataset was labelled with).
-- **Recovered k** — what DYF found, unprompted.
-- **NMI** — Normalized Mutual Information against the ground truth (0 = random, 1 = perfect).
+- **Recovered k** — the finest-resolution partition DYF finds from the data.
+- **Merge walk** — how NMI and ARI evolve as you collapse that partition to coarser `k` values.
+- **NMI / ARI at matched granularity** — how closely DYF's partition aligns with the ground truth at the *resolution* the label is expressed at.
+
+Each notebook also scores k-means (told the oracle `k`) as a ceiling, and HDBSCAN (parameter-light, but not parameter-free) as a second baseline. Where DYF loses, the notebook says so.
 
 ## The notebooks
 
 :::{#gallery-listing}
 :::
 
-## How to read this
+## How to read the results
 
-A good parameter-free algorithm should:
+The gallery's cross-notebook findings cluster into four patterns:
 
-1. **Recover something close to true k** without being told. Off by ±20% is fine; off by 10× is a problem.
-2. **Score well on NMI** even when `recovered_k` differs from `true_k` — NMI rewards getting the *partitions* right even if the granularity is slightly off.
-3. **Work across domains** — image pixels, TF-IDF vectors, motion capture joints, sentence embeddings. The same call signature, no per-domain tuning.
+**DYF behavior depends on two axes, not one.**
 
-Where DYF fails these tests, the notebook says so. These are demonstrations, not marketing.
+| Axis             | Where DYF struggles                     | Where DYF wins                           |
+|------------------|-----------------------------------------|------------------------------------------|
+| Cluster *shape*  | Low-dim curved / topologically nested (HDBSCAN wins — [see Moons](synthetic-shapes.qmd)) | Convex or hierarchical clusters in medium-to-high dim |
+| Data *scale*     | Very small n, very high d ([Olivetti](olivetti-faces.qmd) 400 × 4096 breaks it) | Medium-to-large n, moderate d — where HDBSCAN's O(n²) breaks |
 
-## The comparison
+**Over-partitioning is often a feature.** On [MNIST](mnist.qmd) DYF finds 81 communities for 10 classes, and on [20 Newsgroups](twenty-newsgroups.qmd) it finds 34 for 20. The merge walk shows those extra splits are genuine hierarchy — collapsing 81 → 20 on MNIST roughly doubles ARI while barely moving NMI. The finer grain isn't noise; it's sub-style / sub-topic / sub-motion structure that the flat ground-truth label ignores.
 
-Each notebook also runs k-means and HDBSCAN for reference:
+**Merging walks hierarchy; it can't fix bad geometry.** On [Moons](synthetic-shapes.qmd) merging 3 → 2 *decreases* NMI. That's diagnostic: the raw over-partition must contain the coarser structure as a sub-partition for the merge to help.
 
-- **k-means** gets *told* the true k (unfair advantage — it's the ceiling, not a fair comparison).
-- **HDBSCAN** runs with its defaults (fair — it's also parameter-light, but not parameter-free).
-- **DYF** runs with defaults.
+**"True k" is frequently a fiction.** [CMU MoCap](cmu-mocap.qmd) has three plausible ground-truth labels at different granularities (7 / 25 / 80 classes). DYF's partition beats oracle k-means on NMI against every one of them, because it doesn't commit to a single k at fit time.
 
-The question isn't "does DYF beat k-means-with-an-oracle?" — nobody beats that. The question is: *how close can you get without the oracle?*
+## Who should be in your toolbox?
+
+Based on the nine notebooks:
+
+- **HDBSCAN** for low-dimensional, clean, small-to-medium datasets where cluster shape matters and you can tolerate a "noise" bucket.
+- **K-means** when you genuinely know `k`, your clusters are convex-ish, and you need the fastest possible fit.
+- **DYF** for medium-to-large datasets where you don't know `k`, the structure is hierarchical, or you want multi-resolution output for downstream routing / retrieval / exploration.
+
+These are compositional, not competitive. The recipe *"pretrained embedder → DYF tree → merge-walk to whatever resolution the downstream task wants"* is the pattern [CIFAR-10 + CLIP](cifar10-clip.qmd) demonstrates end-to-end.
