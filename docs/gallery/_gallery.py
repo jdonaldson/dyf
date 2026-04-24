@@ -25,6 +25,20 @@ class GalleryResult:
     ari: float                  # adjusted rand index
     umap_2d: np.ndarray         # (N, 2) 2D layout for plotting
 
+    def save(self, path: str) -> None:
+        np.savez(path, labels=self.labels, recovered_k=self.recovered_k,
+                 true_k=self.true_k, nmi=self.nmi, ari=self.ari,
+                 umap_2d=self.umap_2d)
+
+    @classmethod
+    def load(cls, path: str) -> "GalleryResult":
+        z = np.load(path)
+        return cls(
+            labels=z["labels"], recovered_k=int(z["recovered_k"]),
+            true_k=int(z["true_k"]), nmi=float(z["nmi"]),
+            ari=float(z["ari"]), umap_2d=z["umap_2d"],
+        )
+
 
 def run_dyf(
     embeddings: np.ndarray,
@@ -82,6 +96,25 @@ def run_dyf(
         ari=float(adjusted_rand_score(y_true, labels)),
         umap_2d=umap_2d,
     )
+
+
+def run_dyf_cached(
+    embeddings: np.ndarray,
+    y_true: np.ndarray,
+    cache_path: str,
+    **kwargs: Any,
+) -> GalleryResult:
+    """Cached wrapper around ``run_dyf``. First call computes and writes to
+    ``cache_path``; later calls load from disk. Cache is invalidated on shape
+    mismatch against current inputs."""
+    import os
+    if os.path.exists(cache_path):
+        cached = GalleryResult.load(cache_path)
+        if cached.labels.shape[0] == embeddings.shape[0]:
+            return cached
+    result = run_dyf(embeddings, y_true, **kwargs)
+    result.save(cache_path)
+    return result
 
 
 def run_kmeans(embeddings: np.ndarray, y_true: np.ndarray, *, seed: int = 42) -> dict[str, Any]:
@@ -153,8 +186,88 @@ def plot_single(
     ax.set_title(title)
     ax.set_xticks([])
     ax.set_yticks([])
-    plt.tight_layout()
+    fig.tight_layout()
+    plt.close(fig)  # prevent pyplot from also auto-displaying — Quarto uses the returned Figure
     return fig
+
+
+def image_grid(
+    images: np.ndarray,
+    indices: np.ndarray,
+    *,
+    image_shape: tuple[int, int] = (28, 28),
+    rows: int = 4,
+    cols: int = 8,
+    title: str = "",
+    seed: int = 0,
+):
+    """Render a grid of images drawn from ``images[indices]``.
+
+    ``images`` may be flat (N, d) — each row is reshaped to ``image_shape``.
+    Sampling is random without replacement; pass ``seed`` to reproduce.
+    """
+    import matplotlib.pyplot as plt
+
+    rng = np.random.default_rng(seed)
+    pick = rng.choice(indices, size=min(rows * cols, len(indices)), replace=False)
+    fig, axes = plt.subplots(rows, cols, figsize=(cols * 0.9, rows * 0.9))
+    for ax, idx in zip(axes.flat, pick):
+        ax.imshow(images[idx].reshape(image_shape), cmap="gray", vmin=0, vmax=1)
+        ax.set_xticks([])
+        ax.set_yticks([])
+    # Blank any axes we didn't fill
+    for ax in list(axes.flat)[len(pick):]:
+        ax.axis("off")
+    if title:
+        fig.suptitle(title, fontsize=11)
+    fig.tight_layout()
+    plt.close(fig)
+    return fig
+
+
+def merge_walk(
+    dyf: GalleryResult,
+    embeddings: np.ndarray,
+    y_true: np.ndarray,
+    targets: list[int],
+) -> list[dict[str, Any]]:
+    """Walk DYF's partition hierarchy to coarser resolutions.
+
+    Calls ``dyf.agglomerate.merge_to_max_k`` at each target k, scores the
+    resulting partition against ``y_true`` with NMI and ARI, and returns a
+    list of rows. Targets larger than the raw recovered_k are returned as the
+    raw result (nothing to merge up). Targets smaller merge to that count.
+    """
+    from sklearn.metrics import adjusted_mutual_info_score, adjusted_rand_score
+    from dyf.agglomerate import merge_to_max_k
+
+    labels_i32 = dyf.labels.astype(np.int32)
+    rows: list[dict[str, Any]] = []
+    for target in targets:
+        merged = merge_to_max_k(labels_i32, embeddings, max_k=target)
+        k = int(len(np.unique(merged)))
+        rows.append({
+            "target": target,
+            "actual_k": k,
+            "nmi": float(adjusted_mutual_info_score(y_true, merged)),
+            "ari": float(adjusted_rand_score(y_true, merged)),
+        })
+    return rows
+
+
+def merge_walk_table(rows: list[dict[str, Any]], raw: GalleryResult) -> str:
+    """Markdown table showing the merge walk — raw DYF + merged resolutions."""
+    lines = [
+        "| Resolution     | Actual k | NMI   | ARI   |",
+        "|----------------|---------:|------:|------:|",
+        f"| **Raw DYF**    | **{raw.recovered_k}** | **{raw.nmi:.3f}** | **{raw.ari:.3f}** |",
+    ]
+    for r in rows:
+        lines.append(
+            f"| merge → {r['target']:<4d}  | {r['actual_k']:>4d}     | "
+            f"{r['nmi']:.3f} | {r['ari']:.3f} |"
+        )
+    return "\n".join(lines)
 
 
 def metrics_table(dyf: GalleryResult, kmeans: dict | None, hdbscan_: dict | None) -> str:
