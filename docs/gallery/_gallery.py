@@ -191,6 +191,207 @@ def plot_single(
     return fig
 
 
+def hierarchy_slider(
+    result: "GalleryResult",
+    embeddings: np.ndarray,
+    y_true: np.ndarray,
+    k_values: list[int],
+    *,
+    class_names: list[str] | None = None,
+    show_ground_truth: bool = False,
+    height: int = 560,
+    title_prefix: str = "DYF partition at",
+):
+    """Interactive plotly slider that sweeps DYF's merge hierarchy.
+
+    Pre-computes ``merge_to_max_k`` at each requested k, stacks one WebGL
+    scatter trace per k on the UMAP layout, and wires a slider to toggle which
+    trace is visible. NMI / ARI vs ``y_true`` appear in the title as the slider
+    moves. ``k_values`` higher than ``result.recovered_k`` collapse to the raw
+    partition (nothing to merge up). Uses Turbo colorscale.
+    """
+    import plotly.graph_objects as go
+    from sklearn.metrics import adjusted_mutual_info_score, adjusted_rand_score
+    from dyf.agglomerate import merge_to_max_k
+
+    labels_i32 = result.labels.astype(np.int32)
+    coords = result.umap_2d
+
+    # Fixed palette keyed on the raw (finest) partition — every point gets a
+    # stable color based on which raw cluster it belongs to. As the slider
+    # moves to coarser k, we re-color each point with the palette entry of the
+    # *representative* (largest) raw cluster in its merged group. Small raw
+    # clusters visibly "get absorbed" into their larger siblings' color, but
+    # points in the dominant cluster never change color across the whole sweep.
+    raw_ids = np.unique(labels_i32)
+    import plotly.colors as pc
+    palette = pc.qualitative.Alphabet + pc.qualitative.Light24 + pc.qualitative.Dark24
+    raw_color = {int(rid): palette[i % len(palette)] for i, rid in enumerate(raw_ids)}
+
+    def color_points_at(merged_labels: np.ndarray) -> list[str]:
+        """For each point, return the hex color of the representative raw cluster
+        in its merged group at this resolution."""
+        # group raw cluster -> merged cluster id
+        raw_to_merged: dict[int, int] = {}
+        for raw_id in raw_ids:
+            m = labels_i32 == raw_id
+            if m.any():
+                raw_to_merged[int(raw_id)] = int(merged_labels[np.argmax(m)])
+        # for each merged group, pick the raw cluster with the largest size
+        merged_to_rep: dict[int, int] = {}
+        for raw_id, mid in raw_to_merged.items():
+            size = int((labels_i32 == raw_id).sum())
+            cur = merged_to_rep.get(mid)
+            if cur is None or size > int((labels_i32 == cur).sum()):
+                merged_to_rep[mid] = raw_id
+        rep_color = {mid: raw_color[rep] for mid, rep in merged_to_rep.items()}
+        return [rep_color[int(m)] for m in merged_labels]
+
+    # Precompute each partition + scores, de-dup by actual_k.
+    # Ascending order so the slider reads left=coarse → right=fine —
+    # dragging right reveals more structure, matching how people read hierarchies.
+    partitions: list[dict[str, Any]] = []
+    seen: set[int] = set()
+    for k in sorted(set(k_values)):
+        merged = merge_to_max_k(labels_i32, embeddings, max_k=k)
+        actual_k = int(len(np.unique(merged)))
+        if actual_k in seen:
+            continue
+        seen.add(actual_k)
+        partitions.append({
+            "k": actual_k,
+            "labels": merged,
+            "colors": color_points_at(merged),
+            "nmi": float(adjusted_mutual_info_score(y_true, merged)),
+            "ari": float(adjusted_rand_score(y_true, merged)),
+        })
+
+    if not partitions:
+        raise ValueError("No partitions to display — check k_values")
+
+    # Open on the coarsest partition — reveal complexity as the user drags right.
+    default_i = 0
+
+    # Build per-point hover text: true class name (if provided) + point index.
+    if class_names is not None:
+        hover_text = [f"class: {class_names[int(y)]}<br>idx: {i}"
+                      for i, y in enumerate(y_true)]
+    else:
+        hover_text = [f"class: {int(y)}<br>idx: {i}"
+                      for i, y in enumerate(y_true)]
+
+    # Ground-truth coloring uses a separate qualitative palette — distinct from
+    # the partition palette so the eye doesn't confuse the two panels.
+    gt_palette = pc.qualitative.Plotly + pc.qualitative.D3 + pc.qualitative.Bold
+    gt_unique = np.unique(y_true)
+    gt_color_map = {int(c): gt_palette[i % len(gt_palette)]
+                    for i, c in enumerate(gt_unique)}
+    gt_colors = [gt_color_map[int(c)] for c in y_true]
+
+    fig: go.Figure
+    if show_ground_truth:
+        from plotly.subplots import make_subplots
+        fig = make_subplots(
+            rows=1, cols=2,
+            subplot_titles=("DYF (move slider)", "Ground truth (fixed)"),
+            horizontal_spacing=0.04,
+            shared_xaxes=True, shared_yaxes=True,
+        )  # type: ignore[assignment]
+    else:
+        fig = go.Figure()
+
+    # DYF traces — one per k-resolution, only the default visible
+    dyf_trace_indices: list[int] = []
+    for i, p in enumerate(partitions):
+        trace = go.Scattergl(
+            x=coords[:, 0], y=coords[:, 1],
+            mode="markers",
+            marker=dict(
+                color=p["colors"],  # pre-computed hex per point — stable across frames
+                size=4,
+                opacity=0.75,
+                line=dict(width=0),
+            ),
+            visible=(i == default_i),
+            name=f"k={p['k']}",
+            text=hover_text,
+            hovertemplate="%{text}<extra></extra>",
+        )
+        if show_ground_truth:
+            fig.add_trace(trace, row=1, col=1)
+        else:
+            fig.add_trace(trace)
+        dyf_trace_indices.append(len(fig.data) - 1)  # type: ignore[arg-type]
+
+    # Ground-truth trace (always visible, doesn't move with slider)
+    if show_ground_truth:
+        fig.add_trace(
+            go.Scattergl(
+                x=coords[:, 0], y=coords[:, 1],
+                mode="markers",
+                marker=dict(color=gt_colors, size=4, opacity=0.75, line=dict(width=0)),
+                text=hover_text,
+                hovertemplate="%{text}<extra></extra>",
+                showlegend=False,
+            ),
+            row=1, col=2,
+        )
+        gt_trace_index = len(fig.data) - 1  # type: ignore[arg-type]
+
+    # Slider — toggles DYF trace visibility only; ground-truth trace stays on.
+    steps = []
+    for i, p in enumerate(partitions):
+        title = (
+            f"{title_prefix} k={p['k']} — "
+            f"NMI={p['nmi']:.3f}, ARI={p['ari']:.3f}"
+        )
+        if show_ground_truth:
+            visible = [False] * len(fig.data)  # type: ignore[arg-type]
+            visible[dyf_trace_indices[i]] = True
+            visible[gt_trace_index] = True
+        else:
+            visible = [j == i for j in range(len(partitions))]
+        steps.append(dict(
+            method="update",
+            label=str(p["k"]),
+            args=[{"visible": visible}, {"title.text": title}],
+        ))
+
+    p0 = partitions[default_i]
+    layout_axes = dict(
+        xaxis=dict(showticklabels=False, zeroline=False, showgrid=False),
+        yaxis=dict(showticklabels=False, zeroline=False, showgrid=False,
+                   scaleanchor="x", scaleratio=1),
+    )
+    if show_ground_truth:
+        layout_axes = dict(
+            xaxis=dict(showticklabels=False, zeroline=False, showgrid=False),
+            yaxis=dict(showticklabels=False, zeroline=False, showgrid=False),
+            xaxis2=dict(showticklabels=False, zeroline=False, showgrid=False),
+            yaxis2=dict(showticklabels=False, zeroline=False, showgrid=False),
+        )
+
+    layout_kwargs: dict[str, Any] = dict(
+        title=dict(
+            text=f"{title_prefix} k={p0['k']} — "
+                 f"NMI={p0['nmi']:.3f}, ARI={p0['ari']:.3f}",
+            x=0.5, xanchor="center",
+        ),
+        sliders=[dict(
+            active=default_i,
+            currentvalue=dict(prefix="k = ", font=dict(size=14)),
+            steps=steps,
+            pad=dict(t=40, b=10),
+        )],
+        height=height,
+        margin=dict(l=20, r=20, t=80, b=40),
+        showlegend=False,
+    )
+    layout_kwargs.update(layout_axes)
+    fig.update_layout(**layout_kwargs)
+    return fig
+
+
 def image_grid(
     images: np.ndarray,
     indices: np.ndarray,
