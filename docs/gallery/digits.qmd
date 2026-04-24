@@ -2,7 +2,7 @@
 title: "Digits"
 subtitle: "1,797 handwritten digits, 64d pixel vectors, k=10 ground truth."
 order: 1
-image: /viz_thumbnail.png
+image: digits_files/figure-html/fig-dyf-output-1.png
 categories: [images, small, pixels]
 true-k: 10
 format:
