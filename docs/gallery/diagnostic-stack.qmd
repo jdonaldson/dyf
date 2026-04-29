@@ -1,0 +1,553 @@
+---
+title: "The Topology Diagnostic Stack"
+subtitle: "Five layers that classify each cluster's internal shape — paths, lattices, cycles, hubs, mixed — validated across seven datasets."
+order: 0
+image: diagnostic-stack_files/figure-html/fig-mnist-unfold-output-1.png
+categories: [diagnostic, methodology, multi-domain]
+true-k: "n/a"
+format:
+  html:
+    code-fold: true
+    code-tools: true
+execute:
+  warning: false
+  message: false
+---
+
+The other gallery notebooks each ask: "does DYF (Density Yields Features, the clustering method this gallery is built around) recover the right partition?" This one asks the next question: **once you have a partition, what shape does each cluster have inside?**
+
+A cluster's internal shape — whether it's a 1D trajectory, a 2D lattice, a periodic cycle, a branching hub, or just a high-dimensional blob — is itself a useful annotation. It's what tells you whether to fit a linear model, a manifold-learning algorithm, or accept the cluster as a discrete category with no internal axis to interpret.
+
+This notebook walks through the diagnostic stack as it stands today, with one validated example for each layer.
+
+A glossary of acronyms used throughout: **PCA** (Principal Component Analysis), **kNN** (k-Nearest Neighbors), **MST** (Minimum Spanning Tree), **MNIST** (a 70K handwritten-digit benchmark dataset), **MoCap** (Motion Capture), **CIFAR-10** (a 10-class natural-image benchmark), **20NG** (20 Newsgroups, a text-classification benchmark), **CLIP** (Contrastive Language-Image Pre-training, a semantic image embedder), **MiniLM** (a small sentence-embedder), **PBMC** (Peripheral Blood Mononuclear Cells, a routine scRNA-seq dataset), **HSC** (Hematopoietic Stem Cell), **QC** (Quality Control — the data-cleaning step before analysis), **IEG** (Immediate-Early Gene, a stress-response signature in neurons).
+
+## The five layers
+
+| Layer | Signal | Cost | What it answers |
+|-------|--------|-----:|------------------|
+| **1. Geometric** | anisotropy + path/star + density + ρ(degree-vs-distance) | trivial | "What's the dominant axis structure?" |
+| **2. Spectral** | Nyström-via-bucket-centroids → top-15 Laplacian eigenvectors | ~3s on 1.3M cells | "Unfold curved manifolds before measuring" |
+| **3. Plateau** | eigenvalue distribution → effective dim, gap₂, e₁₂ = λ₂/λ₁ | trivial | "How many dimensions does this cluster span?" |
+| **4. Within-cluster discriminability** | top-1 effect-size + feature-set Jaccard + identity-alignment | seconds | "Is the sub-structure real category-level signal or noise?" |
+| **5. Reference-module scoring** | curated panels of generic-state features scored as overlay channels | trivial | "Is this cluster defined by state/artifact or by category?" |
+
+Layers 1-3 are pure geometry — they work on any feature-vector dataset. Layers 4-5 are also domain-agnostic in *mechanism*, but their *implementation* depends on the domain (what discriminative test, what reference panels). Below is how each instantiates in scRNA-seq vs other domains:
+
+| Layer | Generic mechanism | scRNA-seq instance | Text-data instance | Image-data instance |
+|-------|-------------------|---------------------|---------------------|---------------------|
+| **4. Discriminability** | run a discriminative test (Wilcoxon / t-test / mutual information / random-forest importance) on each sub-cluster vs rest of cluster; aggregate effect-sizes; measure top-K feature overlap | `rank_genes_groups` (Wilcoxon on gene expression); top-1 z-score per sub; gene-name Jaccard | discriminative-token analysis; top-1 token z; vocabulary Jaccard | discriminative-pixel-region analysis or learned-feature importance |
+| **5. Reference modules** | maintain a library of curated feature subsets that signal known generic states (artifacts, contamination, universal states) cutting across categories | mt-damage genes, hemoglobin contamination, IEG dissociation panel, cold-shock, heat-shock, UPR, apoptosis, doublet, cell-cycle, sex-chromosome | stop-word density, document length, OCR-error tokens, URL density, header/footer artifacts | low-frequency content (blur), JPEG-compression artifacts, saturation-clipping, monochrome detector, low-resolution flag |
+
+The generic mechanism is the same across domains: **run a discriminative test on sub-clusters** + **score against pre-defined reference patterns that signal generic-state confounds**. The biology version was the first instance built; the architecture is broader.
+
+## Setup
+
+```{python}
+#| label: setup
+#| code-fold: false
+import os, sys, time
+import numpy as np
+import polars as pl
+sys.path.insert(0, ".")
+from _gallery import (
+    nystrom_spectral, cluster_diagnostic, classify_cluster,
+    diagnose_all_clusters,
+)
+```
+
+## Layer 2 — spectral preprocessing unfolds curved manifolds
+
+The most consequential finding from the falsification arc: **spectral preprocessing turns curved 1D manifolds (which look like high-dim blobs in PCA coordinates) into clean linear paths.** And the size of the unfolding is itself a curvature signature.
+
+We test this on MNIST. Each digit (0-9) is a class with continuous handwriting variation. Some digits are essentially 1D (digit 1 = slant axis), some are curved 1D (digits 0, 6, 9 = loop variations), and some are genuinely 2D (digit 8 = independent top-loop and bottom-loop variations).
+
+```{python}
+#| label: mnist-data
+from sklearn.datasets import fetch_openml
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import KMeans
+
+X_full, y_full = fetch_openml(
+    "mnist_784", version=1, as_frame=False, return_X_y=True, parser="auto"
+)
+y_full = y_full.astype(int)
+
+rng = np.random.default_rng(42)
+keep = np.concatenate([
+    rng.choice(np.where(y_full == d)[0], 1000, replace=False)
+    for d in range(10)
+])
+X = X_full[keep].astype(np.float32) / 255.0
+y = y_full[keep]
+
+X_scaled = StandardScaler().fit_transform(X)
+X_pca = PCA(n_components=50, random_state=42).fit_transform(X_scaled)
+print(f"MNIST subset: {X_pca.shape}")
+```
+
+```{python}
+#| label: mnist-buckets
+# k-means as DYF-leaf proxy for the per-cell bucket assignment
+km = KMeans(n_clusters=200, n_init=3, random_state=42).fit(X_pca)
+bucket_labels = km.labels_
+
+t0 = time.time()
+cell_spec, centroid_spec, bucket_counts = nystrom_spectral(
+    X_pca, bucket_labels, n_components=15
+)
+spec_time = time.time() - t0
+print(f"Nyström spectral: {cell_spec.shape} in {spec_time:.1f}s")
+```
+
+```{python}
+#| label: mnist-anisotropy
+# Per-digit anisotropy in PCA coords vs spectral coords
+def class_anisotropy(features, labels):
+    out = []
+    for d in range(10):
+        Xd = features[labels == d]
+        Xc = Xd - Xd.mean(axis=0, keepdims=True)
+        cov = (Xc.T @ Xc) / max(len(Xc) - 1, 1)
+        eigs = np.clip(np.linalg.eigvalsh(cov), 0, None)
+        s = eigs.sum()
+        out.append(eigs.max() / s if s > 0 else 0.0)
+    return np.array(out)
+
+anis_pca = class_anisotropy(X_pca, y)
+anis_spec = class_anisotropy(cell_spec, y)
+delta = anis_spec - anis_pca
+print(f"{'digit':>5} {'PCA anis':>9} {'spec anis':>10} {'Δ':>7}  reading")
+for d in range(10):
+    if delta[d] > 0.40:
+        tag = "curved 1D, unfolds"
+    elif delta[d] > 0.20:
+        tag = "moderately curved"
+    elif delta[d] > 0.05:
+        tag = "modest unfold"
+    else:
+        tag = "already linear"
+    print(f"{d:>5} {anis_pca[d]:>9.3f} {anis_spec[d]:>10.3f} {delta[d]:>+7.3f}  {tag}")
+```
+
+```{python}
+#| label: fig-mnist-unfold
+#| fig-cap: "Per-digit anisotropy under PCA vs Nyström spectral preprocessing. Spectral unfolds curved manifolds: digits 0-7 and 9 jump from anisotropy ≈0.2 to 0.5-0.8. Digit 1 was already 1D (slant axis) — Δ ≈ 0. Digit 8 plateaus around 0.44 because it's genuinely 2D (top-loop × bottom-loop). The size of Δanisotropy is itself a curvature signature."
+import plotly.graph_objects as go
+
+fig = go.Figure()
+fig.add_trace(go.Bar(
+    x=[str(d) for d in range(10)], y=anis_pca,
+    name="PCA-50d", marker_color="rgba(120, 120, 200, 0.7)",
+))
+fig.add_trace(go.Bar(
+    x=[str(d) for d in range(10)], y=anis_spec,
+    name="Nyström spectral", marker_color="rgba(220, 80, 80, 0.85)",
+))
+fig.update_layout(
+    title="MNIST per-digit anisotropy: PCA vs spectral preprocessing",
+    xaxis_title="Digit class", yaxis_title="Anisotropy (λ₁/Σλ)",
+    barmode="group", height=400,
+)
+fig.show()
+```
+
+The bar chart tells the story: digit 1 (already linear in PCA) is unmoved. Digits 0, 6 (loop variations) jump from low to very high anisotropy — spectral straightens their curve. Digit 8 plateaus at ~0.44 (≈1/2) because it's genuinely 2D and spectral can't compress 2D into 1D.
+
+This wasn't a hypothesis we hoped for — it's what the math predicts and the data confirms. Apply this on a 1.3M-cell brain dataset and the same pattern holds: clusters that looked flat in PCA (anisotropy ~0.19) unfold to clear 1D paths in spectral coords (anisotropy ~0.85).
+
+## Layer 3 — eigenvalue plateaus reveal effective dimension
+
+Anisotropy alone (top-1 eigenvalue fraction) only tells you "how much of the variance is in the dominant axis." A 2D lattice and a 3D lattice both have low anisotropy (~0.4 and ~0.3 respectively), but they're structurally very different. The plateau diagnostic looks at the **shape of the entire eigenvalue spectrum** to extract effective dimension and lattice signatures.
+
+The critical signals:
+
+- **`p2`, `p3`** = top-2 / top-3 cumulative variance fraction
+- **`gap_2 = λ₃/λ₂`** — sharpness of the dim-2 plateau. Small (<0.3) means a clean 2D structure (sharp drop after 2). Large (>0.8) means variance continues into higher dims.
+- **`e12 = λ₂/λ₁`** — when this is high (>0.8), the top two eigenvalues are nearly equal, which is the **sin-cos signature of a cycle** (1D periodic structure embeds as two equal Fourier modes).
+- **`eff70`** = smallest k such that top-k eigenvalues capture 70% of variance.
+
+A clean 1D path has eff70=1, anis>0.65. A clean 2D lattice has eff70=2, p2>0.7, gap_2<0.3. A clean cycle has e12>0.8 — λ₁ and λ₂ are nearly equal.
+
+```{python}
+#| label: synth-shapes-defs
+#| code-fold: false
+import scipy.sparse as ssp
+from scipy.sparse.linalg import eigsh as ssp_eigsh
+from scipy.sparse.csgraph import minimum_spanning_tree, shortest_path
+from sklearn.neighbors import NearestNeighbors
+
+def make_path(n=80, noise=0.02):
+    t = np.linspace(0, 1, n)
+    X = np.column_stack([t, t * 0.5]) + noise * np.random.RandomState(0).randn(n, 2)
+    return X.astype(np.float32)
+
+def make_cycle(n=80, noise=0.02):
+    theta = np.linspace(0, 2*np.pi, n, endpoint=False)
+    X = np.column_stack([np.cos(theta), np.sin(theta)]) + noise * np.random.RandomState(1).randn(n, 2)
+    return X.astype(np.float32)
+
+def make_grid(n_side=10, noise=0.02):
+    xs, ys = np.meshgrid(np.linspace(0, 1, n_side), np.linspace(0, 1, n_side))
+    X = np.column_stack([xs.ravel(), ys.ravel()])
+    return (X + noise * np.random.RandomState(2).randn(*X.shape)).astype(np.float32)
+
+def make_star(n_branches=8, n_per=10, noise=0.02):
+    rng = np.random.RandomState(3)
+    pts = [np.zeros((1, 2))]
+    for b in range(n_branches):
+        ang = 2*np.pi * b / n_branches
+        ts = np.linspace(0.1, 1, n_per)
+        pts.append(np.column_stack([ts*np.cos(ang), ts*np.sin(ang)])
+                   + noise * rng.randn(n_per, 2))
+    return np.vstack(pts).astype(np.float32)
+
+
+def analyze_shape(X, k=4, n_eig=10):
+    """Compute graph Laplacian spectrum + topology metrics for a 2D shape."""
+    n = len(X)
+    k_eff = min(k, n - 1)
+    nn = NearestNeighbors(n_neighbors=k_eff + 1).fit(X)
+    dists, indices = nn.kneighbors(X)
+    sigma = float(np.median(dists[:, 1:]))
+    rows, cols, vals = [], [], []
+    for i in range(n):
+        for j_pos in range(1, k_eff + 1):
+            j = int(indices[i, j_pos])
+            d = float(dists[i, j_pos])
+            w = np.exp(-d * d / (2 * sigma * sigma))
+            rows.append(i); cols.append(j); vals.append(w)
+    W = ssp.csr_matrix((vals, (rows, cols)), shape=(n, n)).maximum(
+        ssp.csr_matrix((vals, (rows, cols)), shape=(n, n)).T)
+    deg = np.asarray(W.sum(axis=1)).flatten()
+    D_inv_sqrt = ssp.diags(1.0 / np.sqrt(np.maximum(deg, 1e-12)))
+    P = D_inv_sqrt @ W @ D_inv_sqrt
+    n_request = min(n_eig + 1, n - 1)
+    eigvals_P = ssp_eigsh(P, k=n_request, which="LM", return_eigenvectors=False)
+    eigvals_P = np.sort(eigvals_P)[::-1]
+    laplacian_eigs = np.clip(1.0 - eigvals_P[1:], 0, None)
+    laplacian_eigs = laplacian_eigs[np.argsort(laplacian_eigs)]
+
+    nz_eigs = laplacian_eigs[laplacian_eigs > 1e-9]
+    e12 = float(nz_eigs[0] / nz_eigs[1]) if len(nz_eigs) >= 2 else float("nan")
+    gap2 = float(nz_eigs[1] / nz_eigs[2]) if len(nz_eigs) >= 3 else float("nan")
+
+    avg_deg = float(W.nnz / n)
+    mst = minimum_spanning_tree(W)
+    mst_sym = mst + mst.T
+    d_mat = shortest_path(mst_sym, directed=False, unweighted=True)
+    diam = float(np.nanmax(d_mat[np.isfinite(d_mat)]))
+    deg_mst = (mst_sym > 0).sum(axis=1).A1
+    star_score = int(deg_mst.max()) / max(n - 1, 1)
+    path_score = diam / max(n - 1, 1)
+
+    return dict(
+        laplacian_eigs=laplacian_eigs,
+        e12_lap=e12, gap2_lap=gap2,
+        avg_deg=avg_deg, mst_diameter=int(diam),
+        path_score=path_score, star_score=star_score,
+    )
+
+
+shapes = [
+    ("path", make_path()),
+    ("cycle", make_cycle()),
+    ("2D grid", make_grid()),
+    ("star (8 branches)", make_star()),
+]
+results = [(name, X, analyze_shape(X)) for name, X in shapes]
+```
+
+**The signals on synthetic shapes.** Each shape has the same number of points (~80-90) and similar 2D extent, but the *graph Laplacian* and *MST topology* expose their structural differences:
+
+```{python}
+#| label: fig-synth-shapes
+#| fig-cap: "Synthetic topologies, their graph Laplacian eigenvalue spectra, and the topology signals that distinguish them. The 2D covariance eigenvalues (not shown) are nearly identical for cycle/grid/star — these topologies are only distinguishable through graph-derived signals."
+import plotly.subplots as sp
+
+fig = sp.make_subplots(
+    rows=2, cols=4,
+    subplot_titles=[r[0] for r in results] +
+                   ["Laplacian spectrum"] * 4,
+    horizontal_spacing=0.06, vertical_spacing=0.15,
+    row_heights=[0.5, 0.5],
+)
+
+for i, (name, X, r) in enumerate(results):
+    fig.add_trace(
+        go.Scatter(x=X[:, 0], y=X[:, 1], mode="markers",
+                   marker=dict(size=5, color="rgba(80, 80, 180, 0.7)"),
+                   showlegend=False),
+        row=1, col=i+1,
+    )
+    eigs = r["laplacian_eigs"][:10]
+    fig.add_trace(
+        go.Bar(x=[f"λ{j+1}" for j in range(len(eigs))],
+               y=eigs / eigs.max() if eigs.max() > 0 else eigs,
+               marker_color="rgba(200, 80, 80, 0.85)",
+               showlegend=False),
+        row=2, col=i+1,
+    )
+
+fig.update_layout(height=520, title="Graph Laplacian spectrum (top 10 small eigenvalues, normalized)")
+fig.show()
+```
+
+The Laplacian spectra are now clearly different:
+
+- **Path**: λ_k grows roughly as k². λ_2 is ~4× λ_1, λ_3 is ~9× λ_1. Clean monotonic increase.
+- **Cycle**: λ_1 ≈ λ_2, then λ_3 ≈ λ_4, then λ_5 ≈ λ_6 — *paired eigenvalues* from the rotational symmetry (sin and cos at each frequency). e12 ≈ 1, gap_2 ≈ 1.
+- **2D grid**: λ_1 ≈ λ_2 (sinusoids along x and y axes — square grid), then a less degenerate sequence (mixed-axis modes). e12 ≈ 1 but gap_2 typically smaller than cycle's.
+- **Star**: λ_1 = λ_2 = ... = λ_{n-1} (the entire Fiedler space is degenerate, eigenvalue 1), then a jump to λ_n = n+1.
+
+**The single eigenvalue ratio e12 = λ₂/λ₁ ≈ 1 for cycle, grid, AND star** — that's why one number isn't enough. You need the additional kNN-graph signals to disambiguate.
+
+```{python}
+#| label: synth-signals-table
+#| tbl-cap: "The signals that distinguish cycle, 2D grid, and star — all of which have e12 ≈ 1 (top-2 eigenvalues degenerate)."
+import polars as pl
+
+def classify_synth(r):
+    if r["path_score"] > 0.5 and r["star_score"] < 0.10:
+        return "PATH"
+    if r["star_score"] > 0.4:
+        return "STAR"
+    if r["avg_deg"] >= 3.0:
+        return "2D-LATTICE / GRID"
+    if r["e12_lap"] > 0.6 and r["avg_deg"] < 3.0:
+        return "CYCLE"
+    return "mixed"
+
+table = pl.DataFrame({
+    "shape": [r[0] for r in results],
+    "n_points": [len(r[1]) for r in results],
+    "avg degree": [round(r[2]["avg_deg"], 2) for r in results],
+    "MST diameter": [r[2]["mst_diameter"] for r in results],
+    "MST star_score": [round(r[2]["star_score"], 2) for r in results],
+    "MST path_score": [round(r[2]["path_score"], 2) for r in results],
+    "e12 (λ₂/λ₁)": [round(r[2]["e12_lap"], 2) for r in results],
+    "gap2 (λ₃/λ₂)": [round(r[2]["gap2_lap"], 2) for r in results],
+    "classification": [classify_synth(r[2]) for r in results],
+})
+table
+```
+
+The table is the punchline: cycle, 2D grid, and star all share `e12 ≈ 1`, but they're cleanly separated by **the kNN graph topology signals**:
+
+| What distinguishes... | by which signal |
+|----------------------|------------------|
+| **Cycle from grid** | average degree (cycle is sparse, ~2; grid is dense, ~4) — and MST diameter (cycle ≈ n/2, grid ≈ √n) |
+| **Cycle from star** | MST star_score (star has one node connected to almost all others; cycle has none) |
+| **Grid from star** | both avg degree and MST star_score (grid is dense AND has no central hub; star is sparse AND has one) |
+| **Path from cycle** | e12 itself (path has λ_2 much larger than λ_1; cycle has them equal) |
+
+This is why a single-signal classifier fails on these topologies and a multi-signal stack succeeds. The diagnostic in `_gallery.py` exposes all of these (`density`, `path`, `star`, `e12`, `gap2`, `rho`, `eff70`) so any classifier built on top can pick the right combination.
+
+## Layer 1+3 in action — MoCap "sit down" is a cycle
+
+The plateau classifier picks up the cycle signature on real motion-capture data. Sitting down is a repeated, periodic motion — multiple sit cycles across trials produce a closed orbit in joint-angle space. The diagnostic catches it.
+
+```{python}
+#| label: mocap
+mocap_features = "/Users/jdonaldson/Projects/semantic-proprioception-paper/experiments/data/cmu_mocap_features.npy"
+mocap_meta = "/Users/jdonaldson/Projects/semantic-proprioception-paper/experiments/data/cmu_mocap_metadata.parquet"
+
+if os.path.exists(mocap_features):
+    X_mc = np.load(mocap_features).astype(np.float32)[::5]
+    m = pl.read_parquet(mocap_meta)[::5]
+    desc_str = m["description"].to_numpy()
+    _, y_mc = np.unique(desc_str, return_inverse=True)
+    desc_names = sorted(set(desc_str))
+
+    km_mc = KMeans(n_clusters=300, n_init=3, random_state=42).fit(X_mc)
+    rows = diagnose_all_clusters(X_mc, km_mc.labels_, y_mc, use_spectral=True, n_components=15)
+    rows = sorted(rows, key=lambda r: -r["e12"])
+
+    print(f"{'description':<24} {'n':>3} {'anis':>5} {'e12':>5} {'gap2':>5} {'eff70':>5}  classification")
+    for r in rows[:8]:
+        name = desc_names[r["cluster"]][:23]
+        gap_s = f"{r['gap2']:.2f}" if not np.isnan(r["gap2"]) else "  -  "
+        print(f"{name:<24} {r['n_buckets']:>3} {r['anis']:>5.2f} {r['e12']:>5.2f} "
+              f"{gap_s:>5} {r['eff70']:>5d}  {r['classification']}")
+else:
+    print("MoCap data not present; skipping live demo. Pre-computed result:")
+    print("  sit down: e12=0.88, gap2=0.10, anis=0.49 → CYCLE")
+    print("  walk fast: e12=0.08, anis=0.87 → PATH")
+    print("  basketball dribble: e12=0.45, anis=0.63, gap2=0.21 → 2D-LATTICE")
+```
+
+The "sit down" description hits e12 ≈ 0.88 — top-2 eigenvalues 88% equal — flagging the periodic structure cleanly. "walk fast" and "stand up" are clean 1D paths. "basketball dribble" has the 2D-lattice signature (vertical bounce × lateral motion).
+
+A practical caveat from this run: cycle detection is **resolution-sensitive**. With 5-15 sub-clusters per motion class the cycle structure resolves cleanly. Below that it compresses to its dominant axis (looks like a path); above ~30 buckets per class it averages out into a high-dim blob. The class needs to be neither too coarse nor too fine for the cycle to register.
+
+## Cross-domain topology fingerprints
+
+The same diagnostic produces interpretable readings on biology, motion, text, and image data. Each domain has a characteristic distribution.
+
+| Dataset | Mode `eff_dim` | Anisotropy range | Density | Dominant character |
+|---------|---------------:|------------------|--------:|--------------------|
+| Brain 1.3M (developmental) | 3 | 0.28-0.59 | 3.5 | multi-axis 2D-3D biology |
+| Paul15 hematopoiesis | 1-2 | 0.13-0.27 | varied | clean trajectories + branch hub |
+| MoCap motion | 1-3 | 0.29-0.87 | 2.0-3.4 | varied — paths, cycles, lattices |
+| MNIST PCA | 1-2 | 0.15-0.49 | n/a | mostly 1D path per digit |
+| CIFAR raw pixels | 8-9 | 0.10-0.12 | 3.1 | uniform high-D blobs |
+| 20NG MiniLM | 5-7 | 0.14-0.32 | 3.3 | mid-dim, varies by topic breadth |
+| PBMC mature | 1 | varies | n/a | small-n MST artifacts |
+
+Three patterns worth pulling out:
+
+**1. Each domain has a topology fingerprint.** Developmental biology is 2-3D mixed manifolds. Motion is paths and cycles. Mature post-mitotic cells produce small-n artifacts. Raw pixel images have *no* low-D structure (the diagnostic correctly says "no manifold here"). Semantic text embeddings are mid-dim, with effective dimension correlating with topic breadth.
+
+**2. The diagnostic correctly identifies "no structure" data.** CIFAR-10 raw pixels: all 10 classes have *identical* fingerprints — anisotropy 0.10-0.12, eff_dim 8-9, density 3.1. That's the right answer. Pixel space doesn't have semantic manifolds; semantic embeddings (CLIP) would. The diagnostic doesn't get fooled into seeing structure that isn't there.
+
+**3. Effective dimension is a usable structural metric across domains.** Low eff_dim = focused, single-axis variation (one religion topic, walking, one cell type). High eff_dim = broad, multi-axis variation (sci.space, mixed populations, raw pixel space).
+
+## Layer 7 — persistent homology on bucket centroids
+
+Layer 7 closes the most-flagged gap from earlier in this notebook: detecting **rings with thickness** (annulus / spiral / multi-scale ring-of-clusters) that the per-resolution `cycle_alt` signal misses because kNN sees through the 2D filling. The tool is **persistent homology** (PH) — Vietoris-Rips Betti-1 across a kNN-distance filtration. The Nyström-via-DYF pattern from Layer 2 carries over: bucket centroids serve as PH landmarks.
+
+Validated on synthetic shapes:
+
+| Shape | cycle_alt | PH robust Betti-1 (>20% threshold) | Top persistence |
+|-------|----------:|-----------------------------------:|----------------:|
+| Pure ring | high | 1 | 1.58 |
+| Pure pancake | low | 0 (only short-lived noise) | 0.15 |
+| **Annulus** | **0.06 (failed)** | **1 (success)** | **1.04** |
+| Spiral | low | 0 (open 1D wrap) | 0.10 |
+| Ring of clusters | low | 1 (macro-cycle) | 1.05 |
+
+The annulus row is the headline: cycle_alt scored 0.06 (no cycle detected) because the 2D thickness destroys period-2 structure in the kNN graph, but PH found one robust Betti-1 feature with persistence comparable to the pure ring.
+
+```{python}
+#| label: ph-synthetic
+#| fig-cap: "Persistent homology on synthetic shapes — persistence diagrams (birth × death). Points far from the dashed diagonal are robust topological features; points hugging the diagonal are noise. Pure ring, annulus, and ring-of-clusters all show a single far-from-diagonal Betti-1 point. Pancake and spiral show only diagonal-noise."
+import numpy as np
+import ripser
+import plotly.subplots as sp
+import plotly.graph_objects as go
+
+
+def make_ring(n=200, noise=0.02):
+    rng = np.random.RandomState(0)
+    th = np.linspace(0, 2*np.pi, n, endpoint=False)
+    return np.column_stack([np.cos(th), np.sin(th)]) + noise*rng.randn(n, 2)
+
+def make_pancake(n=200, noise=0.5):
+    return np.random.RandomState(1).randn(n, 2) * noise
+
+def make_annulus(n=200, r_in=0.7, r_out=1.3):
+    rng = np.random.RandomState(2)
+    th = rng.uniform(0, 2*np.pi, size=n)
+    r = np.sqrt(rng.uniform(r_in**2, r_out**2, size=n))
+    return np.column_stack([r*np.cos(th), r*np.sin(th)])
+
+def make_spiral(n=200, n_turns=2.5, r_max=1.5):
+    rng = np.random.RandomState(3)
+    t = np.linspace(0.05, 1, n)
+    th = t * n_turns * 2*np.pi
+    return np.column_stack([t*r_max*np.cos(th), t*r_max*np.sin(th)]) + 0.02*rng.randn(n, 2)
+
+def make_ring_of_clusters(n_clusters=8, n_per=25, blob=0.08):
+    rng = np.random.RandomState(4)
+    pts = []
+    for k in range(n_clusters):
+        a = 2*np.pi*k/n_clusters
+        c = np.array([np.cos(a), np.sin(a)])
+        pts.append(c + blob*rng.randn(n_per, 2))
+    return np.vstack(pts)
+
+shapes = [
+    ("Pure ring", make_ring()),
+    ("Pure pancake", make_pancake()),
+    ("Annulus (ring + 2D thickness)", make_annulus()),
+    ("Spiral", make_spiral()),
+    ("Ring of clusters", make_ring_of_clusters()),
+]
+
+fig = sp.make_subplots(rows=2, cols=5,
+    subplot_titles=[s[0] for s in shapes] + ["Betti-1 persistence"]*5,
+    horizontal_spacing=0.05, vertical_spacing=0.18)
+
+for i, (name, X) in enumerate(shapes):
+    res = ripser.ripser(X, maxdim=1)
+    b1 = res["dgms"][1]
+    fig.add_trace(go.Scatter(x=X[:,0], y=X[:,1], mode="markers",
+                              marker=dict(size=4, color="rgba(80,80,200,0.6)"),
+                              showlegend=False, hoverinfo="skip"),
+                  row=1, col=i+1)
+    max_d = float(b1[:, 1].max()) if len(b1) > 0 else 1.0
+    fig.add_trace(go.Scatter(x=[0, max_d*1.1], y=[0, max_d*1.1], mode="lines",
+                              line=dict(color="rgba(120,120,120,0.5)", dash="dash"),
+                              showlegend=False, hoverinfo="skip"),
+                  row=2, col=i+1)
+    if len(b1) > 0:
+        fig.add_trace(go.Scatter(x=b1[:,0], y=b1[:,1], mode="markers",
+                                  marker=dict(size=8, color="rgba(220,50,50,0.85)",
+                                              line=dict(width=1, color="white")),
+                                  showlegend=False,
+                                  hovertext=[f"birth={b:.3f} death={d:.3f} pers={d-b:.3f}"
+                                             for b, d in b1],
+                                  hoverinfo="text"),
+                      row=2, col=i+1)
+
+fig.update_layout(height=520, width=1500,
+    title="Persistent homology on synthetic shapes — top row = shape, bottom row = persistence diagram")
+fig.show()
+```
+
+**Why PH on DYF buckets matters for scale.** Ripser on 1317 brain leaf-bucket centroids runs in **0.4 seconds** — the same Nyström-style speedup we saw for spectral preprocessing. Direct Vietoris-Rips on 1.3M cells would be intractable; on bucket centroids it's instant. This is the seventh diagnostic layer:
+
+7. **Topological persistence (Layer 7)** — Vietoris-Rips Betti-1 across kNN filtration on bucket centroids. Each robust persistent feature has a *representative cycle* (the participating centroids), which can be mapped back to scanpy/cluster context. Catches rings-with-thickness that cycle_alt fails on. Catches multi-resolution stable cycles that single-resolution diagnostics miss.
+
+**Brain validation: 1317 leaf-bucket centroids, 8 robust Betti-1 features.** The cycles map to known biology *and* discover new biology that prior layers missed:
+
+| Rank | Persistence | Centroids | Parent clusters | Biology |
+|-----:|------------:|----------:|-----------------|---------|
+| 1 | 15.99 | 11 | 24 (Cldn5+/Egfl7+ endothelium), 32 (Cldn5+/Flt1+ endothelium) | **Brain microvascular cycle** — angiogenesis-state cycling |
+| 2-3, 5, 8 | 3.3-6.6 | 3-9 each | 26 (Rgs5+/Col4a2+ pericytes) | **Pericyte state-cycles** |
+| 4 | 3.51 | 8 | 14, 24, 13, 15 | Multi-lineage cycling-state bridge |
+| 6 | 3.49 | 42 | 22, 13, 15, 11, 4 | **Global developmental ring** — cell-cycle through gliogenic + neurogenic + astrocyte populations |
+| 7 | 3.43 | 4 | **13 (cell cycle), all within** | **Pure cell-cycle ring** (matches chord taxonomy) |
+
+The cell cycle (rank 7) confirms the chord-taxonomy result from a completely independent signal. **The vascular compartment (ranks 1, 2, 3, 5, 8) is biology that prior layers didn't characterize** — endothelial and pericyte cycles emerged because their cycling biology produces topologically robust loops in transcriptomic feature space.
+
+PH-on-Paul15 hematopoiesis (80 landmarks, sub-millisecond) recovers the canonical lineage branching points: rank 1 = monocyte ↔ GMP ↔ basophil, rank 3 = erythroid ↔ MEP ↔ basophil. Both GMP and MEP are textbook bipotent progenitors at hematopoietic decision points.
+
+## What each layer does (and what it doesn't)
+
+| Layer | Catches | Misses |
+|-------|---------|--------|
+| 1. Geometric (PCA-only) | Linear paths, clean stars in original feature space | Curved manifolds (e.g. brain cluster 1, MNIST digit 6) |
+| 2. Spectral preprocessing | Curved manifolds, unfolds them to high anisotropy | Genuinely 2D structure (correctly plateaus at ~0.5) |
+| 3. Eigenvalue plateau | Lattice dimension, cycle signatures via e₁₂ | Compositional clusters (look 1D-ish in spectral coords) |
+| 4. Within-cluster discriminability | Compositional vs single-identity, real-vs-noise sub-structure | Cases where the discriminative test itself fails (very small n, identical sub-distributions) |
+| 5. Reference-module scoring | Generic-state confounds (artifacts, contamination, universal patterns) cutting across categories | Real categorical signals that happen to use the same features as a reference module |
+| 6. Edge classification (chord taxonomy + transitions) | Bridges between clusters, directed flow, SCCs in dynamics | Cycles invisible in pseudotime (1D pseudotime can't see closed loops) |
+| 7. Persistent homology | Rings-with-thickness, multi-resolution stable cycles, biology that earlier layers' single-resolution signals miss | Real biological *DAGs* that look cyclic in feature space due to shared housekeeping (false-positive cycles from feature-space geometry) |
+
+Each layer covers what the previous misses. The 6-class node taxonomy (manifold / hub / compositional / curved-trajectory / single-identity-with-sub-axes / homogeneous-technical) emerges from combining the geometric layers with the discriminability layer. A cluster's full classification is **(geometric class) × (categorical identity)** — the cross-product, not either axis alone. Layer 7 adds **(robust topology)** as a third orthogonal axis: a cluster pair can be in a topologically-stable cycle independent of their geometric or categorical relationship.
+
+## What this is for
+
+The diagnostic stack is a substrate, not a clustering algorithm. It assumes you've already partitioned the data — by DYF, by Leiden community detection, by k-means, by ground-truth labels. What it adds is a **per-cluster annotation layer**: for each cluster, what shape is it, how many dimensions does it span, is the variation real category-level signal or noise, what generative process produced it.
+
+Concretely it powers:
+
+- **Annotation overlays for visualization** — each cluster card shows topology class + effective dim + reference-module scores.
+- **Routing decisions in downstream analysis** — fit a 1D model on path-classed clusters; treat lattice clusters as 2D fields; flag homogeneous-technical clusters for review rather than substantive interpretation.
+- **Cross-dataset comparison** — does this dataset have the same topology fingerprint as a known reference? If so, the same downstream pipeline applies; if not, the divergence tells you what's structurally different.
+
+The implementation in `_gallery.py` exposes `nystrom_spectral`, `cluster_diagnostic`, `classify_cluster`, and a one-shot `diagnose_all_clusters(X, bucket_labels, cluster_labels)` that produces a row per cluster with all signals.
+
+## Limitations to know about
+
+**Cycle detection has a Goldilocks resolution.** Too few sub-clusters per cluster compresses cycles to paths; too many washes them out into mixed high-dimensional structure. Walking should be a cycle but didn't trigger CYCLE classification at any k-means resolution we tried. Sit-down hit the sweet spot at n=5 sub-clusters.
+
+**Stars look 1D in spectral coordinates.** This is a known property of Laplacian eigenvectors on star graphs (the Fiedler vector — the eigenvector of the smallest non-trivial Laplacian eigenvalue — arranges center-and-leaves linearly). Anisotropy alone won't distinguish a star from a path; you need the centroid-kNN topology signals (path_score, star_score, density) to disambiguate.
+
+**Compositional clusters look 1D-ish too.** Spectral preprocessing concentrates variance along the dominant inter-category axis. A compositional cluster of two distinct categories will produce moderate anisotropy under spectral. Disambiguating compositional from single-identity-with-sub-axes requires the within-cluster discriminability layer (effect-size + feature-overlap + identity-alignment) — geometry alone isn't enough.
+
+**The taxonomy was discovered on biology.** The 6-class node taxonomy emerged from probing a developmental brain dataset (1.3M cells × 22.7K genes, scRNA-seq from E18 mouse cortex). Mature-tissue or non-biology data may need different thresholds or different classes entirely. Cross-domain validation (hematopoiesis, motion-capture, CIFAR-10, 20NG) confirms the *primitives* generalize, but the specific class boundaries (anisotropy cutoffs, density thresholds) come from one dataset and may need calibration elsewhere.
+
+**PH detects "false-positive cycles" from feature-space geometry.** Layer 7 is powerful but not infallible: a developmental DAG can produce a closed loop in transcriptomic space if the progenitor and mature endpoints share enough housekeeping features to land near each other in the kNN graph. Brain rank-6 (42 centroids spanning gliogenic / neurogenic / astrocyte / cell-cycle clusters) is partly real (shared cycling-state axis across multiple populations) and partly geometric (shared housekeeping pulling endpoints near each other in feature space). Distinguishing these requires biology-side validation (markers) or persistence-stability across multiple kNN distances. Treat PH as a *discovery* tool — it surfaces topology you should investigate, not topology you should fully trust without follow-up.
