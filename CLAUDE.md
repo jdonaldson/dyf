@@ -72,15 +72,45 @@ topology, making the test trivial.
 
 **Synthesis updated:** [synthesis_diagnostic_stack.md](~/.claude/projects/-Users-jdonaldson-Projects-dyf/memory/synthesis_diagnostic_stack.md) Layer 7 caveat block reflects the salvage path + QC dependency.
 
-**Open threads from this arc:**
-1. TCC-gated E18 re-validation — apply new framework (QC → pool cycling
-   cells → PH). Predict: detectable cell-cycle ring (E18 has 70% cycling
-   progenitors); brain vascular discovery rephrased as
-   endothelial→pericyte→smooth-muscle lineage span. **Blocked on TCC.**
-2. Replicate vertex-content vs WCS on Lung/Liver/Limb_Muscle to confirm
-   the lineage-span pattern generalizes.
-3. Update gallery notebook (`docs/gallery/diagnostic-stack.qmd`) to
-   reflect Layer 5 → Layer 7 dependency.
+**Cross-tissue replication (2026-04-29):**
+The lineage-span signal is **tissue-specific**, correlating with active
+ongoing lineage flow rather than cell-type count:
+
+| Tissue | Δh (real − WCS) | Lineage flow status |
+|---|---:|---|
+| Marrow | +0.36 ★ | hematopoiesis lifelong |
+| **Brain_Non-Myeloid 3mo** | **+0.46 ★** | **neurogenesis + OPC→oligo + endothelial** |
+| Limb_Muscle | +0.17 ◐ | satellite cells (small) |
+| Liver | −0.10 ✗ | terminal hepatocytes |
+| Lung | −0.35 ◐ | terminal alveolar/airway (REVERSED) |
+
+Adult brain rank-2 cycle (the partial rescue of the original
+"vascular compartment" claim) spans 6 types: astrocyte + brain pericyte +
+endothelial + oligodendrocyte + OPC + neuronal stem cell. The cycle
+visits the vascular compartment as part of a broader glial+vascular+
+stem-cell loop. Adult brain showed **no cell-cycle ring** even in the
+cycling subset — too few cells and too diverse identities.
+
+**Shipped this arc:**
+- `score_stress_modules`, `qc_filter_mask`, `cycle_lineage_spans` in
+  `docs/gallery/_gallery.py` (mechanically encode Layer 5 → Layer 7)
+- 15-test pytest suite at `docs/gallery/test_gallery_ph.py`
+- Worked-example code listing in `diagnostic-stack.qmd` (rendered)
+- Universal lesson: null-design rule promoted to `~/.claude/CLAUDE.md`
+  Signal Pipeline Auditing section
+
+**Open threads (in priority order):**
+1. **TCC-gated E18 re-validation** — apply new framework. Predict:
+   detectable cell-cycle ring (E18 has 70% cycling progenitors,
+   should pool cleanly across cell types unlike adult brain's 23%);
+   stronger lineage-span signal than adult brain's +0.46.
+   **Still blocked on TCC.**
+2. **Cross-cycle cluster comparison** for the brain rank-2 6-type
+   cycle — does it trace known glial-vascular-stem-cell developmental
+   relationships, or generic geometric loops? Inspect cocycle reps.
+3. **Other dyf-core threads** (real music, spatial transcriptomics,
+   SCC-DAG, threshold calibration, CellRank/PAGA benchmark) — PH
+   falsification arc is at clean closure.
 
 **Scripts:** `~/Projects/dyf/data/adult_brain/` (gitignored) — TMS
 Droplet h5ad (8.2 GB), TMS FACS h5ad (4.8 GB, has brain), and ten
