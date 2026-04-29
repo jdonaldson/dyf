@@ -1,6 +1,6 @@
 ---
 title: "The Topology Diagnostic Stack"
-subtitle: "Five layers that classify each cluster's internal shape — paths, lattices, cycles, hubs, mixed — validated across seven datasets."
+subtitle: "Seven layers that classify each cluster's internal shape — paths, lattices, cycles, hubs, mixed — validated across multiple datasets, with Layer 7 (persistent homology) gated by Layer 5 quality control."
 order: 0
 image: diagnostic-stack_files/figure-html/fig-mnist-unfold-output-1.png
 categories: [diagnostic, methodology, multi-domain]
@@ -22,7 +22,7 @@ This notebook walks through the diagnostic stack as it stands today, with one va
 
 A glossary of acronyms used throughout: **PCA** (Principal Component Analysis), **kNN** (k-Nearest Neighbors), **MST** (Minimum Spanning Tree), **MNIST** (a 70K handwritten-digit benchmark dataset), **MoCap** (Motion Capture), **CIFAR-10** (a 10-class natural-image benchmark), **20NG** (20 Newsgroups, a text-classification benchmark), **CLIP** (Contrastive Language-Image Pre-training, a semantic image embedder), **MiniLM** (a small sentence-embedder), **PBMC** (Peripheral Blood Mononuclear Cells, a routine scRNA-seq dataset), **HSC** (Hematopoietic Stem Cell), **QC** (Quality Control — the data-cleaning step before analysis), **IEG** (Immediate-Early Gene, a stress-response signature in neurons).
 
-## The five layers
+## The seven layers
 
 | Layer | Signal | Cost | What it answers |
 |-------|--------|-----:|------------------|
@@ -30,9 +30,11 @@ A glossary of acronyms used throughout: **PCA** (Principal Component Analysis), 
 | **2. Spectral** | Nyström-via-bucket-centroids → top-15 Laplacian eigenvectors | ~3s on 1.3M cells | "Unfold curved manifolds before measuring" |
 | **3. Plateau** | eigenvalue distribution → effective dim, gap₂, e₁₂ = λ₂/λ₁ | trivial | "How many dimensions does this cluster span?" |
 | **4. Within-cluster discriminability** | top-1 effect-size + feature-set Jaccard + identity-alignment | seconds | "Is the sub-structure real category-level signal or noise?" |
-| **5. Reference-module scoring** | curated panels of generic-state features scored as overlay channels | trivial | "Is this cluster defined by state/artifact or by category?" |
+| **5. Reference-module scoring** | curated panels of generic-state features scored as overlay channels | trivial | "Is this cluster defined by state/artifact or by category? *AND: which cells should be filtered before downstream cycle-detection?*" |
+| **6. Edge classification** | chord taxonomy + transitions + SCC decomposition over cluster pairs | seconds | "How do clusters relate? Bridges, branches, cycles between them?" |
+| **7. Persistent homology** *(requires Layer 5 QC)* | Vietoris-Rips Betti-1 on bucket centroids — but vertex content + lineage spans, not raw count | ~0.4s on 1300 centroids | "What pre-known cyclic topology exists? Which cycles span ≥2 cell types?" |
 
-Layers 1-3 are pure geometry — they work on any feature-vector dataset. Layers 4-5 are also domain-agnostic in *mechanism*, but their *implementation* depends on the domain (what discriminative test, what reference panels). Below is how each instantiates in scRNA-seq vs other domains:
+Layers 1-3 are pure geometry — they work on any feature-vector dataset. Layers 4-5 are also domain-agnostic in *mechanism*, but their *implementation* depends on the domain (what discriminative test, what reference panels). Layer 7 has a hard prerequisite: **Layer 5's stress / death / damage filters must run first**, otherwise PH persistence values are inflated by artifact-driven topology (see the Layer 7 section for the empirical evidence). Below is how each instantiates in scRNA-seq vs other domains:
 
 | Layer | Generic mechanism | scRNA-seq instance | Text-data instance | Image-data instance |
 |-------|-------------------|---------------------|---------------------|---------------------|
@@ -405,9 +407,21 @@ Three patterns worth pulling out:
 
 ## Layer 7 — persistent homology on bucket centroids
 
+::: {.callout-warning}
+## 2026-04-29 update — Layer 7 partially falsified, salvaged via Layer 5 dependency
+
+A multi-test falsification arc (TMS Droplet adult tissues, Marrow / Spleen / Tongue, multiple null models) clarified what Layer 7 actually measures on biological data:
+
+- **PH cycle COUNT is NOT a topology fingerprint.** Real cycle counts are statistically indistinguishable from a within-cluster-shuffle null — count measures clustering, not topology beyond it. The original framing "brain has 8 robust cycles" was never noise-baselined and conflates clustering with topology.
+- **What survives:** (a) detection of pre-known specific topology like the annulus example below — ripser does what it mathematically should; (b) cycle vertex content with ≥2 distinct cell types traces lineage relationships (Marrow myeloid lineage, Spleen erythroblastic islands); (c) pooling cycling cells across cell types reveals a real cell-cycle ring topology with persistence ~3.
+- **CRITICAL: Layer 5 (reference-module scoring for stress / death / UPR / heat-shock) MUST precede Layer 7.** Stress signatures inflate persistence values. Without QC the Marrow cell-cycle ring shows persistence 7.49 with top-1/top-2 ratio 14.95; after removing top 10% stressed cells the honest values are 3.16 and 3.59. The framework's stated architecture (Layer 5 → Layer 7) is empirically required, not optional.
+
+Detail: see `~/.claude/projects/.../memory/project_ph_layer_falsification.md`. The synthetic-shapes example below is unaffected (it tests pre-known topology, the case where ripser's math is sound). The biology examples that follow it should be read as preliminary findings pending re-validation under the new pipeline.
+:::
+
 Layer 7 closes the most-flagged gap from earlier in this notebook: detecting **rings with thickness** (annulus / spiral / multi-scale ring-of-clusters) that the per-resolution `cycle_alt` signal misses because kNN sees through the 2D filling. The tool is **persistent homology** (PH) — Vietoris-Rips Betti-1 across a kNN-distance filtration. The Nyström-via-DYF pattern from Layer 2 carries over: bucket centroids serve as PH landmarks.
 
-Validated on synthetic shapes:
+Validated on synthetic shapes (mathematically pre-known topology — the case where ripser's results are unambiguous):
 
 | Shape | cycle_alt | PH robust Betti-1 (>20% threshold) | Top persistence |
 |-------|----------:|-----------------------------------:|----------------:|
@@ -500,19 +514,21 @@ fig.show()
 
 7. **Topological persistence (Layer 7)** — Vietoris-Rips Betti-1 across kNN filtration on bucket centroids. Each robust persistent feature has a *representative cycle* (the participating centroids), which can be mapped back to scanpy/cluster context. Catches rings-with-thickness that cycle_alt fails on. Catches multi-resolution stable cycles that single-resolution diagnostics miss.
 
-**Brain validation: 1317 leaf-bucket centroids, 8 robust Betti-1 features.** The cycles map to known biology *and* discover new biology that prior layers missed:
+**Brain preliminary findings (1317 leaf-bucket centroids, 8 robust Betti-1 features).** *Pending re-validation under the new framework — listed below for historical context, not yet confirmed against the within-cluster-shuffle null or the Layer-5-first pipeline.*
 
-| Rank | Persistence | Centroids | Parent clusters | Biology |
+| Rank | Persistence | Centroids | Parent clusters | Original interpretation |
 |-----:|------------:|----------:|-----------------|---------|
-| 1 | 15.99 | 11 | 24 (Cldn5+/Egfl7+ endothelium), 32 (Cldn5+/Flt1+ endothelium) | **Brain microvascular cycle** — angiogenesis-state cycling |
-| 2-3, 5, 8 | 3.3-6.6 | 3-9 each | 26 (Rgs5+/Col4a2+ pericytes) | **Pericyte state-cycles** |
+| 1 | 15.99 | 11 | 24 (Cldn5+/Egfl7+ endothelium), 32 (Cldn5+/Flt1+ endothelium) | Brain microvascular angiogenesis cycle |
+| 2-3, 5, 8 | 3.3-6.6 | 3-9 each | 26 (Rgs5+/Col4a2+ pericytes) | Pericyte state-cycles |
 | 4 | 3.51 | 8 | 14, 24, 13, 15 | Multi-lineage cycling-state bridge |
-| 6 | 3.49 | 42 | 22, 13, 15, 11, 4 | **Global developmental ring** — cell-cycle through gliogenic + neurogenic + astrocyte populations |
-| 7 | 3.43 | 4 | **13 (cell cycle), all within** | **Pure cell-cycle ring** (matches chord taxonomy) |
+| 6 | 3.49 | 42 | 22, 13, 15, 11, 4 | Global developmental ring |
+| 7 | 3.43 | 4 | **13 (cell cycle), all within** | Pure cell-cycle ring (matches chord taxonomy) |
 
-The cell cycle (rank 7) confirms the chord-taxonomy result from a completely independent signal. **The vascular compartment (ranks 1, 2, 3, 5, 8) is biology that prior layers didn't characterize** — endothelial and pericyte cycles emerged because their cycling biology produces topologically robust loops in transcriptomic feature space.
+These are still likely directionally correct — the cycles' VERTEX CONTENT does map to coherent cluster sets, which is the salvageable part of the claim — but the persistence values are stress-inflated (Layer 5 QC was not applied) and the cycle count claim is invalid as a topology fingerprint. Reframed claims that survive: rank-7 cell cycle (within cluster 13's cycling cells) ↔ "cycling cells form a state-axis ring across cluster boundaries when pooled and QC-filtered"; ranks 1, 2-3, 5, 8 (vascular) ↔ "endothelial → pericyte → smooth-muscle lineage spans" (vertex content with multiple cell types).
 
-PH-on-Paul15 hematopoiesis (80 landmarks, sub-millisecond) recovers the canonical lineage branching points: rank 1 = monocyte ↔ GMP ↔ basophil, rank 3 = erythroid ↔ MEP ↔ basophil. Both GMP and MEP are textbook bipotent progenitors at hematopoietic decision points.
+**Adult Marrow replication (2026-04-29):** Pooled all S/G2M-phase cells across cell types (n=1660), within-tissue PCA, k-means at 55 landmarks, ripser. Result: **one dominant Betti-1 feature, persistence 3.16 after QC (was 7.49 raw, dropped after removing top 10% apoptosis ∪ UPR ∪ HSP cells). Top-1/top-2 ratio 3.59 — clear ring signature** (ratio > 1.5). Single-cluster runs (promonocyte alone, n=231, 99.6% cycling) found zero cycles — too small to capture the cell-cycle axis. The state axis crosses cell-type clusters; pooling across types is required.
+
+PH-on-Paul15 hematopoiesis (80 landmarks, sub-millisecond) recovers cycles whose vertex content corresponds to canonical bipotent decision points: rank 1 vertices include monocyte / GMP / basophil clusters, rank 3 includes erythroid / MEP / basophil. *The lineage-span interpretation survives the falsification; the count interpretation does not.*
 
 ## What each layer does (and what it doesn't)
 
@@ -524,7 +540,7 @@ PH-on-Paul15 hematopoiesis (80 landmarks, sub-millisecond) recovers the canonica
 | 4. Within-cluster discriminability | Compositional vs single-identity, real-vs-noise sub-structure | Cases where the discriminative test itself fails (very small n, identical sub-distributions) |
 | 5. Reference-module scoring | Generic-state confounds (artifacts, contamination, universal patterns) cutting across categories | Real categorical signals that happen to use the same features as a reference module |
 | 6. Edge classification (chord taxonomy + transitions) | Bridges between clusters, directed flow, SCCs in dynamics | Cycles invisible in pseudotime (1D pseudotime can't see closed loops) |
-| 7. Persistent homology | Rings-with-thickness, multi-resolution stable cycles, biology that earlier layers' single-resolution signals miss | Real biological *DAGs* that look cyclic in feature space due to shared housekeeping (false-positive cycles from feature-space geometry) |
+| 7. Persistent homology *(requires Layer 5 QC first)* | Pre-known specific topology (annulus, ring, key cycle) where math is unambiguous; lineage-span cycles spanning ≥2 cell types; pooled cell-cycle ring across cycling cells | Cycle COUNT is not a topology fingerprint (measures clustering, ≈ within-cluster-shuffle null); single-cluster within-type cycles below detection threshold in adult tissues; persistence values inflated by stress without Layer 5 QC |
 
 Each layer covers what the previous misses. The 6-class node taxonomy (manifold / hub / compositional / curved-trajectory / single-identity-with-sub-axes / homogeneous-technical) emerges from combining the geometric layers with the discriminability layer. A cluster's full classification is **(geometric class) × (categorical identity)** — the cross-product, not either axis alone. Layer 7 adds **(robust topology)** as a third orthogonal axis: a cluster pair can be in a topologically-stable cycle independent of their geometric or categorical relationship.
 
@@ -550,4 +566,8 @@ The implementation in `_gallery.py` exposes `nystrom_spectral`, `cluster_diagnos
 
 **The taxonomy was discovered on biology.** The 6-class node taxonomy emerged from probing a developmental brain dataset (1.3M cells × 22.7K genes, scRNA-seq from E18 mouse cortex). Mature-tissue or non-biology data may need different thresholds or different classes entirely. Cross-domain validation (hematopoiesis, motion-capture, CIFAR-10, 20NG) confirms the *primitives* generalize, but the specific class boundaries (anisotropy cutoffs, density thresholds) come from one dataset and may need calibration elsewhere.
 
-**PH detects "false-positive cycles" from feature-space geometry.** Layer 7 is powerful but not infallible: a developmental DAG can produce a closed loop in transcriptomic space if the progenitor and mature endpoints share enough housekeeping features to land near each other in the kNN graph. Brain rank-6 (42 centroids spanning gliogenic / neurogenic / astrocyte / cell-cycle clusters) is partly real (shared cycling-state axis across multiple populations) and partly geometric (shared housekeeping pulling endpoints near each other in feature space). Distinguishing these requires biology-side validation (markers) or persistence-stability across multiple kNN distances. Treat PH as a *discovery* tool — it surfaces topology you should investigate, not topology you should fully trust without follow-up.
+**PH cycle COUNT is below noise on biological data.** Layer 7 was originally framed as "PH detects topology in the data; more cycles = more topological richness." This is empirically false: column-shuffled noise produces *more* cycles than real biological data (clustered data has fewer cycles in its proximity graph than spread isotropic data, by graph topology), and within-cluster-shuffled data produces ≈ the same cycle count as real (count is a clustering measure, no extra topology). The cycle-count framing should be retired.
+
+**What survives is more specific.** PH on biological data is useful for: (a) detecting *pre-known* specific topology (annulus, ring, key-cycle — the synthetic-shapes example here), where ripser's math is unambiguous; (b) cycles whose vertex content spans **multiple cell types** — these trace cross-cluster lineage relationships (myeloid lineage in marrow; erythroblastic islands in spleen) and are the part that survives the within-cluster-shuffle null; (c) detecting a **cell-cycle ring** when cycling cells are pooled across cell types and stress-filtered. Within a single cell-type cluster in adult tissues, no detectable rings (tested promonocyte n=231, 99.6% cycling — zero cycles). Filter PH cycles to require ≥2 distinct dominant cell types in vertex content; treat single-type cycles as clustering artifacts.
+
+**Layer 5 must precede Layer 7.** Stress / death / damage gene-module scores inflate persistence values. Apply reference-module scoring as a per-cell QC filter before running PH. Without it, the Marrow cell-cycle ring shows persistence 7.49 with top-1/top-2 ratio 14.95 (looks dramatic); after removing top-10% stressed cells, the honest values are 3.16 and 3.59 (modest but real). Stressed cells alone don't form artifactual rings — they sit at the periphery (G2/M cells co-express damage-response markers) and inflate the ring's diameter rather than fabricating it.
