@@ -39,38 +39,58 @@ Y = UMAP(n_components=2, n_neighbors=15).fit_transform(X)
 
 ## 🔄 RESUME CONTEXT - DELETE AFTER READING
 
-### ⚠ Layer 7 (PH cycle count) falsified 2026-04-28
+### ⚠ Layer 7 (PH) falsified + salvaged 2026-04-28/29
 
-**Adult mouse brain falsification thread executed and pivoted.** TMS
-Droplet didn't contain brain; ran multi-tissue noise-baseline panel
-instead and discovered the PH cycle-count claim is broken.
+**Adult mouse brain falsification arc** — TMS Droplet didn't contain
+brain; pivoted to multi-tissue panel + cell-cycle gene module test +
+QC-filtering test. Falsification + salvage via QC dependency.
 
-- **Finding:** real biological PCA data produces SYSTEMATICALLY FEWER
-  PH cycles than column-shuffled noise. 78% of 18 (Marrow / Tongue /
-  Spleen × 6 landmark counts) configs at z<−1 vs noise; 0% above z>1.5.
-  Mean z @20% = −4.99, mean z @5% = −6.64.
-- **Mechanism:** clustering reduces ripser cycle count (sparse
-  proximity graph at cluster centers), shuffled isotropic data has
-  more spurious small loops in its proximity graph. Cycle COUNT
-  measures un-clusteredness, not topological richness.
-- **Memo:** [project_ph_layer_falsification.md](~/.claude/projects/-Users-jdonaldson-Projects-dyf/memory/project_ph_layer_falsification.md)
-- **Synthesis updated:** `synthesis_diagnostic_stack.md` has a
-  prominent caveat at the top demoting the Layer 7 cycle-count claim.
-- **Open threads from this falsification:**
-  1. TCC-gated E18 re-validation (blocked on `/Volumes/Models` access;
-     ghostty FDA broken, see TCC notes below)
-  2. Cycle vertex content vs cluster identity — does the brain
-     vascular discovery survive on shuffled E18?
-  3. Persistence-distribution shape comparison (vs count comparison)
-- **Scripts:** `~/Projects/dyf/data/adult_brain/` — TMS Droplet h5ad
-  (8.2 GB), TMS FACS h5ad (4.8 GB, has brain), and the sweep / noise
-  scripts. All gitignored.
-- **TCC issue blocking E18 re-validation:** ghostty's FDA grant
-  apparently doesn't flow through to subprocesses writing to
-  `/Volumes/Models`. Sandbox config update + full session restart
-  didn't fix it. May need to remove ghostty from FDA list, quit, and
-  re-add (TCC keys by code-signing identity; updates can break
-  grants).
+**Falsified — cycle COUNT is not topology:**
+Real cycle count ≈ within-cluster-shuffle null (the methodologically
+correct null). PH count measures clustering, not topology beyond it.
+Original column-shuffle finding (real << shuffled, z = −5 avg) was
+artifact of wrong null — column shuffle destroyed BOTH clustering and
+topology, making the test trivial.
+
+**Survives in three refined claims:**
+1. **Vertex content with ≥2 dominant cell types = lineage relationships**
+   (Marrow myeloid lineage, Spleen erythroblastic islands, NK/NKT pair).
+   50/50 split between single-type clustering artifacts and real lineage
+   spans. Filter for ≥2 types downstream.
+2. **Pooled cycling cells produce a detectable cell-cycle ring** (after
+   filtering by Tirosh S/G2M gene module score). Persistence ~3 after
+   QC. Single-cluster too small (promonocyte n=231, 99.6% cycling →
+   0 cycles).
+3. **CRITICAL: Layer 5 (reference modules) MUST precede Layer 7 (PH).**
+   Stress/death/UPR/HSP signatures inflate ring persistence (7.49 raw →
+   3.16 after removing top 10% stressed cells). Stress-only cells alone
+   produce no cycles — they sit at G2/M ring periphery and inflate its
+   diameter. The diagnostic stack's stated architecture is empirically
+   required, not optional.
+
+**Memo:** [project_ph_layer_falsification.md](~/.claude/projects/-Users-jdonaldson-Projects-dyf/memory/project_ph_layer_falsification.md) (317 lines, full investigation).
+
+**Synthesis updated:** [synthesis_diagnostic_stack.md](~/.claude/projects/-Users-jdonaldson-Projects-dyf/memory/synthesis_diagnostic_stack.md) Layer 7 caveat block reflects the salvage path + QC dependency.
+
+**Open threads from this arc:**
+1. TCC-gated E18 re-validation — apply new framework (QC → pool cycling
+   cells → PH). Predict: detectable cell-cycle ring (E18 has 70% cycling
+   progenitors); brain vascular discovery rephrased as
+   endothelial→pericyte→smooth-muscle lineage span. **Blocked on TCC.**
+2. Replicate vertex-content vs WCS on Lung/Liver/Limb_Muscle to confirm
+   the lineage-span pattern generalizes.
+3. Update gallery notebook (`docs/gallery/diagnostic-stack.qmd`) to
+   reflect Layer 5 → Layer 7 dependency.
+
+**Scripts:** `~/Projects/dyf/data/adult_brain/` (gitignored) — TMS
+Droplet h5ad (8.2 GB), TMS FACS h5ad (4.8 GB, has brain), and ten
+analysis scripts spanning the multi-test arc.
+
+**TCC issue blocking E18 re-validation:** ghostty's FDA grant doesn't
+flow through to subprocesses writing to `/Volumes/Models`. Sandbox
+config update + full session restart didn't fix it. To resolve:
+remove ghostty from FDA list, quit, re-add (TCC keys by code-signing
+identity; updates can break grants).
 
 ### Recent commits (2026-04-28)
 4 commits landing the diagnostic-stack consolidation:
