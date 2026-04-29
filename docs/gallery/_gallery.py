@@ -801,3 +801,233 @@ def diagnose_all_clusters(
         d["classification"] = classify_cluster(d)
         rows.append(d)
     return rows
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Layer 5 → Layer 7 dependency primitives
+#
+# The PH layer (Layer 7) requires reference-module QC (Layer 5) as a
+# prerequisite, per the 2026-04-29 falsification finding. Without QC,
+# stress / death / damage signatures inflate persistence values and
+# create false ring signals. See
+# `~/.claude/projects/.../memory/project_ph_layer_falsification.md`.
+#
+# These primitives are the mechanical enforcement of that dependency.
+# ─────────────────────────────────────────────────────────────────────────
+
+
+# Default reference modules for scRNA-seq stress/death scoring.
+# Mouse symbol case. Add more or override per domain.
+DEFAULT_STRESS_MODULES: dict[str, list[str]] = {
+    "apoptosis": ["Casp3", "Casp7", "Casp8", "Casp9", "Bax", "Bak1",
+                   "Bcl2l11", "Cycs", "Apaf1", "Diablo", "Pmaip1", "Bid"],
+    "upr":       ["Hspa5", "Atf4", "Ddit3", "Xbp1", "Atf6", "Ern1", "Eif2ak3"],
+    "hsp":       ["Hspa1a", "Hspa1b", "Hsp90aa1", "Hsp90ab1", "Hspb1", "Dnajb1"],
+}
+
+
+def score_stress_modules(
+    adata,
+    modules: dict[str, list[str]] | None = None,
+) -> list[str]:
+    """Score each cell on stress / death / damage gene modules.
+
+    Adds one obs column per module (named ``{key}_score``). Uses scanpy's
+    ``sc.tl.score_genes`` (Tirosh-style: mean expression of module minus
+    mean expression of a length-matched random control set).
+
+    Parameters
+    ----------
+    adata : AnnData
+        Must already be normalized + log1p-transformed. Raw counts will
+        give nonsensical scores.
+    modules : dict[str, list[str]] | None
+        Mapping ``module_name → list of gene symbols``. Defaults to
+        ``DEFAULT_STRESS_MODULES`` (apoptosis, upr, hsp).
+
+    Returns
+    -------
+    list[str]
+        Names of the score columns added to ``adata.obs``.
+
+    Notes
+    -----
+    For non-biology domains, replace ``modules`` with domain-specific
+    reference panels (e.g., for text: ``{"stop_words": [...],
+    "ocr_artifacts": [...]}``). The mechanism is the same: pre-defined
+    feature subsets that signal known generic-state confounds.
+    """
+    import scanpy as sc
+
+    modules = modules if modules is not None else DEFAULT_STRESS_MODULES
+    added = []
+    for name, genes in modules.items():
+        present = [g for g in genes if g in adata.var_names]
+        if not present:
+            continue
+        col = f"{name}_score"
+        sc.tl.score_genes(adata, gene_list=present, score_name=col)
+        added.append(col)
+    return added
+
+
+def qc_filter_mask(
+    adata,
+    *,
+    score_columns: list[str] | None = None,
+    drop_top_pct: float = 10.0,
+    pct_mt_max: float | None = 10.0,
+    pct_hb_max: float | None = 5.0,
+    n_genes_min: int = 200,
+) -> np.ndarray:
+    """Return a boolean mask of cells passing reference-module QC.
+
+    A cell passes if all of:
+      - ``n_genes`` (or ``n_genes_by_counts``) ≥ ``n_genes_min``
+      - ``pct_mt`` < ``pct_mt_max`` (skipped if column missing)
+      - ``pct_hb`` < ``pct_hb_max`` (skipped if column missing)
+      - For each score column: cell is NOT in the top ``drop_top_pct%``
+        of that score's distribution
+
+    Parameters
+    ----------
+    adata : AnnData
+        Must have any score columns referenced (typically created by
+        :func:`score_stress_modules`).
+    score_columns : list[str] | None
+        Score columns whose top-percentile cells should be dropped.
+        Defaults to all ``*_score`` columns in ``adata.obs``.
+    drop_top_pct : float
+        Drop cells in the top this percent of EACH score (combined via
+        OR — failing any one drops the cell).
+    pct_mt_max, pct_hb_max : float | None
+        Maximum mitochondrial / hemoglobin fractions. Set to ``None`` to
+        skip the check (e.g., when mt-genes are pre-stripped, as in TMS).
+    n_genes_min : int
+        Minimum gene count per cell.
+
+    Returns
+    -------
+    np.ndarray of bool, shape (n_cells,)
+        True for cells that pass.
+
+    Notes
+    -----
+    Use ``adata[qc_filter_mask(adata)]`` to obtain the QC-filtered subset
+    before running PH (Layer 7). On TMS-style preprocessed data,
+    ``pct_mt`` may be unavailable because mt-genes were stripped during
+    upstream preprocessing — pass ``pct_mt_max=None`` in that case.
+    """
+    import pandas as pd
+
+    n = adata.n_obs
+    keep = np.ones(n, dtype=bool)
+
+    # n_genes (try both common column names)
+    n_genes_col = None
+    for c in ("n_genes", "n_genes_by_counts"):
+        if c in adata.obs.columns:
+            n_genes_col = c
+            break
+    if n_genes_col is not None:
+        keep &= np.asarray(adata.obs[n_genes_col]) >= n_genes_min
+
+    if pct_mt_max is not None and "pct_mt" in adata.obs.columns:
+        keep &= np.asarray(adata.obs["pct_mt"]) < pct_mt_max
+    if pct_hb_max is not None and "pct_hb" in adata.obs.columns:
+        keep &= np.asarray(adata.obs["pct_hb"]) < pct_hb_max
+
+    if score_columns is None:
+        score_columns = [c for c in adata.obs.columns
+                          if c.endswith("_score") and pd.api.types.is_numeric_dtype(
+                              adata.obs[c])]
+
+    if drop_top_pct > 0:
+        for c in score_columns:
+            if c not in adata.obs.columns:
+                continue
+            vals = np.asarray(adata.obs[c], dtype=np.float64)
+            thresh = np.quantile(vals, 1.0 - drop_top_pct / 100.0)
+            keep &= vals < thresh
+
+    return keep
+
+
+def cycle_lineage_spans(
+    cocycles_1: list,
+    persistences: np.ndarray,
+    landmark_labels: np.ndarray,
+    *,
+    threshold_frac: float = 0.20,
+    min_distinct_types: int = 2,
+) -> list[dict[str, Any]]:
+    """Filter ripser Betti-1 cycles to those spanning multiple cell types.
+
+    The 2026-04-29 falsification arc found that PH cycle COUNT is a
+    clustering measure (≈ within-cluster shuffle null). What survives
+    as a unique signal is **vertex content with ≥2 distinct dominant
+    types** — these cycles trace cross-cluster lineage relationships
+    (myeloid lineage, erythroblastic islands, NK/NKT pair, etc.) and are
+    not reproduced by the WCS null. Single-type cycles are clustering
+    artifacts and should be filtered out.
+
+    Note: replication on Lung / Liver / Limb_Muscle showed the
+    lineage-span signal does NOT robustly generalize across all tissues.
+    Strong in actively-differentiating tissues (Marrow); null or
+    reversed in mostly-terminal-identity tissues (Lung, Liver). The
+    filter is appropriate; whether the resulting cycles are biologically
+    meaningful is dataset-dependent.
+
+    Parameters
+    ----------
+    cocycles_1 : list
+        ``ripser.ripser(...)["cocycles"][1]`` — one cocycle per Betti-1
+        feature. Each cocycle is an array of ``[v_i, v_j, val]`` rows.
+    persistences : np.ndarray, shape (n_features,)
+        Persistence value (death − birth) for each Betti-1 feature.
+    landmark_labels : np.ndarray, shape (n_landmarks,)
+        Label per landmark — typically the dominant cell type (mode of
+        cell types of cells assigned to that landmark by k-means).
+    threshold_frac : float
+        Robustness cutoff: keep features with persistence > this fraction
+        of the maximum.
+    min_distinct_types : int
+        Keep only cycles whose vertex set spans at least this many
+        distinct labels. ``2`` filters out single-type clustering
+        artifacts.
+
+    Returns
+    -------
+    list[dict]
+        One per surviving cycle, with keys: ``rank`` (sort by
+        persistence), ``persistence``, ``vertices`` (np.ndarray of
+        landmark indices), ``vertex_labels`` (np.ndarray of labels),
+        ``n_distinct_types`` (int), ``label_counts`` (dict).
+    """
+    if len(persistences) == 0:
+        return []
+    pmax = float(persistences.max())
+    threshold = threshold_frac * pmax
+    robust_idx = np.where(persistences > threshold)[0]
+    # sort by persistence descending so rank is meaningful
+    robust_idx = robust_idx[np.argsort(-persistences[robust_idx])]
+
+    out = []
+    for rank, idx in enumerate(robust_idx):
+        cc = cocycles_1[idx]
+        if cc.shape[0] == 0:
+            continue
+        verts = np.unique(cc[:, :2].astype(int))
+        labels = landmark_labels[verts]
+        unique_labels, counts = np.unique(labels, return_counts=True)
+        if len(unique_labels) < min_distinct_types:
+            continue
+        out.append({
+            "rank": rank + 1,
+            "persistence": float(persistences[idx]),
+            "vertices": verts,
+            "vertex_labels": labels,
+            "n_distinct_types": int(len(unique_labels)),
+            "label_counts": dict(zip(unique_labels.tolist(), counts.tolist())),
+        })
+    return out
