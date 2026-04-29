@@ -4,6 +4,7 @@ subtitle: "DYF produces a partition hierarchy, not a single k. Here's what that 
 listing:
   id: gallery-listing
   contents:
+    - diagnostic-stack.qmd
     - synthetic-shapes.qmd
     - digits.qmd
     - mnist.qmd
@@ -72,3 +73,42 @@ Based on the nine notebooks:
 - **DYF** for medium-to-large datasets where you don't know `k`, the structure is hierarchical, or you want multi-resolution output for downstream routing / retrieval / exploration.
 
 These are compositional, not competitive. The recipe *"pretrained embedder → DYF tree → merge-walk to whatever resolution the downstream task wants"* is the pattern [CIFAR-10 + CLIP](cifar10-clip.qmd) demonstrates end-to-end.
+
+## What "parameter-free" actually means here
+
+The gallery's title uses "parameter-free" loosely. DYF has parameters — it just doesn't ask the user for the *data-dependent* ones that make other clustering methods fiddly.
+
+### Parameters you don't supply
+
+- **`k`** (number of clusters). DYF discovers it. *This is the big one — k-means and spectral clustering both need it.*
+- **`eps`** (DBSCAN-style distance threshold). No such knob; you don't need to know your data's scale to run DYF.
+- **`min_cluster_size`** (HDBSCAN-style). DYF has a structural `min_leaf_size` analog, but it isn't tied to what you think your cluster count should be.
+
+Not needing `k` or `eps` is the real claim DYF makes. The ones below are structural choices that stay fixed across every gallery dataset.
+
+### Parameters DYF fixes at defaults
+
+Every notebook uses **these same values** — not tuned per-dataset, not adaptive. Where they break, the relevant notebook says so honestly.
+
+| Parameter | Default | What it does | Known failure mode |
+|---|---:|---|---|
+| `max_depth` | 4 | Tree depth cap (→ 4096 leaves max) | Needs deeper tree at n > ~250K |
+| `num_bits` | 3 | Branching factor (8-way splits) | Alternatives untested |
+| `min_leaf_size` | 20 | Leaves must contain ≥20 points | Breaks below ~10 points per latent class ([Olivetti](olivetti-faces.qmd)) |
+| Louvain `resolution` | 1.0 | Modularity granularity | Fails on extreme imbalance (10:1–20:1 minority-size range) |
+| Louvain `leaf_k` | 10 | kNN on leaf centroids | No observed failure mode |
+| Metric | cosine | Implicit in LSH tree construction | Wrong for low-dim Euclidean ([Moons](synthetic-shapes.qmd) partial failure) |
+| `seed` | 42 | Reproducibility | Run-to-run variance uncharacterized |
+
+### Parameters the reader *does* supply
+
+- **`target_k`** in the merge walk or slider — the resolution at which you want to view the hierarchy. This is the *only* knob a gallery user touches, and it's downstream of clustering, not upstream of it.
+- **The embedding model** for text and image data — not a DYF parameter, but the pre-embedding step is an unavoidable user choice. [CIFAR-CLIP](cifar10-clip.qmd) documents the `raw pixels → pretrained embedder → DYF` recipe.
+
+### So what's the actual claim?
+
+Not "DYF has no parameters." The honest claim is:
+
+> *The same three lines of DYF, with the same defaults, work across every dataset in this gallery — from 400 faces to 120,000 news articles, from 2D synthetic shapes to 62-dim motion capture. You don't tune per dataset. You don't have to know `k` or `eps`. The fit runs everywhere.*
+
+That's weaker than "parameter-free" but it's a true claim, and it's the one the gallery actually demonstrates. The cases where defaults fail (Olivetti's density floor, Moons' metric mismatch, imbalanced-class Louvain) are documented in the notebooks, not hidden.
