@@ -530,6 +530,65 @@ These are still likely directionally correct — the cycles' VERTEX CONTENT does
 
 PH-on-Paul15 hematopoiesis (80 landmarks, sub-millisecond) recovers cycles whose vertex content corresponds to canonical bipotent decision points: rank 1 vertices include monocyte / GMP / basophil clusters, rank 3 includes erythroid / MEP / basophil. *The lineage-span interpretation survives the falsification; the count interpretation does not.*
 
+### Using the Layer 5 → Layer 7 pipeline
+
+The `_gallery.py` module exports three primitives that mechanically encode the dependency. The pattern (illustrated for an scRNA-seq AnnData `adata` with cycling-cell selection in `cycling_mask`):
+
+```python
+from _gallery import (
+    score_stress_modules, qc_filter_mask, cycle_lineage_spans,
+)
+import scanpy as sc
+import numpy as np
+import ripser
+from sklearn.cluster import KMeans
+from collections import Counter
+
+# Layer 5: score stress / death / damage modules.
+# Defaults to apoptosis + UPR + HSP for scRNA-seq; pass custom modules
+# dict for non-biology domains.
+added_score_cols = score_stress_modules(adata)
+
+# QC mask: keep cells that pass n_genes / pct_mt / pct_hb / per-score
+# thresholds. drop_top_pct=10 drops the top decile per stress score.
+# pct_mt_max=None when mt-genes were stripped upstream (TMS-style data).
+keep = qc_filter_mask(adata, drop_top_pct=10, pct_mt_max=None) & cycling_mask
+adata_clean = adata[keep].copy()
+
+# Layer 7: standard PH pipeline on QC-filtered subset.
+# (Within-tissue HVG → scale → PCA → k-means landmarks → ripser.)
+sc.pp.highly_variable_genes(adata_clean, n_top_genes=2000)
+adata_hvg = adata_clean[:, adata_clean.var["highly_variable"]].copy()
+sc.pp.scale(adata_hvg, max_value=10)
+sc.tl.pca(adata_hvg, n_comps=50)
+
+n_lm = max(50, adata_hvg.n_obs // 30)
+km = KMeans(n_clusters=n_lm, n_init=3, random_state=42).fit(adata_hvg.obsm["X_pca"])
+cell_types = adata_clean.obs["cell_ontology_class"].astype(str).to_numpy()
+landmark_dom_type = np.array([
+    Counter(cell_types[km.labels_ == i]).most_common(1)[0][0]
+    if (km.labels_ == i).sum() > 0 else "EMPTY"
+    for i in range(n_lm)
+])
+
+result = ripser.ripser(km.cluster_centers_, maxdim=1, do_cocycles=True)
+b1 = result["dgms"][1]
+persistences = b1[:, 1] - b1[:, 0]
+
+# Filter cycles to lineage-spanning ones (drop single-type artifacts).
+# Result: list of dicts with keys rank/persistence/vertices/vertex_labels/
+# n_distinct_types/label_counts.
+spans = cycle_lineage_spans(
+    result["cocycles"][1], persistences, landmark_dom_type,
+    threshold_frac=0.20, min_distinct_types=2,
+)
+for s in spans:
+    print(f"rank {s['rank']}: pers={s['persistence']:.2f}, "
+          f"{s['n_distinct_types']} types, {s['label_counts']}")
+```
+
+End-to-end smoke-test on TMS Marrow 3mo recovers a 3-type cycle (basophil + granulocyte + monocyte = myeloid lineage span). Tests at `docs/gallery/test_gallery_ph.py` lock down the contract for `cycle_lineage_spans` and `qc_filter_mask`. **Note the tissue-specificity caveat from the falsification arc**: lineage-span cycles are biologically meaningful in actively-differentiating tissues (Marrow), null or reversed in mostly-terminal-identity tissues (Lung, Liver). The `min_distinct_types=2` filter is correct; the *biological meaning* of surviving cycles is dataset-dependent.
+
 ## What each layer does (and what it doesn't)
 
 | Layer | Catches | Misses |
