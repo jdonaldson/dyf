@@ -39,35 +39,38 @@ Y = UMAP(n_components=2, n_neighbors=15).fit_transform(X)
 
 ## 🔄 RESUME CONTEXT - DELETE AFTER READING
 
-### ⏸ In-Progress (paused 2026-04-28 end of day)
+### ⚠ Layer 7 (PH cycle count) falsified 2026-04-28
 
-**Adult mouse brain falsification thread** — started, blocked on
-filesystem access, paused for session restart.
+**Adult mouse brain falsification thread executed and pivoted.** TMS
+Droplet didn't contain brain; ran multi-tissue noise-baseline panel
+instead and discovered the PH cycle-count claim is broken.
 
-- Plan: download Tabula Muris Senis Droplet h5ad (~8.2 GB, figshare
-  article 8273102, file `tabula-muris-senis-droplet-processed-official-annotations.h5ad`)
-  to `/Volumes/Models/dyf_brain_adult_tms/`, subset to brain + 3mo
-  (and 24mo for free aging comparison), apply 7-layer stack, compare
-  cycle counts vs E18 baseline.
-- **Falsification prediction:** adult brain is mostly post-mitotic →
-  PH @ 20% threshold should yield <3 robust cycles (E18 had 8);
-  PH @ 5% threshold should yield <50 cycles (E18 had 235); cell
-  cycle gene module score should be near-baseline.
-- **Blocked on:** `/Volumes/Models` write access. Settings updated
-  (`additionalDirectories` includes `/Volumes/Models`) but session
-  needs restart for sandbox config to take effect. After restart,
-  test with `mkdir -p /Volumes/Models/dyf_brain_adult_tms` (without
-  `dangerouslyDisableSandbox` flag) — should succeed silently.
-- **TMS gotcha discovered:** brain is NOT in figshare article
-  12654728 (per-organ split, 10 organs missing brain). Only path is
-  the 8.2 GB whole-droplet file in article 8273102. Existing fetch
-  script at `/tmp/adult_brain/fetch_tms_brain.py` queries the wrong
-  article and needs to be repointed to 8273102.
-- **Fallback if TMS download is too slow:** Allen Tasic 2018 (~25K
-  cortex cells, smaller, gold-standard adult cortex reference) or
-  10x's 9K Adult Mouse Brain Nuclei (matches E18 h5 format).
-- Reference: full thread context lives in this RESUME CONTEXT;
-  no separate memory file written yet (the experiment hasn't run).
+- **Finding:** real biological PCA data produces SYSTEMATICALLY FEWER
+  PH cycles than column-shuffled noise. 78% of 18 (Marrow / Tongue /
+  Spleen × 6 landmark counts) configs at z<−1 vs noise; 0% above z>1.5.
+  Mean z @20% = −4.99, mean z @5% = −6.64.
+- **Mechanism:** clustering reduces ripser cycle count (sparse
+  proximity graph at cluster centers), shuffled isotropic data has
+  more spurious small loops in its proximity graph. Cycle COUNT
+  measures un-clusteredness, not topological richness.
+- **Memo:** [project_ph_layer_falsification.md](~/.claude/projects/-Users-jdonaldson-Projects-dyf/memory/project_ph_layer_falsification.md)
+- **Synthesis updated:** `synthesis_diagnostic_stack.md` has a
+  prominent caveat at the top demoting the Layer 7 cycle-count claim.
+- **Open threads from this falsification:**
+  1. TCC-gated E18 re-validation (blocked on `/Volumes/Models` access;
+     ghostty FDA broken, see TCC notes below)
+  2. Cycle vertex content vs cluster identity — does the brain
+     vascular discovery survive on shuffled E18?
+  3. Persistence-distribution shape comparison (vs count comparison)
+- **Scripts:** `~/Projects/dyf/data/adult_brain/` — TMS Droplet h5ad
+  (8.2 GB), TMS FACS h5ad (4.8 GB, has brain), and the sweep / noise
+  scripts. All gitignored.
+- **TCC issue blocking E18 re-validation:** ghostty's FDA grant
+  apparently doesn't flow through to subprocesses writing to
+  `/Volumes/Models`. Sandbox config update + full session restart
+  didn't fix it. May need to remove ghostty from FDA list, quit, and
+  re-add (TCC keys by code-signing identity; updates can break
+  grants).
 
 ### Recent commits (2026-04-28)
 4 commits landing the diagnostic-stack consolidation:
