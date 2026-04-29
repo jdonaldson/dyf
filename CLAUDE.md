@@ -39,6 +39,43 @@ Y = UMAP(n_components=2, n_neighbors=15).fit_transform(X)
 
 ## 🔄 RESUME CONTEXT - DELETE AFTER READING
 
+### ⏸ In-Progress (paused 2026-04-28 end of day)
+
+**Adult mouse brain falsification thread** — started, blocked on
+filesystem access, paused for session restart.
+
+- Plan: download Tabula Muris Senis Droplet h5ad (~8.2 GB, figshare
+  article 8273102, file `tabula-muris-senis-droplet-processed-official-annotations.h5ad`)
+  to `/Volumes/Models/dyf_brain_adult_tms/`, subset to brain + 3mo
+  (and 24mo for free aging comparison), apply 7-layer stack, compare
+  cycle counts vs E18 baseline.
+- **Falsification prediction:** adult brain is mostly post-mitotic →
+  PH @ 20% threshold should yield <3 robust cycles (E18 had 8);
+  PH @ 5% threshold should yield <50 cycles (E18 had 235); cell
+  cycle gene module score should be near-baseline.
+- **Blocked on:** `/Volumes/Models` write access. Settings updated
+  (`additionalDirectories` includes `/Volumes/Models`) but session
+  needs restart for sandbox config to take effect. After restart,
+  test with `mkdir -p /Volumes/Models/dyf_brain_adult_tms` (without
+  `dangerouslyDisableSandbox` flag) — should succeed silently.
+- **TMS gotcha discovered:** brain is NOT in figshare article
+  12654728 (per-organ split, 10 organs missing brain). Only path is
+  the 8.2 GB whole-droplet file in article 8273102. Existing fetch
+  script at `/tmp/adult_brain/fetch_tms_brain.py` queries the wrong
+  article and needs to be repointed to 8273102.
+- **Fallback if TMS download is too slow:** Allen Tasic 2018 (~25K
+  cortex cells, smaller, gold-standard adult cortex reference) or
+  10x's 9K Adult Mouse Brain Nuclei (matches E18 h5 format).
+- Reference: full thread context lives in this RESUME CONTEXT;
+  no separate memory file written yet (the experiment hasn't run).
+
+### Recent commits (2026-04-28)
+4 commits landing the diagnostic-stack consolidation:
+- `761e347` docs(session): resume context — sec10quant downstream
+- `0d3c385` docs(gallery): index — listing + parameter-free honesty
+- `65518ed` feat(gallery): diagnostic-stack notebook — 7-layer stack
+- `75d8c04` feat(gallery): _gallery.py primitives — auto-tune + diagnostic
+
 ### Current Status (2026-04-28)
 Consolidation pass after the audio cross-domain validation. The
 diagnostic stack now has **7 layers** and is documented as a
