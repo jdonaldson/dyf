@@ -510,6 +510,139 @@ fig.update_layout(height=520, width=1500,
 fig.show()
 ```
 
+### The null ladder — what test asks what question
+
+The brain biology examples below ran into a methodological subtlety the falsification callout alluded to: a single PH cycle count on its own says nothing about topology — it says something about clustering. A *ladder* of nulls disambiguates what's actually being detected. The synthetic example below makes this visceral.
+
+```{python}
+#| label: fig-null-ladder
+#| fig-cap: "The null ladder. **Top row**: data under three nulls — real (3 ring-clusters), within-cluster-shuffled (cluster identity preserved, internal joint structure broken), column-shuffled (everything scrambled). **Bottom row**: persistence diagrams. Real detects 3 high-persistence ring features. WCS detects 0 (rings destroyed but clusters intact). Column-shuffle produces many low-persistence features from random proximity geometry — saying 'real << column-shuffled' would just confirm the data is clustered, which is trivially true. WCS is the right null to test 'is there topology beyond clustering.'"
+import numpy as np
+import ripser
+import plotly.subplots as sp
+import plotly.graph_objects as go
+
+
+def make_ring_cluster(cx, cy, n=80, r=0.5, noise=0.04, seed=0):
+    rng = np.random.RandomState(seed)
+    th = np.linspace(0, 2*np.pi, n, endpoint=False)
+    pts = np.column_stack([cx + r*np.cos(th), cy + r*np.sin(th)])
+    return pts + noise * rng.randn(n, 2)
+
+
+def within_cluster_shuffle(pts, labels, rng):
+    """Permute each PC independently within each cluster.
+    Preserves cluster identity + per-PC marginal; destroys joint structure."""
+    out = pts.copy()
+    for c in np.unique(labels):
+        idx = np.where(labels == c)[0]
+        for j in range(pts.shape[1]):
+            out[idx, j] = pts[rng.permutation(idx), j]
+    return out
+
+
+def column_shuffle(pts, rng):
+    """Permute each column independently across all points.
+    Preserves per-column marginal; destroys cluster identity AND joint structure."""
+    out = np.empty_like(pts)
+    for j in range(pts.shape[1]):
+        out[:, j] = pts[rng.permutation(pts.shape[0]), j]
+    return out
+
+
+# Three rings, each its own cluster
+real_pts = np.vstack([
+    make_ring_cluster(-2.2, 0, seed=0),
+    make_ring_cluster(0, 1.8, seed=1),
+    make_ring_cluster(2.2, 0, seed=2),
+])
+labels = np.repeat([0, 1, 2], 80)
+
+rng = np.random.RandomState(42)
+wcs_pts = within_cluster_shuffle(real_pts, labels, rng)
+col_pts = column_shuffle(real_pts, rng)
+
+datasets = [
+    ("Real (3 ring-clusters)", real_pts, labels),
+    ("Within-cluster shuffled\n(clusters intact, rings destroyed)", wcs_pts, labels),
+    ("Column shuffled\n(clusters destroyed)", col_pts, labels),
+]
+
+# 2x3 grid: top = scatter, bottom = persistence diagrams
+fig = sp.make_subplots(
+    rows=2, cols=3,
+    subplot_titles=[d[0] for d in datasets] + ["Persistence diagram"]*3,
+    vertical_spacing=0.18, horizontal_spacing=0.06,
+)
+cluster_colors = ["rgba(220,80,80,0.7)", "rgba(80,180,80,0.7)", "rgba(80,80,220,0.7)"]
+for col_i, (name, pts, lab) in enumerate(datasets):
+    # Scatter
+    for c in range(3):
+        m = lab == c
+        fig.add_trace(go.Scatter(x=pts[m, 0], y=pts[m, 1], mode="markers",
+                                  marker=dict(size=5, color=cluster_colors[c]),
+                                  showlegend=False, hoverinfo="skip"),
+                      row=1, col=col_i+1)
+
+    # Persistence diagram
+    res = ripser.ripser(pts, maxdim=1)
+    b1 = res["dgms"][1]
+    n_features = len(b1)
+    if n_features > 0:
+        max_d = float(b1[:, 1].max())
+        # Threshold robust features at top 20% persistence
+        pers_vals = b1[:, 1] - b1[:, 0]
+        robust = pers_vals > 0.20 * pers_vals.max()
+        n_robust = int(robust.sum())
+    else:
+        max_d = 1.0
+        n_robust = 0
+
+    # Diagonal reference
+    fig.add_trace(go.Scatter(x=[0, max_d*1.1], y=[0, max_d*1.1],
+                              mode="lines",
+                              line=dict(color="rgba(120,120,120,0.5)", dash="dash"),
+                              showlegend=False, hoverinfo="skip"),
+                  row=2, col=col_i+1)
+    if n_features > 0:
+        fig.add_trace(go.Scatter(
+            x=b1[:, 0], y=b1[:, 1], mode="markers",
+            marker=dict(size=7, color="rgba(220,50,50,0.85)",
+                          line=dict(width=1, color="white")),
+            showlegend=False,
+            hovertext=[f"birth={b:.3f} death={d:.3f} pers={d-b:.3f}"
+                        for b, d in b1],
+            hoverinfo="text",
+        ), row=2, col=col_i+1)
+    fig.layout.annotations[col_i+3].text = (
+        f"Persistence diagram<br>"
+        f"<sub>{n_features} total Betti-1, {n_robust} robust @20%</sub>"
+    )
+
+fig.update_layout(height=620, width=1200,
+                    margin=dict(t=80, b=40),
+                    title="The null ladder — what test asks what question")
+for col_i in range(3):
+    fig.update_xaxes(scaleanchor="y", scaleratio=1, row=1, col=col_i+1)
+fig.show()
+```
+
+**What WCS preserves vs destroys** (and why this matters across domains):
+
+| WCS preserves | WCS destroys |
+|---|---|
+| Cluster identity | Joint structure within a cluster |
+| Per-feature marginal distribution within cluster | → Lineage trajectories |
+| Cluster centroid | → Cell-cycle phase |
+| (For PCA-embedded data: per-PC variance per cluster) | → Pseudotime |
+|  | → Any axis encoded in correlated features |
+
+**Caveat for time-series domains.** WCS as defined here destroys *any* within-cluster joint structure, which includes temporal axes (cell-cycle phase, gait phase, audio key-cycles). For a domain whose substrate IS temporal (MoCap frames, audio chunks, time-stamped sensor data), WCS may be too aggressive — it destroys the temporal axis you may actually want PH to detect. The right null for those domains is closer to **phase randomization** (preserves power spectrum, breaks phase relationships) or **temporal block shuffles** (preserves within-window order, shuffles across windows). The methodology lesson generalizes; the specific null does not.
+
+**Reading the test on real data** (from the falsification arc above): on TMS Marrow scRNA-seq at 200 landmarks, real cycle COUNT ≈ WCS — meaning there's no extra topology beyond clustering at the count level. But cycle VERTEX CONTENT differs (real cycles span specific cell types), and that signal survives in tissues with active lineage flow. The synthetic example here is the ideal case where the lesson works as advertised; real biology only partly mirrors it, which is the point.
+
+---
+
 **Why PH on DYF buckets matters for scale.** Ripser on 1317 brain leaf-bucket centroids runs in **0.4 seconds** — the same Nyström-style speedup we saw for spectral preprocessing. Direct Vietoris-Rips on 1.3M cells would be intractable; on bucket centroids it's instant. This is the seventh diagnostic layer:
 
 7. **Topological persistence (Layer 7)** — Vietoris-Rips Betti-1 across kNN filtration on bucket centroids. Each robust persistent feature has a *representative cycle* (the participating centroids), which can be mapped back to scanpy/cluster context. Catches rings-with-thickness that cycle_alt fails on. Catches multi-resolution stable cycles that single-resolution diagnostics miss.
