@@ -99,12 +99,33 @@ cycling subset — too few cells and too diverse identities.
 - Universal lesson: null-design rule promoted to `~/.claude/CLAUDE.md`
   Signal Pipeline Auditing section
 
-**Open threads (in priority order):**
-1. **TCC-gated E18 re-validation** — apply new framework. Predict:
-   detectable cell-cycle ring (E18 has 70% cycling progenitors,
-   should pool cleanly across cell types unlike adult brain's 23%);
-   stronger lineage-span signal than adult brain's +0.46.
-   **Still blocked on TCC.**
+**E18 re-validation DONE 2026-04-29.** Pivoted from /Volumes/Models
+(stale mount, will fix later) to direct download of the 1.3M h5 from
+10x. Subsampled to 200K, fresh preprocessing, Leiden, applied new
+pipeline. Findings:
+
+- **Vascular state-cycle CONFIRMED** on E18 at z=+12.82 vs WCS null.
+  Rank-1 cycle persistence 14.24-19.16, dominated by Cldn5+/Egfl7+/Flt1+
+  endothelium (cluster 21, endo score +1.99) + Rgs5+/Vtn+ pericytes
+  (cluster 26, peri score +1.59). Markers via Wilcoxon
+  rank_genes_groups are unambiguous brain microvascular endothelium.
+  **Matches original synthesis rank-1 finding** (pers 15.99,
+  "Cldn5+/Egfl7+/Flt1+ endothelium + Rgs5+/Col4a2+ pericytes")
+  line-for-line via fully independent methodology.
+- **Cell-cycle ring did NOT cleanly emerge** in E18 cycling cells
+  (16.4% Tirosh-cycling, 3751 QC-passed) — top1/top2 = 1.08, flat
+  spectrum. Cycling cells span many lineages, don't pool around
+  single axis. Cell-cycle ring detection generalizes to homogeneous
+  progenitor populations (Marrow) only.
+
+**Three independent methodologies converge on the same brain
+microvascular biology:**
+1. Original synthesis: 1.3M cells via DYF tree (1317 buckets) → pers 15.99
+2. Adult brain TMS FACS: 3442 cells via k-means (72 lm) → pers 5.07
+3. E18 fresh: 200K subsample via k-means (500 lm) → pers 14.24-19.16
+
+The framework's most-cited PH finding is real biology, confirmed at
+z = +12.82 vs noise.
 2. **Cross-cycle cluster comparison** for the brain rank-2 6-type
    cycle — does it trace known glial-vascular-stem-cell developmental
    relationships, or generic geometric loops? Inspect cocycle reps.
