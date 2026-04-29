@@ -431,15 +431,18 @@ Layer 7 closes the most-flagged gap from earlier in this notebook: detecting **r
 
 Validated on synthetic shapes (mathematically pre-known topology — the case where ripser's results are unambiguous):
 
-| Shape | cycle_alt | PH robust Betti-1 (>20% threshold) | Top persistence |
+| Shape | cycle_alt | PH robust Betti-1 (>20% threshold) | Top persistence(s) |
 |-------|----------:|-----------------------------------:|----------------:|
 | Pure ring | high | 1 | 1.58 |
 | Pure pancake | low | 0 (only short-lived noise) | 0.15 |
 | **Annulus** | **0.06 (failed)** | **1 (success)** | **1.04** |
 | Spiral | low | 0 (open 1D wrap) | 0.10 |
 | Ring of clusters | low | 1 (macro-cycle) | 1.05 |
+| **Ring of rings (6 inner)** | low | **7 (1 macro + 6 micro, in two tiers)** | **1.96 (macro), ~0.55 (micro)** |
 
-The annulus row is the headline: cycle_alt scored 0.06 (no cycle detected) because the 2D thickness destroys period-2 structure in the kNN graph, but PH found one robust Betti-1 feature with persistence comparable to the pure ring.
+The annulus row is the headline for "PH catches what cycle_alt misses": cycle_alt scored 0.06 (no cycle detected) because the 2D thickness destroys period-2 structure in the kNN graph, but PH found one robust Betti-1 feature with persistence comparable to the pure ring.
+
+The ring-of-rings row is the headline for **scale-hierarchical detection**: when topology has multiple scales, PH separates them into persistence *tiers* — one macro-cycle at the radius of the big ring (~1.96), six micro-cycles at the radius of the small rings (~0.55), and noise below 0.01. This is a property simpler signals don't have: PH doesn't just say "there is some topology," it tells you the *scale spectrum* of the topology. In biology, a "ring of state-cycles" pattern (multiple cycles with similar moderate persistence + one larger persistence) would suggest hierarchical structure — e.g., the original synthesis brain finding's tier of pericyte state-cycles at persistence 3.3-6.6 alongside the rank-1 microvascular cycle at 15.99 has this shape. (Whether that hierarchy is real biology or post-hoc pattern-matching is for the cocycle-representative analysis to decide; see the limitations section.)
 
 ```{python}
 #| label: ph-synthetic
@@ -479,17 +482,32 @@ def make_ring_of_clusters(n_clusters=8, n_per=25, blob=0.08):
         pts.append(c + blob*rng.randn(n_per, 2))
     return np.vstack(pts)
 
+def make_ring_of_rings(n_outer=6, n_per_ring=40, R=2.5, r=0.4, noise=0.02):
+    """6 small rings (radius r) arranged on a big ring (radius R).
+    Should produce 7 robust Betti-1 features in two tiers:
+    1 macro-cycle at scale R, 6 micro-cycles at scale r."""
+    rng = np.random.RandomState(5)
+    pts = []
+    for k in range(n_outer):
+        theta = 2*np.pi*k/n_outer
+        cx, cy = R*np.cos(theta), R*np.sin(theta)
+        phi = np.linspace(0, 2*np.pi, n_per_ring, endpoint=False)
+        ring_pts = np.column_stack([cx + r*np.cos(phi), cy + r*np.sin(phi)])
+        pts.append(ring_pts + noise*rng.randn(n_per_ring, 2))
+    return np.vstack(pts)
+
 shapes = [
     ("Pure ring", make_ring()),
     ("Pure pancake", make_pancake()),
     ("Annulus (ring + 2D thickness)", make_annulus()),
     ("Spiral", make_spiral()),
     ("Ring of clusters", make_ring_of_clusters()),
+    ("Ring of rings (6×)", make_ring_of_rings()),
 ]
 
-fig = sp.make_subplots(rows=2, cols=5,
-    subplot_titles=[s[0] for s in shapes] + ["Betti-1 persistence"]*5,
-    horizontal_spacing=0.05, vertical_spacing=0.18)
+fig = sp.make_subplots(rows=2, cols=6,
+    subplot_titles=[s[0] for s in shapes] + ["Betti-1 persistence"]*6,
+    horizontal_spacing=0.04, vertical_spacing=0.18)
 
 for i, (name, X) in enumerate(shapes):
     res = ripser.ripser(X, maxdim=1)
@@ -513,10 +531,12 @@ for i, (name, X) in enumerate(shapes):
                                   hoverinfo="text"),
                       row=2, col=i+1)
 
-fig.update_layout(height=520, width=1500,
+fig.update_layout(height=520, width=1700,
     title="Persistent homology on synthetic shapes — top row = shape, bottom row = persistence diagram")
 fig.show()
 ```
+
+The ring-of-rings persistence diagram (rightmost column) is the most pedagogically useful single panel in this notebook: hover over the 7 red points and notice they cluster into TWO HORIZONTAL TIERS — one point at death ≈ 1.96 (the macro-cycle), six points at death ≈ 0.55 (the micro-cycles), plus a near-diagonal noise floor. The vertical separation between the macro-tier and the micro-tier is ~3.5×, the separation between the micro-tier and noise is ~70×. Same data, two distinct topological scales — the persistence diagram **separates them automatically**. This is the property that makes PH more than "is there a cycle yes/no" — it's "what is the scale spectrum of the topology."
 
 ### The null ladder — what test asks what question
 
