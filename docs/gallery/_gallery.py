@@ -953,6 +953,73 @@ def qc_filter_mask(
     return keep
 
 
+def wcs_persistence_null(
+    pca: np.ndarray,
+    cluster_labels: np.ndarray,
+    n_landmarks: int,
+    *,
+    n_shuffles: int = 5,
+    seed: int = 42,
+) -> np.ndarray:
+    """Build a pooled within-cluster-shuffled persistence null distribution.
+
+    Per the 2026-04-29 calibration finding, the dataset-relative
+    "robust = top 20% of max persistence" threshold admits clustering-
+    geometry artifacts. A WCS-calibrated significance test compares
+    each real cycle's persistence to a pool of persistences from
+    within-cluster-shuffled data — same cluster identities preserved,
+    within-cluster joint structure broken.
+
+    Parameters
+    ----------
+    pca : np.ndarray, shape (n_cells, n_pcs)
+        The PCA-embedded data. Same input that produced the real
+        cycles being tested.
+    cluster_labels : np.ndarray, shape (n_cells,)
+        Discrete labels (typically Leiden or cell-type) — the
+        clustering whose internal structure WCS preserves while
+        permuting feature values within each cluster.
+    n_landmarks : int
+        Same k-means landmark count used for the real run. Must match
+        for persistences to be comparable.
+    n_shuffles : int
+        Number of WCS replicates. Default 5; raise to 10+ for tighter
+        z-score estimates on small datasets.
+    seed : int
+        Base seed; replicate ``k`` uses ``seed + k + 1`` so the real
+        run (which conventionally uses ``seed`` directly) is excluded.
+
+    Returns
+    -------
+    np.ndarray, shape (≈ n_shuffles × n_features_per_shuffle,)
+        Pooled persistence values from all WCS replicates. Use as the
+        null distribution against which real persistences are compared.
+
+    See also
+    --------
+    cycle_lineage_spans : pass this output as ``wcs_persistences`` and
+        set ``min_z_vs_wcs=3.0`` for null-calibrated cycle filtering.
+    """
+    import ripser
+    from sklearn.cluster import KMeans
+
+    rng = np.random.default_rng(seed)
+    pooled = []
+    for k in range(n_shuffles):
+        shuffled = pca.copy()
+        for c in np.unique(cluster_labels):
+            idx = np.where(cluster_labels == c)[0]
+            for j in range(pca.shape[1]):
+                shuffled[idx, j] = pca[rng.permutation(idx), j]
+        n_lm = min(n_landmarks, shuffled.shape[0] - 1)
+        km = KMeans(n_clusters=n_lm, n_init=3, random_state=seed + k + 1).fit(shuffled)
+        result = ripser.ripser(km.cluster_centers_, maxdim=1, do_cocycles=False)
+        b1 = result["dgms"][1]
+        if len(b1) > 0:
+            pooled.extend((b1[:, 1] - b1[:, 0]).tolist())
+    return np.asarray(pooled, dtype=np.float64)
+
+
 def cycle_lineage_spans(
     cocycles_1: list,
     persistences: np.ndarray,
@@ -960,8 +1027,10 @@ def cycle_lineage_spans(
     *,
     threshold_frac: float = 0.20,
     min_distinct_types: int = 2,
+    wcs_persistences: np.ndarray | None = None,
+    min_z_vs_wcs: float | None = None,
 ) -> list[dict[str, Any]]:
-    """Filter ripser Betti-1 cycles to those spanning multiple cell types.
+    """Filter ripser Betti-1 cycles by robustness + vertex-content + (optional) null-calibration.
 
     The 2026-04-29 falsification arc found that PH cycle COUNT is a
     clustering measure (≈ within-cluster shuffle null). What survives
@@ -970,6 +1039,14 @@ def cycle_lineage_spans(
     (myeloid lineage, erythroblastic islands, NK/NKT pair, etc.) and are
     not reproduced by the WCS null. Single-type cycles are clustering
     artifacts and should be filtered out.
+
+    The ``threshold_frac=0.20`` rule is dataset-relative and admits
+    clustering-geometry artifacts when the data has a large persistence
+    ceiling. For null-calibrated significance, pass ``wcs_persistences``
+    (from :func:`wcs_persistence_null`) and ``min_z_vs_wcs`` — empirical
+    default ``3.0``. This was demonstrated on Marrow res=0.5: the 20%
+    rule kept 20 cycles, but only the top 7 had z > 3 vs WCS pool;
+    cycles 8-20 fell into the noise band.
 
     Note: replication on Lung / Liver / Limb_Muscle showed the
     lineage-span signal does NOT robustly generalize across all tissues.
@@ -990,26 +1067,47 @@ def cycle_lineage_spans(
         cell types of cells assigned to that landmark by k-means).
     threshold_frac : float
         Robustness cutoff: keep features with persistence > this fraction
-        of the maximum.
+        of the maximum. Ignored when ``wcs_persistences`` + ``min_z_vs_wcs``
+        are both provided (the WCS-z filter supersedes it).
     min_distinct_types : int
         Keep only cycles whose vertex set spans at least this many
         distinct labels. ``2`` filters out single-type clustering
         artifacts.
+    wcs_persistences : np.ndarray | None
+        Pooled persistence values from WCS replicates. When provided
+        AND ``min_z_vs_wcs`` is set, replaces the relative threshold
+        with a null-calibrated z-score filter. Each cycle's
+        ``z_vs_wcs`` and empirical ``p_vs_wcs`` are added to its dict.
+    min_z_vs_wcs : float | None
+        Minimum z-score (cycle persistence vs WCS pool) to keep a cycle.
+        Empirical default 3.0; lower (e.g. 2.0) is more permissive.
 
     Returns
     -------
     list[dict]
-        One per surviving cycle, with keys: ``rank`` (sort by
-        persistence), ``persistence``, ``vertices`` (np.ndarray of
-        landmark indices), ``vertex_labels`` (np.ndarray of labels),
-        ``n_distinct_types`` (int), ``label_counts`` (dict).
+        One per surviving cycle, with keys: ``rank`` (1-indexed by
+        persistence), ``persistence``, ``vertices``, ``vertex_labels``,
+        ``n_distinct_types``, ``label_counts``. When WCS is provided:
+        also ``z_vs_wcs`` and ``p_vs_wcs`` (empirical fraction of WCS
+        persistences ≥ this cycle's persistence).
     """
     if len(persistences) == 0:
         return []
-    pmax = float(persistences.max())
-    threshold = threshold_frac * pmax
-    robust_idx = np.where(persistences > threshold)[0]
-    # sort by persistence descending so rank is meaningful
+
+    use_wcs = wcs_persistences is not None and min_z_vs_wcs is not None
+    if use_wcs:
+        wcs_arr = np.asarray(wcs_persistences, dtype=np.float64)
+        wcs_mean = float(wcs_arr.mean()) if len(wcs_arr) > 0 else 0.0
+        wcs_std = float(wcs_arr.std() + 1e-9) if len(wcs_arr) > 0 else 1.0
+
+    if use_wcs:
+        z_threshold = float(min_z_vs_wcs)  # narrow Optional[float] → float
+        z_per_cycle = (persistences - wcs_mean) / wcs_std
+        robust_idx = np.where(z_per_cycle >= z_threshold)[0]
+    else:
+        pmax = float(persistences.max())
+        threshold = threshold_frac * pmax
+        robust_idx = np.where(persistences > threshold)[0]
     robust_idx = robust_idx[np.argsort(-persistences[robust_idx])]
 
     out = []
@@ -1022,12 +1120,17 @@ def cycle_lineage_spans(
         unique_labels, counts = np.unique(labels, return_counts=True)
         if len(unique_labels) < min_distinct_types:
             continue
-        out.append({
+        entry = {
             "rank": rank + 1,
             "persistence": float(persistences[idx]),
             "vertices": verts,
             "vertex_labels": labels,
             "n_distinct_types": int(len(unique_labels)),
             "label_counts": dict(zip(unique_labels.tolist(), counts.tolist())),
-        })
+        }
+        if use_wcs:
+            p = float(persistences[idx])
+            entry["z_vs_wcs"] = float((p - wcs_mean) / wcs_std)
+            entry["p_vs_wcs"] = float((wcs_arr >= p).mean())
+        out.append(entry)
     return out
