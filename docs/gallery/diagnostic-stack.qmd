@@ -738,19 +738,27 @@ result = ripser.ripser(km.cluster_centers_, maxdim=1, do_cocycles=True)
 b1 = result["dgms"][1]
 persistences = b1[:, 1] - b1[:, 0]
 
-# Filter cycles to lineage-spanning ones (drop single-type artifacts).
-# Result: list of dicts with keys rank/persistence/vertices/vertex_labels/
-# n_distinct_types/label_counts.
+# Filter cycles to lineage-spanning ones, with WCS-z null calibration.
+# wcs_persistence_null builds the null distribution; passing it +
+# min_z_vs_wcs replaces the dataset-relative 20% threshold with a
+# null-anchored z-score gate.
+from _gallery import wcs_persistence_null
+wcs_pool = wcs_persistence_null(
+    adata_hvg.obsm["X_pca"], cell_types, n_landmarks=n_lm,
+    n_shuffles=10, seed=42,
+)
 spans = cycle_lineage_spans(
     result["cocycles"][1], persistences, landmark_dom_type,
-    threshold_frac=0.20, min_distinct_types=2,
+    min_distinct_types=2,
+    wcs_persistences=wcs_pool, min_z_vs_wcs=3.0,
 )
 for s in spans:
     print(f"rank {s['rank']}: pers={s['persistence']:.2f}, "
+          f"z={s['z_vs_wcs']:+.1f}, p={s['p_vs_wcs']:.4f}, "
           f"{s['n_distinct_types']} types, {s['label_counts']}")
 ```
 
-End-to-end smoke-test on TMS Marrow 3mo recovers a 3-type cycle (basophil + granulocyte + monocyte = myeloid lineage span). Tests at `docs/gallery/test_gallery_ph.py` lock down the contract for `cycle_lineage_spans` and `qc_filter_mask`. **Note the tissue-specificity caveat from the falsification arc**: lineage-span cycles are biologically meaningful in actively-differentiating tissues (Marrow), null or reversed in mostly-terminal-identity tissues (Lung, Liver). The `min_distinct_types=2` filter is correct; the *biological meaning* of surviving cycles is dataset-dependent.
+End-to-end on TMS Marrow res=0.5: the dataset-relative `threshold_frac=0.20` rule kept 11 cycles; the WCS-z gate at `min_z_vs_wcs=3.0` keeps 4 (the genuine signal — top z-scores 7.3, 7.0, 4.7, 4.5). Cycles 5-11 from the relative threshold fell into the WCS clustering-geometry noise band and got correctly filtered. The dominant rank-1 cycle (z=7.3, persistence 4.81) was inspected separately and confirmed to trace the classical GMP→granulocyte/monocyte myeloid bifurcation in PCA space — five Leiden clusters, two parallel maturation arms (precursor → intermediate → mature for both granulocyte and monocyte), with the loop closing because mature neutrophils and mature monocytes share enough effector gene programs (Lyz, Ifitm, S100 family) to be PCA-near each other. The framework's most defensible application is the WCS-z gate; for backward compatibility, callers who omit both `wcs_persistences` and `min_z_vs_wcs` get the legacy `threshold_frac` behavior. **Note the tissue-specificity caveat from the falsification arc**: lineage-span cycles are biologically meaningful in actively-differentiating tissues (Marrow), null or reversed in mostly-terminal-identity tissues (Lung, Liver). The `min_distinct_types=2` filter is correct; the *biological meaning* of surviving cycles is dataset-dependent.
 
 ## What each layer does (and what it doesn't)
 
