@@ -61,6 +61,7 @@ demo/site/
 # Scanpy / sklearn dataset caches (re-downloadable on demand)
 data/
 docs/data/
+.embeddings_cache/
 
 # Sibling projects
 turnstyle/
