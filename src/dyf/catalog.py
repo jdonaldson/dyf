@@ -183,8 +183,13 @@ class JointMatchResult:
 
 
 @dataclass
-class _FittedCatalog:
-    """Pre-computed stats for a single catalog after fit()."""
+class FittedCatalog:
+    """Pre-computed stats for a single catalog after :meth:`CatalogSpace.fit`.
+
+    This is the public schema for the per-catalog fit result. Access via
+    :meth:`CatalogSpace.get_fitted` rather than reaching into
+    ``CatalogSpace._fitted`` directly.
+    """
 
     config: CatalogConfig
     # Ontology-wide statistics
@@ -203,6 +208,12 @@ class _FittedCatalog:
     # Term disambiguation
     branch_terms: dict[str, set[str]] = field(default_factory=dict)  # node_id → discriminating terms
     term_boost: float = 0.04      # additive boost alpha
+
+
+# Backcompat alias — the leading-underscore name was the legacy/private form.
+# External code (e.g., earlier shortorder versions) may import it; new code
+# should use ``FittedCatalog``.
+_FittedCatalog = FittedCatalog
 
 
 # ── Utility functions ────────────────────────────────────────────────────
@@ -248,6 +259,12 @@ def _compute_entropy(
     entropy = -np.sum(probs * np.log(probs + 1e-10))
     max_entropy = np.log(k)
     return float(entropy / max_entropy) if max_entropy > 0 else 0.0
+
+
+# Public alias — :func:`_compute_entropy` is the legacy private name.
+# Returns normalized entropy of a similarity distribution, useful for
+# diagnosing match confidence (0 = peaked, 1 = uniform spread).
+compute_similarity_entropy = _compute_entropy
 
 
 def _compute_path_alignment(
@@ -1382,6 +1399,43 @@ class CatalogSpace:
             parts.append(f"  {len(self._mappings)} cross-mappings")
         parts.append(f"  fitted={self._is_fitted}")
         return "\n".join(parts)
+
+    # ── Public accessors (stable substrate API) ───────────────────────────
+
+    def get_fitted(self, catalog_name: str) -> FittedCatalog:
+        """Return the fitted state for a named catalog.
+
+        Use this rather than reaching into ``CatalogSpace._fitted`` — the
+        underscore-prefixed dict is an implementation detail; the returned
+        :class:`FittedCatalog` has the stable public schema.
+
+        Raises
+        ------
+        ValueError
+            If :meth:`fit` has not been called, or no catalog has the given name.
+        """
+        if not self._is_fitted:
+            raise ValueError("CatalogSpace.fit() has not been called")
+        if catalog_name not in self._fitted:
+            raise ValueError(
+                f"no catalog named {catalog_name!r}; "
+                f"known: {list(self._fitted.keys())}"
+            )
+        return self._fitted[catalog_name]
+
+    def get_lca_depth(self, catalog_name: str, node_a: str, node_b: str) -> int:
+        """Depth of the lowest common ancestor of two nodes in *catalog_name*'s graph.
+
+        Returns -1 if either node is missing or the nodes share no common
+        ancestor. Convenience wrapper around
+        :meth:`CategoryGraph.lca_depth`.
+        """
+        if catalog_name not in self._configs:
+            raise ValueError(
+                f"no catalog named {catalog_name!r}; "
+                f"known: {list(self._configs.keys())}"
+            )
+        return self._configs[catalog_name].graph.lca_depth(node_a, node_b)
 
 
 # ── Helper on CatalogMatch for internal use ──────────────────────────────

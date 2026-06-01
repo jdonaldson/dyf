@@ -134,13 +134,22 @@ except ImportError:
 # Fisher dimension weighting
 import logging
 
-# CatalogSpace — available via dyf.catalog (not re-exported)
+# CatalogSpace — substrate API, promoted to top-level export
 # Pipeline DAG runner — available via dyf.pipeline (not re-exported)
 # Concept graph — available via dyf.concept_graph (not re-exported)
 from . import (
     catalog,  # noqa: F401
     concept_graph,  # noqa: F401
     pipeline,  # noqa: F401
+)
+from .catalog import (
+    CatalogConfig,
+    CatalogMatch,
+    CatalogSpace,
+    CrossMapping,
+    FittedCatalog,
+    JointMatchResult,
+    compute_similarity_entropy,
 )
 
 # Tree-leaf agglomeration
@@ -320,7 +329,14 @@ __all__ = [
     "multi_level_fisher_weights",
     "store_category_graph",
     "load_category_graphs",
-    # CatalogSpace — internal/experimental, import directly from dyf.catalog
+    # CatalogSpace — substrate API for hierarchical catalog matching
+    "CatalogSpace",
+    "CatalogConfig",
+    "CatalogMatch",
+    "CrossMapping",
+    "FittedCatalog",
+    "JointMatchResult",
+    "compute_similarity_entropy",
     # Split-based tree keywords
     "TextDiversityReport",
     "assess_text_diversity",
