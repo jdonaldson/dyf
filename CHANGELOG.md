@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.9.0
+
+### Substrate API for downstream consumers
+
+The CatalogSpace subsystem is now a first-class public substrate API.
+Downstream consumers (notably shortorder) previously had to reach into
+underscore-prefixed names to use it; those reach-ins are now eliminated.
+
+- **`CatalogSpace`, `CatalogConfig`, `CatalogMatch`, `CrossMapping`,
+  `FittedCatalog`, `JointMatchResult`, `compute_similarity_entropy`**
+  are now exported from the top-level `dyf` namespace.
+  Previously `from dyf import CatalogSpace` raised `ImportError` despite
+  the comment in `__init__.py` describing it as "available via dyf.catalog";
+  it's now genuinely available from both paths.
+- **`_FittedCatalog` → `FittedCatalog`** (the public class name).
+  `_FittedCatalog` is retained as a backcompat alias.
+- **`compute_similarity_entropy`** added as the public alias for the
+  internal `_compute_entropy` (legacy name retained).
+- **`CatalogSpace.get_fitted(catalog_name) -> FittedCatalog`** — public
+  accessor replacing direct `._fitted[name]` reach-ins.
+- **`CatalogSpace.get_lca_depth(catalog_name, a, b) -> int`** — convenience
+  wrapper around `CategoryGraph.lca_depth`.
+- **`CatalogSpace.get_cross_domain_affinity(catalog_name, query_emb, n=5)`**
+  — public version of the prior private `_get_cross_domain_affinity`,
+  consistent with the other public accessors (takes `catalog_name`).
+
+### Dependency bump
+
+- `dyf-rs >= 0.7.1` (was `>= 0.7.0`) — pulls in the new `.pyi` type stubs
+  for `BridgeAnalysis`, `BridgePersistence`, and `MultiResolutionAnalysis`.
+  Stubs document field semantics (e.g. `recovery_depth` encoding,
+  `bridge_ratio` interpretation) that previously lived only in the Rust
+  source.
+
 ## 0.8.1
 
 ### API Changes
