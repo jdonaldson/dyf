@@ -337,6 +337,8 @@ __all__ = [
     "FittedCatalog",
     "JointMatchResult",
     "compute_similarity_entropy",
+    # (CatalogSpace public methods: get_fitted, get_lca_depth,
+    #  get_cross_domain_affinity)
     # Split-based tree keywords
     "TextDiversityReport",
     "assess_text_diversity",

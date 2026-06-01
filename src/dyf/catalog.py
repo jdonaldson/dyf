@@ -1437,6 +1437,22 @@ class CatalogSpace:
             )
         return self._configs[catalog_name].graph.lca_depth(node_a, node_b)
 
+    def get_cross_domain_affinity(
+        self,
+        catalog_name: str,
+        query_emb: np.ndarray,
+        n: int = 5,
+    ) -> dict[str, float]:
+        """Affinity scores between a query and the shallowest non-root nodes
+        of *catalog_name*'s graph.
+
+        Returns up to *n* (node_id, score) entries as a dict — useful as a
+        coarse "which domain does this query belong to" signal.
+        """
+        return self._get_cross_domain_affinity(
+            self.get_fitted(catalog_name), query_emb, n=n
+        )
+
 
 # ── Helper on CatalogMatch for internal use ──────────────────────────────
 
