@@ -28,7 +28,7 @@ classifiers = [
 keywords = ["outlier", "classification", "lsh", "pca", "embeddings", "machine-learning"]
 dependencies = [
     "numpy>=1.20",
-    "dyf-rs>=0.7.1",
+    "dyf-rs>=0.7.2",
 ]
 
 [project.optional-dependencies]

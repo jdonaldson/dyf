@@ -28,7 +28,7 @@ underscore-prefixed names to use it; those reach-ins are now eliminated.
 
 ### Dependency bump
 
-- `dyf-rs >= 0.7.1` (was `>= 0.7.0`) — pulls in the new `.pyi` type stubs
+- `dyf-rs >= 0.7.2` (was `>= 0.7.0`) — pulls in the new `.pyi` type stubs
   for `BridgeAnalysis`, `BridgePersistence`, and `MultiResolutionAnalysis`.
   Stubs document field semantics (e.g. `recovery_depth` encoding,
   `bridge_ratio` interpretation) that previously lived only in the Rust
