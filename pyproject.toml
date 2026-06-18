@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dyf"
-version = "0.9.0"
+version = "0.10.0"
 description = "Density Yields Features - discover structure in embedding spaces"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -28,7 +28,7 @@ classifiers = [
 keywords = ["outlier", "classification", "lsh", "pca", "embeddings", "machine-learning"]
 dependencies = [
     "numpy>=1.20",
-    "dyf-rs>=0.7.2",
+    "dyf-rs>=0.8.0",
 ]
 
 [project.optional-dependencies]

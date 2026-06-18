@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.10.0
+
+### Dense Rust-backed multiprobe search
+
+New `DenseSearchIndex` — a dense in-memory nearest-neighbor search over a dyf tree,
+backed by the Rust kernel `dyf_rs.dense_search_batch` (requires **dyf-rs >= 0.8.0**).
+
+- **`DenseSearchIndex(embeddings).search(queries, k=10, nprobe=256)`** routes queries
+  through a `build_dyf_tree` partition via a batched, rayon-parallel Rust kernel. Top-k
+  is identical to the Python multiprobe at ~100x lower per-query latency; on 8.84M
+  MSMARCO it reproduces dyf-mp recall at ~9ms/query (vs ~58ms in pure Python). Accepts
+  a 1D query (`(dim,)` → `(k,)`) or a batch (`(nq, dim)` → `(nq, k)`).
+- **`flatten_tree`** exposed for callers who want the CSR arrays the kernel consumes.
+- This is the *dense in-memory* path; the on-disk `LazyIndex` path is unchanged.
+- Dependency floor raised to `dyf-rs>=0.8.0`.
+
 ## 0.9.0
 
 ### Substrate API for downstream consumers

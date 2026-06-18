@@ -90,6 +90,9 @@ from .dyf_tree import (
     refine_dyf_tree,
 )
 
+# Dense in-memory multiprobe search (Rust-backed, dyf-rs >= 0.8.0)
+from .dense_search import DenseSearchIndex, flatten_tree
+
 # PCA tree
 from .pca_tree import (
     boundary_persistence_scores,
@@ -299,6 +302,9 @@ __all__ = [
     "build_dyf_tree",
     "refine_dyf_tree",
     "refine_clusters",
+    # Dense Rust-backed search
+    "DenseSearchIndex",
+    "flatten_tree",
     # Unified tree-cutting dispatcher
     "cut_tree_to_labels",
     # Lazy index
