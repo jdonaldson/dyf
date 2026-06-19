@@ -13,8 +13,20 @@ backed by the Rust kernel `dyf_rs.dense_search_batch` (requires **dyf-rs >= 0.8.
   MSMARCO it reproduces dyf-mp recall at ~9ms/query (vs ~58ms in pure Python). Accepts
   a 1D query (`(dim,)` → `(k,)`) or a batch (`(nq, dim)` → `(nq, k)`).
 - **`flatten_tree`** exposed for callers who want the CSR arrays the kernel consumes.
-- This is the *dense in-memory* path; the on-disk `LazyIndex` path is unchanged.
 - Dependency floor raised to `dyf-rs>=0.8.0`.
+
+### On-disk `LazyIndex.search(backend="rust")`
+
+`LazyIndex.search` gains a `backend=` argument. `backend="rust"` routes the on-disk
+search through a preloaded Rust kernel (`dyf_rs.DyfSearcher`) — same `SearchResult`
+shape, stored fields included. On the immich index (n≈35k, dim=512, f16) it is ~15×
+faster with stored fields and ~100×+ on pure-retrieval indexes, warm.
+
+- Default `backend="python"` — behavior unchanged.
+- Falls back to the python path for: PQ-compressed indexes, overflow batches,
+  adaptive `nprobe` (`"auto"`/`AdaptiveProbeConfig`), and `return_routing=True`.
+- Multiprobe leaf-selection differs slightly from the python path (~0.92 top-k
+  overlap); validated on recall rather than exact top-k.
 
 ## 0.9.0
 

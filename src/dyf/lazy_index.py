@@ -1578,7 +1578,7 @@ class LazyIndex:
                 cost += abs(float(projections[i]))
         return cost
 
-    def search(self, query, k=10, nprobe=3, return_routing=False):
+    def search(self, query, k=10, nprobe=3, return_routing=False, backend="python"):
         """Search the index for nearest neighbors.
 
         Args:
@@ -1589,6 +1589,11 @@ class LazyIndex:
                 - "auto": adaptive probing with default AdaptiveProbeConfig
                 - AdaptiveProbeConfig: adaptive probing with custom thresholds
             return_routing: If True, populate result.routing with diagnostics.
+            backend: "python" (default) or "rust". The rust backend uses a
+                preloaded Rust kernel (dyf_rs.DyfSearcher) — much faster, same
+                result shape. It falls back to the python path when the index is
+                PQ-compressed, has overflow batches, or when nprobe is adaptive
+                or return_routing is requested (see _rust_eligible).
 
         Returns:
             SearchResult with indices, scores, and fields. Supports
@@ -1602,6 +1607,9 @@ class LazyIndex:
             raise ValueError(
                 f"Query must be 1D with dim={self.embedding_dim}, "
                 f"got shape {query.shape}")
+
+        if backend == "rust" and self._rust_eligible(nprobe, return_routing):
+            return self._search_rust(query, k, nprobe)
 
         # Normalize query for cosine similarity
         qnorm = np.linalg.norm(query)
@@ -1671,6 +1679,74 @@ class LazyIndex:
                 routing_info['adaptive_nprobe'] = len(candidate_leaves)
 
         return SearchResult(top_indices, top_scores, result_fields, routing_info)
+
+    # --- Rust backend (dyf_rs.DyfSearcher, preloaded dense path) ---------------
+
+    def _rust_eligible(self, nprobe, return_routing):
+        """Whether the rust fast path can serve this query. Falls back to python
+        for PQ, adaptive nprobe, return_routing, or overflow batches."""
+        if self.is_pq or return_routing or not isinstance(nprobe, int):
+            return False
+        if getattr(self, "_has_overflow", None) is None:
+            import dyf_rs
+            f = dyf_rs.DyfFile.open(self._path)
+            nob = f.num_overflow_batches
+            if callable(nob):
+                nob = nob()
+            self._has_overflow = nob > 0
+        return not self._has_overflow
+
+    def _rust_searcher(self):
+        if getattr(self, "_rust_search_obj", None) is None:
+            import dyf_rs
+            self._rust_search_obj = dyf_rs.DyfSearcher.open(self._path)
+        return self._rust_search_obj
+
+    def _search_rust(self, query, k, nprobe):
+        s = self._rust_searcher()
+        q2 = np.ascontiguousarray(query, dtype=np.float32).reshape(1, -1)
+        idx, sc = s.search_batch(q2, int(k), int(nprobe))
+        idx, sc = np.asarray(idx[0]), np.asarray(sc[0])
+        mask = idx >= 0
+        idx = idx[mask].astype(np.uint32)
+        sc = sc[mask].astype(np.float32)
+        fields = self._gather_fields(idx) if self.has_stored_fields else {}
+        return SearchResult(idx, sc, fields)
+
+    def _leaf_batch_indices(self):
+        if getattr(self, "_leaf_batches", None) is None:
+            bs = []
+            for nid in range(self._index.NodesLength()):
+                node = self._index.Nodes(nid)
+                if node and node.ChildrenLength() == 0 and node.BatchIndex() >= 0:
+                    bs.append(node.BatchIndex())
+            self._leaf_batches = bs
+        return self._leaf_batches
+
+    def _gather_fields(self, item_indices):
+        """Stored-field values for the final-k items (rust path). Builds a
+        per-item field cache once (one pass over base batches, matching the
+        preloaded corpus), then per-query lookup is O(k)."""
+        sf_types = self._get_stored_field_types()
+        if not sf_types:
+            return {}
+        if getattr(self, "_field_cache", None) is None:
+            cache = {f: {} for f in sf_types}
+            for bi in self._leaf_batch_indices():
+                b = self.get_leaf(bi)
+                iidx = b.column("item_index").to_numpy()
+                for f, ftype in sf_types.items():
+                    col = b.column(f)
+                    vals = col.to_pylist() if ftype in ("utf8", "binary") else col.to_numpy()
+                    d = cache[f]
+                    for row, it in enumerate(iidx):
+                        d[int(it)] = vals[row]
+            self._field_cache = cache
+        out = {}
+        for f, d in self._field_cache.items():
+            vals = [d.get(int(it)) for it in item_indices]
+            out[f] = vals if sf_types[f] in ("utf8", "binary") else np.asarray(vals)
+        return out
 
     def _build_centroid_index(self):
         """Build a flat centroid matrix from all leaf nodes.
