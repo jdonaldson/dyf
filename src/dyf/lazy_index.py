@@ -1578,7 +1578,7 @@ class LazyIndex:
                 cost += abs(float(projections[i]))
         return cost
 
-    def search(self, query, k=10, nprobe=3, return_routing=False, backend="python"):
+    def search(self, query, k=10, nprobe=3, return_routing=False, backend="rust"):
         """Search the index for nearest neighbors.
 
         Args:
@@ -1589,11 +1589,12 @@ class LazyIndex:
                 - "auto": adaptive probing with default AdaptiveProbeConfig
                 - AdaptiveProbeConfig: adaptive probing with custom thresholds
             return_routing: If True, populate result.routing with diagnostics.
-            backend: "python" (default) or "rust". The rust backend uses a
-                preloaded Rust kernel (dyf_rs.DyfSearcher) — much faster, same
-                result shape. It falls back to the python path when the index is
-                PQ-compressed, has overflow batches, or when nprobe is adaptive
-                or return_routing is requested (see _rust_eligible).
+            backend: "rust" (default) or "python". The rust backend uses the
+                Rust kernel (dyf_rs.DyfSearcher) — much faster, same result shape,
+                and now handles fixed/adaptive nprobe and return_routing. It falls
+                back to the python path only for PQ-compressed or overflow indexes
+                (the non-load-bearing tail). Pass backend="python" to force the
+                reference path (e.g. for parity testing).
 
         Returns:
             SearchResult with indices, scores, and fields. Supports
@@ -1608,8 +1609,8 @@ class LazyIndex:
                 f"Query must be 1D with dim={self.embedding_dim}, "
                 f"got shape {query.shape}")
 
-        if backend == "rust" and self._rust_eligible(nprobe, return_routing):
-            return self._search_rust(query, k, nprobe)
+        if backend == "rust" and self._rust_eligible():
+            return self._search_rust(query, k, nprobe, return_routing, t0)
 
         # Normalize query for cosine similarity
         qnorm = np.linalg.norm(query)
@@ -1682,10 +1683,11 @@ class LazyIndex:
 
     # --- Rust backend (dyf_rs.DyfSearcher, preloaded dense path) ---------------
 
-    def _rust_eligible(self, nprobe, return_routing):
-        """Whether the rust fast path can serve this query. Falls back to python
-        for PQ, adaptive nprobe, return_routing, or overflow batches."""
-        if self.is_pq or return_routing or not isinstance(nprobe, int):
+    def _rust_eligible(self):
+        """Whether the rust path can serve this query. The rust kernel now handles
+        fixed AND adaptive nprobe and return_routing; only the non-load-bearing tail
+        (PQ-compressed indexes, overflow batches) falls back to python."""
+        if self.is_pq:
             return False
         if getattr(self, "_has_overflow", None) is None:
             import dyf_rs
@@ -1696,6 +1698,17 @@ class LazyIndex:
             self._has_overflow = nob > 0
         return not self._has_overflow
 
+    def _adaptive_params(self, nprobe):
+        """(adaptive, nprobe, margin_lo, margin_hi, min_probes, max_probes) for the
+        rust kernel, matching _resolve_nprobe semantics."""
+        if isinstance(nprobe, int):
+            return False, nprobe, 0.01, 0.1, 1, 5
+        cfg = AdaptiveProbeConfig() if nprobe == "auto" else nprobe
+        if not isinstance(cfg, AdaptiveProbeConfig):
+            raise ValueError(
+                f"nprobe must be int, 'auto', or AdaptiveProbeConfig, got {nprobe!r}")
+        return True, 256, cfg.margin_lo, cfg.margin_hi, cfg.min_probes, cfg.max_probes
+
     def _rust_searcher(self):
         if getattr(self, "_rust_search_obj", None) is None:
             import dyf_rs
@@ -1705,16 +1718,31 @@ class LazyIndex:
             self._rust_search_obj = dyf_rs.DyfSearcher.open(self._path, lazy=True)
         return self._rust_search_obj
 
-    def _search_rust(self, query, k, nprobe):
+    def _search_rust(self, query, k, nprobe, return_routing, t0):
+        import time
         s = self._rust_searcher()
+        adaptive, npb, mlo, mhi, minp, maxp = self._adaptive_params(nprobe)
         q2 = np.ascontiguousarray(query, dtype=np.float32).reshape(1, -1)
-        idx, sc = s.search_batch(q2, int(k), int(nprobe))
+        idx, sc, routing = s.search_batch(q2, int(k), int(npb), adaptive,
+                                          float(mlo), float(mhi), int(minp), int(maxp),
+                                          bool(return_routing))
         idx, sc = np.asarray(idx[0]), np.asarray(sc[0])
         mask = idx >= 0
         idx = idx[mask].astype(np.uint32)
         sc = sc[mask].astype(np.float32)
         fields = self._gather_fields(idx) if self.has_stored_fields else {}
-        return SearchResult(idx, sc, fields)
+        routing_info = None
+        if return_routing and routing is not None:
+            routing_info = {
+                "leaves_probed": int(routing["leaves_probed"][0]),
+                "candidates_scored": int(routing["candidates_scored"][0]),
+                "min_margin": float(routing["min_margin"][0]),
+                "elapsed_ms": (time.perf_counter() - t0) * 1000,
+            }
+            if adaptive:
+                routing_info["nprobe_mode"] = "adaptive"
+                routing_info["adaptive_nprobe"] = int(routing["effective_nprobe"][0])
+        return SearchResult(idx, sc, fields, routing_info)
 
     def _leaf_batch_indices(self):
         if getattr(self, "_leaf_batches", None) is None:
