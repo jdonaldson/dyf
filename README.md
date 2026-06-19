@@ -77,11 +77,22 @@ write_lazy_index(tree, embeddings, "index.dyf",
                  stored_fields={"title": titles},
                  metadata={"model": "nomic-embed-text-v1.5"})
 
-# Search (instant open, LRU-cached leaf access)
+# Search — instant open, LRU-bounded leaf cache, fast Rust backend
 with LazyIndex("index.dyf") as idx:
-    result = idx.search(query_embedding, k=10, nprobe=3)
+    result = idx.search(query_embedding, k=10, nprobe=256, backend="rust")
     print(result.indices, result.scores)
     print(result.fields["title"])  # stored fields returned with results
+```
+
+For a fully in-memory corpus, `DenseSearchIndex` builds the tree and searches via the
+same Rust kernel (batched queries supported):
+
+```python
+from dyf import DenseSearchIndex
+
+idx = DenseSearchIndex(embeddings)                  # builds tree + flattens
+indices, scores = idx.search(query, k=10, nprobe=256)
+I, S = idx.search(query_batch, k=10, nprobe=256)    # batched -> (nq, k)
 ```
 
 ### Adaptive Probing
@@ -131,11 +142,28 @@ The key insight: items that appear as outliers globally often share structure at
 
 ## Performance
 
-| Dataset | Time | Per item |
-|---------|------|----------|
-| 60K embeddings (384d) | ~60ms | 1.0 µs |
+Search runs on a Rust multiprobe kernel (`dyf-rs >= 0.8.0`, PyO3) — the default path for
+both `LazyIndex.search` and `DenseSearchIndex`. Results are **bit-identical** to the
+pure-Python reference (`backend="python"`); the kernel handles fixed *and* adaptive
+`nprobe` and `return_routing`. MSMARCO MiniLM-L6 (384d), Apple Silicon, batched unless
+noted:
 
-Rust-accelerated via PyO3. ~4x faster than pure Python.
+| path | corpus / setting | latency / query | vs pure-Python |
+|------|------------------|-----------------|----------------|
+| `DenseSearchIndex` (in-memory, batched) | 8.84M, nprobe=256 | ~0.5 ms | ~100× |
+| `LazyIndex.search` (on-disk, batched) | up to 8.84M, nprobe=256 | ~0.9 ms | ~29× |
+| `LazyIndex.search` (on-disk, single query) | nprobe=256 | ~4 ms | ~6× |
+| `LazyIndex.search` (with stored fields) | immich 35K | ~2 ms | ~15× |
+
+Speedup is largest at low `nprobe`, batched queries, and without field-gather. Lazy mode
+opens in ~5 ms (vs ~0.4 s preload) and bounds memory with an LRU; only PQ-compressed and
+overflow indexes fall back to Python.
+
+> **Scope.** These are Rust-vs-pure-Python speedups — recovering the cost of the per-query
+> Python loop. They are **not** a claim that dyf is the fastest ANN retriever: on the pure
+> recall-vs-latency frontier, mature graph libraries (pynndescent, HNSW) are faster. dyf's
+> strengths are structure discovery, hierarchy, instant-open on-disk indexes, and reaching
+> exact recall on a single index by raising `nprobe`.
 
 ## API
 

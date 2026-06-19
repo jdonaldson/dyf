@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Rust is the default search backend
+
+`LazyIndex.search` now defaults to `backend="rust"`. The Rust kernel covers the full
+load-bearing query path — **fixed and adaptive `nprobe`** (`"auto"` /
+`AdaptiveProbeConfig`) and **`return_routing`** — all faithful to the Python reference
+(top-k overlap 1.000; `adaptive_nprobe` identical). Only PQ-compressed and overflow
+indexes fall back to Python; `backend="python"` remains as an explicit override.
+
+- Requires **dyf-rs >= 0.9.0** (extended `search_batch`: adaptive resolution + routing).
+- Note: on the rust path, `routing["leaves_probed"]` is a count (the python path returns
+  a list of probed batch indices) — diagnostic only.
+
 ## 0.10.0
 
 ### Dense Rust-backed multiprobe search
