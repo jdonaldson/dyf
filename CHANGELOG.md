@@ -25,8 +25,12 @@ faster with stored fields and ~100×+ on pure-retrieval indexes, warm.
 - Default `backend="python"` — behavior unchanged.
 - Falls back to the python path for: PQ-compressed indexes, overflow batches,
   adaptive `nprobe` (`"auto"`/`AdaptiveProbeConfig`), and `return_routing=True`.
-- Multiprobe leaf-selection differs slightly from the python path (~0.92 top-k
-  overlap); validated on recall rather than exact top-k.
+- Uses the Rust searcher's lazy mode (instant open, bounded memory — only touched
+  leaves are decoded; per-leaf contiguous scoring). Cold leaves pay a one-time
+  decode on first use.
+- Recall-validated, not bit-exact: top-k matches the python path on MSMARCO
+  (overlap 1.000) and is within ~0.92 on some indexes; recall@10 vs exact
+  brute-force is identical across backends.
 
 ## 0.9.0
 

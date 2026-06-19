@@ -1699,7 +1699,10 @@ class LazyIndex:
     def _rust_searcher(self):
         if getattr(self, "_rust_search_obj", None) is None:
             import dyf_rs
-            self._rust_search_obj = dyf_rs.DyfSearcher.open(self._path)
+            # lazy=True: instant open, bounded memory (only touched leaves), and
+            # faster warm queries (per-leaf contiguous scoring) — the right fit for
+            # the on-disk LazyIndex. Cold leaves pay a one-time decode on first use.
+            self._rust_search_obj = dyf_rs.DyfSearcher.open(self._path, lazy=True)
         return self._rust_search_obj
 
     def _search_rust(self, query, k, nprobe):
