@@ -30,7 +30,12 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libopenblas-dev
 
       - name: Install package
-        run: pip install -e ".[dev,full,io,lazy]"
+        run: pip install -e ".[dev,full,io,lazy,viz]"
+
+      - name: Install gallery render dependencies
+        # Jupyter stack (Quarto executes the python .qmd cells) + render-time imports
+        # the gallery pages use that aren't in the package extras.
+        run: pip install jupyter datasets matplotlib plotly ripser scanpy hdbscan
 
       - name: Configure git identity
         run: |

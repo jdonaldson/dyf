@@ -5,6 +5,7 @@ order: 4
 image: cifar100-deck-thumb.jpg
 categories: [images, embeddings, interactive]
 true-k: 20
+engine: markdown
 ---
 
 Most of the gallery shows clusterings as colored *dots*. This one shows the **actual
