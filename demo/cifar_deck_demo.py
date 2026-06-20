@@ -1,23 +1,24 @@
 """CIFAR-100 dyf image-scatter demo (interactive, open dataset).
 
-Pipeline: local CIFAR-100 -> CLIP embeddings -> dyf tree (cut to clusters) -> UMAP ->
-an interactive deck.gl scatter where every image sits at its UMAP coordinate, outlined
-in its dyf-cluster color, with hover tooltips (fine class + cluster).
+Pipeline: local CIFAR-100 -> CLIP embeddings -> dyf tree -> UMAP -> an interactive deck.gl
+scatter where every image sits at its UMAP coordinate, backed by a square outline colored
+by its cluster. Two toolbar controls:
+  * facet depth slider  — re-cuts the clustering at different granularities (few -> many)
+  * method toggle       — recolors outlines by dyf clusters vs k-means clusters at that depth
+so you can eyeball where dyf and k-means agree/disagree. An NMI table (dyf vs k-means vs the
+true coarse classes, per depth) is printed at build time.
 
-Outputs (written next to this script, in demo/):
-  cifar100.npz       cached embeddings + thumbnails + labels (regenerate-skippable)
-  cifar_atlas.png    texture atlas of cluster-outlined 32px thumbnails
-  cifar_deck.html    the viewer (references cifar_atlas.png -> serve over http)
+Outputs (in demo/): cifar100.npz (cache), cifar_atlas.png (thumbnails), cifar_deck.html (viewer).
 
 Run:
-  pip install "dyf[vision]" mlx-vis matplotlib            # (umap-learn works instead of mlx-vis)
-  # ensure the CIFAR-100 pickle exists (one-time, ~178MB):
+  pip install "dyf[vision]" mlx-vis matplotlib scikit-learn   # umap-learn works instead of mlx-vis
   python -c "import torchvision; torchvision.datasets.CIFAR100('~/.cache/torchvision', download=True)"
   python demo/cifar_deck_demo.py
-  python demo/viz_server.py --dir demo                    # then open cifar_deck.html
-Because deck.gl fetches the atlas, the page MUST be served over http(s) (a file:// open
-is blocked by CORS) — use viz_server.py or `python -m http.server`.
+  python demo/viz_server.py --dir demo                        # then open cifar_deck.html
+deck.gl fetches the atlas, so the page MUST be served over http(s) (file:// is CORS-blocked).
 """
+import base64
+import io
 import json
 import os
 import pickle
@@ -31,8 +32,8 @@ NPZ = os.path.join(HERE, "cifar100.npz")
 ATLAS = os.path.join(HERE, "cifar_atlas.png")
 HTML = os.path.join(HERE, "cifar_deck.html")
 CLIP_MODEL = "openai/clip-vit-base-patch32"
-N_SCATTER = 10000   # subset rendered for smooth interactivity
-K = 20              # dyf clusters (matches CIFAR-100's 20 coarse superclasses)
+N_SCATTER = 10000                            # subset rendered for smooth interactivity
+DEPTHS = [2, 4, 8, 16, 32, 64, 128]          # facet granularities (n_clusters) for the slider
 
 
 def _unpickle(f):
@@ -79,8 +80,8 @@ def _umap(X):
 
 
 def build_viz():
-    import matplotlib
     from PIL import Image
+    from sklearn.cluster import MiniBatchKMeans
     from sklearn.metrics import normalized_mutual_info_score as nmi
 
     import dyf
@@ -90,58 +91,106 @@ def build_viz():
     imgs, fine, coarse = D["images"], D["fine"], D["coarse"]
     fine_names = list(D["fine_names"])
 
-    # dyf structure + how well it recovers the true coarse superclasses
+    # cluster the full set with BOTH methods at every facet depth
     tree = dyf.build_dyf_tree(X, max_depth=10, num_bits=3, min_leaf_size=16)
-    labels = np.asarray(dyf.cut_tree_to_labels(tree, len(X), K, embeddings=X))
-    print(f"NMI(dyf clusters, true coarse classes) = {nmi(coarse, labels):.3f}")
+    dyf_labels, km_labels = {}, {}
+    for g in DEPTHS:
+        dyf_labels[g] = np.asarray(dyf.cut_tree_to_labels(tree, len(X), g, embeddings=X))
+        km_labels[g] = MiniBatchKMeans(n_clusters=g, random_state=0, n_init="auto").fit_predict(X)
+
+    print(f"\n{'facet':>6} {'dyf~coarse':>11} {'kmeans~coarse':>14} {'dyf~kmeans':>11}")
+    for g in DEPTHS:
+        print(f"{g:>6} {nmi(coarse, dyf_labels[g]):>11.3f} {nmi(coarse, km_labels[g]):>14.3f} "
+              f"{nmi(dyf_labels[g], km_labels[g]):>11.3f}")
 
     rng = np.random.default_rng(0)
     sub = rng.choice(len(X), min(N_SCATTER, len(X)), replace=False)
-    lab = labels[sub]
     Y = _umap(X[sub])
 
-    cmap = matplotlib.colormaps["tab20"]
-    palette = [tuple(int(255 * c) for c in cmap(i % 20)[:3]) for i in range(K)]
-
-    CELL, IMG, BORDER = 40, 32, 4
+    # borderless thumbnail atlas (outline is a separate deck.gl layer)
+    CELL = 32
     cols = int(np.ceil(np.sqrt(len(sub))))
     rows = int(np.ceil(len(sub) / cols))
     atlas = Image.new("RGB", (cols * CELL, rows * CELL), (0, 0, 0))
     mapping = {}
     for k, i in enumerate(sub):
         cx, cy = (k % cols) * CELL, (k // cols) * CELL
-        cell = Image.new("RGB", (CELL, CELL), palette[lab[k]])
-        cell.paste(Image.fromarray(imgs[i]).resize((IMG, IMG)), (BORDER, BORDER))
-        atlas.paste(cell, (cx, cy))
+        atlas.paste(Image.fromarray(imgs[i]).resize((CELL, CELL)), (cx, cy))
         mapping[str(k)] = {"x": cx, "y": cy, "width": CELL, "height": CELL, "mask": False}
     atlas.save(ATLAS)
 
+    # 1x1 white square -> tintable backing icon (mask:true colors it by getColor)
+    buf = io.BytesIO(); Image.new("RGBA", (1, 1), (255, 255, 255, 255)).save(buf, "PNG")
+    white = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+
     Yn = (Y - Y.mean(0)) / (Y.std(0) + 1e-9) * 100
     data = [{"position": [float(Yn[k, 0]), float(Yn[k, 1])], "icon": str(k),
-             "name": f"{fine_names[fine[sub[k]]]}  ·  dyf cluster {int(lab[k])}"}
+             "dyf": [int(dyf_labels[g][sub[k]]) for g in DEPTHS],
+             "km": [int(km_labels[g][sub[k]]) for g in DEPTHS],
+             "name": fine_names[fine[sub[k]]]}
             for k in range(len(sub))]
-    html = _HTML.replace("__DATA__", json.dumps(data)).replace("__MAPPING__", json.dumps(mapping))
+    html = (_HTML.replace("__DMAX__", str(len(DEPTHS) - 1))
+                 .replace("__DATA__", json.dumps(data))
+                 .replace("__MAPPING__", json.dumps(mapping))
+                 .replace("__DEPTHS__", json.dumps(DEPTHS))
+                 .replace("__WHITE__", white))
     with open(HTML, "w") as f:
         f.write(html)
-    print(f"atlas {cols*CELL}x{rows*CELL}, {len(sub)} icons -> {HTML}")
+    print(f"\natlas {cols*CELL}x{rows*CELL}, {len(sub)} icons, {len(DEPTHS)} depths, 2 methods -> {HTML}")
 
 
 _HTML = """<!doctype html><html><head><meta charset="utf-8">
-<title>CIFAR-100 - dyf image scatter</title>
+<title>CIFAR-100 - dyf vs k-means image scatter</title>
 <style>html,body,#c{margin:0;width:100%;height:100%;background:#0b0b10;overflow:hidden}
-#cap{position:fixed;top:10px;left:12px;color:#ccc;font:13px system-ui;
- background:rgba(0,0,0,.5);padding:6px 10px;border-radius:6px;z-index:5}#cap b{color:#fff}</style>
+#bar{position:fixed;top:10px;left:12px;color:#ddd;font:13px system-ui;z-index:5;
+ background:rgba(0,0,0,.6);padding:8px 12px;border-radius:8px;display:flex;gap:12px;align-items:center}
+#bar b{color:#fff}#bar input[type=range]{vertical-align:middle}#dval{min-width:58px;color:#7fd1ff}
+.seg{display:inline-flex;border:1px solid #555;border-radius:6px;overflow:hidden}
+.seg button{background:#1a1a22;color:#bbb;border:0;padding:3px 10px;cursor:pointer;font:13px system-ui}
+.seg button.on{background:#2d6cdf;color:#fff}
+#note{position:fixed;top:48px;left:12px;color:#9aa;font:11px system-ui;z-index:5;
+ background:rgba(0,0,0,.5);padding:4px 9px;border-radius:6px}</style>
 <script src="https://unpkg.com/deck.gl@9.0.0/dist.min.js"></script></head><body>
-<div id="cap"><b>CIFAR-100</b> - images at UMAP coords, outline = dyf cluster &middot; scroll zoom / drag pan / hover</div>
+<div id="bar"><b>CIFAR-100</b>
+ &middot; granularity (k): <input id="d" type="range" min="0" max="__DMAX__" value="3" step="1"> <span id="dval"></span>
+ &middot; outline: <span class="seg"><button id="m_dyf" class="on">dyf</button><button id="m_km">k-means</button></span>
+ &middot; <span class="seg"><button id="img_t" class="on">images</button></span>
+ &middot; scroll/drag/hover</div>
+<div id="note">same k, two clusterings &mdash; dyf = nested tree cuts (one fit &rarr; all k) &middot; k-means = independent fit per k</div>
 <div id="c"></div><script>
-const DATA = __DATA__, MAPPING = __MAPPING__;
+const DATA = __DATA__, MAPPING = __MAPPING__, DEPTHS = __DEPTHS__, WHITE = "__WHITE__";
 const {DeckGL, IconLayer, OrthographicView} = deck;
-new DeckGL({container:"c", views:[new OrthographicView({})],
+let di = 3, method = "dyf", showImg = true;
+function hsl(label){ // golden-angle hue -> distinct colors at any cluster count
+  const h=(label*137.508)%360, s=0.62, l=0.55, a=s*Math.min(l,1-l);
+  const f=n=>{const k=(n+h/30)%12; return Math.round(255*(l-a*Math.max(-1,Math.min(k-3,9-k,1))));};
+  return [f(0),f(8),f(4)];
+}
+const deckgl = new DeckGL({container:"c", views:[new OrthographicView({})],
   initialViewState:{target:[0,0,0], zoom:2}, controller:true,
-  getTooltip: ({object}) => object && {text: object.name},
-  layers:[ new IconLayer({id:"imgs", data:DATA, iconAtlas:"cifar_atlas.png",
-    iconMapping:MAPPING, getIcon:d=>d.icon, getPosition:d=>d.position,
-    getSize:1.6, sizeUnits:"common", pickable:true, alphaCutoff:-1}) ]});
+  getTooltip: ({object}) => object && {text: object.name
+    +"\\ndyf cluster "+object.dyf[di]+"  |  k-means "+object.km[di]+"   ("+DEPTHS[di]+"-way)"}});
+function render(){
+  const layers=[
+    new IconLayer({id:"outline", data:DATA, iconAtlas:WHITE,
+      iconMapping:{sq:{x:0,y:0,width:1,height:1,mask:true}}, getIcon:()=>"sq",
+      getPosition:d=>d.position, getColor:d=>hsl(d[method][di]), getSize:showImg?2.4:2.1,
+      sizeUnits:"common", pickable:true, updateTriggers:{getColor:[di,method], getSize:showImg}})];
+  if(showImg) layers.push(
+    new IconLayer({id:"imgs", data:DATA, iconAtlas:"cifar_atlas.png",
+      iconMapping:MAPPING, getIcon:d=>d.icon, getPosition:d=>d.position,
+      getSize:1.9, sizeUnits:"common", pickable:true, alphaCutoff:-1}));
+  deckgl.setProps({layers});
+  document.getElementById("dval").textContent = DEPTHS[di]+"-way";
+}
+document.getElementById("d").addEventListener("input", e=>{di=+e.target.value; render();});
+function setM(m){method=m; document.getElementById("m_dyf").classList.toggle("on",m==="dyf");
+  document.getElementById("m_km").classList.toggle("on",m==="km"); render();}
+document.getElementById("m_dyf").onclick=()=>setM("dyf");
+document.getElementById("m_km").onclick=()=>setM("km");
+document.getElementById("img_t").onclick=()=>{showImg=!showImg;
+  document.getElementById("img_t").classList.toggle("on",showImg); render();};
+render();
 </script></body></html>"""
 
 
