@@ -29,7 +29,7 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 CIFAR = os.path.expanduser("~/.cache/torchvision/cifar-100-python")
 NPZ = os.path.join(HERE, "cifar100.npz")
-ATLAS = os.path.join(HERE, "cifar_atlas.png")
+ATLAS = os.path.join(HERE, "cifar_atlas.jpg")  # JPEG: 10k photo thumbs compress ~10x vs PNG
 HTML = os.path.join(HERE, "cifar_deck.html")
 CLIP_MODEL = "openai/clip-vit-base-patch32"
 N_SCATTER = 10000                            # subset rendered for smooth interactivity
@@ -117,7 +117,7 @@ def build_viz():
         cx, cy = (k % cols) * CELL, (k // cols) * CELL
         atlas.paste(Image.fromarray(imgs[i]).resize((CELL, CELL)), (cx, cy))
         mapping[str(k)] = {"x": cx, "y": cy, "width": CELL, "height": CELL, "mask": False}
-    atlas.save(ATLAS)
+    atlas.save(ATLAS, quality=82)
 
     # 1x1 white square -> tintable backing icon (mask:true colors it by getColor)
     buf = io.BytesIO(); Image.new("RGBA", (1, 1), (255, 255, 255, 255)).save(buf, "PNG")
@@ -177,7 +177,7 @@ function render(){
       getPosition:d=>d.position, getColor:d=>hsl(d[method][di]), getSize:showImg?2.4:2.1,
       sizeUnits:"common", pickable:true, updateTriggers:{getColor:[di,method], getSize:showImg}})];
   if(showImg) layers.push(
-    new IconLayer({id:"imgs", data:DATA, iconAtlas:"cifar_atlas.png",
+    new IconLayer({id:"imgs", data:DATA, iconAtlas:"cifar_atlas.jpg",
       iconMapping:MAPPING, getIcon:d=>d.icon, getPosition:d=>d.position,
       getSize:1.9, sizeUnits:"common", pickable:true, alphaCutoff:-1}));
   deckgl.setProps({layers});

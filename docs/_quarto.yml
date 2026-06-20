@@ -3,6 +3,8 @@ project:
   output-dir: _site
   resources:
     - CNAME
+    - gallery/cifar100-deck/
+    - gallery/cifar100-deck-thumb.jpg
 
 metadata-files:
   - reference/_sidebar.yml

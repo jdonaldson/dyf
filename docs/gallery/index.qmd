@@ -11,6 +11,7 @@ listing:
     - fashion-mnist.qmd
     - twenty-newsgroups.qmd
     - cifar10-clip.qmd
+    - cifar100-deck.qmd
     - olivetti-faces.qmd
     - cmu-mocap.qmd
     - wine-iris.qmd

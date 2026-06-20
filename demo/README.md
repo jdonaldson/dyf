@@ -35,7 +35,8 @@ python demo/viz_server.py --dir demo  # serve, then open http://localhost:<port>
 
 deck.gl fetches the texture atlas, so the page **must be served over http(s)** — opening
 `cifar_deck.html` as a `file://` is blocked by CORS. Generated artifacts (`cifar100.npz`,
-`cifar_atlas.png`, `cifar_deck.html`) are gitignored.
+`cifar_atlas.jpg`, `cifar_deck.html`) are gitignored. A built copy is published to the docs
+gallery at [dyf.io/gallery/cifar100-deck](https://dyf.io/gallery/cifar100-deck.html).
 
 ## Wikipedia Knowledge Graph Visualization
 
