@@ -44,6 +44,7 @@ htmlcov/
 demo/*.parquet
 demo/*.pkl
 demo/*.npy
+demo/*.npz
 demo/*.dyf
 demo/*.html
 !demo/dyf_viewer.html
