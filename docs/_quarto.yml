@@ -6,6 +6,11 @@ project:
     - gallery/cifar100-deck/
     - gallery/cifar100-deck-thumb.jpg
 
+# Freeze computational pages: render locally, commit _freeze/, and CI (quarto basics,
+# no heavy deps) just assembles the stored output instead of re-executing the cells.
+execute:
+  freeze: auto
+
 metadata-files:
   - reference/_sidebar.yml
 
