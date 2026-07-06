@@ -43,6 +43,8 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+from ._arrays import ensure_f32
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -545,12 +547,14 @@ def _compute_local_centrality(
 
         try:
             facet_clf = DensityClassifier(embedding_dim=dim, num_bits=bits, seed=seed)
-            facet_clf.fit(bucket_emb)
+            facet_clf.fit(ensure_f32(bucket_emb, "embeddings"))
             facet_bridge = facet_clf.analyze_bridges(bucket_emb)
 
             for i in range(len(facet_bridge.bridge_indices)):
                 local_idx, _, neighbors = facet_bridge.get_bridge_connections(i)
                 local_centrality[indices[local_idx]] = len(neighbors) + 1
+        except TypeError:
+            raise   # dtype/signature errors are bugs, never graceful-degradation
         except Exception as e:
             logger.debug("Facet bridge analysis failed for bucket: %s", e)
 

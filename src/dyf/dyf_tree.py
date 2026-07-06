@@ -25,6 +25,8 @@ from collections import defaultdict
 import numpy as np
 from sklearn.cluster import AgglomerativeClustering
 
+from ._arrays import ensure_f32
+
 logger = logging.getLogger(__name__)
 
 
@@ -70,6 +72,8 @@ def _build_dyf_tree(embeddings, point_indices, depth, num_bits, min_leaf_size,
         # np.asarray: dyf-rs < 0.6.0 returned Python lists here
         bucket_ids = np.asarray(clf.get_bucket_ids())
         centroid_sims = clf.get_centroid_similarities()
+    except TypeError:
+        raise   # dtype/signature errors are bugs, never graceful-degradation
     except Exception as e:
         if len(point_indices) == len(embeddings):
             # Root-level fit failure is never benign: the whole tree degenerates
@@ -183,9 +187,7 @@ def build_dyf_tree(embeddings, max_depth, num_bits=3, min_leaf_size=4,
     Returns:
         Tree dict with keys: children, indices, depth, point_margin_map.
     """
-    # float32: dyf-rs's DensityClassifier has a typed f32 signature; float64
-    # input would make every fit throw (degenerating the tree to a single leaf).
-    embeddings = np.asarray(embeddings, dtype=np.float32)
+    embeddings = ensure_f32(embeddings)
     all_indices = np.arange(len(embeddings))
     return _build_dyf_tree(
         embeddings, all_indices, max_depth, num_bits, min_leaf_size, seed,
@@ -379,6 +381,8 @@ def _try_resplit(indices, embeddings, num_bits, seed):
         # np.asarray: dyf-rs < 0.6.0 returned Python lists here
         bucket_ids = np.asarray(clf.get_bucket_ids())
         centroid_sims = clf.get_centroid_similarities()
+    except TypeError:
+        raise   # dtype/signature errors are bugs, never graceful-degradation
     except Exception as e:
         logger.debug("Resplit failed: %s", e)
         return None
@@ -487,9 +491,7 @@ def refine_dyf_tree(tree, embeddings, min_coherence=None, num_bits=3,
         dict with stats: n_refined, n_leaves_before, n_leaves_after,
         coherence_before, coherence_after.
     """
-    # float32: dyf-rs's DensityClassifier has a typed f32 signature; float64
-    # input would make every fit throw (degenerating the tree to a single leaf).
-    embeddings = np.asarray(embeddings, dtype=np.float32)
+    embeddings = ensure_f32(embeddings)
     norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
     emb_normed = embeddings / np.maximum(norms, 1e-10)
 
@@ -601,6 +603,8 @@ def _resplit_ejected(ejected_indices, embeddings, num_bits, seed_offset):
         clf.fit(ejected_emb)
         # np.asarray: dyf-rs < 0.6.0 returned Python lists here
         bucket_ids = np.asarray(clf.get_bucket_ids())
+    except TypeError:
+        raise   # dtype/signature errors are bugs, never graceful-degradation
     except Exception as e:
         logger.debug("Ejected re-split failed, falling back to zeros: %s", e)
         bucket_ids = np.zeros(len(ejected_indices), dtype=int)
@@ -720,9 +724,7 @@ def refine_clusters(labels, embeddings, min_coherence=None,
         np.ndarray of shape (n,) with refined cluster labels.
     """
     labels = np.asarray(labels).copy()
-    # float32: dyf-rs's DensityClassifier has a typed f32 signature; float64
-    # input would make every fit throw (degenerating the tree to a single leaf).
-    embeddings = np.asarray(embeddings, dtype=np.float32)
+    embeddings = ensure_f32(embeddings)
 
     if min_cluster_size is None:
         n_original = len(set(labels.tolist()))

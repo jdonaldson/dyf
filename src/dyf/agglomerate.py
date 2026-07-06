@@ -263,8 +263,10 @@ def _run_louvain_on_centroids(centroids_normed, k, resolution,
     """
     try:
         from dyf_rs import louvain_from_centroids
+        from ._arrays import ensure_f32
         labels_arr, n_communities = louvain_from_centroids(
-            centroids_normed, k=k, resolution=resolution)
+            ensure_f32(centroids_normed, "centroids_normed"),
+            k=k, resolution=resolution)
         leaf_labels = labels_arr.astype(np.int32)
         logger.info(f"    Louvain (Rust) found {n_communities} communities "
                     f"from {len(centroids_normed)} leaves (k={k}, res={resolution})")

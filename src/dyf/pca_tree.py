@@ -46,7 +46,14 @@ def _build_pca_tree(embeddings, point_indices, depth, min_leaf_size=2):
         pca = PCA(n_components=1)
         projections = pca.fit_transform(subset).ravel()
     except Exception as e:
-        logger.debug("PCA split failed at depth %d: %s", depth, e)
+        if len(point_indices) == len(embeddings):
+            # Root-level failure degenerates the whole tree to a single leaf —
+            # a valid-looking but useless result. Never benign; say so.
+            logger.warning(
+                "PCA ROOT split failed — returning a single-leaf tree (all %d "
+                "points in one cluster). Cause: %s", len(point_indices), e)
+        else:
+            logger.debug("PCA split failed at depth %d: %s", depth, e)
         return {
             'left': None, 'right': None,
             'indices': point_indices, 'depth': depth,
