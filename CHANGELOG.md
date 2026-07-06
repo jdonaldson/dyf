@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **`LazyIndex.search` crashed on DYF1/DYF3 files** with `OSError: Invalid magic`
+  when using the default `backend="rust"` (dyf-rs only reads DYF2). Since
+  `write_lazy_index` defaults to `format_version=1`, any default-written index hit
+  this on its first search. Non-DYF2 files now fall back to the python path, as
+  PQ/overflow indexes already did. Regression introduced in 0.11.0.
+
+### CI
+
+- Lint (`ruff check` + `ruff format --check`) actually passes again — CI had been
+  red on lint since March, so tests never ran (which is how the crash above shipped).
+  `ruff` is now pinned to a minor version in dev extras so formatter drift can't
+  silently break CI.
+
 ## 0.11.0
 
 ### Rust is the default search backend

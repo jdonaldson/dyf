@@ -38,20 +38,23 @@ StoredFieldInput = np.ndarray | Sequence[str | bytes | None]
 
 class TreeNode(TypedDict):
     """Single node from LazyIndex.get_tree_structure()."""
+
     node_id: int
     parent_id: int | None
     depth: int
     num_items: int
     is_leaf: bool
-    batch_index: int           # -1 for internal nodes
+    batch_index: int  # -1 for internal nodes
     eigenvalues: np.ndarray | None  # (num_bits,) float32 or None
 
 
 class ExtractedData(TypedDict):
     """Return type for LazyIndex.extract_all_fields()."""
-    embeddings: np.ndarray     # (N, D) float32
+
+    embeddings: np.ndarray  # (N, D) float32
     fields: dict[str, StoredFieldValue]
     metadata: dict[str, str]
+
 
 MAGIC = b"DYF1"
 MAGIC_V2 = b"DYF2"
@@ -87,8 +90,9 @@ def detect_dyf_version(path: str) -> int:
 @dataclass
 class SearchResult:
     """Search result with indices, scores, and optional stored fields."""
-    indices: np.ndarray      # (k,) uint32
-    scores: np.ndarray       # (k,) float32
+
+    indices: np.ndarray  # (k,) uint32
+    scores: np.ndarray  # (k,) float32
     fields: dict = field(default_factory=dict)  # field_name -> (k,) values
     routing: dict | None = None  # routing diagnostics when return_routing=True
 
@@ -115,8 +119,9 @@ class AdaptiveProbeConfig:
     between min_probes and max_probes based on where min_margin falls between
     margin_lo and margin_hi.
     """
-    margin_lo: float = 0.01   # below this, always probe max
-    margin_hi: float = 0.1    # above this, always probe min
+
+    margin_lo: float = 0.01  # below this, always probe max
+    margin_hi: float = 0.1  # above this, always probe min
     min_probes: int = 1
     max_probes: int = 5
 
@@ -137,12 +142,12 @@ def _build_flat_node(node_id, node, node_to_id, embeddings, embedding_dim, batch
         bucket_ids_to_children, centroid, num_items, batch_index, depth,
         is_leaf, indices, eigenvalues.
     """
-    is_leaf = not node['children']
+    is_leaf = not node["children"]
 
     # Use pre-computed centroid if available, else compute from embeddings
-    indices = node['indices']
-    if node.get('centroid') is not None:
-        centroid = node['centroid']
+    indices = node["indices"]
+    if node.get("centroid") is not None:
+        centroid = node["centroid"]
     elif embeddings is not None:
         if len(indices) > 0:
             centroid = embeddings[indices].mean(axis=0).astype(np.float32)
@@ -158,12 +163,12 @@ def _build_flat_node(node_id, node, node_to_id, embeddings, embedding_dim, batch
 
     # Get children IDs
     children_ids = []
-    for child in node['children']:
+    for child in node["children"]:
         children_ids.append(node_to_id[id(child)])
 
     # Hyperplanes and bucket mapping
-    hp = node.get('hyperplanes')
-    bid_map = node.get('bucket_id_to_child')
+    hp = node.get("hyperplanes")
+    bid_map = node.get("bucket_id_to_child")
 
     if hp is not None:
         num_bits = hp.shape[0]
@@ -173,7 +178,7 @@ def _build_flat_node(node_id, node, node_to_id, embeddings, embedding_dim, batch
         hyperplanes_flat = None
 
     # Eigenvalues
-    ev = node.get('eigenvalues')
+    ev = node.get("eigenvalues")
     eigenvalues_flat = ev.astype(np.float32) if ev is not None else None
 
     # Build bucket_ids_to_children parallel array
@@ -190,17 +195,17 @@ def _build_flat_node(node_id, node, node_to_id, embeddings, embedding_dim, batch
     bi = batch_idx if is_leaf else -1
 
     return {
-        'children_ids': children_ids,
-        'hyperplanes': hyperplanes_flat,
-        'num_bits': num_bits,
-        'bucket_ids_to_children': bucket_ids_to_children,
-        'centroid': centroid,
-        'num_items': len(indices),
-        'batch_index': bi,
-        'depth': node['depth'],
-        'is_leaf': is_leaf,
-        'indices': indices,
-        'eigenvalues': eigenvalues_flat,
+        "children_ids": children_ids,
+        "hyperplanes": hyperplanes_flat,
+        "num_bits": num_bits,
+        "bucket_ids_to_children": bucket_ids_to_children,
+        "centroid": centroid,
+        "num_items": len(indices),
+        "batch_index": bi,
+        "depth": node["depth"],
+        "is_leaf": is_leaf,
+        "indices": indices,
+        "eigenvalues": eigenvalues_flat,
     }
 
 
@@ -233,7 +238,7 @@ def _flatten_tree_bfs(tree, embeddings, embedding_dim=None):
         node_id = len(flat_nodes)
         node_to_id[id(node)] = node_id
         flat_nodes.append(node)
-        for child in node['children']:
+        for child in node["children"]:
             queue.append(child)
 
     # Second pass: build flat representations
@@ -242,9 +247,8 @@ def _flatten_tree_bfs(tree, embeddings, embedding_dim=None):
     leaf_batch_map = {}
 
     for node_id, node in enumerate(flat_nodes):
-        flat_node = _build_flat_node(
-            node_id, node, node_to_id, embeddings, embedding_dim, batch_idx)
-        if flat_node['is_leaf']:
+        flat_node = _build_flat_node(node_id, node, node_to_id, embeddings, embedding_dim, batch_idx)
+        if flat_node["is_leaf"]:
             leaf_batch_map[node_id] = batch_idx
             batch_idx += 1
         result.append(flat_node)
@@ -254,11 +258,11 @@ def _flatten_tree_bfs(tree, embeddings, embedding_dim=None):
 
 def _quantize_embeddings(embeddings, quantization):
     """Quantize embeddings to the requested precision."""
-    if quantization == 'float32':
+    if quantization == "float32":
         return embeddings.astype(np.float32)
-    elif quantization == 'float16':
+    elif quantization == "float16":
         return embeddings.astype(np.float16)
-    elif quantization == 'int8':
+    elif quantization == "int8":
         # Scale to [-127, 127]
         max_val = np.abs(embeddings).max()
         if max_val > 0:
@@ -272,11 +276,12 @@ def _quantize_embeddings(embeddings, quantization):
 def _numpy_dtype_to_arrow(quantization):
     """Map quantization string to pyarrow type."""
     import pyarrow as pa
-    if quantization == 'float32':
+
+    if quantization == "float32":
         return pa.float32()
-    elif quantization == 'float16':
+    elif quantization == "float16":
         return pa.float16()
-    elif quantization == 'int8':
+    elif quantization == "int8":
         return pa.int8()
     raise ValueError(f"Unknown quantization: {quantization}")
 
@@ -347,7 +352,8 @@ def _serialize_codebook(codebook):
         Base64 encoded string.
     """
     import base64
-    return base64.b64encode(codebook.astype(np.float32).tobytes()).decode('ascii')
+
+    return base64.b64encode(codebook.astype(np.float32).tobytes()).decode("ascii")
 
 
 def _deserialize_codebook(b64_str, n_subquantizers, dsub):
@@ -362,6 +368,7 @@ def _deserialize_codebook(b64_str, n_subquantizers, dsub):
         (M, 256, dsub) float32 codebook.
     """
     import base64
+
     raw = base64.b64decode(b64_str)
     return np.frombuffer(raw, dtype=np.float32).reshape(n_subquantizers, 256, dsub).copy()
 
@@ -381,29 +388,28 @@ def _infer_arrow_type(values):
 
     # numpy arrays: match dtype
     if values.dtype == np.float32:
-        return pa.float32(), 'float32'
+        return pa.float32(), "float32"
     elif values.dtype == np.float64:
-        return pa.float64(), 'float64'
+        return pa.float64(), "float64"
     elif values.dtype == np.int32:
-        return pa.int32(), 'int32'
+        return pa.int32(), "int32"
     elif values.dtype == np.int64:
-        return pa.int64(), 'int64'
-    elif values.dtype.kind in ('U', 'O'):
+        return pa.int64(), "int64"
+    elif values.dtype.kind in ("U", "O"):
         # String or object array — check first non-None value
         for v in values:
             if v is not None:
                 if isinstance(v, bytes):
-                    return pa.binary(), 'binary'
-                return pa.utf8(), 'utf8'
-        return pa.utf8(), 'utf8'
-    elif values.dtype.kind == 'S':
-        return pa.binary(), 'binary'
+                    return pa.binary(), "binary"
+                return pa.utf8(), "utf8"
+        return pa.utf8(), "utf8"
+    elif values.dtype.kind == "S":
+        return pa.binary(), "binary"
     else:
         raise ValueError(f"Unsupported stored field dtype: {values.dtype}")
 
 
-def _resolve_arrow_schema(has_embeddings, embeddings, quantization,
-                          embedding_dim, metadata, stored_fields):
+def _resolve_arrow_schema(has_embeddings, embeddings, quantization, embedding_dim, metadata, stored_fields):
     """Build the Arrow schema and prepare PQ state for write_lazy_index.
 
     Args:
@@ -420,37 +426,38 @@ def _resolve_arrow_schema(has_embeddings, embeddings, quantization,
     """
     import pyarrow as pa
 
-    is_pq = has_embeddings and quantization.startswith('pq')
+    is_pq = has_embeddings and quantization.startswith("pq")
     pq_state = {
-        'is_pq': is_pq,
-        'all_codes': None,
-        'n_subquantizers': 0,
-        'q_embeddings': None,
+        "is_pq": is_pq,
+        "all_codes": None,
+        "n_subquantizers": 0,
+        "q_embeddings": None,
     }
 
     if not has_embeddings:
         # No embeddings — schema has item_index + stored fields only
-        arrow_schema = pa.schema([
-            ('item_index', pa.uint32()),
-        ])
+        arrow_schema = pa.schema(
+            [
+                ("item_index", pa.uint32()),
+            ]
+        )
         if metadata is None:
             metadata = {}
-        metadata['has_embeddings'] = 'false'
+        metadata["has_embeddings"] = "false"
     elif is_pq:
-        if quantization == 'pq':
+        if quantization == "pq":
             # Auto-select M = dim // 4 (dsub=4, canonical PQ default)
             n_subquantizers = embedding_dim // 4
             if n_subquantizers < 1:
-                raise ValueError(
-                    f"embedding_dim={embedding_dim} too small for PQ "
-                    f"(need at least 4)")
+                raise ValueError(f"embedding_dim={embedding_dim} too small for PQ (need at least 4)")
         else:
             # Parse M from e.g. "pq-8" -> M=8
-            n_subquantizers = int(quantization.split('-')[1])
+            n_subquantizers = int(quantization.split("-")[1])
         if embedding_dim % n_subquantizers != 0:
             raise ValueError(
                 f"embedding_dim={embedding_dim} must be divisible by "
-                f"n_subquantizers={n_subquantizers} for PQ quantization")
+                f"n_subquantizers={n_subquantizers} for PQ quantization"
+            )
         dsub = embedding_dim // n_subquantizers
 
         # Train PQ on full dataset, encode all embeddings
@@ -460,26 +467,30 @@ def _resolve_arrow_schema(has_embeddings, embeddings, quantization,
         # Store PQ params in metadata
         if metadata is None:
             metadata = {}
-        metadata['pq_codebook'] = _serialize_codebook(codebook)
-        metadata['pq_n_subquantizers'] = str(n_subquantizers)
-        metadata['pq_dsub'] = str(dsub)
+        metadata["pq_codebook"] = _serialize_codebook(codebook)
+        metadata["pq_n_subquantizers"] = str(n_subquantizers)
+        metadata["pq_dsub"] = str(dsub)
 
         # Arrow schema for PQ: codes stored as FixedSizeList(uint8, M)
-        arrow_schema = pa.schema([
-            ('item_index', pa.uint32()),
-            ('embedding', pa.list_(pa.uint8(), n_subquantizers)),
-        ])
-        pq_state['all_codes'] = all_codes
-        pq_state['n_subquantizers'] = n_subquantizers
+        arrow_schema = pa.schema(
+            [
+                ("item_index", pa.uint32()),
+                ("embedding", pa.list_(pa.uint8(), n_subquantizers)),
+            ]
+        )
+        pq_state["all_codes"] = all_codes
+        pq_state["n_subquantizers"] = n_subquantizers
     else:
         # Standard quantization path
         q_embeddings = _quantize_embeddings(embeddings, quantization)
         arrow_value_type = _numpy_dtype_to_arrow(quantization)
-        arrow_schema = pa.schema([
-            ('item_index', pa.uint32()),
-            ('embedding', pa.list_(arrow_value_type, embedding_dim)),
-        ])
-        pq_state['q_embeddings'] = q_embeddings
+        arrow_schema = pa.schema(
+            [
+                ("item_index", pa.uint32()),
+                ("embedding", pa.list_(arrow_value_type, embedding_dim)),
+            ]
+        )
+        pq_state["q_embeddings"] = q_embeddings
 
     # Process stored fields: detect types, extend schema, store metadata
     sf_types = {}  # field_name -> (pa_type, type_name)
@@ -491,14 +502,14 @@ def _resolve_arrow_schema(has_embeddings, embeddings, quantization,
         # Store field schema in metadata
         if metadata is None:
             metadata = {}
-        metadata['stored_fields'] = json.dumps(
-            {fname: tname for fname, (_, tname) in sf_types.items()})
+        metadata["stored_fields"] = json.dumps({fname: tname for fname, (_, tname) in sf_types.items()})
 
     return arrow_schema, sf_types, metadata, pq_state
 
 
-def _build_leaf_batches(flat_nodes, arrow_schema, has_embeddings, quantization,
-                        stored_fields, sf_types, pq_state, compression):
+def _build_leaf_batches(
+    flat_nodes, arrow_schema, has_embeddings, quantization, stored_fields, sf_types, pq_state, compression
+):
     """Build Arrow IPC byte buffers for each leaf node.
 
     Args:
@@ -517,25 +528,23 @@ def _build_leaf_batches(flat_nodes, arrow_schema, has_embeddings, quantization,
     """
     import pyarrow as pa
 
-    is_pq = pq_state['is_pq']
-    all_codes = pq_state['all_codes']
-    n_subquantizers = pq_state['n_subquantizers']
-    q_embeddings = pq_state['q_embeddings']
-    embedding_dim = arrow_schema.field('embedding').type.list_size if has_embeddings and not is_pq else 0
+    is_pq = pq_state["is_pq"]
+    all_codes = pq_state["all_codes"]
+    n_subquantizers = pq_state["n_subquantizers"]
+    q_embeddings = pq_state["q_embeddings"]
+    embedding_dim = arrow_schema.field("embedding").type.list_size if has_embeddings and not is_pq else 0
 
     ipc_options = None
-    if compression == 'zstd':
-        ipc_options = pa.ipc.IpcWriteOptions(
-            compression=pa.Codec('zstd'))
-    elif compression == 'lz4':
-        ipc_options = pa.ipc.IpcWriteOptions(
-            compression=pa.Codec('lz4'))
+    if compression == "zstd":
+        ipc_options = pa.ipc.IpcWriteOptions(compression=pa.Codec("zstd"))
+    elif compression == "lz4":
+        ipc_options = pa.ipc.IpcWriteOptions(compression=pa.Codec("lz4"))
 
     batch_buffers = []
     for node in flat_nodes:
-        if not node['is_leaf']:
+        if not node["is_leaf"]:
             continue
-        indices = node['indices']
+        indices = node["indices"]
 
         # Build Arrow RecordBatch
         item_idx_arr = pa.array(indices.astype(np.uint32), type=pa.uint32())
@@ -548,20 +557,18 @@ def _build_leaf_batches(flat_nodes, arrow_schema, has_embeddings, quantization,
                 leaf_codes = all_codes[indices]  # (n_leaf, M) uint8
                 flat_codes = leaf_codes.flatten()
                 values_arr = pa.array(flat_codes, type=pa.uint8())
-                emb_arr = pa.FixedSizeListArray.from_arrays(
-                    values_arr, n_subquantizers)
+                emb_arr = pa.FixedSizeListArray.from_arrays(values_arr, n_subquantizers)
             else:
                 # Standard path: quantized embeddings
                 leaf_emb = q_embeddings[indices]
                 flat_values = leaf_emb.flatten()
-                if quantization == 'int8':
+                if quantization == "int8":
                     values_arr = pa.array(flat_values, type=pa.int8())
-                elif quantization == 'float16':
+                elif quantization == "float16":
                     values_arr = pa.array(flat_values, type=pa.float16())
                 else:
                     values_arr = pa.array(flat_values, type=pa.float32())
-                emb_arr = pa.FixedSizeListArray.from_arrays(
-                    values_arr, embedding_dim)
+                emb_arr = pa.FixedSizeListArray.from_arrays(values_arr, embedding_dim)
             columns.append(emb_arr)
         if stored_fields:
             for fname in sf_types:
@@ -579,8 +586,7 @@ def _build_leaf_batches(flat_nodes, arrow_schema, has_embeddings, quantization,
 
         # Write to IPC stream bytes
         sink = pa.BufferOutputStream()
-        writer = pa.ipc.new_stream(sink, arrow_schema,
-                                   options=ipc_options)
+        writer = pa.ipc.new_stream(sink, arrow_schema, options=ipc_options)
         writer.write_batch(batch)
         writer.close()
         batch_buffers.append(sink.getvalue())
@@ -588,9 +594,19 @@ def _build_leaf_batches(flat_nodes, arrow_schema, has_embeddings, quantization,
     return batch_buffers
 
 
-def _build_flatbuffer_index(flat_nodes, batch_buffers, metadata, build_params,
-                            tree, quantization, compression, embedding_dim,
-                            n_items, n_leaves, format_version):
+def _build_flatbuffer_index(
+    flat_nodes,
+    batch_buffers,
+    metadata,
+    build_params,
+    tree,
+    quantization,
+    compression,
+    embedding_dim,
+    n_items,
+    n_leaves,
+    format_version,
+):
     """Build the FlatBuffer index bytes.
 
     Args:
@@ -650,17 +666,17 @@ def _build_flatbuffer_index(flat_nodes, batch_buffers, metadata, build_params,
     node_offsets = []
     for fnode in flat_nodes:
         # Children vector
-        if fnode['children_ids']:
-            FBNode.NodeStartChildrenVector(builder, len(fnode['children_ids']))
-            for cid in reversed(fnode['children_ids']):
+        if fnode["children_ids"]:
+            FBNode.NodeStartChildrenVector(builder, len(fnode["children_ids"]))
+            for cid in reversed(fnode["children_ids"]):
                 builder.PrependUint32(cid)
             children_vec = builder.EndVector()
         else:
             children_vec = None
 
         # Hyperplanes vector
-        if fnode['hyperplanes'] is not None:
-            hp = fnode['hyperplanes']
+        if fnode["hyperplanes"] is not None:
+            hp = fnode["hyperplanes"]
             FBNode.NodeStartHyperplanesVector(builder, len(hp))
             for val in reversed(hp):
                 builder.PrependFloat32(float(val))
@@ -669,8 +685,8 @@ def _build_flatbuffer_index(flat_nodes, batch_buffers, metadata, build_params,
             hp_vec = None
 
         # Bucket IDs to children vector
-        if fnode['bucket_ids_to_children']:
-            bids = fnode['bucket_ids_to_children']
+        if fnode["bucket_ids_to_children"]:
+            bids = fnode["bucket_ids_to_children"]
             FBNode.NodeStartBucketIdsToChildrenVector(builder, len(bids))
             for bid in reversed(bids):
                 builder.PrependUint64(int(bid))
@@ -679,15 +695,15 @@ def _build_flatbuffer_index(flat_nodes, batch_buffers, metadata, build_params,
             bids_vec = None
 
         # Centroid vector
-        cent = fnode['centroid']
+        cent = fnode["centroid"]
         FBNode.NodeStartCentroidVector(builder, len(cent))
         for val in reversed(cent):
             builder.PrependFloat32(float(val))
         cent_vec = builder.EndVector()
 
         # Eigenvalues vector
-        if fnode.get('eigenvalues') is not None:
-            ev = fnode['eigenvalues']
+        if fnode.get("eigenvalues") is not None:
+            ev = fnode["eigenvalues"]
             FBNode.NodeStartEigenvaluesVector(builder, len(ev))
             for val in reversed(ev):
                 builder.PrependFloat32(float(val))
@@ -701,13 +717,13 @@ def _build_flatbuffer_index(flat_nodes, batch_buffers, metadata, build_params,
             FBNode.NodeAddChildren(builder, children_vec)
         if hp_vec is not None:
             FBNode.NodeAddHyperplanes(builder, hp_vec)
-        FBNode.NodeAddNumBits(builder, fnode['num_bits'])
+        FBNode.NodeAddNumBits(builder, fnode["num_bits"])
         if bids_vec is not None:
             FBNode.NodeAddBucketIdsToChildren(builder, bids_vec)
         FBNode.NodeAddCentroid(builder, cent_vec)
-        FBNode.NodeAddNumItems(builder, fnode['num_items'])
-        FBNode.NodeAddBatchIndex(builder, fnode['batch_index'])
-        FBNode.NodeAddDepth(builder, fnode['depth'])
+        FBNode.NodeAddNumItems(builder, fnode["num_items"])
+        FBNode.NodeAddBatchIndex(builder, fnode["batch_index"])
+        FBNode.NodeAddDepth(builder, fnode["depth"])
         if ev_vec is not None:
             FBNode.NodeAddEigenvalues(builder, ev_vec)
         node_offsets.append(FBNode.NodeEnd(builder))
@@ -733,8 +749,8 @@ def _build_flatbuffer_index(flat_nodes, batch_buffers, metadata, build_params,
         FBBatch.BatchDescriptorAddOffset(builder, batch_offsets[i])
         FBBatch.BatchDescriptorAddLength(builder, len(buf))
         # Count rows from the flat_nodes
-        leaf_nodes = [n for n in flat_nodes if n['is_leaf']]
-        FBBatch.BatchDescriptorAddNumRows(builder, len(leaf_nodes[i]['indices']))
+        leaf_nodes = [n for n in flat_nodes if n["is_leaf"]]
+        FBBatch.BatchDescriptorAddNumRows(builder, len(leaf_nodes[i]["indices"]))
         batch_desc_offsets.append(FBBatch.BatchDescriptorEnd(builder))
 
     FBIndex.IndexStartBatchesVector(builder, len(batch_desc_offsets))
@@ -745,10 +761,10 @@ def _build_flatbuffer_index(flat_nodes, batch_buffers, metadata, build_params,
     # BuildParams
     bp = build_params or {}
     FBBuildParams.BuildParamsStart(builder)
-    FBBuildParams.BuildParamsAddMaxDepth(builder, bp.get('max_depth', tree['depth']))
-    FBBuildParams.BuildParamsAddNumBits(builder, bp.get('num_bits', 3))
-    FBBuildParams.BuildParamsAddMinLeafSize(builder, bp.get('min_leaf_size', 4))
-    FBBuildParams.BuildParamsAddSeed(builder, bp.get('seed', 42))
+    FBBuildParams.BuildParamsAddMaxDepth(builder, bp.get("max_depth", tree["depth"]))
+    FBBuildParams.BuildParamsAddNumBits(builder, bp.get("num_bits", 3))
+    FBBuildParams.BuildParamsAddMinLeafSize(builder, bp.get("min_leaf_size", 4))
+    FBBuildParams.BuildParamsAddSeed(builder, bp.get("seed", 42))
     FBBuildParams.BuildParamsAddQuantization(builder, quant_off)
     FBBuildParams.BuildParamsAddCompression(builder, comp_off)
     bp_off = FBBuildParams.BuildParamsEnd(builder)
@@ -793,10 +809,10 @@ def _write_dyf_file(path, format_version, fb_bytes, batch_buffers):
 
     if format_version == 2:
         # DYF2: header(8) + arrow batches + FlatBuffers + footer(16)
-        with open(path, 'wb') as f:
+        with open(path, "wb") as f:
             # 8-byte header: magic + flags
             f.write(MAGIC_V2)
-            f.write(struct.pack('<I', 0))  # flags (reserved)
+            f.write(struct.pack("<I", 0))  # flags (reserved)
 
             # Arrow IPC batches
             for buf in batch_buffers:
@@ -807,28 +823,28 @@ def _write_dyf_file(path, format_version, fb_bytes, batch_buffers):
             f.write(fb_bytes)
 
             # 16-byte footer: fb_offset (u64 LE) + fb_size (u64 LE)
-            f.write(struct.pack('<Q', fb_offset))
-            f.write(struct.pack('<Q', fb_size))
+            f.write(struct.pack("<Q", fb_offset))
+            f.write(struct.pack("<Q", fb_size))
     elif format_version == 3:
         # DYF3: header(32) + FlatBuffers + padding + arrow batches
         # Same layout as DYF1 but with 32-byte header supporting chunked reads
         total_header_fb = HEADER_SIZE_V3 + fb_size
         padding = (PAGE_SIZE - (total_header_fb % PAGE_SIZE)) % PAGE_SIZE
 
-        with open(path, 'wb') as f:
+        with open(path, "wb") as f:
             # 32-byte header
-            f.write(MAGIC_V3)                      # 4: magic
-            f.write(struct.pack('<Q', fb_size))     # 8: fb_size (u64 LE)
-            f.write(struct.pack('<H', 1))           # 2: n_chunks (u16 LE, 1 = single file)
-            f.write(struct.pack('<H', 0))           # 2: flags (reserved)
-            f.write(b'\x00' * 16)                   # 16: reserved
+            f.write(MAGIC_V3)  # 4: magic
+            f.write(struct.pack("<Q", fb_size))  # 8: fb_size (u64 LE)
+            f.write(struct.pack("<H", 1))  # 2: n_chunks (u16 LE, 1 = single file)
+            f.write(struct.pack("<H", 0))  # 2: flags (reserved)
+            f.write(b"\x00" * 16)  # 16: reserved
 
             # FlatBuffers
             f.write(fb_bytes)
 
             # Padding to 4KB boundary
             if padding > 0:
-                f.write(b'\x00' * padding)
+                f.write(b"\x00" * padding)
 
             # Arrow IPC batches
             for buf in batch_buffers:
@@ -838,18 +854,18 @@ def _write_dyf_file(path, format_version, fb_bytes, batch_buffers):
         total_header_fb = HEADER_SIZE + fb_size
         padding = (PAGE_SIZE - (total_header_fb % PAGE_SIZE)) % PAGE_SIZE
 
-        with open(path, 'wb') as f:
+        with open(path, "wb") as f:
             # Header
             f.write(MAGIC)
-            f.write(struct.pack('<Q', fb_size))
-            f.write(struct.pack('<I', 0))  # reserved
+            f.write(struct.pack("<Q", fb_size))
+            f.write(struct.pack("<I", 0))  # reserved
 
             # FlatBuffers
             f.write(fb_bytes)
 
             # Padding to 4KB boundary
             if padding > 0:
-                f.write(b'\x00' * padding)
+                f.write(b"\x00" * padding)
 
             # Arrow IPC batches
             for buf in batch_buffers:
@@ -860,8 +876,8 @@ def write_lazy_index(
     tree: dict,
     embeddings: np.ndarray | None,
     path: str,
-    compression: str = 'none',
-    quantization: str = 'float16',
+    compression: str = "none",
+    quantization: str = "float16",
     metadata: dict[str, str] | None = None,
     build_params: dict[str, int] | None = None,
     stored_fields: Mapping[str, StoredFieldInput] | None = None,
@@ -897,31 +913,38 @@ def write_lazy_index(
         n_items, embedding_dim = embeddings.shape
     else:
         if embedding_dim is None:
-            raise ValueError(
-                "embedding_dim is required when embeddings is None")
+            raise ValueError("embedding_dim is required when embeddings is None")
         # Count items from tree leaves
-        n_items = len(tree['indices'])
+        n_items = len(tree["indices"])
 
     # Flatten tree to BFS node list
-    flat_nodes, _leaf_batch_map = _flatten_tree_bfs(
-        tree, embeddings, embedding_dim=embedding_dim)
-    n_leaves = sum(1 for n in flat_nodes if n['is_leaf'])
+    flat_nodes, _leaf_batch_map = _flatten_tree_bfs(tree, embeddings, embedding_dim=embedding_dim)
+    n_leaves = sum(1 for n in flat_nodes if n["is_leaf"])
 
     # Build Arrow schema and prepare PQ/quantization state
     arrow_schema, sf_types, metadata, pq_state = _resolve_arrow_schema(
-        has_embeddings, embeddings, quantization, embedding_dim,
-        metadata, stored_fields)
+        has_embeddings, embeddings, quantization, embedding_dim, metadata, stored_fields
+    )
 
     # Build Arrow IPC batches per leaf
     batch_buffers = _build_leaf_batches(
-        flat_nodes, arrow_schema, has_embeddings, quantization,
-        stored_fields, sf_types, pq_state, compression)
+        flat_nodes, arrow_schema, has_embeddings, quantization, stored_fields, sf_types, pq_state, compression
+    )
 
     # Build FlatBuffer index
     fb_bytes = _build_flatbuffer_index(
-        flat_nodes, batch_buffers, metadata, build_params, tree,
-        quantization, compression, embedding_dim, n_items, n_leaves,
-        format_version)
+        flat_nodes,
+        batch_buffers,
+        metadata,
+        build_params,
+        tree,
+        quantization,
+        compression,
+        embedding_dim,
+        n_items,
+        n_leaves,
+        format_version,
+    )
 
     # Write file
     _write_dyf_file(path, format_version, fb_bytes, batch_buffers)
@@ -952,7 +975,7 @@ def split_dyf3(
     import math
     import os
 
-    with open(path, 'rb') as f:
+    with open(path, "rb") as f:
         magic = f.read(4)
     if magic != MAGIC_V3:
         raise ValueError(f"split_dyf3 requires a DYF3 file, got magic {magic!r}")
@@ -963,27 +986,26 @@ def split_dyf3(
 
     n_chunks = math.ceil(file_size / chunk_size)
     if n_chunks > 65535:
-        raise ValueError(
-            f"Too many chunks ({n_chunks}); increase chunk_size or reduce file")
+        raise ValueError(f"Too many chunks ({n_chunks}); increase chunk_size or reduce file")
 
     # Write companion chunks (1..N) as raw byte slices
-    with open(path, 'rb') as f:
+    with open(path, "rb") as f:
         for ci in range(1, n_chunks):
             offset = ci * chunk_size
             f.seek(offset)
             data = f.read(chunk_size)
             chunk_path = f"{path}.{ci}"
-            with open(chunk_path, 'wb') as cf:
+            with open(chunk_path, "wb") as cf:
                 cf.write(data)
 
     # Truncate original to chunk_size
-    with open(path, 'r+b') as f:
+    with open(path, "r+b") as f:
         f.truncate(chunk_size)
 
     # Patch n_chunks in header (offset 12, u16 LE)
-    with open(path, 'r+b') as f:
+    with open(path, "r+b") as f:
         f.seek(12)
-        f.write(struct.pack('<H', n_chunks))
+        f.write(struct.pack("<H", n_chunks))
 
     return n_chunks
 
@@ -1078,7 +1100,7 @@ class LazyIndex:
 
     def __init__(self, path):
         self._path = path
-        self._file = open(path, 'rb')
+        self._file = open(path, "rb")
         self._mm = mmap.mmap(self._file.fileno(), 0, access=mmap.ACCESS_READ)
         self._extra_files = []  # track companion chunk file handles
 
@@ -1091,19 +1113,17 @@ class LazyIndex:
         elif magic == MAGIC_V3:
             self._format_version = 3
         else:
-            raise ValueError(
-                f"Invalid magic: {magic!r}, expected {MAGIC!r}, "
-                f"{MAGIC_V2!r}, or {MAGIC_V3!r}"
-            )
+            raise ValueError(f"Invalid magic: {magic!r}, expected {MAGIC!r}, {MAGIC_V2!r}, or {MAGIC_V3!r}")
 
         if self._format_version == 3:
             # DYF3: 32-byte header, same layout as DYF1 but supports chunks
-            self._fb_size = struct.unpack_from('<Q', self._mm, 4)[0]
-            n_chunks = struct.unpack_from('<H', self._mm, 12)[0]
+            self._fb_size = struct.unpack_from("<Q", self._mm, 4)[0]
+            n_chunks = struct.unpack_from("<H", self._mm, 12)[0]
 
             if n_chunks > 1:
                 # Multi-chunk: concatenate all chunks into a bytearray
                 import os
+
                 base_path = path
                 buf = bytearray(self._mm[:])
                 self._mm.close()
@@ -1114,26 +1134,25 @@ class LazyIndex:
                 for ci in range(1, n_chunks):
                     chunk_path = f"{base_path}.{ci}"
                     if not os.path.exists(chunk_path):
-                        raise FileNotFoundError(
-                            f"DYF3 chunk {ci} not found: {chunk_path}")
-                    with open(chunk_path, 'rb') as cf:
+                        raise FileNotFoundError(f"DYF3 chunk {ci} not found: {chunk_path}")
+                    with open(chunk_path, "rb") as cf:
                         buf.extend(cf.read())
 
                 self._mm = memoryview(buf)
             # else: n_chunks == 1, mmap is fine as-is
 
             fb_start = HEADER_SIZE_V3
-            fb_buf = bytes(self._mm[fb_start:fb_start + self._fb_size])
+            fb_buf = bytes(self._mm[fb_start : fb_start + self._fb_size])
 
             from dyf.schema.Index import Index as FBIndex
+
             self._index = FBIndex.GetRootAs(fb_buf, 0)
 
             total_header_fb = HEADER_SIZE_V3 + self._fb_size
-            self._arrow_start = total_header_fb + (
-                (PAGE_SIZE - (total_header_fb % PAGE_SIZE)) % PAGE_SIZE)
+            self._arrow_start = total_header_fb + ((PAGE_SIZE - (total_header_fb % PAGE_SIZE)) % PAGE_SIZE)
 
         elif self._format_version == 1:
-            self._fb_size = struct.unpack_from('<Q', self._mm, 4)[0]
+            self._fb_size = struct.unpack_from("<Q", self._mm, 4)[0]
 
             # Parse FlatBuffers (at start of file)
             fb_start = HEADER_SIZE
@@ -1141,22 +1160,23 @@ class LazyIndex:
             fb_buf = self._mm[fb_start:fb_end]
 
             from dyf.schema.Index import Index as FBIndex
+
             self._index = FBIndex.GetRootAs(fb_buf, 0)
 
             # Compute arrow section start
             total_header_fb = HEADER_SIZE + self._fb_size
-            self._arrow_start = total_header_fb + (
-                (PAGE_SIZE - (total_header_fb % PAGE_SIZE)) % PAGE_SIZE)
+            self._arrow_start = total_header_fb + ((PAGE_SIZE - (total_header_fb % PAGE_SIZE)) % PAGE_SIZE)
         else:
             # DYF2: FlatBuffers in footer, Arrow batches after 8-byte header
             file_len = len(self._mm)
             # Read 16-byte footer (last 16 bytes)
-            fb_offset = struct.unpack_from('<Q', self._mm, file_len - 16)[0]
-            self._fb_size = struct.unpack_from('<Q', self._mm, file_len - 8)[0]
+            fb_offset = struct.unpack_from("<Q", self._mm, file_len - 16)[0]
+            self._fb_size = struct.unpack_from("<Q", self._mm, file_len - 8)[0]
 
-            fb_buf = self._mm[fb_offset:fb_offset + self._fb_size]
+            fb_buf = self._mm[fb_offset : fb_offset + self._fb_size]
 
             from dyf.schema.Index import Index as FBIndex
+
             self._index = FBIndex.GetRootAs(fb_buf, 0)
 
             # Arrow data starts right after the 8-byte header
@@ -1213,7 +1233,7 @@ class LazyIndex:
     def stored_field_names(self):
         """List of stored field names (empty if no stored fields)."""
         meta = self._get_metadata()
-        sf_json = meta.get('stored_fields')
+        sf_json = meta.get("stored_fields")
         if not sf_json:
             return []
         return list(json.loads(sf_json).keys())
@@ -1228,39 +1248,39 @@ class LazyIndex:
         """Return tree stats without touching Arrow data."""
         bp = self._index.BuildParams()
         summary = {
-            'version': self._index.Version().decode() if self._index.Version() else None,
-            'embedding_dim': self.embedding_dim,
-            'total_items': self.total_items,
-            'num_leaves': self.num_leaves,
-            'num_nodes': self.num_nodes,
-            'build_params': {
-                'max_depth': bp.MaxDepth() if bp else None,
-                'num_bits': bp.NumBits() if bp else None,
-                'min_leaf_size': bp.MinLeafSize() if bp else None,
-                'seed': bp.Seed() if bp else None,
-                'quantization': bp.Quantization().decode() if bp and bp.Quantization() else None,
-                'compression': bp.Compression().decode() if bp and bp.Compression() else None,
-            } if bp else None,
+            "version": self._index.Version().decode() if self._index.Version() else None,
+            "embedding_dim": self.embedding_dim,
+            "total_items": self.total_items,
+            "num_leaves": self.num_leaves,
+            "num_nodes": self.num_nodes,
+            "build_params": {
+                "max_depth": bp.MaxDepth() if bp else None,
+                "num_bits": bp.NumBits() if bp else None,
+                "min_leaf_size": bp.MinLeafSize() if bp else None,
+                "seed": bp.Seed() if bp else None,
+                "quantization": bp.Quantization().decode() if bp and bp.Quantization() else None,
+                "compression": bp.Compression().decode() if bp and bp.Compression() else None,
+            }
+            if bp
+            else None,
         }
         # Add PQ section if applicable
         if self.is_pq:
             meta = self._get_metadata()
-            m = int(meta.get('pq_n_subquantizers', '0'))
-            dsub = int(meta.get('pq_dsub', '0'))
-            summary['pq'] = {
-                'n_subquantizers': m,
-                'dsub': dsub,
-                'bytes_per_vector': m,
-                'codebook_size_kb': round(m * 256 * dsub * 4 / 1024, 1),
+            m = int(meta.get("pq_n_subquantizers", "0"))
+            dsub = int(meta.get("pq_dsub", "0"))
+            summary["pq"] = {
+                "n_subquantizers": m,
+                "dsub": dsub,
+                "bytes_per_vector": m,
+                "codebook_size_kb": round(m * 256 * dsub * 4 / 1024, 1),
             }
         # Add stored fields info
         sf_names = self.stored_field_names
         if sf_names:
             meta = self._get_metadata()
-            sf_schema = json.loads(meta['stored_fields'])
-            summary['stored_fields'] = [
-                {'name': name, 'type': sf_schema[name]} for name in sf_names
-            ]
+            sf_schema = json.loads(meta["stored_fields"])
+            summary["stored_fields"] = [{"name": name, "type": sf_schema[name]} for name in sf_names]
         return summary
 
     def get_tree_structure(self) -> list[TreeNode]:
@@ -1270,7 +1290,7 @@ class LazyIndex:
             list of dicts with keys: node_id, parent_id, depth, num_items,
             is_leaf, batch_index. Cached after first call.
         """
-        if hasattr(self, '_tree_structure_cache'):
+        if hasattr(self, "_tree_structure_cache"):
             return self._tree_structure_cache
 
         n_nodes = self._index.NodesLength()
@@ -1293,15 +1313,17 @@ class LazyIndex:
             ev = None
             if not node.EigenvaluesIsNone() and node.EigenvaluesLength() > 0:
                 ev = node.EigenvaluesAsNumpy().copy()
-            result.append({
-                'node_id': nid,
-                'parent_id': parent_map.get(nid),  # None for root
-                'depth': node.Depth(),
-                'num_items': node.NumItems(),
-                'is_leaf': is_leaf,
-                'batch_index': node.BatchIndex() if is_leaf else -1,
-                'eigenvalues': ev,
-            })
+            result.append(
+                {
+                    "node_id": nid,
+                    "parent_id": parent_map.get(nid),  # None for root
+                    "depth": node.Depth(),
+                    "num_items": node.NumItems(),
+                    "is_leaf": is_leaf,
+                    "batch_index": node.BatchIndex() if is_leaf else -1,
+                    "eigenvalues": ev,
+                }
+            )
 
         self._tree_structure_cache = result
         return result
@@ -1337,13 +1359,12 @@ class LazyIndex:
             if node is None:
                 continue
             if not node.EigenvaluesIsNone() and node.EigenvaluesLength() > 0:
-                result[nid] = np.array(
-                    node.EigenvaluesAsNumpy(), dtype=np.float32)
+                result[nid] = np.array(node.EigenvaluesAsNumpy(), dtype=np.float32)
         return result
 
     def _get_metadata(self):
         """Parse FlatBuffers KeyValue pairs into dict (cached)."""
-        if hasattr(self, '_metadata_cache'):
+        if hasattr(self, "_metadata_cache"):
             return self._metadata_cache
         meta = {}
         n = self._index.MetadataLength()
@@ -1364,10 +1385,10 @@ class LazyIndex:
             dict mapping field name to type string (e.g. 'utf8', 'float32').
             Empty dict if no stored fields.
         """
-        if hasattr(self, '_sf_types_cache'):
+        if hasattr(self, "_sf_types_cache"):
             return self._sf_types_cache
         meta = self._get_metadata()
-        sf_json = meta.get('stored_fields')
+        sf_json = meta.get("stored_fields")
         if not sf_json:
             self._sf_types_cache = {}
         else:
@@ -1380,21 +1401,21 @@ class LazyIndex:
         bp = self._index.BuildParams()
         if bp and bp.Quantization():
             return bp.Quantization().decode()
-        return 'float16'
+        return "float16"
 
     @property
     def is_pq(self):
         """True if this index uses Product Quantization."""
-        return self.quantization.startswith('pq')
+        return self.quantization.startswith("pq")
 
     def _load_pq_codebook(self):
         """Deserialize PQ codebook from metadata (cached)."""
-        if hasattr(self, '_pq_codebook'):
+        if hasattr(self, "_pq_codebook"):
             return self._pq_codebook
         meta = self._get_metadata()
-        m = int(meta['pq_n_subquantizers'])
-        dsub = int(meta['pq_dsub'])
-        self._pq_codebook = _deserialize_codebook(meta['pq_codebook'], m, dsub)
+        m = int(meta["pq_n_subquantizers"])
+        dsub = int(meta["pq_dsub"])
+        self._pq_codebook = _deserialize_codebook(meta["pq_codebook"], m, dsub)
         return self._pq_codebook
 
     def _pq_precompute_tables(self, query_normed):
@@ -1411,7 +1432,7 @@ class LazyIndex:
         dsub = codebook.shape[2]
         query_subs = query_normed.reshape(m, dsub)  # (M, dsub)
         # tables[j, c] = dot(query_sub_j, codebook[j, c])
-        tables = np.einsum('md,mcd->mc', query_subs, codebook)  # (M, 256)
+        tables = np.einsum("md,mcd->mc", query_subs, codebook)  # (M, 256)
         return tables
 
     def _pq_adc_scores(self, tables, codes):
@@ -1446,14 +1467,14 @@ class LazyIndex:
             (item_indices, scores, field_data) — numpy arrays and dict of
             stored field arrays. field_data is {} if no stored fields.
         """
-        item_indices = batch.column('item_index').to_numpy()
-        emb_col = batch.column('embedding')
+        item_indices = batch.column("item_index").to_numpy()
+        emb_col = batch.column("embedding")
         n_rows = len(emb_col)
         flat_values = emb_col.values.to_numpy()
 
         if self.is_pq:
             meta = self._get_metadata()
-            m = int(meta['pq_n_subquantizers'])
+            m = int(meta["pq_n_subquantizers"])
             codes = flat_values.reshape(n_rows, m)
             scores = self._pq_adc_scores(adc_tables, codes)
         else:
@@ -1468,7 +1489,7 @@ class LazyIndex:
         sf_types = self._get_stored_field_types()
         for fname in sf_types:
             col = batch.column(fname)
-            if sf_types[fname] in ('utf8', 'binary'):
+            if sf_types[fname] in ("utf8", "binary"):
                 field_data[fname] = col.to_pylist()
             else:
                 field_data[fname] = col.to_numpy()
@@ -1489,7 +1510,7 @@ class LazyIndex:
         n = codes.shape[0]
         reconstructed = np.zeros((n, m * dsub), dtype=np.float32)
         for j in range(m):
-            reconstructed[:, j * dsub:(j + 1) * dsub] = codebook[j, codes[:, j]]
+            reconstructed[:, j * dsub : (j + 1) * dsub] = codebook[j, codes[:, j]]
         return reconstructed
 
     def get_leaf(self, batch_index):
@@ -1561,7 +1582,7 @@ class LazyIndex:
         bits = (projections > 0).astype(np.uint64)
         bucket_id = np.uint64(0)
         for i, b in enumerate(bits):
-            bucket_id |= (b << np.uint64(i))
+            bucket_id |= b << np.uint64(i)
         return int(bucket_id), projections
 
     def _margin_distance(self, a, b, projections, num_bits):
@@ -1601,13 +1622,12 @@ class LazyIndex:
             backward-compatible unpacking: indices, scores = idx.search(...)
         """
         import time
+
         t0 = time.perf_counter()
 
         query = np.asarray(query, dtype=np.float32)
         if query.ndim != 1 or len(query) != self.embedding_dim:
-            raise ValueError(
-                f"Query must be 1D with dim={self.embedding_dim}, "
-                f"got shape {query.shape}")
+            raise ValueError(f"Query must be 1D with dim={self.embedding_dim}, got shape {query.shape}")
 
         if backend == "rust" and self._rust_eligible():
             return self._search_rust(query, k, nprobe, return_routing, t0)
@@ -1636,8 +1656,7 @@ class LazyIndex:
 
         for batch_index in candidate_leaves:
             batch = self.get_leaf(batch_index)
-            item_indices, scores, field_data = self._score_leaf(
-                batch, query_normed, adc_tables)
+            item_indices, scores, field_data = self._score_leaf(batch, query_normed, adc_tables)
             candidates_scored += len(item_indices)
             all_indices.append(item_indices)
             all_scores.append(scores)
@@ -1646,38 +1665,35 @@ class LazyIndex:
 
         if not all_indices:
             result = SearchResult(
-                np.array([], dtype=np.uint32),
-                np.array([], dtype=np.float32),
-                {fname: [] for fname in sf_names})
+                np.array([], dtype=np.uint32), np.array([], dtype=np.float32), {fname: [] for fname in sf_names}
+            )
             if return_routing:
                 routing = {
-                    'leaves_probed': list(candidate_leaves),
-                    'candidates_scored': 0,
-                    'min_margin': min_margin if min_margin != float('inf') else None,
-                    'elapsed_ms': (time.perf_counter() - t0) * 1000,
+                    "leaves_probed": list(candidate_leaves),
+                    "candidates_scored": 0,
+                    "min_margin": min_margin if min_margin != float("inf") else None,
+                    "elapsed_ms": (time.perf_counter() - t0) * 1000,
                 }
                 if not isinstance(nprobe, int):
-                    routing['nprobe_mode'] = 'adaptive'
-                    routing['adaptive_nprobe'] = len(candidate_leaves)
+                    routing["nprobe_mode"] = "adaptive"
+                    routing["adaptive_nprobe"] = len(candidate_leaves)
                 result.routing = routing
             return result
 
-        all_indices, all_scores, merged_fields = _merge_leaf_results(
-            all_indices, all_scores, all_fields, sf_names)
-        top_indices, top_scores, result_fields = _topk_with_fields(
-            all_indices, all_scores, merged_fields, sf_names, k)
+        all_indices, all_scores, merged_fields = _merge_leaf_results(all_indices, all_scores, all_fields, sf_names)
+        top_indices, top_scores, result_fields = _topk_with_fields(all_indices, all_scores, merged_fields, sf_names, k)
 
         routing_info = None
         if return_routing:
             routing_info = {
-                'leaves_probed': list(candidate_leaves),
-                'candidates_scored': candidates_scored,
-                'min_margin': min_margin if min_margin != float('inf') else None,
-                'elapsed_ms': (time.perf_counter() - t0) * 1000,
+                "leaves_probed": list(candidate_leaves),
+                "candidates_scored": candidates_scored,
+                "min_margin": min_margin if min_margin != float("inf") else None,
+                "elapsed_ms": (time.perf_counter() - t0) * 1000,
             }
             if not isinstance(nprobe, int):
-                routing_info['nprobe_mode'] = 'adaptive'
-                routing_info['adaptive_nprobe'] = len(candidate_leaves)
+                routing_info["nprobe_mode"] = "adaptive"
+                routing_info["adaptive_nprobe"] = len(candidate_leaves)
 
         return SearchResult(top_indices, top_scores, result_fields, routing_info)
 
@@ -1686,11 +1702,17 @@ class LazyIndex:
     def _rust_eligible(self):
         """Whether the rust path can serve this query. The rust kernel now handles
         fixed AND adaptive nprobe and return_routing; only the non-load-bearing tail
-        (PQ-compressed indexes, overflow batches) falls back to python."""
+        (non-DYF2 files, PQ-compressed indexes, overflow batches) falls back to python."""
         if self.is_pq:
+            return False
+        if getattr(self, "_rust_readable", None) is None:
+            # dyf_rs only reads DYF2 (footer-based); DYF1/DYF3 take the python path
+            self._rust_readable = detect_dyf_version(self._path) == 2
+        if not self._rust_readable:
             return False
         if getattr(self, "_has_overflow", None) is None:
             import dyf_rs
+
             f = dyf_rs.DyfFile.open(self._path)
             nob = f.num_overflow_batches
             if callable(nob):
@@ -1705,13 +1727,13 @@ class LazyIndex:
             return False, nprobe, 0.01, 0.1, 1, 5
         cfg = AdaptiveProbeConfig() if nprobe == "auto" else nprobe
         if not isinstance(cfg, AdaptiveProbeConfig):
-            raise ValueError(
-                f"nprobe must be int, 'auto', or AdaptiveProbeConfig, got {nprobe!r}")
+            raise ValueError(f"nprobe must be int, 'auto', or AdaptiveProbeConfig, got {nprobe!r}")
         return True, 256, cfg.margin_lo, cfg.margin_hi, cfg.min_probes, cfg.max_probes
 
     def _rust_searcher(self):
         if getattr(self, "_rust_search_obj", None) is None:
             import dyf_rs
+
             # lazy=True: instant open, bounded memory (only touched leaves), and
             # faster warm queries (per-leaf contiguous scoring) — the right fit for
             # the on-disk LazyIndex. Cold leaves pay a one-time decode on first use.
@@ -1720,12 +1742,13 @@ class LazyIndex:
 
     def _search_rust(self, query, k, nprobe, return_routing, t0):
         import time
+
         s = self._rust_searcher()
         adaptive, npb, mlo, mhi, minp, maxp = self._adaptive_params(nprobe)
         q2 = np.ascontiguousarray(query, dtype=np.float32).reshape(1, -1)
-        idx, sc, routing = s.search_batch(q2, int(k), int(npb), adaptive,
-                                          float(mlo), float(mhi), int(minp), int(maxp),
-                                          bool(return_routing))
+        idx, sc, routing = s.search_batch(
+            q2, int(k), int(npb), adaptive, float(mlo), float(mhi), int(minp), int(maxp), bool(return_routing)
+        )
         idx, sc = np.asarray(idx[0]), np.asarray(sc[0])
         mask = idx >= 0
         idx = idx[mask].astype(np.uint32)
@@ -1786,7 +1809,7 @@ class LazyIndex:
         returns (centroid_matrix, batch_indices) for IVF-style search.
         Cached after first call.
         """
-        if hasattr(self, '_centroid_matrix'):
+        if hasattr(self, "_centroid_matrix"):
             return self._centroid_matrix, self._centroid_batch_indices
 
         centroids = []
@@ -1825,9 +1848,7 @@ class LazyIndex:
         """
         query = np.asarray(query, dtype=np.float32)
         if query.ndim != 1 or len(query) != self.embedding_dim:
-            raise ValueError(
-                f"Query must be 1D with dim={self.embedding_dim}, "
-                f"got shape {query.shape}")
+            raise ValueError(f"Query must be 1D with dim={self.embedding_dim}, got shape {query.shape}")
 
         # Normalize query
         qnorm = np.linalg.norm(query)
@@ -1861,8 +1882,7 @@ class LazyIndex:
 
         for batch_index in candidate_batches:
             batch = self.get_leaf(int(batch_index))
-            item_indices, scores, field_data = self._score_leaf(
-                batch, query_normed, adc_tables)
+            item_indices, scores, field_data = self._score_leaf(batch, query_normed, adc_tables)
             all_indices.append(item_indices)
             all_scores.append(scores)
             for fname in sf_names:
@@ -1870,14 +1890,11 @@ class LazyIndex:
 
         if not all_indices:
             return SearchResult(
-                np.array([], dtype=np.uint32),
-                np.array([], dtype=np.float32),
-                {fname: [] for fname in sf_names})
+                np.array([], dtype=np.uint32), np.array([], dtype=np.float32), {fname: [] for fname in sf_names}
+            )
 
-        all_indices, all_scores, merged_fields = _merge_leaf_results(
-            all_indices, all_scores, all_fields, sf_names)
-        top_indices, top_scores, result_fields = _topk_with_fields(
-            all_indices, all_scores, merged_fields, sf_names, k)
+        all_indices, all_scores, merged_fields = _merge_leaf_results(all_indices, all_scores, all_fields, sf_names)
+        top_indices, top_scores, result_fields = _topk_with_fields(all_indices, all_scores, merged_fields, sf_names, k)
 
         return SearchResult(top_indices, top_scores, result_fields)
 
@@ -1887,13 +1904,13 @@ class LazyIndex:
         Scans all leaf batches once, caches the mapping for O(1) subsequent
         lookups. Called lazily on first get_item_vector() or similar call.
         """
-        if hasattr(self, '_item_map'):
+        if hasattr(self, "_item_map"):
             return self._item_map
         item_map = {}
         n_batches = self._index.BatchesLength()
         for bi in range(n_batches):
             batch = self.get_leaf(bi)
-            batch_item_ids = batch.column('item_index').to_numpy()
+            batch_item_ids = batch.column("item_index").to_numpy()
             for row_idx, item_id in enumerate(batch_item_ids):
                 item_map[int(item_id)] = (bi, row_idx)
         self._item_map = item_map
@@ -1920,15 +1937,15 @@ class LazyIndex:
 
         batch_index, row_idx = item_map[item_index]
         batch = self.get_leaf(batch_index)
-        emb_col = batch.column('embedding')
+        emb_col = batch.column("embedding")
         flat_values = emb_col.values.to_numpy()
 
         if self.is_pq:
             meta = self._get_metadata()
-            m = int(meta['pq_n_subquantizers'])
+            m = int(meta["pq_n_subquantizers"])
             n_rows = len(emb_col)
             codes = flat_values.reshape(n_rows, m)
-            row_codes = codes[row_idx:row_idx + 1]  # (1, M)
+            row_codes = codes[row_idx : row_idx + 1]  # (1, M)
             return self._pq_reconstruct(row_codes)[0]  # (dim,) float32
         else:
             dim = self.embedding_dim
@@ -1963,7 +1980,7 @@ class LazyIndex:
         n_batches = self._index.BatchesLength()
         for bi in range(n_batches):
             batch = self.get_leaf(bi)
-            batch_item_ids = batch.column('item_index').to_numpy()
+            batch_item_ids = batch.column("item_index").to_numpy()
 
             # Check which target items are in this batch
             for row_idx, item_id in enumerate(batch_item_ids):
@@ -1990,7 +2007,7 @@ class LazyIndex:
         n = self.total_items
         dim = self.embedding_dim
         meta = self._get_metadata()
-        has_embeddings = meta.get('has_embeddings') != 'false'
+        has_embeddings = meta.get("has_embeddings") != "false"
 
         embeddings = np.zeros((n, dim), dtype=np.float32) if has_embeddings else None
         sf_names = self.stored_field_names
@@ -2000,15 +2017,15 @@ class LazyIndex:
         fields = {}
         for fname in sf_names:
             tname = sf_types[fname]
-            if tname in ('utf8', 'binary'):
+            if tname in ("utf8", "binary"):
                 fields[fname] = [None] * n
-            elif tname == 'float32':
+            elif tname == "float32":
                 fields[fname] = np.zeros(n, dtype=np.float32)
-            elif tname == 'float64':
+            elif tname == "float64":
                 fields[fname] = np.zeros(n, dtype=np.float64)
-            elif tname == 'int32':
+            elif tname == "int32":
                 fields[fname] = np.zeros(n, dtype=np.int32)
-            elif tname == 'int64':
+            elif tname == "int64":
                 fields[fname] = np.zeros(n, dtype=np.int64)
             else:
                 fields[fname] = [None] * n
@@ -2016,21 +2033,20 @@ class LazyIndex:
         n_batches = self._index.BatchesLength()
         for bi in range(n_batches):
             batch = self.get_leaf(bi)
-            item_indices = batch.column('item_index').to_numpy()
+            item_indices = batch.column("item_index").to_numpy()
 
             # Extract embeddings (if present)
             if has_embeddings:
-                emb_col = batch.column('embedding')
+                emb_col = batch.column("embedding")
                 n_rows = len(emb_col)
                 flat_values = emb_col.values.to_numpy()
 
                 if self.is_pq:
-                    m = int(meta['pq_n_subquantizers'])
+                    m = int(meta["pq_n_subquantizers"])
                     codes = flat_values.reshape(n_rows, m)
                     leaf_emb = self._pq_reconstruct(codes)
                 else:
-                    leaf_emb = flat_values.reshape(n_rows, dim).astype(
-                        np.float32)
+                    leaf_emb = flat_values.reshape(n_rows, dim).astype(np.float32)
 
                 embeddings[item_indices] = leaf_emb
 
@@ -2038,7 +2054,7 @@ class LazyIndex:
             for fname in sf_names:
                 col = batch.column(fname)
                 tname = sf_types[fname]
-                if tname in ('utf8', 'binary'):
+                if tname in ("utf8", "binary"):
                     values = col.to_pylist()
                     for i, item_idx in enumerate(item_indices):
                         fields[fname][int(item_idx)] = values[i]
@@ -2047,9 +2063,9 @@ class LazyIndex:
                     fields[fname][item_indices] = values
 
         return {
-            'embeddings': embeddings,
-            'fields': fields,
-            'metadata': dict(self._get_metadata()),
+            "embeddings": embeddings,
+            "fields": fields,
+            "metadata": dict(self._get_metadata()),
         }
 
     def detect_enrichment_level(self) -> int:
@@ -2064,14 +2080,14 @@ class LazyIndex:
         sf = set(self.stored_field_names)
         meta = self._get_metadata()
 
-        has_umap = {'umap_x', 'umap_y', 'umap_z'}.issubset(sf)
+        has_umap = {"umap_x", "umap_y", "umap_z"}.issubset(sf)
         has_clusters = (
-            any(f.startswith('cluster_') for f in sf)
-            or 'community_id' in sf
-            or 'lsh_bucket_ids' in sf
-            or 'louvain_dendrogram' in meta
+            any(f.startswith("cluster_") for f in sf)
+            or "community_id" in sf
+            or "lsh_bucket_ids" in sf
+            or "louvain_dendrogram" in meta
         )
-        has_viz = 'edge_pairs' in meta or 'tour_narration' in meta
+        has_viz = "edge_pairs" in meta or "tour_narration" in meta
 
         if has_viz:
             return 3
@@ -2100,8 +2116,7 @@ class LazyIndex:
         elif isinstance(nprobe, AdaptiveProbeConfig):
             cfg = nprobe
         else:
-            raise ValueError(
-                f"nprobe must be int, 'auto', or AdaptiveProbeConfig, got {nprobe!r}")
+            raise ValueError(f"nprobe must be int, 'auto', or AdaptiveProbeConfig, got {nprobe!r}")
 
         if min_margin <= cfg.margin_lo:
             return cfg.max_probes
@@ -2126,11 +2141,11 @@ class LazyIndex:
         """
         is_adaptive = not isinstance(nprobe, int)
         # For adaptive mode, always enqueue alternatives during phase 1
-        effective_nprobe = nprobe if isinstance(nprobe, int) else float('inf')
+        effective_nprobe = nprobe if isinstance(nprobe, int) else float("inf")
 
         root_id = self._index.Root()
         candidates = set()
-        min_margin = float('inf')
+        min_margin = float("inf")
 
         # Use a priority queue of (priority, node_id) to manage probes
         # Priority 0 = primary path, 1+ = alternative paths
@@ -2157,8 +2172,7 @@ class LazyIndex:
                     # Phase transition: after first leaf, resolve adaptive nprobe
                     if is_adaptive and not first_leaf_found:
                         first_leaf_found = True
-                        effective_nprobe = self._resolve_nprobe(
-                            nprobe, min_margin)
+                        effective_nprobe = self._resolve_nprobe(nprobe, min_margin)
                 continue
 
             # Internal node: compute hash and route
@@ -2191,7 +2205,7 @@ class LazyIndex:
                     primary_bid = bucket_id
                 else:
                     # Fallback: find nearest bucket by margin distance
-                    best_dist = float('inf')
+                    best_dist = float("inf")
                     for bid, child_nid in bid_to_child.items():
                         dist = self._margin_distance(bucket_id, bid, projections, num_bits)
                         if dist < best_dist:
@@ -2271,12 +2285,9 @@ class LazyIndex:
 
         # Create IVF index
         if pq_subquantizers is not None:
-            index = faiss.IndexIVFPQ(
-                quantizer, dim, n_leaves, pq_subquantizers, pq_bits,
-                faiss.METRIC_INNER_PRODUCT)
+            index = faiss.IndexIVFPQ(quantizer, dim, n_leaves, pq_subquantizers, pq_bits, faiss.METRIC_INNER_PRODUCT)
         else:
-            index = faiss.IndexIVFFlat(
-                quantizer, dim, n_leaves, faiss.METRIC_INNER_PRODUCT)
+            index = faiss.IndexIVFFlat(quantizer, dim, n_leaves, faiss.METRIC_INNER_PRODUCT)
 
         # Collect all embeddings and IDs from leaves
         all_embeddings = []
@@ -2284,16 +2295,18 @@ class LazyIndex:
 
         if self.is_pq:
             import warnings
+
             warnings.warn(
                 "Exporting PQ-quantized index to FAISS uses lossy "
                 "reconstructed vectors. Search quality may be reduced.",
-                stacklevel=2)
+                stacklevel=2,
+            )
             meta = self._get_metadata()
-            m = int(meta['pq_n_subquantizers'])
+            m = int(meta["pq_n_subquantizers"])
             for batch_idx in batch_indices:
                 batch = self.get_leaf(int(batch_idx))
-                item_indices = batch.column('item_index').to_numpy().astype(np.int64)
-                emb_col = batch.column('embedding')
+                item_indices = batch.column("item_index").to_numpy().astype(np.int64)
+                emb_col = batch.column("embedding")
                 flat_values = emb_col.values.to_numpy()
                 codes = flat_values.reshape(len(item_indices), m)
                 leaf_emb = self._pq_reconstruct(codes)
@@ -2302,8 +2315,8 @@ class LazyIndex:
         else:
             for batch_idx in batch_indices:
                 batch = self.get_leaf(int(batch_idx))
-                item_indices = batch.column('item_index').to_numpy().astype(np.int64)
-                emb_col = batch.column('embedding')
+                item_indices = batch.column("item_index").to_numpy().astype(np.int64)
+                emb_col = batch.column("embedding")
                 flat_values = emb_col.values.to_numpy()
                 leaf_emb = flat_values.reshape(len(item_indices), dim).astype(np.float32)
                 all_embeddings.append(leaf_emb)
@@ -2330,8 +2343,8 @@ class LazyIndex:
 def from_faiss(
     faiss_index,
     path: str,
-    compression: str = 'zstd',
-    quantization: str = 'float16',
+    compression: str = "zstd",
+    quantization: str = "float16",
     metadata: dict[str, str] | None = None,
     stored_fields: Mapping[str, StoredFieldInput] | None = None,
 ) -> LazyIndex:
@@ -2411,44 +2424,50 @@ def from_faiss(
     for cell_id in non_empty_cells:
         list_size = cell_sizes[cell_id]
         # all_ids was built in cell order, so slice to get this cell's IDs
-        cell_faiss_ids = all_ids[cell_id_offset:cell_id_offset + list_size]
+        cell_faiss_ids = all_ids[cell_id_offset : cell_id_offset + list_size]
         cell_id_offset += list_size
-        children.append({
-            'children': [],
-            'indices': cell_faiss_ids.astype(np.intp),
-            'depth': 0,
-            'point_margin_map': None,
-            'hyperplanes': None,
-            'bucket_id_to_child': None,
-        })
+        children.append(
+            {
+                "children": [],
+                "indices": cell_faiss_ids.astype(np.intp),
+                "depth": 0,
+                "point_margin_map": None,
+                "hyperplanes": None,
+                "bucket_id_to_child": None,
+            }
+        )
 
     tree = {
-        'children': children,
-        'indices': np.arange(n_total),
-        'depth': 1,
-        'point_margin_map': None,
-        'hyperplanes': None,
-        'bucket_id_to_child': None,
+        "children": children,
+        "indices": np.arange(n_total),
+        "depth": 1,
+        "point_margin_map": None,
+        "hyperplanes": None,
+        "bucket_id_to_child": None,
     }
 
     build_params = {
-        'max_depth': 1,
-        'num_bits': 0,
-        'min_leaf_size': 1,
-        'seed': 0,
+        "max_depth": 1,
+        "num_bits": 0,
+        "min_leaf_size": 1,
+        "seed": 0,
     }
 
     if metadata is None:
         metadata = {}
-    metadata['source'] = 'faiss'
-    metadata['faiss_nlist'] = str(n_cells)
+    metadata["source"] = "faiss"
+    metadata["faiss_nlist"] = str(n_cells)
 
-    write_lazy_index(tree, ordered_embeddings, path,
-                     compression=compression,
-                     quantization=quantization,
-                     metadata=metadata,
-                     build_params=build_params,
-                     stored_fields=stored_fields)
+    write_lazy_index(
+        tree,
+        ordered_embeddings,
+        path,
+        compression=compression,
+        quantization=quantization,
+        metadata=metadata,
+        build_params=build_params,
+        stored_fields=stored_fields,
+    )
 
     return LazyIndex(path)
 
@@ -2473,15 +2492,12 @@ def _reconstruct_tree(idx):
     node_data = []
     for nid in range(n_nodes):
         fb_node = idx._index.Nodes(nid)
-        children_ids = [fb_node.Children(i)
-                        for i in range(fb_node.ChildrenLength())]
+        children_ids = [fb_node.Children(i) for i in range(fb_node.ChildrenLength())]
 
         # Hyperplanes
         hp = None
         num_bits = fb_node.NumBits()
-        if (not fb_node.HyperplanesIsNone()
-                and fb_node.HyperplanesLength() > 0
-                and num_bits > 0):
+        if not fb_node.HyperplanesIsNone() and fb_node.HyperplanesLength() > 0 and num_bits > 0:
             hp_flat = fb_node.HyperplanesAsNumpy()
             hp = np.array(hp_flat, dtype=np.float32).reshape(num_bits, dim)
 
@@ -2489,8 +2505,7 @@ def _reconstruct_tree(idx):
         # In write_lazy_index: bucket_id_to_child = {bucket_id: child_index}
         # In FlatBuffers: BucketIdsToChildren[ci] = bucket_id for child ci
         bid_to_child = None
-        if (not fb_node.BucketIdsToChildrenIsNone()
-                and fb_node.BucketIdsToChildrenLength() > 0):
+        if not fb_node.BucketIdsToChildrenIsNone() and fb_node.BucketIdsToChildrenLength() > 0:
             bid_to_child = {}
             for ci in range(fb_node.BucketIdsToChildrenLength()):
                 bid = int(fb_node.BucketIdsToChildren(ci))
@@ -2513,18 +2528,20 @@ def _reconstruct_tree(idx):
         indices = None
         if is_leaf and batch_index >= 0:
             batch = idx.get_leaf(batch_index)
-            indices = batch.column('item_index').to_numpy().astype(np.intp)
+            indices = batch.column("item_index").to_numpy().astype(np.intp)
 
-        node_data.append({
-            'children_ids': children_ids,
-            'hyperplanes': hp,
-            'bucket_id_to_child': bid_to_child,
-            'eigenvalues': ev,
-            'centroid': centroid,
-            'depth': int(fb_node.Depth()),
-            'is_leaf': is_leaf,
-            'indices': indices,
-        })
+        node_data.append(
+            {
+                "children_ids": children_ids,
+                "hyperplanes": hp,
+                "bucket_id_to_child": bid_to_child,
+                "eigenvalues": ev,
+                "centroid": centroid,
+                "depth": int(fb_node.Depth()),
+                "is_leaf": is_leaf,
+                "indices": indices,
+            }
+        )
 
     # Build recursive tree structure (bottom-up index aggregation)
     def _build(nid):
@@ -2532,25 +2549,24 @@ def _reconstruct_tree(idx):
         children = []
         all_indices = []
 
-        for child_id in nd['children_ids']:
+        for child_id in nd["children_ids"]:
             child = _build(child_id)
             children.append(child)
-            all_indices.append(child['indices'])
+            all_indices.append(child["indices"])
 
-        if nd['is_leaf']:
-            indices = nd['indices']
+        if nd["is_leaf"]:
+            indices = nd["indices"]
         else:
-            indices = (np.concatenate(all_indices) if all_indices
-                       else np.array([], dtype=np.intp))
+            indices = np.concatenate(all_indices) if all_indices else np.array([], dtype=np.intp)
 
         return {
-            'children': children,
-            'indices': indices,
-            'depth': nd['depth'],
-            'hyperplanes': nd['hyperplanes'],
-            'bucket_id_to_child': nd['bucket_id_to_child'],
-            'eigenvalues': nd['eigenvalues'],
-            'centroid': nd['centroid'],
+            "children": children,
+            "indices": indices,
+            "depth": nd["depth"],
+            "hyperplanes": nd["hyperplanes"],
+            "bucket_id_to_child": nd["bucket_id_to_child"],
+            "eigenvalues": nd["eigenvalues"],
+            "centroid": nd["centroid"],
         }
 
     root_id = idx._index.Root()
@@ -2600,8 +2616,8 @@ def rewrite_lazy_index(
     with LazyIndex(path) as idx:
         if idx.is_pq:
             raise ValueError(
-                "rewrite_lazy_index does not support PQ-quantized indexes "
-                "(round-trip through float32 is lossy)")
+                "rewrite_lazy_index does not support PQ-quantized indexes (round-trip through float32 is lossy)"
+            )
 
         tree = _reconstruct_tree(idx)
         data = idx.extract_all_fields()
@@ -2609,19 +2625,18 @@ def rewrite_lazy_index(
 
         bp = idx._index.BuildParams()
         build_params = {
-            'max_depth': bp.MaxDepth() if bp else 8,
-            'num_bits': bp.NumBits() if bp else 3,
-            'min_leaf_size': bp.MinLeafSize() if bp else 4,
-            'seed': bp.Seed() if bp else 42,
+            "max_depth": bp.MaxDepth() if bp else 8,
+            "num_bits": bp.NumBits() if bp else 3,
+            "min_leaf_size": bp.MinLeafSize() if bp else 4,
+            "seed": bp.Seed() if bp else 42,
         }
         quantization = idx.quantization
-        src_compression = (bp.Compression().decode()
-                           if bp and bp.Compression() else 'none')
+        src_compression = bp.Compression().decode() if bp and bp.Compression() else "none"
         if compression is None:
             compression = src_compression
 
     # Merge stored fields (existing + new)
-    merged_sf: dict[str, StoredFieldInput] = dict(data['fields'])
+    merged_sf: dict[str, StoredFieldInput] = dict(data["fields"])
     if new_stored_fields:
         merged_sf.update(new_stored_fields)
     if drop_fields:
@@ -2629,9 +2644,9 @@ def rewrite_lazy_index(
             merged_sf.pop(fname, None)
 
     # Merge metadata (existing + new; None values delete keys)
-    merged_meta = dict(data['metadata'])
+    merged_meta = dict(data["metadata"])
     # Remove keys that write_lazy_index will regenerate
-    merged_meta.pop('stored_fields', None)
+    merged_meta.pop("stored_fields", None)
     if new_metadata:
         for k, v in new_metadata.items():
             if v is None:
@@ -2641,23 +2656,20 @@ def rewrite_lazy_index(
 
     # For v2 files with only new stored fields (no drops, no output redirect),
     # use efficient append via Rust DyfFile instead of full rewrite.
-    if (
-        format_ver == 2
-        and new_stored_fields
-        and not drop_fields
-        and not new_metadata
-        and output_path is None
-    ):
+    if format_ver == 2 and new_stored_fields and not drop_fields and not new_metadata and output_path is None:
         try:
             from dyf_rs import DyfFile as RustDyfFile  # noqa: F401
+
             _append_fields_v2(path, new_stored_fields)
             return
         except ImportError:
             pass  # Fall through to full rewrite
 
-    out_embeddings = None if drop_embeddings else data['embeddings']
+    out_embeddings = None if drop_embeddings else data["embeddings"]
     write_lazy_index(
-        tree, out_embeddings, out_path,
+        tree,
+        out_embeddings,
+        out_path,
         compression=compression,
         quantization=quantization,
         metadata=merged_meta if merged_meta else None,
@@ -2694,7 +2706,7 @@ def _append_fields_v2(
             arrow_type = "float32"
         elif arr.dtype == np.float64:
             arrow_type = "float64"
-        elif arr.dtype.kind in ('U', 'O'):
+        elif arr.dtype.kind in ("U", "O"):
             arrow_type = "utf8"
         else:
             arrow_type = str(arr.dtype)
