@@ -23,10 +23,12 @@ from dyf.categorical import (
 class TestFromEdges:
     def test_simple_tree(self):
         """Three-node tree: root → A, root → B."""
-        g = CategoryGraph.from_edges([
-            ("root", "A", 0.6),
-            ("root", "B", 0.4),
-        ])
+        g = CategoryGraph.from_edges(
+            [
+                ("root", "A", 0.6),
+                ("root", "B", 0.4),
+            ]
+        )
         assert set(g.roots) == {"root"}
         assert set(g.leaves) == {"A", "B"}
         assert g.get_children("root") == ["A", "B"]
@@ -34,12 +36,14 @@ class TestFromEdges:
 
     def test_dag_with_diamond(self):
         """Diamond: root → A, root → B, A → C, B → C."""
-        g = CategoryGraph.from_edges([
-            ("root", "A", 1.0),
-            ("root", "B", 1.0),
-            ("A", "C", 1.0),
-            ("B", "C", 1.0),
-        ])
+        g = CategoryGraph.from_edges(
+            [
+                ("root", "A", 1.0),
+                ("root", "B", 1.0),
+                ("A", "C", 1.0),
+                ("B", "C", 1.0),
+            ]
+        )
         assert set(g.roots) == {"root"}
         assert set(g.leaves) == {"C"}
         assert sorted(g.get_parents("C")) == ["A", "B"]
@@ -100,13 +104,15 @@ class TestFromSingleLevel:
 class TestNavigation:
     @pytest.fixture()
     def tree(self):
-        return CategoryGraph.from_edges([
-            ("root", "A", 1.0),
-            ("root", "B", 1.0),
-            ("A", "A1", 1.0),
-            ("A", "A2", 1.0),
-            ("B", "B1", 1.0),
-        ])
+        return CategoryGraph.from_edges(
+            [
+                ("root", "A", 1.0),
+                ("root", "B", 1.0),
+                ("A", "A1", 1.0),
+                ("A", "A2", 1.0),
+                ("B", "B1", 1.0),
+            ]
+        )
 
     def test_ancestors(self, tree):
         assert tree.get_ancestors("A1") == {"A", "root"}
@@ -127,12 +133,14 @@ class TestNavigation:
         assert tree.is_tree()
 
     def test_is_tree_false_for_dag(self):
-        g = CategoryGraph.from_edges([
-            ("root", "A", 1.0),
-            ("root", "B", 1.0),
-            ("A", "C", 1.0),
-            ("B", "C", 1.0),
-        ])
+        g = CategoryGraph.from_edges(
+            [
+                ("root", "A", 1.0),
+                ("root", "B", 1.0),
+                ("A", "C", 1.0),
+                ("B", "C", 1.0),
+            ]
+        )
         assert not g.is_tree()
 
     def test_all_nodes(self, tree):
@@ -150,13 +158,15 @@ class TestNavigation:
 class TestLCADepth:
     @pytest.fixture()
     def tree(self):
-        return CategoryGraph.from_edges([
-            ("root", "A", 1.0),
-            ("root", "B", 1.0),
-            ("A", "A1", 1.0),
-            ("A", "A2", 1.0),
-            ("B", "B1", 1.0),
-        ])
+        return CategoryGraph.from_edges(
+            [
+                ("root", "A", 1.0),
+                ("root", "B", 1.0),
+                ("A", "A1", 1.0),
+                ("A", "A2", 1.0),
+                ("B", "B1", 1.0),
+            ]
+        )
 
     def test_lca_siblings(self, tree):
         """A1 and A2 share parent A at depth 1."""
@@ -188,11 +198,13 @@ class TestLCADepth:
 
 class TestSerialization:
     def test_json_roundtrip(self):
-        g = CategoryGraph.from_edges([
-            ("root", "A", 0.7),
-            ("root", "B", 0.3),
-            ("A", "A1", 1.0),
-        ])
+        g = CategoryGraph.from_edges(
+            [
+                ("root", "A", 0.7),
+                ("root", "B", 0.3),
+                ("A", "A1", 1.0),
+            ]
+        )
         j = g.to_json()
         g2 = CategoryGraph.from_json(j)
         assert set(g2.roots) == set(g.roots)
@@ -214,15 +226,17 @@ class TestSerialization:
 class TestItemsAtDepth:
     def test_resolve_to_coarser(self):
         """Items at depth 3 should resolve to depth 1 labels."""
-        g = CategoryGraph.from_edges([
-            ("_root_", "animal", 1.0),
-            ("_root_", "plant", 1.0),
-            ("animal", "mammal", 1.0),
-            ("plant", "tree", 1.0),
-            ("mammal", "dog", 1.0),
-            ("mammal", "cat", 1.0),
-            ("tree", "oak", 1.0),
-        ])
+        g = CategoryGraph.from_edges(
+            [
+                ("_root_", "animal", 1.0),
+                ("_root_", "plant", 1.0),
+                ("animal", "mammal", 1.0),
+                ("plant", "tree", 1.0),
+                ("mammal", "dog", 1.0),
+                ("mammal", "cat", 1.0),
+                ("tree", "oak", 1.0),
+            ]
+        )
         items = np.array(["dog", "cat", "oak", "dog"])
         resolved = g.items_at_depth(1, items)
         # depth 1 = animal, plant
@@ -230,10 +244,12 @@ class TestItemsAtDepth:
 
     def test_depth_matches_label(self):
         """If item is already at target depth, return it unchanged."""
-        g = CategoryGraph.from_edges([
-            ("_root_", "A", 1.0),
-            ("A", "A1", 1.0),
-        ])
+        g = CategoryGraph.from_edges(
+            [
+                ("_root_", "A", 1.0),
+                ("A", "A1", 1.0),
+            ]
+        )
         items = np.array(["A", "A1"])
         resolved = g.items_at_depth(1, items)
         assert list(resolved) == ["A", "A"]
@@ -319,9 +335,7 @@ class TestMultiLevelFisher:
         labels = np.array(["A"] * 100 + ["B"] * 100 + ["C"] * 100)
 
         graph = CategoryGraph.from_single_level(labels)
-        multi_w = multi_level_fisher_weights(
-            embeddings, graph, labels, min_count=10
-        )
+        multi_w = multi_level_fisher_weights(embeddings, graph, labels, min_count=10)
         single_w = compute_fisher_weights(embeddings, labels, min_count=10)
 
         np.testing.assert_allclose(multi_w, single_w, atol=1e-5)
@@ -334,8 +348,10 @@ class TestMultiLevelFisher:
         d = 8
         # 4 groups, 2 families
         groups = {
-            "A1": (0, 3.0), "A2": (0, -3.0),
-            "B1": (1, 3.0), "B2": (1, -3.0),
+            "A1": (0, 3.0),
+            "A2": (0, -3.0),
+            "B1": (1, 3.0),
+            "B2": (1, -3.0),
         }
         parts = []
         labels_l0, labels_l1 = [], []
@@ -350,13 +366,9 @@ class TestMultiLevelFisher:
         embeddings = np.vstack(parts)
         item_labels = np.array(labels_l1)
 
-        graph = CategoryGraph.from_levels(
-            [np.array(labels_l0), np.array(labels_l1)]
-        )
+        graph = CategoryGraph.from_levels([np.array(labels_l0), np.array(labels_l1)])
 
-        multi_w = multi_level_fisher_weights(
-            embeddings, graph, item_labels, min_count=10
-        )
+        multi_w = multi_level_fisher_weights(embeddings, graph, item_labels, min_count=10)
         single_w = compute_fisher_weights(embeddings, item_labels, min_count=10)
 
         # They should not be identical — multi-level mixes in coarser info
@@ -372,9 +384,7 @@ class TestMultiLevelFisher:
         labels = np.array(["A"] * 5 + ["B"] * 5 + ["C"] * 5 + ["D"] * 5)
         graph = CategoryGraph.from_single_level(labels)
 
-        w = multi_level_fisher_weights(
-            embeddings, graph, labels, min_count=100
-        )
+        w = multi_level_fisher_weights(embeddings, graph, labels, min_count=100)
         # Should be uniform
         assert np.allclose(w, w[0])
 
@@ -384,11 +394,13 @@ class TestMultiLevelFisher:
 
 class TestMetadata:
     def test_store_load_roundtrip(self):
-        g = CategoryGraph.from_edges([
-            ("_root_", "A", 0.6),
-            ("_root_", "B", 0.4),
-            ("A", "A1", 1.0),
-        ])
+        g = CategoryGraph.from_edges(
+            [
+                ("_root_", "A", 0.6),
+                ("_root_", "B", 0.4),
+                ("A", "A1", 1.0),
+            ]
+        )
         mapping = {"0": "family", "1": "term"}
         meta = store_category_graph(g, "gmdn", mapping)
         assert "category_graphs" in meta
@@ -467,7 +479,10 @@ class TestDiagnoseAxes:
         labels = np.array(["A"] * 180 + ["B"] * 120)
 
         diags = diagnose_axes(
-            embeddings, {"test": labels}, k=10, sample_n=0,
+            embeddings,
+            {"test": labels},
+            k=10,
+            sample_n=0,
         )
         expected_herf = (0.6**2) + (0.4**2)
         assert abs(diags[0].random_baseline - expected_herf) < 1e-6
@@ -479,7 +494,10 @@ class TestDiagnoseAxes:
         labels = np.array(["A"] * 100 + ["B"] * 100 + ["C"] * 100)
 
         diags = diagnose_axes(
-            embeddings, {"tri": labels}, k=10, sample_n=0,
+            embeddings,
+            {"tri": labels},
+            k=10,
+            sample_n=0,
         )
         assert diags[0].n_classes == 3
 
@@ -487,7 +505,8 @@ class TestDiagnoseAxes:
         """With sample_n < n, should still produce valid results."""
         rng = np.random.default_rng(42)
         embeddings, labels_good, _ = self._make_clustered_data(
-            rng, n_per_class=500,
+            rng,
+            n_per_class=500,
         )
         diags = diagnose_axes(
             embeddings,
@@ -506,7 +525,10 @@ class TestDiagnoseAxes:
         labels = ["A"] * 50 + ["B"] * 50
 
         diags = diagnose_axes(
-            embeddings, {"test": labels}, k=5, sample_n=0,
+            embeddings,
+            {"test": labels},
+            k=5,
+            sample_n=0,
         )
         assert len(diags) == 1
         assert isinstance(diags[0], AxisDiagnostic)
@@ -526,11 +548,13 @@ class TestDiscoverCategoricalColumns:
         """String columns with bounded cardinality are detected."""
         import polars as pl
 
-        df = pl.DataFrame({
-            "text": ["hello world " * 10] * 100,
-            "category": (["A"] * 40 + ["B"] * 30 + ["C"] * 30),
-            "embedding": [[0.1, 0.2]] * 100,
-        })
+        df = pl.DataFrame(
+            {
+                "text": ["hello world " * 10] * 100,
+                "category": (["A"] * 40 + ["B"] * 30 + ["C"] * 30),
+                "embedding": [[0.1, 0.2]] * 100,
+            }
+        )
         result = discover_categorical_columns(df, text_col="text")
         assert "category" in result
         assert "text" not in result
@@ -541,12 +565,14 @@ class TestDiscoverCategoricalColumns:
         """Columns with too many unique values are skipped."""
         import polars as pl
 
-        df = pl.DataFrame({
-            "text": [f"text_{i}" for i in range(200)],
-            "id": [f"id_{i}" for i in range(200)],
-            "category": (["A"] * 100 + ["B"] * 100),
-            "embedding": [[0.1]] * 200,
-        })
+        df = pl.DataFrame(
+            {
+                "text": [f"text_{i}" for i in range(200)],
+                "id": [f"id_{i}" for i in range(200)],
+                "category": (["A"] * 100 + ["B"] * 100),
+                "embedding": [[0.1]] * 200,
+            }
+        )
         result = discover_categorical_columns(df, text_col="text", max_cardinality=10)
         assert "id" not in result
         assert "category" in result
@@ -555,12 +581,14 @@ class TestDiscoverCategoricalColumns:
         """Columns with only one unique value are skipped (min_cardinality=2)."""
         import polars as pl
 
-        df = pl.DataFrame({
-            "text": ["hello"] * 50,
-            "constant": ["same"] * 50,
-            "category": (["A"] * 25 + ["B"] * 25),
-            "embedding": [[0.1]] * 50,
-        })
+        df = pl.DataFrame(
+            {
+                "text": ["hello"] * 50,
+                "constant": ["same"] * 50,
+                "category": (["A"] * 25 + ["B"] * 25),
+                "embedding": [[0.1]] * 50,
+            }
+        )
         result = discover_categorical_columns(df, text_col="text")
         assert "constant" not in result
         assert "category" in result
@@ -569,11 +597,13 @@ class TestDiscoverCategoricalColumns:
         """List[str] columns are coarsened with first_term strategy."""
         import polars as pl
 
-        df = pl.DataFrame({
-            "text": ["a"] * 60,
-            "tags": [["Forceps, bipolar"]] * 30 + [["Catheter, urinary"]] * 30,
-            "embedding": [[0.1]] * 60,
-        })
+        df = pl.DataFrame(
+            {
+                "text": ["a"] * 60,
+                "tags": [["Forceps, bipolar"]] * 30 + [["Catheter, urinary"]] * 30,
+                "embedding": [[0.1]] * 60,
+            }
+        )
         result = discover_categorical_columns(df, text_col="text")
         assert "tags" in result
         assert result["tags"][0] == "forceps"
@@ -584,12 +614,14 @@ class TestDiscoverCategoricalColumns:
         import polars as pl
 
         long_text = "a " * 200  # avg length > 100
-        df = pl.DataFrame({
-            "text": [long_text] * 50,
-            "description": [long_text + str(i) for i in range(50)],
-            "category": (["A"] * 25 + ["B"] * 25),
-            "embedding": [[0.1]] * 50,
-        })
+        df = pl.DataFrame(
+            {
+                "text": [long_text] * 50,
+                "description": [long_text + str(i) for i in range(50)],
+                "category": (["A"] * 25 + ["B"] * 25),
+                "embedding": [[0.1]] * 50,
+            }
+        )
         result = discover_categorical_columns(df, text_col="text")
         assert "description" not in result
 
@@ -635,7 +667,8 @@ class TestEmbedWithDiagnostics:
             return embeddings  # shouldn't be called
 
         result_emb, before, after, result_texts = embed_with_diagnostics(
-            embeddings, texts,
+            embeddings,
+            texts,
             {"good": axis_good},
             embed_fn=mock_embed,
             lift_threshold=1.5,
@@ -660,7 +693,8 @@ class TestEmbedWithDiagnostics:
             return new_emb
 
         result_emb, before, after, result_texts = embed_with_diagnostics(
-            embeddings, texts,
+            embeddings,
+            texts,
             {"good": axis_good, "weak": axis_weak},
             embed_fn=mock_embed,
             lift_threshold=3.0,
@@ -679,7 +713,8 @@ class TestEmbedWithDiagnostics:
             return rng.standard_normal((len(t), 32)).astype(np.float32)
 
         _, _, _, result_texts = embed_with_diagnostics(
-            embeddings, texts,
+            embeddings,
+            texts,
             {"weak": axis_weak},
             embed_fn=mock_embed,
             lift_threshold=100.0,  # force promotion
@@ -697,7 +732,8 @@ class TestEmbedWithDiagnostics:
             return rng.standard_normal((len(t), 32)).astype(np.float32)
 
         _, _, _, result_texts = embed_with_diagnostics(
-            embeddings, texts,
+            embeddings,
+            texts,
             {"weak": axis_weak},
             embed_fn=mock_embed,
             lift_threshold=100.0,
@@ -718,7 +754,8 @@ class TestEmbedWithDiagnostics:
             return rng.standard_normal((len(t), 16)).astype(np.float32)
 
         _, _, _, result_texts = embed_with_diagnostics(
-            embeddings, texts,
+            embeddings,
+            texts,
             {"axis": labels},
             embed_fn=mock_embed,
             lift_threshold=100.0,

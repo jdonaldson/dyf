@@ -15,15 +15,18 @@ from dyf.index_images import make_thumbnail, scan_images
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_pil_image(width=64, height=64, mode="RGB"):
     """Create a simple PIL Image for testing."""
     from PIL import Image
+
     return Image.new(mode, (width, height), color=(128, 64, 32))
 
 
 def _make_image_file(tmp_path: Path, name: str, width=64, height=64) -> Path:
     """Write a real image file to tmp_path."""
     from PIL import Image
+
     img = Image.new("RGB", (width, height), color=(100, 150, 200))
     p = tmp_path / name
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -34,6 +37,7 @@ def _make_image_file(tmp_path: Path, name: str, width=64, height=64) -> Path:
 # ---------------------------------------------------------------------------
 # Tests: scan_images
 # ---------------------------------------------------------------------------
+
 
 class TestScanImages:
     def test_finds_common_formats(self, tmp_path):
@@ -76,6 +80,7 @@ class TestScanImages:
 # Tests: make_thumbnail
 # ---------------------------------------------------------------------------
 
+
 class TestMakeThumbnail:
     def test_returns_data_uri(self):
         img = _make_pil_image(256, 256)
@@ -108,6 +113,7 @@ class TestMakeThumbnail:
 # ---------------------------------------------------------------------------
 # Tests: index_images end-to-end (mocked model)
 # ---------------------------------------------------------------------------
+
 
 class TestIndexImagesE2E:
     @patch("dyf.index_images.load_vision_model")

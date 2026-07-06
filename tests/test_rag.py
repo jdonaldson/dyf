@@ -35,7 +35,7 @@ def clustered_embeddings():
     clusters = []
     for i in range(5):
         center = np.zeros(dim, dtype=np.float32)
-        center[i * 10:(i + 1) * 10] = 1.0
+        center[i * 10 : (i + 1) * 10] = 1.0
         center = center / np.linalg.norm(center)
 
         noise = rng.standard_normal((n_per_cluster, dim)).astype(np.float32) * 0.1
@@ -47,9 +47,9 @@ def clustered_embeddings():
     for _ in range(50):
         c1, c2 = rng.choice(5, 2, replace=False)
         center1 = np.zeros(dim, dtype=np.float32)
-        center1[c1 * 10:(c1 + 1) * 10] = 1.0
+        center1[c1 * 10 : (c1 + 1) * 10] = 1.0
         center2 = np.zeros(dim, dtype=np.float32)
-        center2[c2 * 10:(c2 + 1) * 10] = 1.0
+        center2[c2 * 10 : (c2 + 1) * 10] = 1.0
         bridge = 0.5 * center1 + 0.5 * center2
         bridge = bridge / np.linalg.norm(bridge)
         bridge = bridge + rng.standard_normal(dim).astype(np.float32) * 0.05
@@ -61,7 +61,6 @@ def clustered_embeddings():
 
 @pytest.mark.skipif(not check_rust_available(), reason="Rust extension not available")
 class TestSuperConnectors:
-
     def test_find_super_connectors_basic(self, sample_embeddings):
         """Test basic super connector finding."""
         result = find_super_connectors(sample_embeddings)
@@ -81,8 +80,7 @@ class TestSuperConnectors:
         """Test that quadrant labels are valid."""
         result = find_super_connectors(clustered_embeddings)
 
-        valid_quadrants = {'Regular', 'Minor Bridge', 'Cross-Domain',
-                          'Domain Specialist', 'Super Connector'}
+        valid_quadrants = {"Regular", "Minor Bridge", "Cross-Domain", "Domain Specialist", "Super Connector"}
         for q in result.quadrant:
             assert q in valid_quadrants
 
@@ -97,12 +95,11 @@ class TestSuperConnectors:
         summary = result.summary()
 
         assert isinstance(summary, str)
-        assert 'Super Connector' in summary
+        assert "Super Connector" in summary
 
 
 @pytest.mark.skipif(not check_rust_available(), reason="Rust extension not available")
 class TestOrthogonalAnchors:
-
     def test_select_orthogonal_anchors_basic(self, sample_embeddings):
         """Test basic orthogonal anchor selection."""
         result = select_orthogonal_anchors(sample_embeddings, k=50)
@@ -114,11 +111,7 @@ class TestOrthogonalAnchors:
     def test_select_orthogonal_anchors_with_seeds(self, sample_embeddings):
         """Test selection with explicit seeds."""
         seed_indices = np.array([0, 10, 20])
-        result = select_orthogonal_anchors(
-            sample_embeddings,
-            k=30,
-            seed_indices=seed_indices
-        )
+        result = select_orthogonal_anchors(sample_embeddings, k=30, seed_indices=seed_indices)
 
         # Seeds should be in result
         for seed in seed_indices:
@@ -126,19 +119,14 @@ class TestOrthogonalAnchors:
 
     def test_select_orthogonal_anchors_all_points(self, sample_embeddings):
         """Test selection from all points (not just bridges)."""
-        result = select_orthogonal_anchors(
-            sample_embeddings,
-            k=50,
-            use_bridges=False
-        )
+        result = select_orthogonal_anchors(sample_embeddings, k=50, use_bridges=False)
 
-        assert result.candidate_source == 'all'
+        assert result.candidate_source == "all"
         assert len(result.indices) <= 50
 
 
 @pytest.mark.skipif(not check_rust_available(), reason="Rust extension not available")
 class TestBridgeIndex:
-
     def test_bridge_index_fit(self, sample_embeddings):
         """Test index fitting."""
         index = BridgeIndex(n_anchors=50, expansion_k=20)
@@ -159,7 +147,7 @@ class TestBridgeIndex:
         assert len(indices) == 10
         assert len(scores) == 10
         # Scores should be sorted descending
-        assert all(scores[i] >= scores[i+1] for i in range(len(scores)-1))
+        assert all(scores[i] >= scores[i + 1] for i in range(len(scores) - 1))
 
     def test_bridge_index_query_batch(self, sample_embeddings):
         """Test batch queries."""
@@ -198,8 +186,8 @@ class TestBridgeIndex:
 
         summary = index.summary()
         assert isinstance(summary, str)
-        assert 'BridgeIndex' in summary
-        assert 'Anchors' in summary
+        assert "BridgeIndex" in summary
+        assert "Anchors" in summary
 
     def test_bridge_index_not_fitted_error(self):
         """Test error when querying unfitted index."""
@@ -218,19 +206,16 @@ class TestBridgeIndex:
 
         metrics = index.evaluate_recall(n_queries=20, k=10)
 
-        assert 'recall' in metrics
-        assert 'avg_candidates' in metrics
-        assert 'speedup' in metrics
+        assert "recall" in metrics
+        assert "avg_candidates" in metrics
+        assert "speedup" in metrics
 
         # Recall should be between 0 and 1
-        assert 0.0 <= metrics['recall'] <= 1.0
+        assert 0.0 <= metrics["recall"] <= 1.0
 
     def test_bridge_index_with_sparse_points(self, clustered_embeddings):
         """Test adding sparse region points."""
-        index = BridgeIndex(
-            n_anchors=100,
-            include_sparse_points=20
-        )
+        index = BridgeIndex(n_anchors=100, include_sparse_points=20)
         index.fit(clustered_embeddings, verbose=False)
 
         # Should have anchors
@@ -240,7 +225,6 @@ class TestBridgeIndex:
 
 @pytest.mark.skipif(not check_rust_available(), reason="Rust extension not available")
 class TestBridgeIndexConfiguration:
-
     def test_different_anchor_counts(self, sample_embeddings):
         """Test with different anchor counts."""
         for n_anchors in [10, 50, 100]:
@@ -276,7 +260,6 @@ class TestBridgeIndexConfiguration:
 
 @pytest.mark.skipif(not check_rust_available(), reason="Rust extension not available")
 class TestFacetDiversification:
-
     def test_diversify_by_facet_basic(self, clustered_embeddings):
         """Test basic facet diversification."""
         from dyf import DensityClassifier
@@ -292,9 +275,7 @@ class TestFacetDiversification:
         candidates = np.argsort(sims)[-100:][::-1]
 
         # Diversify
-        result = diversify_by_facet(
-            query, candidates, clustered_embeddings, bucket_ids, k=10
-        )
+        result = diversify_by_facet(query, candidates, clustered_embeddings, bucket_ids, k=10)
 
         assert isinstance(result, FacetDiverseResult)
         assert len(result) <= 10
@@ -309,9 +290,7 @@ class TestFacetDiversification:
         bucket_ids = np.zeros(len(sample_embeddings), dtype=np.int64)
         query = sample_embeddings[0]
 
-        result = diversify_by_facet(
-            query, np.array([]), sample_embeddings, bucket_ids, k=10
-        )
+        result = diversify_by_facet(query, np.array([]), sample_embeddings, bucket_ids, k=10)
 
         assert len(result) == 0
         assert result.buckets_covered == 0
@@ -328,9 +307,7 @@ class TestFacetDiversification:
         sims = query @ clustered_embeddings.T
         candidates = np.argsort(sims)[-100:][::-1]
 
-        result = diversify_by_facet(
-            query, candidates, clustered_embeddings, bucket_ids, k=10
-        )
+        result = diversify_by_facet(query, candidates, clustered_embeddings, bucket_ids, k=10)
 
         # Similarities should be sorted descending (best first per bucket)
         for i in range(len(result.similarities) - 1):
@@ -352,9 +329,7 @@ class TestFacetDiversification:
         sims = query @ clustered_embeddings.T
         candidates = np.argsort(sims)[-200:][::-1]
 
-        result = diversify_by_facet(
-            query, candidates, clustered_embeddings, bucket_ids, k=20
-        )
+        result = diversify_by_facet(query, candidates, clustered_embeddings, bucket_ids, k=20)
 
         # All bucket IDs should be unique
         assert len(set(result.bucket_ids)) == result.buckets_covered
@@ -363,7 +338,6 @@ class TestFacetDiversification:
 
 @pytest.mark.skipif(not check_rust_available(), reason="Rust extension not available")
 class TestKmeansInit:
-
     def test_get_kmeans_init_basic(self, sample_embeddings):
         """Test basic k-means initialization."""
         init = get_kmeans_init(sample_embeddings, nlist=20, verbose=False)
@@ -387,19 +361,14 @@ class TestKmeansInit:
             use_stable_bridges=True,
             num_stability_seeds=3,
             stability_threshold=2,
-            verbose=False
+            verbose=False,
         )
 
         assert init.shape[0] == 30
 
     def test_get_kmeans_init_single_seed(self, sample_embeddings):
         """Test k-means init with single seed (no stability)."""
-        init = get_kmeans_init(
-            sample_embeddings,
-            nlist=20,
-            use_stable_bridges=False,
-            verbose=False
-        )
+        init = get_kmeans_init(sample_embeddings, nlist=20, use_stable_bridges=False, verbose=False)
 
         assert init.shape[0] == 20
 
@@ -435,7 +404,6 @@ from dyf import (
 
 
 class TestNeighborDiversity:
-
     def test_compute_neighbor_diversity_basic(self, sample_embeddings):
         """Test basic diversity computation."""
         diversity = compute_neighbor_diversity(sample_embeddings, k=10)
@@ -465,19 +433,16 @@ class TestNeighborDiversity:
         from sklearn.neighbors import NearestNeighbors
 
         k = 10
-        nn = NearestNeighbors(n_neighbors=k + 1, metric='cosine')
+        nn = NearestNeighbors(n_neighbors=k + 1, metric="cosine")
         nn.fit(sample_embeddings)
         _, neighbors = nn.kneighbors(sample_embeddings)
 
-        diversity = compute_neighbor_diversity(
-            sample_embeddings, k=k, neighbors=neighbors
-        )
+        diversity = compute_neighbor_diversity(sample_embeddings, k=k, neighbors=neighbors)
 
         assert len(diversity) == len(sample_embeddings)
 
 
 class TestDAGMining:
-
     def test_mine_dag_chains_basic(self, sample_embeddings):
         """Test basic DAG mining."""
         result = mine_dag_chains(sample_embeddings, min_chain_length=3, verbose=False)
@@ -489,11 +454,7 @@ class TestDAGMining:
 
     def test_mine_dag_chains_returns_chains(self, clustered_embeddings):
         """Test that chains are found in clustered data."""
-        result = mine_dag_chains(
-            clustered_embeddings,
-            min_chain_length=3,
-            verbose=False
-        )
+        result = mine_dag_chains(clustered_embeddings, min_chain_length=3, verbose=False)
 
         # Should find some structure
         assert result.n_components >= 0
@@ -517,7 +478,7 @@ class TestDAGMining:
 
         summary = result.summary()
         assert isinstance(summary, str)
-        assert 'DAGMiningResult' in summary
+        assert "DAGMiningResult" in summary
 
     def test_dag_mining_result_filters(self, clustered_embeddings):
         """Test chain filtering methods."""
@@ -535,12 +496,7 @@ class TestDAGMining:
 
     def test_dag_mining_diversity_monotonic(self, clustered_embeddings):
         """Test that chains follow diversity gradient."""
-        result = mine_dag_chains(
-            clustered_embeddings,
-            min_chain_length=3,
-            diversity_gap_threshold=0.02,
-            verbose=False
-        )
+        result = mine_dag_chains(clustered_embeddings, min_chain_length=3, diversity_gap_threshold=0.02, verbose=False)
 
         # All chains should have decreasing diversity
         for chain in result.chains:
@@ -554,18 +510,12 @@ class TestDAGMining:
         """Test different parameter settings."""
         # Stricter threshold = fewer edges
         result_strict = mine_dag_chains(
-            sample_embeddings,
-            similarity_threshold=0.7,
-            diversity_gap_threshold=0.05,
-            verbose=False
+            sample_embeddings, similarity_threshold=0.7, diversity_gap_threshold=0.05, verbose=False
         )
 
         # Looser threshold = more edges
         result_loose = mine_dag_chains(
-            sample_embeddings,
-            similarity_threshold=0.4,
-            diversity_gap_threshold=0.01,
-            verbose=False
+            sample_embeddings, similarity_threshold=0.4, diversity_gap_threshold=0.01, verbose=False
         )
 
         # Looser should have more edges
@@ -582,7 +532,7 @@ class TestDAGMining:
             noise,
             min_chain_length=3,
             similarity_threshold=0.9,  # Very strict
-            verbose=False
+            verbose=False,
         )
 
         # Might have no chains, but should not error
@@ -603,7 +553,6 @@ from dyf import (
 
 
 class TestDAGTaxonomy:
-
     def test_build_dag_taxonomy_basic(self, clustered_embeddings):
         """Test basic taxonomy building."""
         taxonomy = build_dag_taxonomy(clustered_embeddings, verbose=False)
@@ -636,9 +585,9 @@ class TestDAGTaxonomy:
 
         summary = taxonomy.summary()
         assert isinstance(summary, str)
-        assert 'DAGTaxonomy' in summary
-        assert 'Nodes' in summary
-        assert 'edges' in summary
+        assert "DAGTaxonomy" in summary
+        assert "Nodes" in summary
+        assert "edges" in summary
 
     def test_get_children_parents(self, clustered_embeddings):
         """Test getting children and parents."""
@@ -822,18 +771,12 @@ class TestDAGTaxonomy:
         """Test with different parameters."""
         # Stricter similarity threshold
         tax_strict = build_dag_taxonomy(
-            sample_embeddings,
-            similarity_threshold=0.7,
-            diversity_gap_threshold=0.05,
-            verbose=False
+            sample_embeddings, similarity_threshold=0.7, diversity_gap_threshold=0.05, verbose=False
         )
 
         # Looser thresholds
         tax_loose = build_dag_taxonomy(
-            sample_embeddings,
-            similarity_threshold=0.4,
-            diversity_gap_threshold=0.01,
-            verbose=False
+            sample_embeddings, similarity_threshold=0.4, diversity_gap_threshold=0.01, verbose=False
         )
 
         # Looser should have more edges
@@ -843,7 +786,6 @@ class TestDAGTaxonomy:
 
 
 class TestUnifiedOntology:
-
     def test_build_unified_ontology_basic(self, clustered_embeddings):
         """Test basic unified ontology building."""
         result = build_unified_ontology(clustered_embeddings, verbose=False)
@@ -855,11 +797,7 @@ class TestUnifiedOntology:
     def test_unified_ontology_coverage(self, clustered_embeddings):
         """Test that unified ontology has better coverage than single threshold."""
         # Single threshold
-        single = build_dag_taxonomy(
-            clustered_embeddings,
-            similarity_threshold=0.55,
-            verbose=False
-        )
+        single = build_dag_taxonomy(clustered_embeddings, similarity_threshold=0.55, verbose=False)
         single_nodes = len(set(single.children.keys()) | set(single.parents.keys()))
 
         # Unified
@@ -889,10 +827,7 @@ class TestUnifiedOntology:
     def test_unified_ontology_thresholds(self, clustered_embeddings):
         """Test that thresholds are stored correctly."""
         result = build_unified_ontology(
-            clustered_embeddings,
-            main_similarity_threshold=0.6,
-            outlier_similarity_threshold=0.4,
-            verbose=False
+            clustered_embeddings, main_similarity_threshold=0.6, outlier_similarity_threshold=0.4, verbose=False
         )
 
         assert result.main_threshold == 0.6
@@ -904,10 +839,10 @@ class TestUnifiedOntology:
 
         summary = result.summary()
         assert isinstance(summary, str)
-        assert 'UnifiedOntologyResult' in summary
-        assert 'Coverage' in summary
-        assert 'Main nodes' in summary
-        assert 'Outlier nodes' in summary
+        assert "UnifiedOntologyResult" in summary
+        assert "Coverage" in summary
+        assert "Main nodes" in summary
+        assert "Outlier nodes" in summary
 
     def test_unified_ontology_len(self, clustered_embeddings):
         """Test __len__ returns ontology size."""
@@ -985,11 +920,7 @@ class TestROG:
 
     def test_rog_coverage(self, clustered_embeddings):
         """Test that ROG achieves coverage."""
-        result = build_rog_ontology(
-            clustered_embeddings,
-            target_coverage=0.90,
-            verbose=False
-        )
+        result = build_rog_ontology(clustered_embeddings, target_coverage=0.90, verbose=False)
 
         # Should achieve close to target coverage
         assert result.total_coverage >= 0.80  # Allow some slack
@@ -1008,9 +939,9 @@ class TestROG:
 
         summary = result.summary()
         assert isinstance(summary, str)
-        assert 'ROG' in summary
-        assert 'coverage' in summary.lower()
-        assert 'Layer' in summary
+        assert "ROG" in summary
+        assert "coverage" in summary.lower()
+        assert "Layer" in summary
 
     def test_rog_get_layer_for_node(self, clustered_embeddings):
         """Test get_layer_for_node method."""
@@ -1062,20 +993,12 @@ class TestROG:
         """Test ROG with different parameters."""
         # Strict (fewer layers, less coverage)
         result_strict = build_rog_ontology(
-            sample_embeddings,
-            initial_threshold=0.6,
-            min_threshold=0.5,
-            target_coverage=0.99,
-            verbose=False
+            sample_embeddings, initial_threshold=0.6, min_threshold=0.5, target_coverage=0.99, verbose=False
         )
 
         # Loose (more layers, more coverage)
         result_loose = build_rog_ontology(
-            sample_embeddings,
-            initial_threshold=0.5,
-            min_threshold=0.3,
-            target_coverage=0.99,
-            verbose=False
+            sample_embeddings, initial_threshold=0.5, min_threshold=0.3, target_coverage=0.99, verbose=False
         )
 
         # Loose should have >= coverage

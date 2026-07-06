@@ -15,29 +15,25 @@ import pytest
 from dyf import check_rust_available
 
 # Add demo/ to path so we can import rog_mcp
-_demo_dir = os.path.join(os.path.dirname(__file__), '..', 'demo')
+_demo_dir = os.path.join(os.path.dirname(__file__), "..", "demo")
 if _demo_dir not in sys.path:
     sys.path.insert(0, os.path.abspath(_demo_dir))
 
-pytestmark = pytest.mark.skipif(
-    not check_rust_available(), reason="Rust extension not available"
-)
+pytestmark = pytest.mark.skipif(not check_rust_available(), reason="Rust extension not available")
 
 try:
     import flatbuffers  # noqa: F401
     import pyarrow  # noqa: F401
     import websockets  # noqa: F401
+
     _HAS_LAZY_DEPS = True
 except ImportError:
     _HAS_LAZY_DEPS = False
 
-lazy_deps = pytest.mark.skipif(
-    not _HAS_LAZY_DEPS, reason="pyarrow, flatbuffers, and websockets required"
-)
+lazy_deps = pytest.mark.skipif(not _HAS_LAZY_DEPS, reason="pyarrow, flatbuffers, and websockets required")
 
 
-def _make_clustered_embeddings(n_clusters=5, points_per_cluster=40, dim=32,
-                               seed=42):
+def _make_clustered_embeddings(n_clusters=5, points_per_cluster=40, dim=32, seed=42):
     """Create synthetic clustered embeddings on the unit sphere."""
     rng = np.random.default_rng(seed)
     centers = rng.standard_normal((n_clusters, dim)).astype(np.float32)
@@ -45,8 +41,7 @@ def _make_clustered_embeddings(n_clusters=5, points_per_cluster=40, dim=32,
 
     points = []
     for i in range(n_clusters):
-        noise = rng.standard_normal(
-            (points_per_cluster, dim)).astype(np.float32) * 0.1
+        noise = rng.standard_normal((points_per_cluster, dim)).astype(np.float32) * 0.1
         cluster_pts = centers[i] + noise
         cluster_pts /= np.linalg.norm(cluster_pts, axis=1, keepdims=True)
         points.append(cluster_pts)
@@ -63,10 +58,8 @@ def _build_level2_dyf(n_clusters=5, points_per_cluster=40, dim=32):
     from dyf.lazy_index import write_lazy_index
 
     n = n_clusters * points_per_cluster
-    embeddings = _make_clustered_embeddings(
-        n_clusters=n_clusters, points_per_cluster=points_per_cluster, dim=dim)
-    tree = build_dyf_tree(embeddings, max_depth=3, num_bits=3,
-                          min_leaf_size=4, seed=42)
+    embeddings = _make_clustered_embeddings(n_clusters=n_clusters, points_per_cluster=points_per_cluster, dim=dim)
+    tree = build_dyf_tree(embeddings, max_depth=3, num_bits=3, min_leaf_size=4, seed=42)
 
     rng = np.random.default_rng(42)
 
@@ -77,8 +70,7 @@ def _build_level2_dyf(n_clusters=5, points_per_cluster=40, dim=32):
     umap_z = rng.standard_normal(n).astype(np.float32)
 
     # Assign clusters based on true cluster membership
-    cluster_labels = np.array(
-        [i // points_per_cluster for i in range(n)], dtype=np.int32)
+    cluster_labels = np.array([i // points_per_cluster for i in range(n)], dtype=np.int32)
 
     # Build Louvain-format metadata
     community_names = {str(i): f"Cluster {i}" for i in range(n_clusters)}
@@ -95,8 +87,7 @@ def _build_level2_dyf(n_clusters=5, points_per_cluster=40, dim=32):
     # Fake linkage matrix: n_clusters-1 merges
     Z = []
     for i in range(n_clusters - 1):
-        Z.append([float(i), float(i + 1), float(i + 1) * 0.1,
-                  float((i + 2) * points_per_cluster)])
+        Z.append([float(i), float(i + 1), float(i + 1) * 0.1, float((i + 2) * points_per_cluster)])
 
     # Leaf-to-community: use identity (1 leaf per community for simplicity)
     leaf_to_community = {str(i): i for i in range(n_clusters)}
@@ -106,34 +97,33 @@ def _build_level2_dyf(n_clusters=5, points_per_cluster=40, dim=32):
         leaf_item_map[str(cid)] = list(range(start, start + points_per_cluster))
 
     dendro_data = {
-        'Z': Z,
-        'community_names': community_names,
-        'community_centroids': community_centroids,
-        'community_sizes': community_sizes,
+        "Z": Z,
+        "community_names": community_names,
+        "community_centroids": community_centroids,
+        "community_sizes": community_sizes,
     }
     leaf_comm_data = {
-        'natural_k': n_clusters,
-        'leaf_to_community': leaf_to_community,
+        "natural_k": n_clusters,
+        "leaf_to_community": leaf_to_community,
     }
 
     sf = {
-        'title': titles,
-        'umap_x': umap_x,
-        'umap_y': umap_y,
-        'umap_z': umap_z,
-        'community_id': cluster_labels,
+        "title": titles,
+        "umap_x": umap_x,
+        "umap_y": umap_y,
+        "umap_z": umap_z,
+        "community_id": cluster_labels,
     }
     meta = {
-        'louvain_dendrogram': json.dumps(dendro_data),
-        'louvain_leaf_communities': json.dumps(leaf_comm_data),
-        'leaf_item_map': json.dumps(leaf_item_map),
+        "louvain_dendrogram": json.dumps(dendro_data),
+        "louvain_leaf_communities": json.dumps(leaf_comm_data),
+        "leaf_item_map": json.dumps(leaf_item_map),
     }
 
-    with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+    with tempfile.NamedTemporaryFile(suffix=".dyf", delete=False) as f:
         path = f.name
 
-    write_lazy_index(tree, embeddings, path, quantization='float32',
-                     stored_fields=sf, metadata=meta)
+    write_lazy_index(tree, embeddings, path, quantization="float32", stored_fields=sf, metadata=meta)
 
     return path, n, n_clusters
 
@@ -156,8 +146,8 @@ class TestLoadCacheFromDyf:
                 rog_mcp.load_cache(path)
 
                 assert rog_mcp.CACHE is not None
-                assert len(rog_mcp.CACHE['titles']) == n
-                assert rog_mcp.CACHE['coords_2d'].shape == (n, 2)
+                assert len(rog_mcp.CACHE["titles"]) == n
+                assert rog_mcp.CACHE["coords_2d"].shape == (n, 2)
             finally:
                 rog_mcp.CACHE = old_cache
                 rog_mcp.DYF_INDEX = old_dyf
@@ -177,12 +167,12 @@ class TestLoadCacheFromDyf:
                 rog_mcp.DYF_INDEX = None
                 rog_mcp.load_cache(path)
 
-                cr = rog_mcp.CACHE['cluster_result']
+                cr = rog_mcp.CACHE["cluster_result"]
                 # natural_k is n_clusters
-                assert n_clusters in cr['labels']
-                assert n_clusters in cr['names']
-                assert n_clusters in cr['centroids']
-                assert len(cr['labels'][n_clusters]) == n
+                assert n_clusters in cr["labels"]
+                assert n_clusters in cr["names"]
+                assert n_clusters in cr["centroids"]
+                assert len(cr["labels"][n_clusters]) == n
             finally:
                 rog_mcp.CACHE = old_cache
                 rog_mcp.DYF_INDEX = old_dyf
@@ -202,7 +192,7 @@ class TestLoadCacheFromDyf:
                 rog_mcp.DYF_INDEX = None
                 rog_mcp.load_cache(path)
 
-                titles = rog_mcp.CACHE['titles']
+                titles = rog_mcp.CACHE["titles"]
                 assert isinstance(titles, list)
                 assert isinstance(titles[0], str)
                 assert titles[0] == "Test Item 0"
@@ -240,10 +230,10 @@ class TestQueryFunctions:
 
         results = rog_mcp.search_points("Test Item 1", limit=5)
         assert len(results) > 0
-        assert all('title' in r for r in results)
-        assert all('x' in r for r in results)
+        assert all("title" in r for r in results)
+        assert all("x" in r for r in results)
         # Should find "Test Item 1", "Test Item 10", etc.
-        assert any("Test Item 1" in r['title'] for r in results)
+        assert any("Test Item 1" in r["title"] for r in results)
 
     def test_search_points_case_insensitive(self):
         import rog_mcp
@@ -262,11 +252,11 @@ class TestQueryFunctions:
 
         clusters = rog_mcp.get_cluster_info(level=self.n_clusters)
         assert len(clusters) > 0
-        assert all('cluster_id' in c for c in clusters)
-        assert all('name' in c for c in clusters)
-        assert all('count' in c for c in clusters)
+        assert all("cluster_id" in c for c in clusters)
+        assert all("name" in c for c in clusters)
+        assert all("count" in c for c in clusters)
         # Total count should equal n
-        total = sum(c['count'] for c in clusters)
+        total = sum(c["count"] for c in clusters)
         assert total == self.n
 
     def test_get_cluster_info_invalid_level(self):
@@ -274,17 +264,17 @@ class TestQueryFunctions:
 
         result = rog_mcp.get_cluster_info(level=99)
         assert len(result) == 1
-        assert 'error' in result[0]
+        assert "error" in result[0]
 
     def test_get_neighbors(self):
         import rog_mcp
 
         neighbors = rog_mcp.get_neighbors(index=0, k=5)
         assert len(neighbors) == 5
-        assert all('index' in n for n in neighbors)
-        assert all('distance' in n for n in neighbors)
+        assert all("index" in n for n in neighbors)
+        assert all("distance" in n for n in neighbors)
         # Distances should be sorted
-        dists = [n['distance'] for n in neighbors]
+        dists = [n["distance"] for n in neighbors]
         assert dists == sorted(dists)
 
     def test_get_neighbors_invalid_index(self):
@@ -292,23 +282,21 @@ class TestQueryFunctions:
 
         result = rog_mcp.get_neighbors(index=999999, k=5)
         assert len(result) == 1
-        assert 'error' in result[0]
+        assert "error" in result[0]
 
     def test_get_cluster_members(self):
         import rog_mcp
 
-        members = rog_mcp.get_cluster_members(
-            cluster_id=0, level=self.n_clusters, limit=10)
+        members = rog_mcp.get_cluster_members(cluster_id=0, level=self.n_clusters, limit=10)
         assert len(members) > 0
         assert len(members) <= 10
-        assert all('title' in m for m in members)
+        assert all("title" in m for m in members)
 
     def test_get_points_in_region(self):
         import rog_mcp
 
         # Use a very large bounding box to ensure we get results
-        result = rog_mcp.get_points_in_region(
-            x_min=-1000, x_max=1000, y_min=-1000, y_max=1000, limit=10)
+        result = rog_mcp.get_points_in_region(x_min=-1000, x_max=1000, y_min=-1000, y_max=1000, limit=10)
         assert len(result) > 0
         assert len(result) <= 10
 
@@ -330,11 +318,11 @@ class TestLouvainClusterLoading:
                 rog_mcp.DYF_INDEX = None
                 rog_mcp.load_cache(path)
 
-                cr = rog_mcp.CACHE['cluster_result']
-                assert n_clusters in cr['labels']
-                assert len(cr['labels'][n_clusters]) == n
-                assert n_clusters in cr['names']
-                assert n_clusters in cr['centroids']
+                cr = rog_mcp.CACHE["cluster_result"]
+                assert n_clusters in cr["labels"]
+                assert len(cr["labels"][n_clusters]) == n
+                assert n_clusters in cr["names"]
+                assert n_clusters in cr["centroids"]
             finally:
                 rog_mcp.CACHE = old_cache
                 rog_mcp.DYF_INDEX = old_dyf
@@ -355,9 +343,9 @@ class TestLouvainClusterLoading:
                 rog_mcp.DYF_INDEX = None
                 rog_mcp.load_cache(path)
 
-                assert rog_mcp.CACHE['dendro_data'] is not None
-                assert 'Z' in rog_mcp.CACHE['dendro_data']
-                assert 'community_names' in rog_mcp.CACHE['dendro_data']
+                assert rog_mcp.CACHE["dendro_data"] is not None
+                assert "Z" in rog_mcp.CACHE["dendro_data"]
+                assert "community_names" in rog_mcp.CACHE["dendro_data"]
             finally:
                 rog_mcp.CACHE = old_cache
                 rog_mcp.DYF_INDEX = old_dyf
@@ -378,26 +366,23 @@ class TestNoClustersLoading:
         from dyf.lazy_index import write_lazy_index
 
         n = 200
-        embeddings = _make_clustered_embeddings(
-            n_clusters=5, points_per_cluster=40, dim=32)
-        tree = build_dyf_tree(embeddings, max_depth=4, num_bits=3,
-                              min_leaf_size=4, seed=42)
+        embeddings = _make_clustered_embeddings(n_clusters=5, points_per_cluster=40, dim=32)
+        tree = build_dyf_tree(embeddings, max_depth=4, num_bits=3, min_leaf_size=4, seed=42)
 
         rng = np.random.default_rng(42)
 
         sf = {
-            'title': [f"Item {i}" for i in range(n)],
-            'umap_x': rng.standard_normal(n).astype(np.float32),
-            'umap_y': rng.standard_normal(n).astype(np.float32),
-            'umap_z': rng.standard_normal(n).astype(np.float32),
+            "title": [f"Item {i}" for i in range(n)],
+            "umap_x": rng.standard_normal(n).astype(np.float32),
+            "umap_y": rng.standard_normal(n).astype(np.float32),
+            "umap_z": rng.standard_normal(n).astype(np.float32),
         }
 
-        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".dyf", delete=False) as f:
             path = f.name
 
         try:
-            write_lazy_index(tree, embeddings, path, quantization='float32',
-                             stored_fields=sf)
+            write_lazy_index(tree, embeddings, path, quantization="float32", stored_fields=sf)
 
             old_cache = rog_mcp.CACHE
             old_dyf = rog_mcp.DYF_INDEX
@@ -406,12 +391,12 @@ class TestNoClustersLoading:
                 rog_mcp.DYF_INDEX = None
                 rog_mcp.load_cache(path)
 
-                cr = rog_mcp.CACHE['cluster_result']
+                cr = rog_mcp.CACHE["cluster_result"]
                 # No Louvain metadata → empty labels
-                assert len(cr['labels']) == 0
+                assert len(cr["labels"]) == 0
                 # But coords and titles should be loaded
-                assert len(rog_mcp.CACHE['titles']) == n
-                assert rog_mcp.CACHE['coords_2d'].shape == (n, 2)
+                assert len(rog_mcp.CACHE["titles"]) == n
+                assert rog_mcp.CACHE["coords_2d"].shape == (n, 2)
             finally:
                 rog_mcp.CACHE = old_cache
                 rog_mcp.DYF_INDEX = old_dyf

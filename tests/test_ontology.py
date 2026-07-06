@@ -28,11 +28,10 @@ class TestBuildRogLayer:
 
         # Diversity: first half "general" (high), second half "specific" (low)
         diversity = np.zeros(n)
-        diversity[:n // 2] = 0.5 + rng.random(n // 2) * 0.3
-        diversity[n // 2:] = 0.1 + rng.random(n - n // 2) * 0.1
+        diversity[: n // 2] = 0.5 + rng.random(n // 2) * 0.3
+        diversity[n // 2 :] = 0.1 + rng.random(n - n // 2) * 0.1
 
-        return _KNNData(neighbors=neighbors, similarities=similarities,
-                        diversity=diversity), n
+        return _KNNData(neighbors=neighbors, similarities=similarities, diversity=diversity), n
 
     def test_basic_layer(self):
         from dyf.ontology import _build_rog_layer, _ROGState
@@ -44,9 +43,9 @@ class TestBuildRogLayer:
         )
         remaining = set(range(n))
 
-        layer = _build_rog_layer(remaining, knn, threshold=0.0,
-                                  diversity_gap_threshold=0.01,
-                                  depth=0, n_points=n, state=state)
+        layer = _build_rog_layer(
+            remaining, knn, threshold=0.0, diversity_gap_threshold=0.01, depth=0, n_points=n, state=state
+        )
         # With threshold=0 (accept all), should connect some nodes
         assert layer is not None
         assert layer.n_nodes > 0
@@ -63,9 +62,9 @@ class TestBuildRogLayer:
         remaining = set(range(n))
 
         # Threshold so high that no edges qualify
-        layer = _build_rog_layer(remaining, knn, threshold=2.0,
-                                  diversity_gap_threshold=0.01,
-                                  depth=0, n_points=n, state=state)
+        layer = _build_rog_layer(
+            remaining, knn, threshold=2.0, diversity_gap_threshold=0.01, depth=0, n_points=n, state=state
+        )
         assert layer is None
 
     def test_mutates_state(self):
@@ -78,9 +77,7 @@ class TestBuildRogLayer:
         )
         remaining = set(range(n))
 
-        _build_rog_layer(remaining, knn, threshold=0.0,
-                         diversity_gap_threshold=0.01,
-                         depth=0, n_points=n, state=state)
+        _build_rog_layer(remaining, knn, threshold=0.0, diversity_gap_threshold=0.01, depth=0, n_points=n, state=state)
         # State should have accumulated edges
         total = sum(len(v) for v in state.all_children.values())
         assert total > 0
@@ -96,8 +93,8 @@ class TestBuildRogLayer:
         remaining = set(range(n))
         original_size = len(remaining)
 
-        layer = _build_rog_layer(remaining, knn, threshold=0.0,
-                                  diversity_gap_threshold=0.01,
-                                  depth=0, n_points=n, state=state)
+        layer = _build_rog_layer(
+            remaining, knn, threshold=0.0, diversity_gap_threshold=0.01, depth=0, n_points=n, state=state
+        )
         if layer is not None:
             assert len(remaining) < original_size

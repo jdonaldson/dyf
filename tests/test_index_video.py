@@ -12,6 +12,7 @@ from dyf.index_video import _format_timestamp
 # Tests: _format_timestamp
 # ---------------------------------------------------------------------------
 
+
 class TestFormatTimestamp:
     def test_zero(self):
         assert _format_timestamp(0) == "0:00"
@@ -42,6 +43,7 @@ class TestFormatTimestamp:
 # ---------------------------------------------------------------------------
 # Tests: detect_scenes (mocked)
 # ---------------------------------------------------------------------------
+
 
 class TestDetectScenes:
     def test_multiple_scenes(self):
@@ -75,8 +77,10 @@ class TestDetectScenes:
         mock_scene_manager_cls = MagicMock(return_value=mock_sm)
         mock_content_detector_cls = MagicMock()
 
-        with patch("dyf.index_video._load_scenedetect",
-                   return_value=(mock_open_video, mock_scene_manager_cls, mock_content_detector_cls)):
+        with patch(
+            "dyf.index_video._load_scenedetect",
+            return_value=(mock_open_video, mock_scene_manager_cls, mock_content_detector_cls),
+        ):
             scenes = detect_scenes(Path("test.mp4"))
 
         assert len(scenes) == 3
@@ -99,8 +103,10 @@ class TestDetectScenes:
         mock_scene_manager_cls = MagicMock(return_value=mock_sm)
         mock_content_detector_cls = MagicMock()
 
-        with patch("dyf.index_video._load_scenedetect",
-                   return_value=(mock_open_video, mock_scene_manager_cls, mock_content_detector_cls)):
+        with patch(
+            "dyf.index_video._load_scenedetect",
+            return_value=(mock_open_video, mock_scene_manager_cls, mock_content_detector_cls),
+        ):
             scenes = detect_scenes(Path("test.mp4"))
 
         # Should fall back to 5s uniform sampling: 0-5, 5-10, 10-15, 15-20
@@ -115,6 +121,7 @@ class TestDetectScenes:
 
 try:
     import PIL  # noqa: F401
+
     _has_pil = True
 except ImportError:
     _has_pil = False
@@ -127,20 +134,15 @@ class TestIndexVideoE2E:
     @patch("dyf.index_video.load_vision_model")
     @patch("dyf.index_video.embed_images")
     @patch("dyf.index_video.make_thumbnail")
-    def test_creates_dyf_file(
-        self, mock_thumb, mock_embed, mock_load_model,
-        mock_extract, mock_detect, tmp_path
-    ):
+    def test_creates_dyf_file(self, mock_thumb, mock_embed, mock_load_model, mock_extract, mock_detect, tmp_path):
         from PIL import Image
 
         from dyf.index_video import index_video
 
         # Mock scenes
         mock_detect.return_value = [
-            {"scene_id": 0, "start_time": 0.0, "end_time": 5.0,
-             "duration": 5.0, "keyframe_time": 2.5},
-            {"scene_id": 1, "start_time": 5.0, "end_time": 12.0,
-             "duration": 7.0, "keyframe_time": 8.5},
+            {"scene_id": 0, "start_time": 0.0, "end_time": 5.0, "duration": 5.0, "keyframe_time": 2.5},
+            {"scene_id": 1, "start_time": 5.0, "end_time": 12.0, "duration": 7.0, "keyframe_time": 8.5},
         ]
 
         # Mock keyframe extraction
@@ -168,18 +170,14 @@ class TestIndexVideoE2E:
     @patch("dyf.index_video.load_vision_model")
     @patch("dyf.index_video.embed_images")
     @patch("dyf.index_video.make_thumbnail")
-    def test_stored_fields(
-        self, mock_thumb, mock_embed, mock_load_model,
-        mock_extract, mock_detect, tmp_path
-    ):
+    def test_stored_fields(self, mock_thumb, mock_embed, mock_load_model, mock_extract, mock_detect, tmp_path):
         from PIL import Image
 
         from dyf.index_video import index_video
         from dyf.lazy_index import LazyIndex
 
         mock_detect.return_value = [
-            {"scene_id": 0, "start_time": 0.0, "end_time": 5.0,
-             "duration": 5.0, "keyframe_time": 2.5},
+            {"scene_id": 0, "start_time": 0.0, "end_time": 5.0, "duration": 5.0, "keyframe_time": 2.5},
         ]
         mock_extract.return_value = [Image.new("RGB", (320, 240))]
         mock_load_model.return_value = (MagicMock(), MagicMock(), "cpu")
@@ -211,18 +209,14 @@ class TestIndexVideoE2E:
     @patch("dyf.index_video.load_vision_model")
     @patch("dyf.index_video.embed_images")
     @patch("dyf.index_video.make_thumbnail")
-    def test_metadata(
-        self, mock_thumb, mock_embed, mock_load_model,
-        mock_extract, mock_detect, tmp_path
-    ):
+    def test_metadata(self, mock_thumb, mock_embed, mock_load_model, mock_extract, mock_detect, tmp_path):
         from PIL import Image
 
         from dyf.index_video import index_video
         from dyf.lazy_index import LazyIndex
 
         mock_detect.return_value = [
-            {"scene_id": 0, "start_time": 0.0, "end_time": 5.0,
-             "duration": 5.0, "keyframe_time": 2.5},
+            {"scene_id": 0, "start_time": 0.0, "end_time": 5.0, "duration": 5.0, "keyframe_time": 2.5},
         ]
         mock_extract.return_value = [Image.new("RGB", (320, 240))]
         mock_load_model.return_value = (MagicMock(), MagicMock(), "cpu")

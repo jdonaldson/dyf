@@ -33,7 +33,7 @@ jobs:
         run: pip install -e ".[dev,full,io,lazy]"
 
       - name: Lint
-        run: ruff check src/dyf/ && ruff format --check src/dyf/
+        run: ruff check src/dyf/ tests/ && ruff format --check src/dyf/ tests/
 
       - name: Run tests
         run: pytest tests/ -v --tb=short --cov=dyf --cov-report=term-missing

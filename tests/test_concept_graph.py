@@ -20,6 +20,7 @@ from dyf.concept_graph import (
 # slugify
 # ---------------------------------------------------------------------------
 
+
 class TestSlugify:
     def test_basic(self):
         assert slugify("Hello World") == "hello-world"
@@ -126,6 +127,7 @@ class TestChunkMarkdown:
 # fuzzy_match
 # ---------------------------------------------------------------------------
 
+
 class TestFuzzyMatch:
     def setup_method(self):
         self.graph = {
@@ -173,6 +175,7 @@ class TestFuzzyMatch:
 # save_graph / load_graph
 # ---------------------------------------------------------------------------
 
+
 class TestGraphSerialization:
     def test_roundtrip(self, tmp_path):
         graph = {
@@ -181,8 +184,7 @@ class TestGraphSerialization:
                 source="test.md",
                 line=1,
                 neighbors=[
-                    {"id": "test/node-b", "header": "Node B",
-                     "similarity": 0.85, "source": "test.md", "line": 10},
+                    {"id": "test/node-b", "header": "Node B", "similarity": 0.85, "source": "test.md", "line": 10},
                 ],
             ),
             "test/node-b": ConceptNode(
@@ -219,6 +221,7 @@ class TestGraphSerialization:
 # ---------------------------------------------------------------------------
 # check_staleness
 # ---------------------------------------------------------------------------
+
 
 class TestCheckStaleness:
     def test_missing_graph_is_stale(self, tmp_path):
@@ -265,6 +268,7 @@ class TestCheckStaleness:
 # ConceptGraphConfig
 # ---------------------------------------------------------------------------
 
+
 class TestConceptGraphConfig:
     def test_defaults(self):
         config = ConceptGraphConfig()
@@ -279,14 +283,18 @@ class TestConceptGraphConfig:
 
     def test_load_from_file(self, tmp_path):
         cfg_path = tmp_path / "config.json"
-        cfg_path.write_text(json.dumps({
-            "sources": ["~/test.md"],
-            "output_path": "/tmp/test_graph.json",
-            "embeddings_cache_path": "/tmp/test_embeddings.npz",
-            "embedder": "medium",
-            "top_k": 3,
-            "similarity_threshold": 0.3,
-        }))
+        cfg_path.write_text(
+            json.dumps(
+                {
+                    "sources": ["~/test.md"],
+                    "output_path": "/tmp/test_graph.json",
+                    "embeddings_cache_path": "/tmp/test_embeddings.npz",
+                    "embedder": "medium",
+                    "top_k": 3,
+                    "similarity_threshold": 0.3,
+                }
+            )
+        )
         config = ConceptGraphConfig.load(str(cfg_path))
         assert config.top_k == 3
         assert config.embedder == "medium"
@@ -306,6 +314,7 @@ class TestConceptGraphConfig:
 # ---------------------------------------------------------------------------
 # MarkdownChunk dataclass
 # ---------------------------------------------------------------------------
+
 
 class TestMarkdownChunk:
     def test_fields(self):

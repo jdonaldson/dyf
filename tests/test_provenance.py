@@ -16,6 +16,7 @@ from dyf.provenance import (
 # file_hash
 # ---------------------------------------------------------------------------
 
+
 class TestFileHash:
     def test_deterministic(self, tmp_path):
         p = tmp_path / "data.bin"
@@ -46,6 +47,7 @@ class TestFileHash:
 # params_hash
 # ---------------------------------------------------------------------------
 
+
 class TestParamsHash:
     def test_deterministic(self):
         d = {"sample": 0, "bridge_level": 100}
@@ -68,6 +70,7 @@ class TestParamsHash:
 # ---------------------------------------------------------------------------
 # create_provenance
 # ---------------------------------------------------------------------------
+
 
 class TestCreateProvenance:
     def test_basic(self, tmp_path):
@@ -121,6 +124,7 @@ class TestCreateProvenance:
 # check_compatible
 # ---------------------------------------------------------------------------
 
+
 class TestCheckCompatible:
     def _make_prov(self, n_items=1000, sample_n=0, sample_seed=42):
         return Provenance(
@@ -169,6 +173,7 @@ class TestCheckCompatible:
 # ---------------------------------------------------------------------------
 # Serialization roundtrip
 # ---------------------------------------------------------------------------
+
 
 class TestSerialization:
     def test_roundtrip(self):

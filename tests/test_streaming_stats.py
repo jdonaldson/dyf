@@ -1,6 +1,5 @@
 """Tests for streaming_stats module."""
 
-
 import numpy as np
 import pytest
 

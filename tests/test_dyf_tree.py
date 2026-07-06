@@ -44,8 +44,7 @@ class TestEjectPeriphery:
         labels, emb, coherence, members = self._make_cluster_data()
         # Set threshold very high so all clusters are "low coherence"
         threshold = 1.0
-        labels_out, ejected = _eject_periphery(
-            labels.copy(), emb, coherence, members, threshold)
+        labels_out, ejected = _eject_periphery(labels.copy(), emb, coherence, members, threshold)
         assert len(ejected) > 0
         # Ejected points should have label -1
         for idx in ejected:
@@ -58,8 +57,7 @@ class TestEjectPeriphery:
         # Set threshold very low so nothing gets ejected
         threshold = 0.0
         original_labels = labels.copy()
-        labels_out, ejected = _eject_periphery(
-            labels.copy(), emb, coherence, members, threshold)
+        labels_out, ejected = _eject_periphery(labels.copy(), emb, coherence, members, threshold)
         assert len(ejected) == 0
         np.testing.assert_array_equal(labels_out, original_labels)
 
@@ -73,19 +71,16 @@ class TestEjectPeriphery:
         coherence = {0: 0.1, 1: 0.1}  # low coherence
         members = {0: np.array([0, 1, 2]), 1: np.array([3, 4, 5])}
 
-        labels_out, ejected = _eject_periphery(
-            labels.copy(), emb, coherence, members, threshold=0.5)
+        labels_out, ejected = _eject_periphery(labels.copy(), emb, coherence, members, threshold=0.5)
         # Clusters with < 4 members should be skipped
         assert len(ejected) == 0
 
     def test_ejected_labels_set_to_neg1(self):
         from dyf.dyf_tree import _eject_periphery
 
-        labels, emb, coherence, members = self._make_cluster_data(
-            n_clusters=2, points_per=30)
+        labels, emb, coherence, members = self._make_cluster_data(n_clusters=2, points_per=30)
         threshold = 1.0  # eject from all
-        labels_out, ejected = _eject_periphery(
-            labels.copy(), emb, coherence, members, threshold)
+        labels_out, ejected = _eject_periphery(labels.copy(), emb, coherence, members, threshold)
         # All ejected indices should have -1
         if len(ejected) > 0:
             assert np.all(labels_out[ejected] == -1)

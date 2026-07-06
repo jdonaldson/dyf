@@ -26,7 +26,7 @@ def clustered_embeddings():
     for i in range(5):
         # Each cluster has a distinct center
         center = np.zeros(dim, dtype=np.float32)
-        center[i * 10:(i + 1) * 10] = 1.0
+        center[i * 10 : (i + 1) * 10] = 1.0
         center = center / np.linalg.norm(center)
 
         # Add noise around center
@@ -40,7 +40,6 @@ def clustered_embeddings():
 
 @pytest.mark.skipif(not check_rust_available(), reason="Rust extension not available")
 class TestDensityClassifier:
-
     def test_init(self):
         """Test classifier initialization."""
         classifier = DensityClassifier(embedding_dim=384)
@@ -171,7 +170,6 @@ class TestDensityClassifier:
 
 @pytest.mark.skipif(not check_rust_available(), reason="Rust extension not available")
 class TestDensityReport:
-
     def test_report_str(self, sample_embeddings):
         """Test report string representation."""
         classifier = DensityClassifier(embedding_dim=64, num_bits=8)
@@ -187,10 +185,10 @@ class TestDensityReport:
         classifier.fit(sample_embeddings)
         report = classifier.report()
 
-        assert hasattr(report, 'corpus_size')
-        assert hasattr(report, 'num_buckets')
-        assert hasattr(report, 'mean_bucket_size')
-        assert hasattr(report, 'median_bucket_size')
-        assert hasattr(report, 'max_bucket_size')
-        assert hasattr(report, 'mean_centroid_similarity')
-        assert hasattr(report, 'mean_isolation_score')
+        assert hasattr(report, "corpus_size")
+        assert hasattr(report, "num_buckets")
+        assert hasattr(report, "mean_bucket_size")
+        assert hasattr(report, "median_bucket_size")
+        assert hasattr(report, "max_bucket_size")
+        assert hasattr(report, "mean_centroid_similarity")
+        assert hasattr(report, "mean_isolation_score")

@@ -249,9 +249,7 @@ class TestPathAlignment:
         child_alignments = fc.path_alignments[child_mask]
 
         # Mean alignment should be positive (parents and children point similar direction)
-        assert child_alignments.mean() > 0.5, (
-            f"Expected positive alignment, got mean={child_alignments.mean():.3f}"
-        )
+        assert child_alignments.mean() > 0.5, f"Expected positive alignment, got mean={child_alignments.mean():.3f}"
 
 
 class TestEntropy:
@@ -737,16 +735,13 @@ class TestBottomUpParentSelection:
         ]
         graph = CategoryGraph.from_edges(edges)
 
-        node_ids = np.array(
-            ["PA", "PB", "CA1", "CA2", "CA3", "CB1", "CB2", "CB3"], dtype=str
-        )
+        node_ids = np.array(["PA", "PB", "CA1", "CA2", "CA3", "CB1", "CB2", "CB3"], dtype=str)
         node_names = np.array(
-            ["Surgical", "Writing", "cautery pencil", "scalpel", "forceps",
-             "mechanical pencil", "ballpoint", "eraser"], dtype=str
+            ["Surgical", "Writing", "cautery pencil", "scalpel", "forceps", "mechanical pencil", "ballpoint", "eraser"],
+            dtype=str,
         )
         embeddings = np.array(
-            [parent_a_emb, parent_b_emb, child_a1, child_a2, child_a3,
-             child_b1, child_b2, child_b3], dtype=np.float32
+            [parent_a_emb, parent_b_emb, child_a1, child_a2, child_a3, child_b1, child_b2, child_b3], dtype=np.float32
         )
 
         config = _make_config("test_bu", graph, embeddings, node_ids, node_names)
@@ -768,9 +763,7 @@ class TestBottomUpParentSelection:
         assert sim_ca1 > max(child_b_sims), "Precondition: CA1 should be nearer to query than any B child"
 
         # Bottom-up should select CA1 (child of Parent A)
-        assert result.node_id == "CA1", (
-            f"Expected CA1 (child of Surgical), got {result.node_id}"
-        )
+        assert result.node_id == "CA1", f"Expected CA1 (child of Surgical), got {result.node_id}"
 
 
 class TestTermDisambiguation:
@@ -852,8 +845,7 @@ class TestTermDisambiguation:
             dtype=str,
         )
         embeddings = np.array(
-            [parent_a_emb, parent_b_emb, child_a1, child_a2, child_a3,
-             child_b1, child_b2, child_b3],
+            [parent_a_emb, parent_b_emb, child_a1, child_a2, child_a3, child_b1, child_b2, child_b3],
             dtype=np.float32,
         )
 
@@ -866,9 +858,7 @@ class TestTermDisambiguation:
         # Verify precondition: B's best child (CB1) is slightly nearer than A's (CA1)
         sim_ca1 = float(child_a1 @ query)
         sim_cb1 = float(child_b1 @ query)
-        assert sim_cb1 > sim_ca1, (
-            f"Precondition failed: CB1 sim {sim_cb1:.4f} should exceed CA1 sim {sim_ca1:.4f}"
-        )
+        assert sim_cb1 > sim_ca1, f"Precondition failed: CB1 sim {sim_cb1:.4f} should exceed CA1 sim {sim_ca1:.4f}"
 
         # Without query_text: Hardware parent wins
         result_no_text = space.match_single("test_td", query)
@@ -877,9 +867,7 @@ class TestTermDisambiguation:
         )
 
         # With query_text: "bone drill high speed" should flip to Medical
-        result_with_text = space.match_single(
-            "test_td", query, query_text="bone drill high speed"
-        )
+        result_with_text = space.match_single("test_td", query, query_text="bone drill high speed")
         assert result_with_text.node_id.startswith("CA"), (
             f"With text, expected CA* (Medical child), got {result_with_text.node_id}"
         )

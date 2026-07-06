@@ -34,20 +34,13 @@ def _make_synthetic_setup():
         cluster 4: items 40-59 (straddles pacemaker/defibrillator boundary)
     """
     tree = [
-        {'node_id': 0, 'parent_id': None, 'depth': 0,
-         'num_items': 200, 'is_leaf': False, 'batch_index': -1},
-        {'node_id': 1, 'parent_id': 0, 'depth': 1,
-         'num_items': 100, 'is_leaf': False, 'batch_index': -1},
-        {'node_id': 2, 'parent_id': 0, 'depth': 1,
-         'num_items': 100, 'is_leaf': False, 'batch_index': -1},
-        {'node_id': 3, 'parent_id': 1, 'depth': 2,
-         'num_items': 50, 'is_leaf': True, 'batch_index': 0},
-        {'node_id': 4, 'parent_id': 1, 'depth': 2,
-         'num_items': 50, 'is_leaf': True, 'batch_index': 1},
-        {'node_id': 5, 'parent_id': 2, 'depth': 2,
-         'num_items': 50, 'is_leaf': True, 'batch_index': 2},
-        {'node_id': 6, 'parent_id': 2, 'depth': 2,
-         'num_items': 50, 'is_leaf': True, 'batch_index': 3},
+        {"node_id": 0, "parent_id": None, "depth": 0, "num_items": 200, "is_leaf": False, "batch_index": -1},
+        {"node_id": 1, "parent_id": 0, "depth": 1, "num_items": 100, "is_leaf": False, "batch_index": -1},
+        {"node_id": 2, "parent_id": 0, "depth": 1, "num_items": 100, "is_leaf": False, "batch_index": -1},
+        {"node_id": 3, "parent_id": 1, "depth": 2, "num_items": 50, "is_leaf": True, "batch_index": 0},
+        {"node_id": 4, "parent_id": 1, "depth": 2, "num_items": 50, "is_leaf": True, "batch_index": 1},
+        {"node_id": 5, "parent_id": 2, "depth": 2, "num_items": 50, "is_leaf": True, "batch_index": 2},
+        {"node_id": 6, "parent_id": 2, "depth": 2, "num_items": 50, "is_leaf": True, "batch_index": 3},
     ]
 
     children_map = {0: [1, 2], 1: [3, 4], 2: [5, 6]}
@@ -67,23 +60,19 @@ def _make_synthetic_setup():
     )
 
     # 4 clean clusters aligned with leaves
-    cluster_labels_clean = np.array(
-        [0] * 50 + [1] * 50 + [2] * 50 + [3] * 50, dtype=np.int32)
+    cluster_labels_clean = np.array([0] * 50 + [1] * 50 + [2] * 50 + [3] * 50, dtype=np.int32)
 
     # 5th cluster straddles pacemaker/defibrillator boundary (60% pace, 40% defib)
     cluster_labels_straddle = cluster_labels_clean.copy()
     # Reassign items 40-49 (pacemaker) and 50-59 (defibrillator) to cluster 4
     cluster_labels_straddle[40:60] = 4
 
-    return (tree, children_map, leaf_batches, titles,
-            cluster_labels_clean, cluster_labels_straddle)
+    return (tree, children_map, leaf_batches, titles, cluster_labels_clean, cluster_labels_straddle)
 
 
 def _make_split_keywords(tree, children_map, leaf_batches, titles):
     """Compute split keywords for the synthetic tree."""
-    return compute_split_keywords(
-        titles, tree, leaf_batches, children_map,
-        max_depth_from_root=3, min_child_items=5)
+    return compute_split_keywords(titles, tree, leaf_batches, children_map, max_depth_from_root=3, min_child_items=5)
 
 
 # ── Tests ─────────────────────────────────────────────────────────────
@@ -94,11 +83,9 @@ class TestBuildClusterTreeDag:
 
     def test_single_path_cluster(self):
         """All points from one branch → one tree parent, clean path."""
-        (tree, cmap, lbatch, titles,
-         labels_clean, _) = _make_synthetic_setup()
+        (tree, cmap, lbatch, titles, labels_clean, _) = _make_synthetic_setup()
 
-        dag = build_cluster_tree_dag(
-            tree, cmap, lbatch, labels_clean, n_clusters=25)
+        dag = build_cluster_tree_dag(tree, cmap, lbatch, labels_clean, n_clusters=25)
 
         # Cluster 0 (pacemakers) should connect to tree_3 (pacemaker leaf)
         # or tree_1 (cardiac parent)
@@ -112,32 +99,24 @@ class TestBuildClusterTreeDag:
 
     def test_straddling_cluster(self):
         """Points split 60/40 across boundary → two tree parents."""
-        (tree, cmap, lbatch, titles,
-         _, labels_straddle) = _make_synthetic_setup()
+        (tree, cmap, lbatch, titles, _, labels_straddle) = _make_synthetic_setup()
 
-        dag = build_cluster_tree_dag(
-            tree, cmap, lbatch, labels_straddle, n_clusters=25,
-            straddle_threshold=0.15)
+        dag = build_cluster_tree_dag(tree, cmap, lbatch, labels_straddle, n_clusters=25, straddle_threshold=0.15)
 
         # Cluster 4 straddles pacemaker (node 3) and defibrillator (node 4)
         c4_parents = dag.get_parents("cluster_25_4")
         tree_parents = [p for p in c4_parents if p.startswith("tree_")]
 
         # Should have at least 2 tree parents (the two sides of the split)
-        assert len(tree_parents) >= 2, (
-            f"Expected >=2 tree parents for straddling cluster, got "
-            f"{tree_parents}")
+        assert len(tree_parents) >= 2, f"Expected >=2 tree parents for straddling cluster, got {tree_parents}"
 
     def test_threshold_filtering(self):
         """High threshold excludes small overlaps."""
-        (tree, cmap, lbatch, titles,
-         _, labels_straddle) = _make_synthetic_setup()
+        (tree, cmap, lbatch, titles, _, labels_straddle) = _make_synthetic_setup()
 
         # With very high threshold, straddling cluster should only attach
         # to the majority side
-        dag_high = build_cluster_tree_dag(
-            tree, cmap, lbatch, labels_straddle, n_clusters=25,
-            straddle_threshold=0.55)
+        dag_high = build_cluster_tree_dag(tree, cmap, lbatch, labels_straddle, n_clusters=25, straddle_threshold=0.55)
 
         c4_parents = dag_high.get_parents("cluster_25_4")
         tree_parents = [p for p in c4_parents if p.startswith("tree_")]
@@ -146,9 +125,7 @@ class TestBuildClusterTreeDag:
         assert len(tree_parents) >= 1
 
         # With low threshold, both sides should attach
-        dag_low = build_cluster_tree_dag(
-            tree, cmap, lbatch, labels_straddle, n_clusters=25,
-            straddle_threshold=0.10)
+        dag_low = build_cluster_tree_dag(tree, cmap, lbatch, labels_straddle, n_clusters=25, straddle_threshold=0.10)
 
         c4_parents_low = dag_low.get_parents("cluster_25_4")
         tree_parents_low = [p for p in c4_parents_low if p.startswith("tree_")]
@@ -158,8 +135,7 @@ class TestBuildClusterTreeDag:
         """Tree-internal edges (parent → child) are in the DAG."""
         (tree, cmap, lbatch, _, labels_clean, _) = _make_synthetic_setup()
 
-        dag = build_cluster_tree_dag(
-            tree, cmap, lbatch, labels_clean, n_clusters=25)
+        dag = build_cluster_tree_dag(tree, cmap, lbatch, labels_clean, n_clusters=25)
 
         # tree_0 → tree_1 and tree_0 → tree_2 should exist
         root_children = dag.get_children("tree_0")
@@ -170,15 +146,13 @@ class TestBuildClusterTreeDag:
         """Every cluster connects to at least one tree node."""
         (tree, cmap, lbatch, _, labels_clean, _) = _make_synthetic_setup()
 
-        dag = build_cluster_tree_dag(
-            tree, cmap, lbatch, labels_clean, n_clusters=25)
+        dag = build_cluster_tree_dag(tree, cmap, lbatch, labels_clean, n_clusters=25)
 
         for cid in range(4):
             node_name = f"cluster_25_{cid}"
             parents = dag.get_parents(node_name)
             tree_parents = [p for p in parents if p.startswith("tree_")]
-            assert len(tree_parents) >= 1, (
-                f"Cluster {cid} has no tree parents")
+            assert len(tree_parents) >= 1, f"Cluster {cid} has no tree parents"
 
 
 class TestDerivePathLabels:
@@ -186,12 +160,10 @@ class TestDerivePathLabels:
 
     def test_single_path_format(self):
         """Single-path cluster gets clean slash-separated label."""
-        (tree, cmap, lbatch, titles,
-         labels_clean, _) = _make_synthetic_setup()
+        (tree, cmap, lbatch, titles, labels_clean, _) = _make_synthetic_setup()
 
         split_kw = _make_split_keywords(tree, cmap, lbatch, titles)
-        dag = build_cluster_tree_dag(
-            tree, cmap, lbatch, labels_clean, n_clusters=25)
+        dag = build_cluster_tree_dag(tree, cmap, lbatch, labels_clean, n_clusters=25)
 
         path_labels = derive_path_labels(dag, split_kw, n_clusters=25)
 
@@ -202,13 +174,10 @@ class TestDerivePathLabels:
 
     def test_straddling_path_has_braces(self):
         """Straddling cluster shows divergence with brace notation."""
-        (tree, cmap, lbatch, titles,
-         _, labels_straddle) = _make_synthetic_setup()
+        (tree, cmap, lbatch, titles, _, labels_straddle) = _make_synthetic_setup()
 
         split_kw = _make_split_keywords(tree, cmap, lbatch, titles)
-        dag = build_cluster_tree_dag(
-            tree, cmap, lbatch, labels_straddle, n_clusters=25,
-            straddle_threshold=0.15)
+        dag = build_cluster_tree_dag(tree, cmap, lbatch, labels_straddle, n_clusters=25, straddle_threshold=0.15)
 
         path_labels = derive_path_labels(dag, split_kw, n_clusters=25)
 
@@ -222,23 +191,19 @@ class TestDerivePathLabels:
         """No split keywords → empty labels."""
         (tree, cmap, lbatch, _, labels_clean, _) = _make_synthetic_setup()
 
-        dag = build_cluster_tree_dag(
-            tree, cmap, lbatch, labels_clean, n_clusters=25)
+        dag = build_cluster_tree_dag(tree, cmap, lbatch, labels_clean, n_clusters=25)
 
-        path_labels = derive_path_labels(
-            dag, {'splits': {}}, n_clusters=25)
+        path_labels = derive_path_labels(dag, {"splits": {}}, n_clusters=25)
 
         for cid in range(4):
             assert path_labels.get(cid, "") == ""
 
     def test_all_clusters_get_labels(self):
         """Every cluster gets a path label (may be empty if no keywords)."""
-        (tree, cmap, lbatch, titles,
-         labels_clean, _) = _make_synthetic_setup()
+        (tree, cmap, lbatch, titles, labels_clean, _) = _make_synthetic_setup()
 
         split_kw = _make_split_keywords(tree, cmap, lbatch, titles)
-        dag = build_cluster_tree_dag(
-            tree, cmap, lbatch, labels_clean, n_clusters=25)
+        dag = build_cluster_tree_dag(tree, cmap, lbatch, labels_clean, n_clusters=25)
 
         path_labels = derive_path_labels(dag, split_kw, n_clusters=25)
         for cid in range(4):
@@ -250,14 +215,11 @@ class TestComputeSiblingKeywords:
 
     def test_siblings_get_contrastive_keywords(self):
         """Clusters sharing a parent get discriminative keywords."""
-        (tree, cmap, lbatch, titles,
-         labels_clean, _) = _make_synthetic_setup()
+        (tree, cmap, lbatch, titles, labels_clean, _) = _make_synthetic_setup()
 
-        dag = build_cluster_tree_dag(
-            tree, cmap, lbatch, labels_clean, n_clusters=25)
+        dag = build_cluster_tree_dag(tree, cmap, lbatch, labels_clean, n_clusters=25)
 
-        kw = compute_sibling_keywords(
-            dag, titles, labels_clean, n_clusters=25)
+        kw = compute_sibling_keywords(dag, titles, labels_clean, n_clusters=25)
 
         # Cluster 0 (pacemakers) and 1 (defibrillators) are siblings
         # under node 1 (cardiac). They should have discriminative keywords.
@@ -273,15 +235,11 @@ class TestComputeSiblingKeywords:
 
     def test_lone_cluster_gets_corpus_keywords(self):
         """Cluster with unique parent set falls back to corpus TF-IDF."""
-        (tree, cmap, lbatch, titles,
-         _, labels_straddle) = _make_synthetic_setup()
+        (tree, cmap, lbatch, titles, _, labels_straddle) = _make_synthetic_setup()
 
-        dag = build_cluster_tree_dag(
-            tree, cmap, lbatch, labels_straddle, n_clusters=25,
-            straddle_threshold=0.15)
+        dag = build_cluster_tree_dag(tree, cmap, lbatch, labels_straddle, n_clusters=25, straddle_threshold=0.15)
 
-        kw = compute_sibling_keywords(
-            dag, titles, labels_straddle, n_clusters=25)
+        kw = compute_sibling_keywords(dag, titles, labels_straddle, n_clusters=25)
 
         # Cluster 4 straddles — may have unique parent set
         assert 4 in kw
@@ -290,14 +248,11 @@ class TestComputeSiblingKeywords:
 
     def test_keywords_have_scores(self):
         """Each keyword should have a float score."""
-        (tree, cmap, lbatch, titles,
-         labels_clean, _) = _make_synthetic_setup()
+        (tree, cmap, lbatch, titles, labels_clean, _) = _make_synthetic_setup()
 
-        dag = build_cluster_tree_dag(
-            tree, cmap, lbatch, labels_clean, n_clusters=25)
+        dag = build_cluster_tree_dag(tree, cmap, lbatch, labels_clean, n_clusters=25)
 
-        kw = compute_sibling_keywords(
-            dag, titles, labels_clean, n_clusters=25)
+        kw = compute_sibling_keywords(dag, titles, labels_clean, n_clusters=25)
 
         for cid, keywords in kw.items():
             for word, score in keywords:
@@ -343,11 +298,9 @@ class TestDagRoundtrip:
 
     def test_roundtrip_preserves_edges(self):
         """Build → serialize → deserialize → edges match."""
-        (tree, cmap, lbatch, _,
-         labels_clean, _) = _make_synthetic_setup()
+        (tree, cmap, lbatch, _, labels_clean, _) = _make_synthetic_setup()
 
-        dag = build_cluster_tree_dag(
-            tree, cmap, lbatch, labels_clean, n_clusters=25)
+        dag = build_cluster_tree_dag(tree, cmap, lbatch, labels_clean, n_clusters=25)
 
         # Serialize and deserialize
         dag_dict = dag.to_dict()
@@ -363,11 +316,9 @@ class TestDagRoundtrip:
 
     def test_json_roundtrip(self):
         """JSON string round-trip works."""
-        (tree, cmap, lbatch, _,
-         labels_clean, _) = _make_synthetic_setup()
+        (tree, cmap, lbatch, _, labels_clean, _) = _make_synthetic_setup()
 
-        dag = build_cluster_tree_dag(
-            tree, cmap, lbatch, labels_clean, n_clusters=25)
+        dag = build_cluster_tree_dag(tree, cmap, lbatch, labels_clean, n_clusters=25)
 
         json_str = dag.to_json()
         dag2 = CategoryGraph.from_json(json_str)
@@ -396,10 +347,8 @@ class TestBackwardCompat:
         embeddings /= np.linalg.norm(embeddings, axis=1, keepdims=True)
 
         # Without split_keywords — should use contrastive TF-IDF fallback
-        with patch('dyf.enrich._labeling._call_ollama', return_value="Test Label"):
-            names = label_clusters(
-                titles, coords, labels, embeddings,
-                split_keywords=None)
+        with patch("dyf.enrich._labeling._call_ollama", return_value="Test Label"):
+            names = label_clusters(titles, coords, labels, embeddings, split_keywords=None)
 
         assert len(names) == 4
         for cid in range(4):

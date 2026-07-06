@@ -122,19 +122,23 @@ int multiply(int a, int b) {
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def tmp_source(tmp_path):
     """Write a source file to tmp_path and return the path."""
+
     def _write(filename: str, content: str) -> Path:
         p = tmp_path / filename
         p.write_text(content)
         return p
+
     return _write
 
 
 # ---------------------------------------------------------------------------
 # Tests: config integrity
 # ---------------------------------------------------------------------------
+
 
 def test_all_extensions_mapped():
     """Every extension in LANG_CONFIG appears in _EXT_TO_LANG."""
@@ -156,6 +160,7 @@ def test_no_duplicate_extensions():
 # ---------------------------------------------------------------------------
 # Tests: Python
 # ---------------------------------------------------------------------------
+
 
 def test_python_chunks(tmp_source):
     p = tmp_source("example.py", PYTHON_SRC)
@@ -195,6 +200,7 @@ def test_python_embed_prefix(tmp_source):
 # Tests: JavaScript
 # ---------------------------------------------------------------------------
 
+
 def test_javascript_chunks(tmp_source):
     p = tmp_source("app.js", JAVASCRIPT_SRC)
     chunks = chunk_source_file(p)
@@ -219,6 +225,7 @@ def test_jsx_extension(tmp_source):
 # Tests: TypeScript
 # ---------------------------------------------------------------------------
 
+
 def test_typescript_chunks(tmp_source):
     p = tmp_source("app.ts", TYPESCRIPT_SRC)
     chunks = chunk_source_file(p)
@@ -242,6 +249,7 @@ def test_tsx_extension(tmp_source):
 # ---------------------------------------------------------------------------
 # Tests: Rust
 # ---------------------------------------------------------------------------
+
 
 def test_rust_chunks(tmp_source):
     p = tmp_source("lib.rs", RUST_SRC)
@@ -270,6 +278,7 @@ def test_rust_chunks(tmp_source):
 # Tests: Go
 # ---------------------------------------------------------------------------
 
+
 def test_go_chunks(tmp_source):
     p = tmp_source("main.go", GO_SRC)
     chunks = chunk_source_file(p)
@@ -286,6 +295,7 @@ def test_go_chunks(tmp_source):
 # ---------------------------------------------------------------------------
 # Tests: Java
 # ---------------------------------------------------------------------------
+
 
 def test_java_chunks(tmp_source):
     p = tmp_source("Calculator.java", JAVA_SRC)
@@ -305,6 +315,7 @@ def test_java_chunks(tmp_source):
 # ---------------------------------------------------------------------------
 # Tests: C
 # ---------------------------------------------------------------------------
+
 
 def test_c_chunks(tmp_source):
     p = tmp_source("math.c", C_SRC)
@@ -333,6 +344,7 @@ def test_c_header(tmp_source):
 # ---------------------------------------------------------------------------
 # Tests: C++
 # ---------------------------------------------------------------------------
+
 
 def test_cpp_chunks(tmp_source):
     p = tmp_source("calc.cpp", CPP_SRC)
@@ -370,6 +382,7 @@ module Math = struct
   let area r = pi *. r *. r
 end
 """
+
 
 def test_ocaml_chunks(tmp_source):
     p = tmp_source("example.ml", OCAML_SRC)
@@ -425,6 +438,7 @@ def test_ocaml_mli(tmp_source):
 # ---------------------------------------------------------------------------
 # Tests: edge cases
 # ---------------------------------------------------------------------------
+
 
 def test_unsupported_extension(tmp_source):
     p = tmp_source("data.csv", "a,b,c\n1,2,3\n")

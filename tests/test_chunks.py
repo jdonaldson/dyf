@@ -41,7 +41,6 @@ def synthetic_data():
 
 
 class TestChunkRedundancy:
-
     def test_basic(self, synthetic_data):
         bucket_ids, doc_ids = synthetic_data
         red = chunk_redundancy(bucket_ids, doc_ids)
@@ -88,7 +87,6 @@ class TestChunkRedundancy:
 
 
 class TestDeduplicateChunks:
-
     def test_basic(self, synthetic_data):
         bucket_ids, doc_ids = synthetic_data
         mask = deduplicate_chunks(bucket_ids, doc_ids)
@@ -96,21 +94,21 @@ class TestDeduplicateChunks:
         assert len(mask) == 15
 
         # First occurrence of each (bucket, doc) pair should be True
-        assert mask[0]   # (0, A) first
+        assert mask[0]  # (0, A) first
         assert not mask[1]  # (0, A) duplicate
-        assert mask[2]   # (1, A) first
-        assert mask[3]   # (2, B) first
+        assert mask[2]  # (1, A) first
+        assert mask[3]  # (2, B) first
         assert not mask[4]  # (2, B) duplicate
         assert not mask[5]  # (2, B) duplicate
-        assert mask[6]   # (3, C) first
-        assert mask[7]   # (0, D) first — different doc from A
+        assert mask[6]  # (3, C) first
+        assert mask[7]  # (0, D) first — different doc from A
         assert not mask[8]  # (0, D) duplicate
-        assert mask[9]   # (4, D) first
-        assert not mask[10] # (4, D) duplicate
-        assert not mask[11] # (4, D) duplicate
+        assert mask[9]  # (4, D) first
+        assert not mask[10]  # (4, D) duplicate
+        assert not mask[11]  # (4, D) duplicate
         assert mask[12]  # (5, E) first
-        assert not mask[13] # (5, E) duplicate
-        assert not mask[14] # (5, E) duplicate
+        assert not mask[13]  # (5, E) duplicate
+        assert not mask[14]  # (5, E) duplicate
 
     def test_reduces_count(self, synthetic_data):
         bucket_ids, doc_ids = synthetic_data
@@ -156,7 +154,6 @@ class TestDeduplicateChunks:
 
 
 class TestDocSpread:
-
     def test_basic(self, synthetic_data):
         bucket_ids, doc_ids = synthetic_data
         spreads = doc_spread(bucket_ids, doc_ids)
@@ -306,9 +303,9 @@ class TestClusterQuality:
         coherence = np.array([0.1, 0.2, 0.9, 0.85, 0.15, 0.25])
         labels = np.array([0, 0, 1, 1, 2, 2])
         result = cluster_quality(coherence, labels)
-        assert 'cluster_mean_coherence' in result
-        assert 'meta_clusters' in result
-        assert 'threshold' in result
+        assert "cluster_mean_coherence" in result
+        assert "meta_clusters" in result
+        assert "threshold" in result
 
     def test_correct_meta_clusters(self):
         # Cluster 1 has high coherence, should be flagged
@@ -316,22 +313,22 @@ class TestClusterQuality:
         labels = np.array([0, 0, 1, 1, 2, 2])
         result = cluster_quality(coherence, labels, threshold_pct=60)
         # Cluster 1 mean = 0.875, should be above threshold
-        assert 1 in result['meta_clusters']
+        assert 1 in result["meta_clusters"]
 
     def test_coherence_array_length(self):
         coherence = np.array([0.5, 0.6, 0.3, 0.4])
         labels = np.array([0, 0, 1, 1])
         result = cluster_quality(coherence, labels)
-        assert len(result['cluster_mean_coherence']) == 2
+        assert len(result["cluster_mean_coherence"]) == 2
 
     def test_threshold_is_float(self):
         coherence = np.array([0.5, 0.6, 0.3, 0.4])
         labels = np.array([0, 0, 1, 1])
         result = cluster_quality(coherence, labels)
-        assert isinstance(result['threshold'], float)
+        assert isinstance(result["threshold"], float)
 
     def test_meta_clusters_is_set(self):
         coherence = np.array([0.5, 0.6, 0.3, 0.4])
         labels = np.array([0, 0, 1, 1])
         result = cluster_quality(coherence, labels)
-        assert isinstance(result['meta_clusters'], set)
+        assert isinstance(result["meta_clusters"], set)

@@ -26,7 +26,7 @@ def clustered_embeddings():
     clusters = []
     for i in range(5):
         center = np.zeros(dim, dtype=np.float32)
-        center[i * 10:(i + 1) * 10] = 1.0
+        center[i * 10 : (i + 1) * 10] = 1.0
         center = center / np.linalg.norm(center)
 
         noise = rng.standard_normal((n_per_cluster, dim)).astype(np.float32) * 0.1
@@ -38,9 +38,9 @@ def clustered_embeddings():
     for _ in range(n_bridges):
         c1, c2 = rng.choice(5, 2, replace=False)
         center1 = np.zeros(dim, dtype=np.float32)
-        center1[c1 * 10:(c1 + 1) * 10] = 1.0
+        center1[c1 * 10 : (c1 + 1) * 10] = 1.0
         center2 = np.zeros(dim, dtype=np.float32)
-        center2[c2 * 10:(c2 + 1) * 10] = 1.0
+        center2[c2 * 10 : (c2 + 1) * 10] = 1.0
         # Bridge point is between two cluster centers
         bridge = 0.5 * center1 + 0.5 * center2
         bridge = bridge / np.linalg.norm(bridge)
@@ -61,7 +61,6 @@ def fitted_classifier(sample_embeddings):
 
 @pytest.mark.skipif(not check_rust_available(), reason="Rust extension not available")
 class TestBridgeAnalysis:
-
     def test_analyze_bridges(self, fitted_classifier, sample_embeddings):
         """Test bridge analysis creation."""
         ba = fitted_classifier.analyze_bridges(sample_embeddings)
@@ -167,7 +166,6 @@ class TestBridgeAnalysis:
 
 @pytest.mark.skipif(not check_rust_available(), reason="Rust extension not available")
 class TestBridgeAnalysisEdgeCases:
-
     def test_small_dataset(self):
         """Test with very small dataset."""
         rng = np.random.default_rng(42)

@@ -12,14 +12,15 @@ Contract under test:
   3. TypeError from the classifier is NEVER swallowed into a leaf — it
      propagates (dtype/signature errors are bugs, not data conditions).
 """
+
 from __future__ import annotations
 
 import numpy as np
 import pytest
 
+from dyf import cut_tree_to_labels
 from dyf._arrays import ensure_f32
 from dyf.dyf_tree import build_dyf_tree
-from dyf import cut_tree_to_labels
 
 
 def _blobs(n_blobs=6, per=60, dim=32, seed=0, dtype=np.float64):
@@ -50,8 +51,7 @@ def test_build_dyf_tree_accepts_float64():
     X = _blobs(dtype=np.float64)
     tree = build_dyf_tree(X, max_depth=3, num_bits=3, min_leaf_size=4)
     assert tree["children"], "root must split on well-separated blobs"
-    labels = np.asarray(cut_tree_to_labels(tree, len(X), 12,
-                                           embeddings=X.astype(np.float32)))
+    labels = np.asarray(cut_tree_to_labels(tree, len(X), 12, embeddings=X.astype(np.float32)))
     assert len(np.unique(labels)) > 1, "float64 input must not degenerate to one cluster"
 
 
