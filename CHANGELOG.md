@@ -10,6 +10,14 @@
   this on its first search. Non-DYF2 files now fall back to the python path, as
   PQ/overflow indexes already did. Regression introduced in 0.11.0.
 
+### Changed
+
+- `LazyIndex` now **capability-probes** the installed dyf-rs rather than
+  hard-coding "rust = DYF2 only": with dyf-rs >= 0.10.0 (which adds DYF1/DYF3
+  read support), default-format indexes are served by the rust kernel too;
+  older dyf-rs (or compressed/chunked files it rejects) falls back to python
+  transparently.
+
 ### CI
 
 - Lint (`ruff check` + `ruff format --check`) actually passes again — CI had been

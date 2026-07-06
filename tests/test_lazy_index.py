@@ -10,24 +10,20 @@ import pytest
 from dyf import check_rust_available
 
 # Skip entire module if Rust extension not available
-pytestmark = pytest.mark.skipif(
-    not check_rust_available(), reason="Rust extension not available"
-)
+pytestmark = pytest.mark.skipif(not check_rust_available(), reason="Rust extension not available")
 
 try:
     import flatbuffers  # noqa: F401
     import pyarrow  # noqa: F401
+
     _HAS_LAZY_DEPS = True
 except ImportError:
     _HAS_LAZY_DEPS = False
 
-lazy_deps = pytest.mark.skipif(
-    not _HAS_LAZY_DEPS, reason="pyarrow and flatbuffers required"
-)
+lazy_deps = pytest.mark.skipif(not _HAS_LAZY_DEPS, reason="pyarrow and flatbuffers required")
 
 
-def _make_clustered_embeddings(n_clusters=5, points_per_cluster=40, dim=32,
-                               seed=42):
+def _make_clustered_embeddings(n_clusters=5, points_per_cluster=40, dim=32, seed=42):
     """Create synthetic clustered embeddings on the unit sphere.
 
     Returns:
@@ -57,22 +53,20 @@ class TestWriteAndLoad:
         from dyf import build_dyf_tree
         from dyf.lazy_index import write_lazy_index
 
-        embeddings = _make_clustered_embeddings(
-            n_clusters=5, points_per_cluster=40, dim=32, seed=42)
-        tree = build_dyf_tree(embeddings, max_depth=3, num_bits=3,
-                              min_leaf_size=4, seed=42)
+        embeddings = _make_clustered_embeddings(n_clusters=5, points_per_cluster=40, dim=32, seed=42)
+        tree = build_dyf_tree(embeddings, max_depth=3, num_bits=3, min_leaf_size=4, seed=42)
 
-        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".dyf", delete=False) as f:
             path = f.name
 
         try:
-            write_lazy_index(tree, embeddings, path, compression='zstd',
-                             quantization='float16',
-                             metadata={'test': 'true'})
+            write_lazy_index(
+                tree, embeddings, path, compression="zstd", quantization="float16", metadata={"test": "true"}
+            )
             yield {
-                'path': path,
-                'embeddings': embeddings,
-                'tree': tree,
+                "path": path,
+                "embeddings": embeddings,
+                "tree": tree,
             }
         finally:
             if os.path.exists(path):
@@ -80,37 +74,37 @@ class TestWriteAndLoad:
 
     def test_file_created(self, index_data):
         """Index file is created and has non-zero size."""
-        path = index_data['path']
+        path = index_data["path"]
         assert os.path.exists(path)
         assert os.path.getsize(path) > 0
 
     def test_magic_header(self, index_data):
         """File starts with DYF1 magic bytes."""
-        with open(index_data['path'], 'rb') as f:
+        with open(index_data["path"], "rb") as f:
             magic = f.read(4)
-        assert magic == b'DYF1'
+        assert magic == b"DYF1"
 
     def test_tree_summary(self, index_data):
         """LazyIndex.tree_summary returns correct metadata."""
         from dyf.lazy_index import LazyIndex
 
-        with LazyIndex(index_data['path']) as idx:
+        with LazyIndex(index_data["path"]) as idx:
             summary = idx.tree_summary
-            assert summary['embedding_dim'] == 32
-            assert summary['total_items'] == 200
-            assert summary['num_leaves'] > 0
-            assert summary['version'] == '1.0'
-            assert summary['build_params']['quantization'] == 'float16'
-            assert summary['build_params']['compression'] == 'zstd'
+            assert summary["embedding_dim"] == 32
+            assert summary["total_items"] == 200
+            assert summary["num_leaves"] > 0
+            assert summary["version"] == "1.0"
+            assert summary["build_params"]["quantization"] == "float16"
+            assert summary["build_params"]["compression"] == "zstd"
 
     def test_search_returns_results(self, index_data):
         """Search returns indices and scores."""
         from dyf.lazy_index import LazyIndex
 
-        embeddings = index_data['embeddings']
+        embeddings = index_data["embeddings"]
         query = embeddings[0]
 
-        with LazyIndex(index_data['path']) as idx:
+        with LazyIndex(index_data["path"]) as idx:
             indices, scores = idx.search(query, k=10, nprobe=3)
             assert len(indices) > 0
             assert len(indices) == len(scores)
@@ -123,10 +117,10 @@ class TestWriteAndLoad:
         """Searching with an existing embedding should find itself."""
         from dyf.lazy_index import LazyIndex
 
-        embeddings = index_data['embeddings']
+        embeddings = index_data["embeddings"]
         query = embeddings[42]
 
-        with LazyIndex(index_data['path']) as idx:
+        with LazyIndex(index_data["path"]) as idx:
             indices, scores = idx.search(query, k=10, nprobe=5)
             # The query itself should be in results with high similarity
             assert 42 in indices
@@ -138,7 +132,7 @@ class TestWriteAndLoad:
         """LazyIndex search should find most of the true top-k."""
         from dyf.lazy_index import LazyIndex
 
-        embeddings = index_data['embeddings']
+        embeddings = index_data["embeddings"]
         query = embeddings[0]
 
         # Brute force top-10
@@ -149,7 +143,7 @@ class TestWriteAndLoad:
         bf_scores = emb_n @ q_n
         bf_top = np.argsort(-bf_scores)[:10]
 
-        with LazyIndex(index_data['path']) as idx:
+        with LazyIndex(index_data["path"]) as idx:
             li_indices, li_scores = idx.search(query, k=10, nprobe=5)
 
         # At least 30% overlap with brute force (approximate + quantized)
@@ -160,11 +154,11 @@ class TestWriteAndLoad:
         """get_leaf returns a valid Arrow RecordBatch."""
         from dyf.lazy_index import LazyIndex
 
-        with LazyIndex(index_data['path']) as idx:
+        with LazyIndex(index_data["path"]) as idx:
             batch = idx.get_leaf(0)
             assert batch is not None
-            assert 'item_index' in batch.schema.names
-            assert 'embedding' in batch.schema.names
+            assert "item_index" in batch.schema.names
+            assert "embedding" in batch.schema.names
             assert batch.num_rows > 0
 
 
@@ -172,28 +166,25 @@ class TestWriteAndLoad:
 class TestQuantization:
     """Test different quantization modes."""
 
-    @pytest.fixture(params=['float32', 'float16'])
+    @pytest.fixture(params=["float32", "float16"])
     def quant_index(self, request):
         """Build index with different quantization."""
         from dyf import build_dyf_tree
         from dyf.lazy_index import write_lazy_index
 
         quantization = request.param
-        embeddings = _make_clustered_embeddings(
-            n_clusters=3, points_per_cluster=30, dim=16, seed=42)
-        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2,
-                              min_leaf_size=4, seed=42)
+        embeddings = _make_clustered_embeddings(n_clusters=3, points_per_cluster=30, dim=16, seed=42)
+        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2, min_leaf_size=4, seed=42)
 
-        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".dyf", delete=False) as f:
             path = f.name
 
         try:
-            write_lazy_index(tree, embeddings, path, compression='zstd',
-                             quantization=quantization)
+            write_lazy_index(tree, embeddings, path, compression="zstd", quantization=quantization)
             yield {
-                'path': path,
-                'embeddings': embeddings,
-                'quantization': quantization,
+                "path": path,
+                "embeddings": embeddings,
+                "quantization": quantization,
             }
         finally:
             if os.path.exists(path):
@@ -203,10 +194,10 @@ class TestQuantization:
         """Quantized index should preserve similarity ranking."""
         from dyf.lazy_index import LazyIndex
 
-        embeddings = quant_index['embeddings']
+        embeddings = quant_index["embeddings"]
         query = embeddings[0]
 
-        with LazyIndex(quant_index['path']) as idx:
+        with LazyIndex(quant_index["path"]) as idx:
             indices, scores = idx.search(query, k=5, nprobe=3)
             assert len(indices) > 0
             # Self should still be found
@@ -222,12 +213,10 @@ class TestCaching:
         from dyf import build_dyf_tree
         from dyf.lazy_index import LazyIndex, write_lazy_index
 
-        embeddings = _make_clustered_embeddings(
-            n_clusters=3, points_per_cluster=20, dim=16, seed=42)
-        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2,
-                              min_leaf_size=4, seed=42)
+        embeddings = _make_clustered_embeddings(n_clusters=3, points_per_cluster=20, dim=16, seed=42)
+        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2, min_leaf_size=4, seed=42)
 
-        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".dyf", delete=False) as f:
             path = f.name
 
         try:
@@ -237,13 +226,13 @@ class TestCaching:
                 query = embeddings[0]
                 # First search: cold cache
                 t0 = time.perf_counter()
-                idx.search(query, k=5, nprobe=1)
+                idx.search(query, k=5, nprobe=1, backend="python")
                 t1 = time.perf_counter()
                 t1 - t0
 
                 # Second search: warm cache
                 t2 = time.perf_counter()
-                idx.search(query, k=5, nprobe=1)
+                idx.search(query, k=5, nprobe=1, backend="python")
                 t3 = time.perf_counter()
                 t3 - t2
 
@@ -269,10 +258,9 @@ class TestEdgeCases:
         norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
         embeddings = embeddings / norms
 
-        tree = build_dyf_tree(embeddings, max_depth=1, num_bits=2,
-                              min_leaf_size=20, seed=42)
+        tree = build_dyf_tree(embeddings, max_depth=1, num_bits=2, min_leaf_size=20, seed=42)
 
-        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".dyf", delete=False) as f:
             path = f.name
 
         try:
@@ -291,12 +279,10 @@ class TestEdgeCases:
         from dyf import build_dyf_tree
         from dyf.lazy_index import LazyIndex, write_lazy_index
 
-        embeddings = _make_clustered_embeddings(
-            n_clusters=2, points_per_cluster=20, dim=8, seed=42)
-        tree = build_dyf_tree(embeddings, max_depth=1, num_bits=2,
-                              min_leaf_size=4, seed=42)
+        embeddings = _make_clustered_embeddings(n_clusters=2, points_per_cluster=20, dim=8, seed=42)
+        tree = build_dyf_tree(embeddings, max_depth=1, num_bits=2, min_leaf_size=4, seed=42)
 
-        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".dyf", delete=False) as f:
             path = f.name
 
         try:
@@ -315,16 +301,14 @@ class TestEdgeCases:
         from dyf import build_dyf_tree
         from dyf.lazy_index import LazyIndex, write_lazy_index
 
-        embeddings = _make_clustered_embeddings(
-            n_clusters=2, points_per_cluster=20, dim=8, seed=42)
-        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2,
-                              min_leaf_size=4, seed=42)
+        embeddings = _make_clustered_embeddings(n_clusters=2, points_per_cluster=20, dim=8, seed=42)
+        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2, min_leaf_size=4, seed=42)
 
-        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".dyf", delete=False) as f:
             path = f.name
 
         try:
-            write_lazy_index(tree, embeddings, path, compression='none')
+            write_lazy_index(tree, embeddings, path, compression="none")
 
             with LazyIndex(path) as idx:
                 indices, scores = idx.search(embeddings[0], k=5, nprobe=2)
@@ -338,12 +322,10 @@ class TestEdgeCases:
         from dyf import build_dyf_tree
         from dyf.lazy_index import LazyIndex, write_lazy_index
 
-        embeddings = _make_clustered_embeddings(
-            n_clusters=2, points_per_cluster=20, dim=8, seed=42)
-        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2,
-                              min_leaf_size=4, seed=42)
+        embeddings = _make_clustered_embeddings(n_clusters=2, points_per_cluster=20, dim=8, seed=42)
+        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2, min_leaf_size=4, seed=42)
 
-        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".dyf", delete=False) as f:
             path = f.name
 
         try:
@@ -367,12 +349,10 @@ class TestMmap:
         from dyf import build_dyf_tree
         from dyf.lazy_index import LazyIndex, write_lazy_index
 
-        embeddings = _make_clustered_embeddings(
-            n_clusters=5, points_per_cluster=100, dim=64, seed=42)
-        tree = build_dyf_tree(embeddings, max_depth=3, num_bits=3,
-                              min_leaf_size=4, seed=42)
+        embeddings = _make_clustered_embeddings(n_clusters=5, points_per_cluster=100, dim=64, seed=42)
+        tree = build_dyf_tree(embeddings, max_depth=3, num_bits=3, min_leaf_size=4, seed=42)
 
-        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".dyf", delete=False) as f:
             path = f.name
 
         try:
@@ -386,7 +366,7 @@ class TestMmap:
                 assert len(idx._mm) == file_size
                 # Tree metadata should be accessible without decompressing leaves
                 summary = idx.tree_summary
-                assert summary['total_items'] == 500
+                assert summary["total_items"] == 500
         finally:
             if os.path.exists(path):
                 os.unlink(path)
@@ -401,24 +381,22 @@ class TestExtractAllFields:
         from dyf import build_dyf_tree
         from dyf.lazy_index import LazyIndex, write_lazy_index
 
-        embeddings = _make_clustered_embeddings(
-            n_clusters=3, points_per_cluster=20, dim=16, seed=42)
-        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2,
-                              min_leaf_size=4, seed=42)
+        embeddings = _make_clustered_embeddings(n_clusters=3, points_per_cluster=20, dim=16, seed=42)
+        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2, min_leaf_size=4, seed=42)
 
-        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".dyf", delete=False) as f:
             path = f.name
 
         try:
-            write_lazy_index(tree, embeddings, path, quantization='float16')
+            write_lazy_index(tree, embeddings, path, quantization="float16")
 
             with LazyIndex(path) as idx:
                 data = idx.extract_all_fields()
-                assert data['embeddings'].shape == embeddings.shape
+                assert data["embeddings"].shape == embeddings.shape
                 # float16 round-trip: should be close but not exact
-                assert np.allclose(data['embeddings'], embeddings, atol=0.01)
-                assert data['fields'] == {}
-                assert 'stored_fields' not in data['metadata']
+                assert np.allclose(data["embeddings"], embeddings, atol=0.01)
+                assert data["fields"] == {}
+                assert "stored_fields" not in data["metadata"]
         finally:
             if os.path.exists(path):
                 os.unlink(path)
@@ -429,40 +407,41 @@ class TestExtractAllFields:
         from dyf.lazy_index import LazyIndex, write_lazy_index
 
         n = 60
-        embeddings = _make_clustered_embeddings(
-            n_clusters=3, points_per_cluster=20, dim=16, seed=42)
-        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2,
-                              min_leaf_size=4, seed=42)
+        embeddings = _make_clustered_embeddings(n_clusters=3, points_per_cluster=20, dim=16, seed=42)
+        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2, min_leaf_size=4, seed=42)
 
         titles = [f"Item {i}" for i in range(n)]
         scores = np.arange(n, dtype=np.float32) * 0.1
         labels = np.array([i % 3 for i in range(n)], dtype=np.int32)
 
-        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".dyf", delete=False) as f:
             path = f.name
 
         try:
             write_lazy_index(
-                tree, embeddings, path, quantization='float32',
-                stored_fields={'title': titles, 'score': scores,
-                               'label': labels})
+                tree,
+                embeddings,
+                path,
+                quantization="float32",
+                stored_fields={"title": titles, "score": scores, "label": labels},
+            )
 
             with LazyIndex(path) as idx:
                 data = idx.extract_all_fields()
 
                 # Verify stored fields
-                assert set(data['fields'].keys()) == {'title', 'score', 'label'}
+                assert set(data["fields"].keys()) == {"title", "score", "label"}
 
                 # Titles should be in order
                 for i in range(n):
-                    assert data['fields']['title'][i] == f"Item {i}"
+                    assert data["fields"]["title"][i] == f"Item {i}"
 
                 # Numeric fields should round-trip exactly (float32)
-                assert np.array_equal(data['fields']['score'], scores)
-                assert np.array_equal(data['fields']['label'], labels)
+                assert np.array_equal(data["fields"]["score"], scores)
+                assert np.array_equal(data["fields"]["label"], labels)
 
                 # Embeddings should be exact for float32
-                assert np.allclose(data['embeddings'], embeddings, atol=1e-6)
+                assert np.allclose(data["embeddings"], embeddings, atol=1e-6)
         finally:
             if os.path.exists(path):
                 os.unlink(path)
@@ -478,24 +457,26 @@ class TestRewriteLazyIndex:
         from dyf.lazy_index import LazyIndex, rewrite_lazy_index, write_lazy_index
 
         n = 60
-        embeddings = _make_clustered_embeddings(
-            n_clusters=3, points_per_cluster=20, dim=16, seed=42)
-        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2,
-                              min_leaf_size=4, seed=42)
+        embeddings = _make_clustered_embeddings(n_clusters=3, points_per_cluster=20, dim=16, seed=42)
+        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2, min_leaf_size=4, seed=42)
 
         titles = [f"Item {i}" for i in range(n)]
 
-        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".dyf", delete=False) as f:
             path = f.name
-        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".dyf", delete=False) as f:
             out_path = f.name
 
         try:
             # Write initial index with titles
             write_lazy_index(
-                tree, embeddings, path, quantization='float32',
-                stored_fields={'title': titles},
-                metadata={'source': 'test'})
+                tree,
+                embeddings,
+                path,
+                quantization="float32",
+                stored_fields={"title": titles},
+                metadata={"source": "test"},
+            )
 
             # Add new stored fields via rewrite
             umap_x = np.random.default_rng(42).standard_normal(n).astype(np.float32)
@@ -505,11 +486,11 @@ class TestRewriteLazyIndex:
             rewrite_lazy_index(
                 path,
                 new_stored_fields={
-                    'umap_x': umap_x,
-                    'umap_y': umap_y,
-                    'cluster_25': cluster_labels,
+                    "umap_x": umap_x,
+                    "umap_y": umap_y,
+                    "cluster_25": cluster_labels,
                 },
-                new_metadata={'umap_n_neighbors': '15'},
+                new_metadata={"umap_n_neighbors": "15"},
                 output_path=out_path,
             )
 
@@ -519,21 +500,20 @@ class TestRewriteLazyIndex:
 
                 # Original title field preserved
                 for i in range(n):
-                    assert data['fields']['title'][i] == f"Item {i}"
+                    assert data["fields"]["title"][i] == f"Item {i}"
 
                 # New fields present
-                assert np.allclose(data['fields']['umap_x'], umap_x, atol=1e-6)
-                assert np.allclose(data['fields']['umap_y'], umap_y, atol=1e-6)
-                assert np.array_equal(data['fields']['cluster_25'],
-                                      cluster_labels)
+                assert np.allclose(data["fields"]["umap_x"], umap_x, atol=1e-6)
+                assert np.allclose(data["fields"]["umap_y"], umap_y, atol=1e-6)
+                assert np.array_equal(data["fields"]["cluster_25"], cluster_labels)
 
                 # Original metadata preserved
-                assert data['metadata']['source'] == 'test'
+                assert data["metadata"]["source"] == "test"
                 # New metadata added
-                assert data['metadata']['umap_n_neighbors'] == '15'
+                assert data["metadata"]["umap_n_neighbors"] == "15"
 
                 # Embeddings preserved
-                assert np.allclose(data['embeddings'], embeddings, atol=1e-6)
+                assert np.allclose(data["embeddings"], embeddings, atol=1e-6)
         finally:
             for p in (path, out_path):
                 if os.path.exists(p):
@@ -545,18 +525,16 @@ class TestRewriteLazyIndex:
         from dyf.lazy_index import LazyIndex, rewrite_lazy_index, write_lazy_index
 
         n = 60
-        embeddings = _make_clustered_embeddings(
-            n_clusters=3, points_per_cluster=20, dim=16, seed=42)
-        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2,
-                              min_leaf_size=4, seed=42)
+        embeddings = _make_clustered_embeddings(n_clusters=3, points_per_cluster=20, dim=16, seed=42)
+        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2, min_leaf_size=4, seed=42)
 
-        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".dyf", delete=False) as f:
             path = f.name
-        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".dyf", delete=False) as f:
             out_path = f.name
 
         try:
-            write_lazy_index(tree, embeddings, path, quantization='float32')
+            write_lazy_index(tree, embeddings, path, quantization="float32")
 
             # Search before rewrite
             with LazyIndex(path) as idx:
@@ -567,7 +545,7 @@ class TestRewriteLazyIndex:
             scores = np.arange(n, dtype=np.float32)
             rewrite_lazy_index(
                 path,
-                new_stored_fields={'score': scores},
+                new_stored_fields={"score": scores},
                 output_path=out_path,
             )
 
@@ -576,13 +554,11 @@ class TestRewriteLazyIndex:
                 result_after = idx.search(query, k=10, nprobe=5)
 
                 # Same indices should be found (tree structure preserved)
-                overlap = len(set(result_before.indices.tolist())
-                              & set(result_after.indices.tolist()))
-                assert overlap >= 8, (
-                    f"Only {overlap}/10 overlap after rewrite")
+                overlap = len(set(result_before.indices.tolist()) & set(result_after.indices.tolist()))
+                assert overlap >= 8, f"Only {overlap}/10 overlap after rewrite"
 
                 # New stored field should be in search results
-                assert 'score' in result_after.fields
+                assert "score" in result_after.fields
         finally:
             for p in (path, out_path):
                 if os.path.exists(p):
@@ -593,29 +569,26 @@ class TestRewriteLazyIndex:
         from dyf import build_dyf_tree
         from dyf.lazy_index import LazyIndex, rewrite_lazy_index, write_lazy_index
 
-        embeddings = _make_clustered_embeddings(
-            n_clusters=3, points_per_cluster=20, dim=16, seed=42)
-        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2,
-                              min_leaf_size=4, seed=42)
+        embeddings = _make_clustered_embeddings(n_clusters=3, points_per_cluster=20, dim=16, seed=42)
+        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2, min_leaf_size=4, seed=42)
 
-        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".dyf", delete=False) as f:
             path = f.name
 
         try:
-            write_lazy_index(tree, embeddings, path, quantization='float32')
+            write_lazy_index(tree, embeddings, path, quantization="float32")
 
             rewrite_lazy_index(
                 path,
-                new_metadata={'enriched': 'true'},
+                new_metadata={"enriched": "true"},
             )
 
             with LazyIndex(path) as idx:
                 meta = idx._get_metadata()
-                assert meta['enriched'] == 'true'
+                assert meta["enriched"] == "true"
         finally:
             if os.path.exists(path):
                 os.unlink(path)
-
 
     def test_rewrite_drop_fields(self):
         """drop_fields removes specified stored fields during rewrite."""
@@ -623,42 +596,37 @@ class TestRewriteLazyIndex:
         from dyf.lazy_index import LazyIndex, rewrite_lazy_index, write_lazy_index
 
         n = 60
-        embeddings = _make_clustered_embeddings(
-            n_clusters=3, points_per_cluster=20, dim=16, seed=42)
-        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2,
-                              min_leaf_size=4, seed=42)
+        embeddings = _make_clustered_embeddings(n_clusters=3, points_per_cluster=20, dim=16, seed=42)
+        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2, min_leaf_size=4, seed=42)
 
         rng = np.random.default_rng(42)
         sf = {
-            'field_a': rng.standard_normal(n).astype(np.float32),
-            'field_b': rng.standard_normal(n).astype(np.float32),
-            'field_c': rng.standard_normal(n).astype(np.float32),
+            "field_a": rng.standard_normal(n).astype(np.float32),
+            "field_b": rng.standard_normal(n).astype(np.float32),
+            "field_c": rng.standard_normal(n).astype(np.float32),
         }
 
-        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".dyf", delete=False) as f:
             path = f.name
-        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".dyf", delete=False) as f:
             out_path = f.name
 
         try:
-            write_lazy_index(tree, embeddings, path, quantization='float32',
-                             stored_fields=sf)
+            write_lazy_index(tree, embeddings, path, quantization="float32", stored_fields=sf)
 
             rewrite_lazy_index(
                 path,
-                drop_fields={'field_b'},
+                drop_fields={"field_b"},
                 output_path=out_path,
             )
 
             with LazyIndex(out_path) as idx:
                 data = idx.extract_all_fields()
-                assert 'field_a' in data['fields']
-                assert 'field_b' not in data['fields']
-                assert 'field_c' in data['fields']
-                assert np.allclose(data['fields']['field_a'],
-                                   sf['field_a'], atol=1e-6)
-                assert np.allclose(data['fields']['field_c'],
-                                   sf['field_c'], atol=1e-6)
+                assert "field_a" in data["fields"]
+                assert "field_b" not in data["fields"]
+                assert "field_c" in data["fields"]
+                assert np.allclose(data["fields"]["field_a"], sf["field_a"], atol=1e-6)
+                assert np.allclose(data["fields"]["field_c"], sf["field_c"], atol=1e-6)
         finally:
             for p in (path, out_path):
                 if os.path.exists(p):
@@ -670,38 +638,34 @@ class TestRewriteLazyIndex:
         from dyf.lazy_index import LazyIndex, rewrite_lazy_index, write_lazy_index
 
         n = 60
-        embeddings = _make_clustered_embeddings(
-            n_clusters=3, points_per_cluster=20, dim=16, seed=42)
-        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2,
-                              min_leaf_size=4, seed=42)
+        embeddings = _make_clustered_embeddings(n_clusters=3, points_per_cluster=20, dim=16, seed=42)
+        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2, min_leaf_size=4, seed=42)
 
         rng = np.random.default_rng(42)
         sf = {
-            'old_field': rng.standard_normal(n).astype(np.float32),
-            'keep_field': rng.standard_normal(n).astype(np.float32),
+            "old_field": rng.standard_normal(n).astype(np.float32),
+            "keep_field": rng.standard_normal(n).astype(np.float32),
         }
         new_field = rng.standard_normal(n).astype(np.float32)
 
-        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".dyf", delete=False) as f:
             path = f.name
 
         try:
-            write_lazy_index(tree, embeddings, path, quantization='float32',
-                             stored_fields=sf)
+            write_lazy_index(tree, embeddings, path, quantization="float32", stored_fields=sf)
 
             rewrite_lazy_index(
                 path,
-                new_stored_fields={'new_field': new_field},
-                drop_fields={'old_field'},
+                new_stored_fields={"new_field": new_field},
+                drop_fields={"old_field"},
             )
 
             with LazyIndex(path) as idx:
                 data = idx.extract_all_fields()
-                assert 'old_field' not in data['fields']
-                assert 'keep_field' in data['fields']
-                assert 'new_field' in data['fields']
-                assert np.allclose(data['fields']['new_field'],
-                                   new_field, atol=1e-6)
+                assert "old_field" not in data["fields"]
+                assert "keep_field" in data["fields"]
+                assert "new_field" in data["fields"]
+                assert np.allclose(data["fields"]["new_field"], new_field, atol=1e-6)
         finally:
             if os.path.exists(path):
                 os.unlink(path)
@@ -716,12 +680,10 @@ class TestDetectEnrichmentLevel:
         from dyf import build_dyf_tree
         from dyf.lazy_index import LazyIndex, write_lazy_index
 
-        embeddings = _make_clustered_embeddings(
-            n_clusters=2, points_per_cluster=20, dim=8, seed=42)
-        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2,
-                              min_leaf_size=4, seed=42)
+        embeddings = _make_clustered_embeddings(n_clusters=2, points_per_cluster=20, dim=8, seed=42)
+        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2, min_leaf_size=4, seed=42)
 
-        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".dyf", delete=False) as f:
             path = f.name
 
         try:
@@ -738,19 +700,17 @@ class TestDetectEnrichmentLevel:
         from dyf.lazy_index import LazyIndex, write_lazy_index
 
         n = 40
-        embeddings = _make_clustered_embeddings(
-            n_clusters=2, points_per_cluster=20, dim=8, seed=42)
-        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2,
-                              min_leaf_size=4, seed=42)
+        embeddings = _make_clustered_embeddings(n_clusters=2, points_per_cluster=20, dim=8, seed=42)
+        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2, min_leaf_size=4, seed=42)
 
         rng = np.random.default_rng(42)
         sf = {
-            'umap_x': rng.standard_normal(n).astype(np.float32),
-            'umap_y': rng.standard_normal(n).astype(np.float32),
-            'umap_z': rng.standard_normal(n).astype(np.float32),
+            "umap_x": rng.standard_normal(n).astype(np.float32),
+            "umap_y": rng.standard_normal(n).astype(np.float32),
+            "umap_z": rng.standard_normal(n).astype(np.float32),
         }
 
-        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".dyf", delete=False) as f:
             path = f.name
 
         try:
@@ -767,20 +727,18 @@ class TestDetectEnrichmentLevel:
         from dyf.lazy_index import LazyIndex, write_lazy_index
 
         n = 40
-        embeddings = _make_clustered_embeddings(
-            n_clusters=2, points_per_cluster=20, dim=8, seed=42)
-        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2,
-                              min_leaf_size=4, seed=42)
+        embeddings = _make_clustered_embeddings(n_clusters=2, points_per_cluster=20, dim=8, seed=42)
+        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2, min_leaf_size=4, seed=42)
 
         rng = np.random.default_rng(42)
         sf = {
-            'umap_x': rng.standard_normal(n).astype(np.float32),
-            'umap_y': rng.standard_normal(n).astype(np.float32),
-            'umap_z': rng.standard_normal(n).astype(np.float32),
-            'cluster_25': np.array([i % 5 for i in range(n)], dtype=np.int32),
+            "umap_x": rng.standard_normal(n).astype(np.float32),
+            "umap_y": rng.standard_normal(n).astype(np.float32),
+            "umap_z": rng.standard_normal(n).astype(np.float32),
+            "cluster_25": np.array([i % 5 for i in range(n)], dtype=np.int32),
         }
 
-        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".dyf", delete=False) as f:
             path = f.name
 
         try:
@@ -797,21 +755,18 @@ class TestDetectEnrichmentLevel:
         from dyf.lazy_index import LazyIndex, write_lazy_index
 
         n = 40
-        embeddings = _make_clustered_embeddings(
-            n_clusters=2, points_per_cluster=20, dim=8, seed=42)
-        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2,
-                              min_leaf_size=4, seed=42)
+        embeddings = _make_clustered_embeddings(n_clusters=2, points_per_cluster=20, dim=8, seed=42)
+        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2, min_leaf_size=4, seed=42)
 
         rng = np.random.default_rng(42)
         sf = {
-            'umap_x': rng.standard_normal(n).astype(np.float32),
-            'umap_y': rng.standard_normal(n).astype(np.float32),
-            'umap_z': rng.standard_normal(n).astype(np.float32),
-            'community_id': np.array([i % 5 for i in range(n)],
-                                     dtype=np.int32),
+            "umap_x": rng.standard_normal(n).astype(np.float32),
+            "umap_y": rng.standard_normal(n).astype(np.float32),
+            "umap_z": rng.standard_normal(n).astype(np.float32),
+            "community_id": np.array([i % 5 for i in range(n)], dtype=np.int32),
         }
 
-        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".dyf", delete=False) as f:
             path = f.name
 
         try:
@@ -828,24 +783,21 @@ class TestDetectEnrichmentLevel:
         from dyf.lazy_index import LazyIndex, write_lazy_index
 
         n = 40
-        embeddings = _make_clustered_embeddings(
-            n_clusters=2, points_per_cluster=20, dim=8, seed=42)
-        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2,
-                              min_leaf_size=4, seed=42)
+        embeddings = _make_clustered_embeddings(n_clusters=2, points_per_cluster=20, dim=8, seed=42)
+        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2, min_leaf_size=4, seed=42)
 
         rng = np.random.default_rng(42)
         sf = {
-            'umap_x': rng.standard_normal(n).astype(np.float32),
-            'umap_y': rng.standard_normal(n).astype(np.float32),
-            'umap_z': rng.standard_normal(n).astype(np.float32),
+            "umap_x": rng.standard_normal(n).astype(np.float32),
+            "umap_y": rng.standard_normal(n).astype(np.float32),
+            "umap_z": rng.standard_normal(n).astype(np.float32),
         }
 
-        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".dyf", delete=False) as f:
             path = f.name
 
         try:
-            write_lazy_index(tree, embeddings, path, stored_fields=sf,
-                             metadata={'louvain_dendrogram': '{}'})
+            write_lazy_index(tree, embeddings, path, stored_fields=sf, metadata={"louvain_dendrogram": "{}"})
             with LazyIndex(path) as idx:
                 assert idx.detect_enrichment_level() == 2
         finally:
@@ -858,29 +810,26 @@ class TestDetectEnrichmentLevel:
         from dyf.lazy_index import LazyIndex, write_lazy_index
 
         n = 40
-        embeddings = _make_clustered_embeddings(
-            n_clusters=2, points_per_cluster=20, dim=8, seed=42)
-        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2,
-                              min_leaf_size=4, seed=42)
+        embeddings = _make_clustered_embeddings(n_clusters=2, points_per_cluster=20, dim=8, seed=42)
+        tree = build_dyf_tree(embeddings, max_depth=2, num_bits=2, min_leaf_size=4, seed=42)
 
         rng = np.random.default_rng(42)
         sf = {
-            'umap_x': rng.standard_normal(n).astype(np.float32),
-            'umap_y': rng.standard_normal(n).astype(np.float32),
-            'umap_z': rng.standard_normal(n).astype(np.float32),
-            'cluster_25': np.array([i % 5 for i in range(n)], dtype=np.int32),
+            "umap_x": rng.standard_normal(n).astype(np.float32),
+            "umap_y": rng.standard_normal(n).astype(np.float32),
+            "umap_z": rng.standard_normal(n).astype(np.float32),
+            "cluster_25": np.array([i % 5 for i in range(n)], dtype=np.int32),
         }
         meta = {
-            'edge_pairs': '[[0,1,5],[1,2,3]]',
-            'tour_narration': '{"intro":"Welcome"}',
+            "edge_pairs": "[[0,1,5],[1,2,3]]",
+            "tour_narration": '{"intro":"Welcome"}',
         }
 
-        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".dyf", delete=False) as f:
             path = f.name
 
         try:
-            write_lazy_index(tree, embeddings, path,
-                             stored_fields=sf, metadata=meta)
+            write_lazy_index(tree, embeddings, path, stored_fields=sf, metadata=meta)
             with LazyIndex(path) as idx:
                 assert idx.detect_enrichment_level() == 3
         finally:
@@ -898,22 +847,20 @@ class TestAdaptiveProbing:
         from dyf import build_dyf_tree
         from dyf.lazy_index import write_lazy_index
 
-        embeddings = _make_clustered_embeddings(
-            n_clusters=5, points_per_cluster=40, dim=32, seed=42)
-        tree = build_dyf_tree(embeddings, max_depth=3, num_bits=3,
-                              min_leaf_size=4, seed=42)
+        embeddings = _make_clustered_embeddings(n_clusters=5, points_per_cluster=40, dim=32, seed=42)
+        tree = build_dyf_tree(embeddings, max_depth=3, num_bits=3, min_leaf_size=4, seed=42)
 
-        with tempfile.NamedTemporaryFile(suffix='.dyf', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".dyf", delete=False) as f:
             path = f.name
 
         try:
-            write_lazy_index(tree, embeddings, path, compression='zstd',
-                             quantization='float16',
-                             metadata={'test': 'true'})
+            write_lazy_index(
+                tree, embeddings, path, compression="zstd", quantization="float16", metadata={"test": "true"}
+            )
             yield {
-                'path': path,
-                'embeddings': embeddings,
-                'tree': tree,
+                "path": path,
+                "embeddings": embeddings,
+                "tree": tree,
             }
         finally:
             if os.path.exists(path):
@@ -923,16 +870,13 @@ class TestAdaptiveProbing:
         """Low-margin queries should probe more leaves than high-margin ones."""
         from dyf.lazy_index import LazyIndex
 
-        embeddings = index_data['embeddings']
+        embeddings = index_data["embeddings"]
 
-        with LazyIndex(index_data['path']) as idx:
+        with LazyIndex(index_data["path"]) as idx:
             margins_and_probes = []
             for i in range(len(embeddings)):
-                result = idx.search(embeddings[i], k=10, nprobe="auto",
-                                    return_routing=True)
-                margins_and_probes.append(
-                    (result.routing['min_margin'],
-                     len(result.routing['leaves_probed'])))
+                result = idx.search(embeddings[i], k=10, nprobe="auto", return_routing=True)
+                margins_and_probes.append((result.routing["min_margin"], len(result.routing["leaves_probed"])))
 
             # Split into low-margin and high-margin groups by median
             margins_and_probes.sort(key=lambda x: x[0])
@@ -945,57 +889,54 @@ class TestAdaptiveProbing:
 
             # Low-margin queries should probe at least as many leaves on average
             assert avg_low >= avg_high, (
-                f"Low-margin queries should probe more: "
-                f"avg_low={avg_low:.2f}, avg_high={avg_high:.2f}")
+                f"Low-margin queries should probe more: avg_low={avg_low:.2f}, avg_high={avg_high:.2f}"
+            )
 
     def test_adaptive_backward_compatible(self, index_data):
         """Fixed nprobe=3 still works and routing includes min_margin."""
         from dyf.lazy_index import LazyIndex
 
-        embeddings = index_data['embeddings']
+        embeddings = index_data["embeddings"]
         query = embeddings[0]
 
-        with LazyIndex(index_data['path']) as idx:
+        with LazyIndex(index_data["path"]) as idx:
             result = idx.search(query, k=10, nprobe=3, return_routing=True)
             assert len(result.indices) > 0
-            assert 'min_margin' in result.routing
-            assert 'nprobe_mode' not in result.routing
-            assert 'adaptive_nprobe' not in result.routing
+            assert "min_margin" in result.routing
+            assert "nprobe_mode" not in result.routing
+            assert "adaptive_nprobe" not in result.routing
 
     def test_adaptive_config_custom(self, index_data):
         """AdaptiveProbeConfig with custom thresholds works."""
         from dyf.lazy_index import AdaptiveProbeConfig, LazyIndex
 
-        embeddings = index_data['embeddings']
+        embeddings = index_data["embeddings"]
         query = embeddings[0]
 
-        cfg = AdaptiveProbeConfig(
-            margin_lo=0.005, margin_hi=0.2,
-            min_probes=2, max_probes=8)
+        cfg = AdaptiveProbeConfig(margin_lo=0.005, margin_hi=0.2, min_probes=2, max_probes=8)
 
-        with LazyIndex(index_data['path']) as idx:
+        with LazyIndex(index_data["path"]) as idx:
             result = idx.search(query, k=10, nprobe=cfg, return_routing=True)
             assert len(result.indices) > 0
-            nprobe_used = result.routing['adaptive_nprobe']
+            nprobe_used = result.routing["adaptive_nprobe"]
             assert 2 <= nprobe_used <= 8
 
     def test_adaptive_routing_diagnostics(self, index_data):
         """nprobe='auto' routing includes min_margin, adaptive_nprobe, nprobe_mode."""
         from dyf.lazy_index import LazyIndex
 
-        embeddings = index_data['embeddings']
+        embeddings = index_data["embeddings"]
         query = embeddings[0]
 
-        with LazyIndex(index_data['path']) as idx:
-            result = idx.search(query, k=10, nprobe="auto",
-                                return_routing=True)
+        with LazyIndex(index_data["path"]) as idx:
+            result = idx.search(query, k=10, nprobe="auto", return_routing=True)
             r = result.routing
-            assert 'min_margin' in r
-            assert 'adaptive_nprobe' in r
-            assert r['nprobe_mode'] == 'adaptive'
-            assert isinstance(r['min_margin'], float)
-            assert isinstance(r['adaptive_nprobe'], int)
-            assert r['adaptive_nprobe'] >= 1
+            assert "min_margin" in r
+            assert "adaptive_nprobe" in r
+            assert r["nprobe_mode"] == "adaptive"
+            assert isinstance(r["min_margin"], float)
+            assert isinstance(r["adaptive_nprobe"], int)
+            assert r["adaptive_nprobe"] >= 1
 
 
 # ── Direct unit tests for extracted helpers ──────────────────────────
@@ -1011,13 +952,12 @@ class TestMergeLeafResults:
         idx2 = np.array([3, 4])
         sc1 = np.array([0.9, 0.8, 0.7])
         sc2 = np.array([0.6, 0.5])
-        fields = {'title': [['a', 'b', 'c'], ['d', 'e']]}
+        fields = {"title": [["a", "b", "c"], ["d", "e"]]}
 
-        indices, scores, merged = _merge_leaf_results(
-            [idx1, idx2], [sc1, sc2], fields, ['title'])
+        indices, scores, merged = _merge_leaf_results([idx1, idx2], [sc1, sc2], fields, ["title"])
         assert len(indices) == 5
         assert len(scores) == 5
-        assert merged['title'] == ['a', 'b', 'c', 'd', 'e']
+        assert merged["title"] == ["a", "b", "c", "d", "e"]
 
     def test_dedup_keeps_first(self):
         from dyf.lazy_index import _merge_leaf_results
@@ -1027,8 +967,7 @@ class TestMergeLeafResults:
         sc1 = np.array([0.9, 0.8])
         sc2 = np.array([0.7, 0.6])
 
-        indices, scores, _ = _merge_leaf_results(
-            [idx1, idx2], [sc1, sc2], {}, [])
+        indices, scores, _ = _merge_leaf_results([idx1, idx2], [sc1, sc2], {}, [])
         assert len(indices) == 3
         # First occurrence of 1 (score 0.8) kept, not second (0.7)
         pos_1 = np.where(indices == 1)[0][0]
@@ -1037,10 +976,7 @@ class TestMergeLeafResults:
     def test_empty_inputs(self):
         from dyf.lazy_index import _merge_leaf_results
 
-        indices, scores, merged = _merge_leaf_results(
-            [np.array([], dtype=int)],
-            [np.array([], dtype=float)],
-            {}, [])
+        indices, scores, merged = _merge_leaf_results([np.array([], dtype=int)], [np.array([], dtype=float)], {}, [])
         assert len(indices) == 0
         assert len(scores) == 0
 
@@ -1051,13 +987,12 @@ class TestMergeLeafResults:
         idx2 = np.array([2, 3])
         sc1 = np.array([0.9, 0.8])
         sc2 = np.array([0.7, 0.6])
-        fields = {'score': [np.array([1.0, 2.0]), np.array([3.0, 4.0])]}
+        fields = {"score": [np.array([1.0, 2.0]), np.array([3.0, 4.0])]}
 
-        indices, scores, merged = _merge_leaf_results(
-            [idx1, idx2], [sc1, sc2], fields, ['score'])
-        assert isinstance(merged['score'], np.ndarray)
-        assert len(merged['score']) == 4
-        np.testing.assert_array_equal(merged['score'], [1.0, 2.0, 3.0, 4.0])
+        indices, scores, merged = _merge_leaf_results([idx1, idx2], [sc1, sc2], fields, ["score"])
+        assert isinstance(merged["score"], np.ndarray)
+        assert len(merged["score"]) == 4
+        np.testing.assert_array_equal(merged["score"], [1.0, 2.0, 3.0, 4.0])
 
 
 class TestTopkWithFields:
@@ -1068,16 +1003,15 @@ class TestTopkWithFields:
 
         indices = np.array([0, 1, 2, 3, 4])
         scores = np.array([0.5, 0.9, 0.3, 0.7, 0.1])
-        fields = {'title': ['a', 'b', 'c', 'd', 'e']}
+        fields = {"title": ["a", "b", "c", "d", "e"]}
 
-        top_idx, top_sc, top_f = _topk_with_fields(
-            indices, scores, fields, ['title'], k=3)
+        top_idx, top_sc, top_f = _topk_with_fields(indices, scores, fields, ["title"], k=3)
         assert len(top_idx) == 3
         # Sorted descending by score
         assert top_sc[0] == pytest.approx(0.9)
         assert top_sc[1] == pytest.approx(0.7)
         assert top_sc[2] == pytest.approx(0.5)
-        assert top_f['title'][0] == 'b'
+        assert top_f["title"][0] == "b"
 
     def test_k_greater_than_n(self):
         from dyf.lazy_index import _topk_with_fields
@@ -1086,8 +1020,7 @@ class TestTopkWithFields:
         scores = np.array([0.5, 0.9])
         fields = {}
 
-        top_idx, top_sc, _ = _topk_with_fields(
-            indices, scores, fields, [], k=10)
+        top_idx, top_sc, _ = _topk_with_fields(indices, scores, fields, [], k=10)
         assert len(top_idx) == 2
         assert top_sc[0] == pytest.approx(0.9)
 
@@ -1096,13 +1029,12 @@ class TestTopkWithFields:
 
         indices = np.array([42])
         scores = np.array([0.99])
-        fields = {'label': np.array([7])}
+        fields = {"label": np.array([7])}
 
-        top_idx, top_sc, top_f = _topk_with_fields(
-            indices, scores, fields, ['label'], k=5)
+        top_idx, top_sc, top_f = _topk_with_fields(indices, scores, fields, ["label"], k=5)
         assert len(top_idx) == 1
         assert top_idx[0] == 42
-        assert top_f['label'][0] == 7
+        assert top_f["label"][0] == 7
 
 
 @lazy_deps
@@ -1113,13 +1045,17 @@ class TestResolveArrowSchema:
         from dyf.lazy_index import _resolve_arrow_schema
 
         schema, sf_types, meta, pq = _resolve_arrow_schema(
-            has_embeddings=False, embeddings=None,
-            quantization='float32', embedding_dim=0,
-            metadata=None, stored_fields=None)
-        assert 'item_index' in schema.names
-        assert 'embedding' not in schema.names
-        assert meta['has_embeddings'] == 'false'
-        assert pq['is_pq'] is False
+            has_embeddings=False,
+            embeddings=None,
+            quantization="float32",
+            embedding_dim=0,
+            metadata=None,
+            stored_fields=None,
+        )
+        assert "item_index" in schema.names
+        assert "embedding" not in schema.names
+        assert meta["has_embeddings"] == "false"
+        assert pq["is_pq"] is False
 
     def test_float16(self):
 
@@ -1127,22 +1063,30 @@ class TestResolveArrowSchema:
 
         emb = np.random.default_rng(42).standard_normal((10, 8)).astype(np.float32)
         schema, sf_types, meta, pq = _resolve_arrow_schema(
-            has_embeddings=True, embeddings=emb,
-            quantization='float16', embedding_dim=8,
-            metadata=None, stored_fields=None)
-        assert 'embedding' in schema.names
-        assert pq['q_embeddings'] is not None
-        assert pq['q_embeddings'].dtype == np.float16
+            has_embeddings=True,
+            embeddings=emb,
+            quantization="float16",
+            embedding_dim=8,
+            metadata=None,
+            stored_fields=None,
+        )
+        assert "embedding" in schema.names
+        assert pq["q_embeddings"] is not None
+        assert pq["q_embeddings"].dtype == np.float16
 
     def test_stored_fields_in_schema(self):
 
         from dyf.lazy_index import _resolve_arrow_schema
 
         emb = np.random.default_rng(42).standard_normal((10, 8)).astype(np.float32)
-        sf = {'label': np.array([0] * 10, dtype=np.int32)}
+        sf = {"label": np.array([0] * 10, dtype=np.int32)}
         schema, sf_types, meta, pq = _resolve_arrow_schema(
-            has_embeddings=True, embeddings=emb,
-            quantization='float32', embedding_dim=8,
-            metadata=None, stored_fields=sf)
-        assert 'label' in schema.names
-        assert 'label' in sf_types
+            has_embeddings=True,
+            embeddings=emb,
+            quantization="float32",
+            embedding_dim=8,
+            metadata=None,
+            stored_fields=sf,
+        )
+        assert "label" in schema.names
+        assert "label" in sf_types

@@ -1702,23 +1702,27 @@ class LazyIndex:
     def _rust_eligible(self):
         """Whether the rust path can serve this query. The rust kernel now handles
         fixed AND adaptive nprobe and return_routing; only the non-load-bearing tail
-        (non-DYF2 files, PQ-compressed indexes, overflow batches) falls back to python."""
+        (files the installed dyf-rs can't read, PQ-compressed indexes, overflow
+        batches) falls back to python."""
         if self.is_pq:
             return False
         if getattr(self, "_rust_readable", None) is None:
-            # dyf_rs only reads DYF2 (footer-based); DYF1/DYF3 take the python path
-            self._rust_readable = detect_dyf_version(self._path) == 2
-        if not self._rust_readable:
-            return False
-        if getattr(self, "_has_overflow", None) is None:
             import dyf_rs
 
-            f = dyf_rs.DyfFile.open(self._path)
-            nob = f.num_overflow_batches
-            if callable(nob):
-                nob = nob()
-            self._has_overflow = nob > 0
-        return not self._has_overflow
+            # Capability probe rather than a version check: dyf-rs >= 0.10 reads
+            # DYF1/DYF3 too (older only DYF2), and it rejects what it can't serve
+            # (compressed batches, chunked DYF3) at open time.
+            try:
+                f = dyf_rs.DyfFile.open(self._path)
+            except OSError:
+                self._rust_readable = False
+            else:
+                self._rust_readable = True
+                nob = f.num_overflow_batches
+                if callable(nob):
+                    nob = nob()
+                self._has_overflow = nob > 0
+        return self._rust_readable and not self._has_overflow
 
     def _adaptive_params(self, nprobe):
         """(adaptive, nprobe, margin_lo, margin_hi, min_probes, max_probes) for the
