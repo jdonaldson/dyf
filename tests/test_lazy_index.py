@@ -79,10 +79,10 @@ class TestWriteAndLoad:
         assert os.path.getsize(path) > 0
 
     def test_magic_header(self, index_data):
-        """File starts with DYF1 magic bytes."""
+        """Default-written file starts with DYF3 magic bytes."""
         with open(index_data["path"], "rb") as f:
             magic = f.read(4)
-        assert magic == b"DYF1"
+        assert magic == b"DYF3"
 
     def test_tree_summary(self, index_data):
         """LazyIndex.tree_summary returns correct metadata."""
@@ -93,7 +93,7 @@ class TestWriteAndLoad:
             assert summary["embedding_dim"] == 32
             assert summary["total_items"] == 200
             assert summary["num_leaves"] > 0
-            assert summary["version"] == "1.0"
+            assert summary["version"] == "3.0"
             assert summary["build_params"]["quantization"] == "float16"
             assert summary["build_params"]["compression"] == "zstd"
 

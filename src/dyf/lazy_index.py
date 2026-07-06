@@ -881,7 +881,7 @@ def write_lazy_index(
     metadata: dict[str, str] | None = None,
     build_params: dict[str, int] | None = None,
     stored_fields: Mapping[str, StoredFieldInput] | None = None,
-    format_version: int = 1,
+    format_version: int = 3,
     embedding_dim: int | None = None,
 ) -> None:
     """Write a DYF lazy index file (FlatBuffers tree + Arrow IPC leaf data).
@@ -902,8 +902,10 @@ def write_lazy_index(
         stored_fields: Optional dict mapping field name to array-like of
             length n_items. Supported types: str/list[str] (Arrow utf8),
             np.int32/int64/float32/float64 arrays, list[bytes] (Arrow binary).
-        format_version: 1 (DYF1, header-based) or 2 (DYF2, footer-based,
-            append-friendly). Default: 1.
+        format_version: 3 (DYF3, header-based, chunkable — readable by
+            python, the browser viewer, and dyf-rs >= 0.10), 2 (DYF2,
+            footer-based, append-friendly, rust read-write), or 1 (DYF1,
+            legacy header-based). Default: 3.
         embedding_dim: Embedding dimension. Required when embeddings is None.
             Inferred from embeddings shape when provided.
     """

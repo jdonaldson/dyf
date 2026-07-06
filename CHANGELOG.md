@@ -1,6 +1,18 @@
 # Changelog
 
-## Unreleased
+## 0.12.0
+
+### DYF3 is the default file format
+
+`write_lazy_index` now writes **DYF3** by default (was DYF1). DYF3 is the same
+header-based layout with a chunk-capable header — readable by python, the
+browser viewer, and the rust kernel — so default-written indexes get rust-speed
+search AND stay web-deployable. DYF2 remains the explicit choice for
+append-heavy workloads (rust read-write); DYF1 files remain fully readable.
+
+- Requires **dyf-rs >= 0.10.0**, which adds read-only DYF1/DYF3 support to the
+  rust kernel (mutations on header-based formats raise: their front-loaded
+  index can't grow in place — convert to DYF2 first).
 
 ### Fixed
 
