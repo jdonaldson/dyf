@@ -71,7 +71,17 @@ def _build_dyf_tree(embeddings, point_indices, depth, num_bits, min_leaf_size,
         bucket_ids = np.asarray(clf.get_bucket_ids())
         centroid_sims = clf.get_centroid_similarities()
     except Exception as e:
-        logger.debug("Tree split failed at depth %d: %s", depth, e)
+        if len(point_indices) == len(embeddings):
+            # Root-level fit failure is never benign: the whole tree degenerates
+            # to a single leaf and every point lands in one cluster — which can
+            # masquerade as a valid result downstream (e.g. trivially perfect
+            # cluster purity). Seen in the wild when float64 embeddings hit
+            # dyf-rs's typed f32 signature.
+            logger.warning(
+                "DYF ROOT split failed — returning a single-leaf tree (all %d "
+                "points in one cluster). Cause: %s", len(point_indices), e)
+        else:
+            logger.debug("Tree split failed at depth %d: %s", depth, e)
         return {
             'children': [],
             'indices': point_indices,
@@ -173,7 +183,9 @@ def build_dyf_tree(embeddings, max_depth, num_bits=3, min_leaf_size=4,
     Returns:
         Tree dict with keys: children, indices, depth, point_margin_map.
     """
-    embeddings = np.asarray(embeddings)
+    # float32: dyf-rs's DensityClassifier has a typed f32 signature; float64
+    # input would make every fit throw (degenerating the tree to a single leaf).
+    embeddings = np.asarray(embeddings, dtype=np.float32)
     all_indices = np.arange(len(embeddings))
     return _build_dyf_tree(
         embeddings, all_indices, max_depth, num_bits, min_leaf_size, seed,
@@ -475,7 +487,9 @@ def refine_dyf_tree(tree, embeddings, min_coherence=None, num_bits=3,
         dict with stats: n_refined, n_leaves_before, n_leaves_after,
         coherence_before, coherence_after.
     """
-    embeddings = np.asarray(embeddings)
+    # float32: dyf-rs's DensityClassifier has a typed f32 signature; float64
+    # input would make every fit throw (degenerating the tree to a single leaf).
+    embeddings = np.asarray(embeddings, dtype=np.float32)
     norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
     emb_normed = embeddings / np.maximum(norms, 1e-10)
 
@@ -706,7 +720,9 @@ def refine_clusters(labels, embeddings, min_coherence=None,
         np.ndarray of shape (n,) with refined cluster labels.
     """
     labels = np.asarray(labels).copy()
-    embeddings = np.asarray(embeddings)
+    # float32: dyf-rs's DensityClassifier has a typed f32 signature; float64
+    # input would make every fit throw (degenerating the tree to a single leaf).
+    embeddings = np.asarray(embeddings, dtype=np.float32)
 
     if min_cluster_size is None:
         n_original = len(set(labels.tolist()))
