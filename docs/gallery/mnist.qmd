@@ -137,7 +137,7 @@ Each DYF cluster has a clear "home" digit. That's the first sign the partition i
 
 ### Sub-clusters of the digit 7
 
-DYF split the digit 7 into 11 sub-clusters. Here are three of the largest, rendered as random samples from each:
+DYF split the digit 7 into multiple sub-clusters. Here are the largest of the high-purity ones, rendered as random samples from each:
 
 ```{python}
 #| label: seven-subs
@@ -146,9 +146,9 @@ DYF split the digit 7 into 11 sub-clusters. Here are three of the largest, rende
 seven_subs = sorted(
     [r for r in rows if r["dominant"] == 7 and r["purity"] > 0.9],
     key=lambda r: -r["n"],
-)[:3]
-print(f"Three purest large sub-clusters of digit 7:\n")
-for s in seven_subs:
+)
+print(f"DYF produced {len(seven_subs)} high-purity (>90%) sub-cluster(s) of digit 7; showing up to the 3 largest:\n")
+for s in seven_subs[:3]:
     print(f"- cluster {s['cid']}: {s['n']} samples, {s['purity']:.0%} are 7s")
 ```
 
@@ -158,22 +158,25 @@ for s in seven_subs:
 #| label: fig-seven-a
 #| fig-cap: "DYF cluster A — random sample of 7s."
 from _gallery import image_grid
-idx = np.where(result.labels == seven_subs[0]["cid"])[0]
-image_grid(X, idx, title=f"DYF cluster {seven_subs[0]['cid']} (n={seven_subs[0]['n']})")
+if len(seven_subs) >= 1:
+    idx = np.where(result.labels == seven_subs[0]["cid"])[0]
+    image_grid(X, idx, title=f"DYF cluster {seven_subs[0]['cid']} (n={seven_subs[0]['n']})")
 ```
 
 ```{python}
 #| label: fig-seven-b
 #| fig-cap: "DYF cluster B — random sample of 7s."
-idx = np.where(result.labels == seven_subs[1]["cid"])[0]
-image_grid(X, idx, title=f"DYF cluster {seven_subs[1]['cid']} (n={seven_subs[1]['n']})")
+if len(seven_subs) >= 2:
+    idx = np.where(result.labels == seven_subs[1]["cid"])[0]
+    image_grid(X, idx, title=f"DYF cluster {seven_subs[1]['cid']} (n={seven_subs[1]['n']})")
 ```
 
 ```{python}
 #| label: fig-seven-c
 #| fig-cap: "DYF cluster C — random sample of 7s."
-idx = np.where(result.labels == seven_subs[2]["cid"])[0]
-image_grid(X, idx, title=f"DYF cluster {seven_subs[2]['cid']} (n={seven_subs[2]['n']})")
+if len(seven_subs) >= 3:
+    idx = np.where(result.labels == seven_subs[2]["cid"])[0]
+    image_grid(X, idx, title=f"DYF cluster {seven_subs[2]['cid']} (n={seven_subs[2]['n']})")
 ```
 
 :::

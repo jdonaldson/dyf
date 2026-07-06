@@ -1,3 +1,10 @@
 /_site/
 /.quarto/
 **/*.quarto_ipynb
+
+# Heavy local datasets — present only for the local `quarto render` that generates
+# _freeze/. Committed output is docs/_freeze/, not the source data.
+/data/*.npy
+/data/*.parquet
+/data/*.h5ad
+/data/paul15/

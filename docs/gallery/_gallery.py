@@ -18,25 +18,35 @@ import numpy as np
 @dataclass
 class GalleryResult:
     """What every notebook produces."""
-    labels: np.ndarray          # (N,) int cluster ids from DYF
-    recovered_k: int            # number of unique cluster ids
-    true_k: int                 # ground-truth class count
-    nmi: float                  # normalized mutual information
-    ari: float                  # adjusted rand index
-    umap_2d: np.ndarray         # (N, 2) 2D layout for plotting
+
+    labels: np.ndarray  # (N,) int cluster ids from DYF
+    recovered_k: int  # number of unique cluster ids
+    true_k: int  # ground-truth class count
+    nmi: float  # normalized mutual information
+    ari: float  # adjusted rand index
+    umap_2d: np.ndarray  # (N, 2) 2D layout for plotting
 
     def save(self, path: str) -> None:
-        np.savez(path, labels=self.labels, recovered_k=self.recovered_k,
-                 true_k=self.true_k, nmi=self.nmi, ari=self.ari,
-                 umap_2d=self.umap_2d)
+        np.savez(
+            path,
+            labels=self.labels,
+            recovered_k=self.recovered_k,
+            true_k=self.true_k,
+            nmi=self.nmi,
+            ari=self.ari,
+            umap_2d=self.umap_2d,
+        )
 
     @classmethod
-    def load(cls, path: str) -> "GalleryResult":
+    def load(cls, path: str) -> GalleryResult:
         z = np.load(path)
         return cls(
-            labels=z["labels"], recovered_k=int(z["recovered_k"]),
-            true_k=int(z["true_k"]), nmi=float(z["nmi"]),
-            ari=float(z["ari"]), umap_2d=z["umap_2d"],
+            labels=z["labels"],
+            recovered_k=int(z["recovered_k"]),
+            true_k=int(z["true_k"]),
+            nmi=float(z["nmi"]),
+            ari=float(z["ari"]),
+            umap_2d=z["umap_2d"],
         )
 
 
@@ -54,6 +64,7 @@ def auto_tune_tree_params(n: int, target_bucket_size: int = 20) -> dict:
     Returns dict ready for ``build_dyf_tree(**params)``.
     """
     import math
+
     target_leaves = max(4, n // target_bucket_size)
     max_depth = max(2, min(6, math.ceil(math.log(target_leaves) / math.log(4))))
     return dict(
@@ -84,7 +95,7 @@ def run_dyf(
     """
     from sklearn.metrics import adjusted_mutual_info_score, adjusted_rand_score
 
-    from dyf import build_dyf_tree, write_lazy_index, LazyIndex
+    from dyf import LazyIndex, build_dyf_tree, write_lazy_index
     from dyf.agglomerate import louvain_cluster_leaves
 
     embeddings = np.ascontiguousarray(embeddings, dtype=np.float32)
@@ -140,6 +151,7 @@ def run_dyf_cached(
     ``cache_path``; later calls load from disk. Cache is invalidated on shape
     mismatch against current inputs."""
     import os
+
     if os.path.exists(cache_path):
         cached = GalleryResult.load(cache_path)
         if cached.labels.shape[0] == embeddings.shape[0]:
@@ -176,8 +188,7 @@ def run_hdbscan(embeddings: np.ndarray, y_true: np.ndarray) -> dict[str, Any] | 
     mask = labels >= 0
     noise_frac = float((~mask).mean())
     if mask.sum() < 2:
-        return {"labels": labels, "recovered_k": 0, "nmi": 0.0, "ari": 0.0,
-                "noise_frac": noise_frac}
+        return {"labels": labels, "recovered_k": 0, "nmi": 0.0, "ari": 0.0, "noise_frac": noise_frac}
     return {
         "labels": labels,
         "recovered_k": int(len(np.unique(labels[mask]))),
@@ -191,9 +202,11 @@ def _umap(embeddings: np.ndarray, *, seed: int = 42) -> np.ndarray:
     """2D UMAP layout for the figure. Fall back to PCA if UMAP isn't installed."""
     try:
         import umap  # type: ignore
+
         layout = umap.UMAP(n_components=2, random_state=seed).fit_transform(embeddings)
     except ImportError:
         from sklearn.decomposition import PCA
+
         layout = PCA(n_components=2, random_state=seed).fit_transform(embeddings)
     return np.asarray(layout, dtype=np.float32)
 
@@ -224,7 +237,7 @@ def plot_single(
 
 
 def hierarchy_slider(
-    result: "GalleryResult",
+    result: GalleryResult,
     embeddings: np.ndarray,
     y_true: np.ndarray,
     k_values: list[int],
@@ -244,6 +257,7 @@ def hierarchy_slider(
     """
     import plotly.graph_objects as go
     from sklearn.metrics import adjusted_mutual_info_score, adjusted_rand_score
+
     from dyf.agglomerate import merge_to_max_k
 
     labels_i32 = result.labels.astype(np.int32)
@@ -257,26 +271,23 @@ def hierarchy_slider(
     # points in the dominant cluster never change color across the whole sweep.
     raw_ids = np.unique(labels_i32)
     import plotly.colors as pc
+
     palette = pc.qualitative.Alphabet + pc.qualitative.Light24 + pc.qualitative.Dark24
     raw_color = {int(rid): palette[i % len(palette)] for i, rid in enumerate(raw_ids)}
 
     def color_points_at(merged_labels: np.ndarray) -> list[str]:
         """For each point, return the hex color of the representative raw cluster
-        in its merged group at this resolution."""
-        # group raw cluster -> merged cluster id
-        raw_to_merged: dict[int, int] = {}
-        for raw_id in raw_ids:
-            m = labels_i32 == raw_id
-            if m.any():
-                raw_to_merged[int(raw_id)] = int(merged_labels[np.argmax(m)])
-        # for each merged group, pick the raw cluster with the largest size
-        merged_to_rep: dict[int, int] = {}
-        for raw_id, mid in raw_to_merged.items():
-            size = int((labels_i32 == raw_id).sum())
-            cur = merged_to_rep.get(mid)
-            if cur is None or size > int((labels_i32 == cur).sum()):
-                merged_to_rep[mid] = raw_id
-        rep_color = {mid: raw_color[rep] for mid, rep in merged_to_rep.items()}
+        in its merged group at this resolution.
+
+        merge_to_max_k reassigns individual points to the nearest merged centroid,
+        so merged groups need not be unions of whole raw clusters — pick each
+        group's representative as the raw cluster contributing the most points.
+        """
+        rep_color: dict[int, str] = {}
+        for mid in np.unique(merged_labels):
+            members = labels_i32[merged_labels == mid]
+            vals, counts = np.unique(members, return_counts=True)
+            rep_color[int(mid)] = raw_color[int(vals[np.argmax(counts)])]
         return [rep_color[int(m)] for m in merged_labels]
 
     # Precompute each partition + scores, de-dup by actual_k.
@@ -290,13 +301,15 @@ def hierarchy_slider(
         if actual_k in seen:
             continue
         seen.add(actual_k)
-        partitions.append({
-            "k": actual_k,
-            "labels": merged,
-            "colors": color_points_at(merged),
-            "nmi": float(adjusted_mutual_info_score(y_true, merged)),
-            "ari": float(adjusted_rand_score(y_true, merged)),
-        })
+        partitions.append(
+            {
+                "k": actual_k,
+                "labels": merged,
+                "colors": color_points_at(merged),
+                "nmi": float(adjusted_mutual_info_score(y_true, merged)),
+                "ari": float(adjusted_rand_score(y_true, merged)),
+            }
+        )
 
     if not partitions:
         raise ValueError("No partitions to display — check k_values")
@@ -306,28 +319,28 @@ def hierarchy_slider(
 
     # Build per-point hover text: true class name (if provided) + point index.
     if class_names is not None:
-        hover_text = [f"class: {class_names[int(y)]}<br>idx: {i}"
-                      for i, y in enumerate(y_true)]
+        hover_text = [f"class: {class_names[int(y)]}<br>idx: {i}" for i, y in enumerate(y_true)]
     else:
-        hover_text = [f"class: {int(y)}<br>idx: {i}"
-                      for i, y in enumerate(y_true)]
+        hover_text = [f"class: {int(y)}<br>idx: {i}" for i, y in enumerate(y_true)]
 
     # Ground-truth coloring uses a separate qualitative palette — distinct from
     # the partition palette so the eye doesn't confuse the two panels.
     gt_palette = pc.qualitative.Plotly + pc.qualitative.D3 + pc.qualitative.Bold
     gt_unique = np.unique(y_true)
-    gt_color_map = {int(c): gt_palette[i % len(gt_palette)]
-                    for i, c in enumerate(gt_unique)}
+    gt_color_map = {int(c): gt_palette[i % len(gt_palette)] for i, c in enumerate(gt_unique)}
     gt_colors = [gt_color_map[int(c)] for c in y_true]
 
     fig: go.Figure
     if show_ground_truth:
         from plotly.subplots import make_subplots
+
         fig = make_subplots(
-            rows=1, cols=2,
+            rows=1,
+            cols=2,
             subplot_titles=("DYF (move slider)", "Ground truth (fixed)"),
             horizontal_spacing=0.04,
-            shared_xaxes=True, shared_yaxes=True,
+            shared_xaxes=True,
+            shared_yaxes=True,
         )  # type: ignore[assignment]
     else:
         fig = go.Figure()
@@ -336,7 +349,8 @@ def hierarchy_slider(
     dyf_trace_indices: list[int] = []
     for i, p in enumerate(partitions):
         trace = go.Scattergl(
-            x=coords[:, 0], y=coords[:, 1],
+            x=coords[:, 0],
+            y=coords[:, 1],
             mode="markers",
             marker=dict(
                 color=p["colors"],  # pre-computed hex per point — stable across frames
@@ -359,41 +373,41 @@ def hierarchy_slider(
     if show_ground_truth:
         fig.add_trace(
             go.Scattergl(
-                x=coords[:, 0], y=coords[:, 1],
+                x=coords[:, 0],
+                y=coords[:, 1],
                 mode="markers",
                 marker=dict(color=gt_colors, size=4, opacity=0.75, line=dict(width=0)),
                 text=hover_text,
                 hovertemplate="%{text}<extra></extra>",
                 showlegend=False,
             ),
-            row=1, col=2,
+            row=1,
+            col=2,
         )
         gt_trace_index = len(fig.data) - 1  # type: ignore[arg-type]
 
     # Slider — toggles DYF trace visibility only; ground-truth trace stays on.
     steps = []
     for i, p in enumerate(partitions):
-        title = (
-            f"{title_prefix} k={p['k']} — "
-            f"NMI={p['nmi']:.3f}, ARI={p['ari']:.3f}"
-        )
+        title = f"{title_prefix} k={p['k']} — NMI={p['nmi']:.3f}, ARI={p['ari']:.3f}"
         if show_ground_truth:
             visible = [False] * len(fig.data)  # type: ignore[arg-type]
             visible[dyf_trace_indices[i]] = True
             visible[gt_trace_index] = True
         else:
             visible = [j == i for j in range(len(partitions))]
-        steps.append(dict(
-            method="update",
-            label=str(p["k"]),
-            args=[{"visible": visible}, {"title.text": title}],
-        ))
+        steps.append(
+            dict(
+                method="update",
+                label=str(p["k"]),
+                args=[{"visible": visible}, {"title.text": title}],
+            )
+        )
 
     p0 = partitions[default_i]
     layout_axes = dict(
         xaxis=dict(showticklabels=False, zeroline=False, showgrid=False),
-        yaxis=dict(showticklabels=False, zeroline=False, showgrid=False,
-                   scaleanchor="x", scaleratio=1),
+        yaxis=dict(showticklabels=False, zeroline=False, showgrid=False, scaleanchor="x", scaleratio=1),
     )
     if show_ground_truth:
         layout_axes = dict(
@@ -405,16 +419,18 @@ def hierarchy_slider(
 
     layout_kwargs: dict[str, Any] = dict(
         title=dict(
-            text=f"{title_prefix} k={p0['k']} — "
-                 f"NMI={p0['nmi']:.3f}, ARI={p0['ari']:.3f}",
-            x=0.5, xanchor="center",
+            text=f"{title_prefix} k={p0['k']} — NMI={p0['nmi']:.3f}, ARI={p0['ari']:.3f}",
+            x=0.5,
+            xanchor="center",
         ),
-        sliders=[dict(
-            active=default_i,
-            currentvalue=dict(prefix="k = ", font=dict(size=14)),
-            steps=steps,
-            pad=dict(t=40, b=10),
-        )],
+        sliders=[
+            dict(
+                active=default_i,
+                currentvalue=dict(prefix="k = ", font=dict(size=14)),
+                steps=steps,
+                pad=dict(t=40, b=10),
+            )
+        ],
         height=height,
         margin=dict(l=20, r=20, t=80, b=40),
         showlegend=False,
@@ -449,7 +465,7 @@ def image_grid(
         ax.set_xticks([])
         ax.set_yticks([])
     # Blank any axes we didn't fill
-    for ax in list(axes.flat)[len(pick):]:
+    for ax in list(axes.flat)[len(pick) :]:
         ax.axis("off")
     if title:
         fig.suptitle(title, fontsize=11)
@@ -472,6 +488,7 @@ def merge_walk(
     raw result (nothing to merge up). Targets smaller merge to that count.
     """
     from sklearn.metrics import adjusted_mutual_info_score, adjusted_rand_score
+
     from dyf.agglomerate import merge_to_max_k
 
     labels_i32 = dyf.labels.astype(np.int32)
@@ -479,12 +496,14 @@ def merge_walk(
     for target in targets:
         merged = merge_to_max_k(labels_i32, embeddings, max_k=target)
         k = int(len(np.unique(merged)))
-        rows.append({
-            "target": target,
-            "actual_k": k,
-            "nmi": float(adjusted_mutual_info_score(y_true, merged)),
-            "ari": float(adjusted_rand_score(y_true, merged)),
-        })
+        rows.append(
+            {
+                "target": target,
+                "actual_k": k,
+                "nmi": float(adjusted_mutual_info_score(y_true, merged)),
+                "ari": float(adjusted_rand_score(y_true, merged)),
+            }
+        )
     return rows
 
 
@@ -496,10 +515,7 @@ def merge_walk_table(rows: list[dict[str, Any]], raw: GalleryResult) -> str:
         f"| **Raw DYF**    | **{raw.recovered_k}** | **{raw.nmi:.3f}** | **{raw.ari:.3f}** |",
     ]
     for r in rows:
-        lines.append(
-            f"| merge → {r['target']:<4d}  | {r['actual_k']:>4d}     | "
-            f"{r['nmi']:.3f} | {r['ari']:.3f} |"
-        )
+        lines.append(f"| merge → {r['target']:<4d}  | {r['actual_k']:>4d}     | {r['nmi']:.3f} | {r['ari']:.3f} |")
     return "\n".join(lines)
 
 
@@ -601,7 +617,9 @@ def nystrom_spectral(
             j = int(indices[i, j_pos])
             d = float(dists[i, j_pos])
             w = np.exp(-d * d / (2 * sigma * sigma))
-            rows.append(i); cols.append(j); vals.append(w)
+            rows.append(i)
+            cols.append(j)
+            vals.append(w)
     W = sp.csr_matrix((vals, (rows, cols)), shape=(n_buckets, n_buckets))
     W = W.maximum(W.T)
     deg = np.asarray(W.sum(axis=1)).flatten()
@@ -681,7 +699,8 @@ def cluster_diagnostic(
     rows, cols = [], []
     for i in range(n):
         for j_pos in range(1, k + 1):
-            rows.append(i); cols.append(int(idx_nn[i, j_pos]))
+            rows.append(i)
+            cols.append(int(idx_nn[i, j_pos]))
     G = sp.csr_matrix(([1.0] * len(rows), (rows, cols)), shape=(n, n))
     G = G.maximum(G.T)
     full_deg = np.asarray((G > 0).sum(axis=1)).flatten()
@@ -702,8 +721,17 @@ def cluster_diagnostic(
         rho = float("nan")
 
     return dict(
-        n_buckets=n, anis=anis, p2=p2, p3=p3, eff70=eff70,
-        gap2=gap2, e12=e12, density=density, path=path, star=star, rho=rho,
+        n_buckets=n,
+        anis=anis,
+        p2=p2,
+        p3=p3,
+        eff70=eff70,
+        gap2=gap2,
+        e12=e12,
+        density=density,
+        path=path,
+        star=star,
+        rho=rho,
         eigvals_top5=eigvals[:5].tolist(),
     )
 
@@ -724,9 +752,15 @@ def classify_cluster(d: dict) -> str:
     Anisotropy gate (>0.18) is implicit: low-anis clusters with high path
     score from few k-means buckets fall into "mixed" rather than PATH.
     """
-    anis = d["anis"]; e12 = d["e12"]; eff = d["eff70"]
-    p2 = d["p2"]; p3 = d["p3"]; gap2 = d["gap2"]
-    dens = d["density"]; rho = d["rho"]; star = d["star"]
+    anis = d["anis"]
+    e12 = d["e12"]
+    eff = d["eff70"]
+    p2 = d["p2"]
+    p3 = d["p3"]
+    gap2 = d["gap2"]
+    dens = d["density"]
+    rho = d["rho"]
+    star = d["star"]
 
     if 0.30 < anis < 0.60 and e12 > 0.80 and dens > 1.5:
         return "CYCLE"
@@ -776,9 +810,7 @@ def diagnose_all_clusters(
         signals, and the topology classification.
     """
     if use_spectral:
-        _, centroid_coords, bucket_counts = nystrom_spectral(
-            X, bucket_labels, n_components=n_components
-        )
+        _, centroid_coords, bucket_counts = nystrom_spectral(X, bucket_labels, n_components=n_components)
         unique_buckets = np.unique(bucket_labels)
     else:
         unique_buckets, inverse = np.unique(bucket_labels, return_inverse=True)
@@ -819,10 +851,22 @@ def diagnose_all_clusters(
 # Default reference modules for scRNA-seq stress/death scoring.
 # Mouse symbol case. Add more or override per domain.
 DEFAULT_STRESS_MODULES: dict[str, list[str]] = {
-    "apoptosis": ["Casp3", "Casp7", "Casp8", "Casp9", "Bax", "Bak1",
-                   "Bcl2l11", "Cycs", "Apaf1", "Diablo", "Pmaip1", "Bid"],
-    "upr":       ["Hspa5", "Atf4", "Ddit3", "Xbp1", "Atf6", "Ern1", "Eif2ak3"],
-    "hsp":       ["Hspa1a", "Hspa1b", "Hsp90aa1", "Hsp90ab1", "Hspb1", "Dnajb1"],
+    "apoptosis": [
+        "Casp3",
+        "Casp7",
+        "Casp8",
+        "Casp9",
+        "Bax",
+        "Bak1",
+        "Bcl2l11",
+        "Cycs",
+        "Apaf1",
+        "Diablo",
+        "Pmaip1",
+        "Bid",
+    ],
+    "upr": ["Hspa5", "Atf4", "Ddit3", "Xbp1", "Atf6", "Ern1", "Eif2ak3"],
+    "hsp": ["Hspa1a", "Hspa1b", "Hsp90aa1", "Hsp90ab1", "Hspb1", "Dnajb1"],
 }
 
 
@@ -938,9 +982,9 @@ def qc_filter_mask(
         keep &= np.asarray(adata.obs["pct_hb"]) < pct_hb_max
 
     if score_columns is None:
-        score_columns = [c for c in adata.obs.columns
-                          if c.endswith("_score") and pd.api.types.is_numeric_dtype(
-                              adata.obs[c])]
+        score_columns = [
+            c for c in adata.obs.columns if c.endswith("_score") and pd.api.types.is_numeric_dtype(adata.obs[c])
+        ]
 
     if drop_top_pct > 0:
         for c in score_columns:

@@ -360,8 +360,8 @@ The plateau classifier picks up the cycle signature on real motion-capture data.
 
 ```{python}
 #| label: mocap
-mocap_features = "/Users/jdonaldson/Projects/semantic-proprioception-paper/experiments/data/cmu_mocap_features.npy"
-mocap_meta = "/Users/jdonaldson/Projects/semantic-proprioception-paper/experiments/data/cmu_mocap_metadata.parquet"
+mocap_features = "../data/cmu_mocap_features.npy"
+mocap_meta = "../data/cmu_mocap_metadata.parquet"
 
 if os.path.exists(mocap_features):
     X_mc = np.load(mocap_features).astype(np.float32)[::5]

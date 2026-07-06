@@ -67,3 +67,6 @@ docs/data/
 
 # Sibling projects
 turnstyle/
+
+# Per-thread session resume files (never committed)
+.resume/

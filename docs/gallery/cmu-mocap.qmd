@@ -29,8 +29,8 @@ Joint-angle features from the CMU Motion Capture Database — 62 channels per fr
 import numpy as np
 import polars as pl
 
-FEATURES = "/Users/jdonaldson/Projects/semantic-proprioception-paper/experiments/data/cmu_mocap_features.npy"
-META     = "/Users/jdonaldson/Projects/semantic-proprioception-paper/experiments/data/cmu_mocap_metadata.parquet"
+FEATURES = "../data/cmu_mocap_features.npy"
+META     = "../data/cmu_mocap_metadata.parquet"
 
 X_full = np.load(FEATURES).astype(np.float32)
 m_full = pl.read_parquet(META)
