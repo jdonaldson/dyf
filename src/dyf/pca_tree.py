@@ -17,8 +17,6 @@ import logging
 from collections import defaultdict
 
 import numpy as np
-from scipy.cluster.hierarchy import fcluster
-from sklearn.decomposition import PCA
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +42,8 @@ def _build_pca_tree(embeddings, point_indices, depth, min_leaf_size=2):
         }
 
     subset = embeddings[point_indices]
+
+    from sklearn.decomposition import PCA
 
     try:
         pca = PCA(n_components=1)
@@ -290,6 +290,8 @@ def _cut_pca_tree_to_labels(tree, max_depth, n_points, n_clusters):
     if n_leaves <= n_clusters:
         leaf_labels = np.arange(n_leaves)
     else:
+        from scipy.cluster.hierarchy import fcluster
+
         leaf_labels = fcluster(Z, t=n_clusters, criterion="maxclust") - 1
 
     point_labels = np.array([leaf_labels[point_to_leaf[i]] for i in range(n_points)])

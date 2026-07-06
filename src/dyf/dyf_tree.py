@@ -23,7 +23,6 @@ import logging
 from collections import defaultdict
 
 import numpy as np
-from sklearn.cluster import AgglomerativeClustering
 
 from ._arrays import ensure_f32
 
@@ -340,6 +339,8 @@ def _cut_dyf_tree_to_labels(tree, n_points, n_clusters, embeddings):
     # Ward minimizes within-cluster variance, producing balanced merges.
     # On unit vectors, euclidean distance is monotonic with cosine distance
     # (||a-b||^2 = 2(1 - cos(a,b))), so semantics are preserved.
+    from sklearn.cluster import AgglomerativeClustering
+
     agg = AgglomerativeClustering(n_clusters=n_clusters, linkage="ward")
     leaf_labels = agg.fit_predict(centroids)
 

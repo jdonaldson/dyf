@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.12.1
+
+### Fixed
+
+- **Bare `pip install dyf` was unusable** — `import dyf` raised
+  `ModuleNotFoundError: No module named 'sklearn'` because three modules
+  imported sklearn/scipy at module top while core dependencies list only
+  numpy + dyf-rs. Those imports are now function-local (they load on first
+  use of the agglomerative cut, `DensityClassifierFull` hashing, and PCA-tree
+  paths). The core path — `build_dyf_tree` → `write_lazy_index` → rust-backed
+  `LazyIndex.search` — now runs with no sklearn installed at all.
+
 ## 0.12.0
 
 ### DYF3 is the default file format

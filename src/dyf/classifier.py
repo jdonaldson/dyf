@@ -32,8 +32,6 @@ if TYPE_CHECKING:
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 
-from sklearn.decomposition import PCA
-
 from .configs import EmbedderConfig, LabelerConfig, list_configs  # noqa: F401
 
 # =============================================================================
@@ -853,6 +851,8 @@ class DensityClassifier:
             logger.debug(f"  Centroids for PCA: {len(centroids_arr):,}")
 
         # Step 1c: PCA on centroids
+        from sklearn.decomposition import PCA
+
         n_components = min(num_bits, len(centroids_arr) - 1)
         pca = PCA(n_components=n_components)
         pca.fit(centroids_arr)
