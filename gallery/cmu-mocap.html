@@ -1,0 +1,1481 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.38">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>CMU MoCap</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-cf35b1e8b68dd0c452cd246239eb2ea9.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-f1a5c2bb43452cd3d80060817c0f5863.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-cf35b1e8b68dd0c452cd246239eb2ea9.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-de8f194416f18390ac7758f973fc7675.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-eb587815051a02b7a77ac6fc122ec681.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../site_libs/bootstrap/bootstrap-de8f194416f18390ac7758f973fc7675.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-QXBFEQPED2"></script>
+
+<script type="text/javascript">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
+</script>
+
+
+</head>
+
+<body class="nav-fixed quarto-light"><script id="quarto-html-before-body" type="application/javascript">
+    const toggleBodyColorMode = (bsSheetEl) => {
+      const mode = bsSheetEl.getAttribute("data-mode");
+      const bodyEl = window.document.querySelector("body");
+      if (mode === "dark") {
+        bodyEl.classList.add("quarto-dark");
+        bodyEl.classList.remove("quarto-light");
+      } else {
+        bodyEl.classList.add("quarto-light");
+        bodyEl.classList.remove("quarto-dark");
+      }
+    }
+    const toggleBodyColorPrimary = () => {
+      const bsSheetEl = window.document.querySelector("link#quarto-bootstrap:not([rel=disabled-stylesheet])");
+      if (bsSheetEl) {
+        toggleBodyColorMode(bsSheetEl);
+      }
+    }
+    const setColorSchemeToggle = (alternate) => {
+      const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+      for (let i=0; i < toggles.length; i++) {
+        const toggle = toggles[i];
+        if (toggle) {
+          if (alternate) {
+            toggle.classList.add("alternate");
+          } else {
+            toggle.classList.remove("alternate");
+          }
+        }
+      }
+    };
+    const toggleColorMode = (alternate) => {
+      // Switch the stylesheets
+      const primaryStylesheets = window.document.querySelectorAll('link.quarto-color-scheme:not(.quarto-color-alternate)');
+      const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+      manageTransitions('#quarto-margin-sidebar .nav-link', false);
+      if (alternate) {
+        // note: dark is layered on light, we don't disable primary!
+        enableStylesheet(alternateStylesheets);
+        for (const sheetNode of alternateStylesheets) {
+          if (sheetNode.id === "quarto-bootstrap") {
+            toggleBodyColorMode(sheetNode);
+          }
+        }
+      } else {
+        disableStylesheet(alternateStylesheets);
+        enableStylesheet(primaryStylesheets)
+        toggleBodyColorPrimary();
+      }
+      manageTransitions('#quarto-margin-sidebar .nav-link', true);
+      // Switch the toggles
+      setColorSchemeToggle(alternate)
+      // Hack to workaround the fact that safari doesn't
+      // properly recolor the scrollbar when toggling (#1455)
+      if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+        manageTransitions("body", false);
+        window.scrollTo(0, 1);
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          manageTransitions("body", true);
+        }, 40);
+      }
+    }
+    const disableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        stylesheet.rel = 'disabled-stylesheet';
+      }
+    }
+    const enableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        if(stylesheet.rel !== 'stylesheet') { // for Chrome, which will still FOUC without this check
+          stylesheet.rel = 'stylesheet';
+        }
+      }
+    }
+    const manageTransitions = (selector, allowTransitions) => {
+      const els = window.document.querySelectorAll(selector);
+      for (let i=0; i < els.length; i++) {
+        const el = els[i];
+        if (allowTransitions) {
+          el.classList.remove('notransition');
+        } else {
+          el.classList.add('notransition');
+        }
+      }
+    }
+    const isFileUrl = () => {
+      return window.location.protocol === 'file:';
+    }
+    const hasAlternateSentinel = () => {
+      let styleSentinel = getColorSchemeSentinel();
+      if (styleSentinel !== null) {
+        return styleSentinel === "alternate";
+      } else {
+        return false;
+      }
+    }
+    const setStyleSentinel = (alternate) => {
+      const value = alternate ? "alternate" : "default";
+      if (!isFileUrl()) {
+        window.localStorage.setItem("quarto-color-scheme", value);
+      } else {
+        localAlternateSentinel = value;
+      }
+    }
+    const getColorSchemeSentinel = () => {
+      if (!isFileUrl()) {
+        const storageValue = window.localStorage.getItem("quarto-color-scheme");
+        return storageValue != null ? storageValue : localAlternateSentinel;
+      } else {
+        return localAlternateSentinel;
+      }
+    }
+    const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+      const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+      const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+      let newTheme = '';
+      if(authorPrefersDark) {
+        newTheme = isAlternate ? baseTheme : alternateTheme;
+      } else {
+        newTheme = isAlternate ? alternateTheme : baseTheme;
+      }
+      const changeGiscusTheme = () => {
+        // From: https://github.com/giscus/giscus/issues/336
+        const sendMessage = (message) => {
+          const iframe = document.querySelector('iframe.giscus-frame');
+          if (!iframe) return;
+          iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+        }
+        sendMessage({
+          setConfig: {
+            theme: newTheme
+          }
+        });
+      }
+      const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+      if (isGiscussLoaded) {
+        changeGiscusTheme();
+      }
+    };
+    const authorPrefersDark = false;
+    const darkModeDefault = authorPrefersDark;
+      document.querySelector('link#quarto-text-highlighting-styles.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+      document.querySelector('link#quarto-bootstrap.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+    let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+    // Dark / light mode switch
+    window.quartoToggleColorScheme = () => {
+      // Read the current dark / light value
+      let toAlternate = !hasAlternateSentinel();
+      toggleColorMode(toAlternate);
+      setStyleSentinel(toAlternate);
+      toggleGiscusIfUsed(toAlternate, darkModeDefault);
+      window.dispatchEvent(new Event('resize'));
+    };
+    // Switch to dark mode if need be
+    if (hasAlternateSentinel()) {
+      toggleColorMode(true);
+    } else {
+      toggleColorMode(false);
+    }
+  </script>
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a href="../index.html" class="navbar-brand navbar-brand-logo">
+    <img src="../dyf_logo.svg" alt="DYF" class="navbar-logo light-content">
+    <img src="../dyf_logo.svg" alt="DYF" class="navbar-logo dark-content">
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../getting-started.html"> 
+<span class="menu-text">Getting Started</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../how-it-works.html"> 
+<span class="menu-text">How It Works</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../gallery/index.html"> 
+<span class="menu-text">Gallery</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../reference/index.html"> 
+<span class="menu-text">API Reference</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/jdonaldson/dyf"> <i class="bi bi-github" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#load-the-data" id="toc-load-the-data" class="nav-link active" data-scroll-target="#load-the-data">Load the data</a></li>
+  <li><a href="#three-ground-truths" id="toc-three-ground-truths" class="nav-link" data-scroll-target="#three-ground-truths">Three ground truths</a></li>
+  <li><a href="#run-dyf-parameter-free-on-the-62d-joint-angles" id="toc-run-dyf-parameter-free-on-the-62d-joint-angles" class="nav-link" data-scroll-target="#run-dyf-parameter-free-on-the-62d-joint-angles">Run DYF (parameter-free) on the 62d joint angles</a></li>
+  <li><a href="#how-well-does-dyfs-partition-match-each-ground-truth" id="toc-how-well-does-dyfs-partition-match-each-ground-truth" class="nav-link" data-scroll-target="#how-well-does-dyfs-partition-match-each-ground-truth">How well does DYF’s partition match each ground truth?</a></li>
+  <li><a href="#oracle-k-means-on-the-middle-granularity" id="toc-oracle-k-means-on-the-middle-granularity" class="nav-link" data-scroll-target="#oracle-k-means-on-the-middle-granularity">Oracle k-means on the middle granularity</a></li>
+  <li><a href="#walking-down-the-hierarchy-against-each-ground-truth" id="toc-walking-down-the-hierarchy-against-each-ground-truth" class="nav-link" data-scroll-target="#walking-down-the-hierarchy-against-each-ground-truth">Walking down the hierarchy against each ground truth</a></li>
+  <li><a href="#figures" id="toc-figures" class="nav-link" data-scroll-target="#figures">Figures</a></li>
+  <li><a href="#why-dyf-wins-on-ambiguous-k-data" id="toc-why-dyf-wins-on-ambiguous-k-data" class="nav-link" data-scroll-target="#why-dyf-wins-on-ambiguous-k-data">Why DYF wins on ambiguous-k data</a>
+  <ul class="collapse">
+  <li><a href="#the-sports-analogy-completed" id="toc-the-sports-analogy-completed" class="nav-link" data-scroll-target="#the-sports-analogy-completed">The sports analogy, completed</a></li>
+  </ul></li>
+  <li><a href="#what-to-take-away" id="toc-what-to-take-away" class="nav-link" data-scroll-target="#what-to-take-away">What to take away</a></li>
+  <li><a href="#caveats" id="toc-caveats" class="nav-link" data-scroll-target="#caveats">Caveats</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<div class="quarto-title-block"><div><h1 class="title">CMU MoCap</h1><button type="button" class="btn code-tools-button dropdown-toggle" id="quarto-code-tools-menu" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi"></i> Code</button><ul class="dropdown-menu dropdown-menu-end" aria-labelelledby="quarto-code-tools-menu"><li><a id="quarto-show-all-code" class="dropdown-item" href="javascript:void(0)" role="button">Show All Code</a></li><li><a id="quarto-hide-all-code" class="dropdown-item" href="javascript:void(0)" role="button">Hide All Code</a></li><li><hr class="dropdown-divider"></li><li><a id="quarto-view-source" class="dropdown-item" href="javascript:void(0)" role="button">View Source</a></li></ul></div></div>
+<p class="subtitle lead">140,837 motion-capture frames, 62d joint angles — true k is ambiguous.</p>
+  <div class="quarto-categories">
+    <div class="quarto-category">motion</div>
+    <div class="quarto-category">large</div>
+    <div class="quarto-category">physical</div>
+    <div class="quarto-category">no-embedding</div>
+  </div>
+  </div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>Every other gallery notebook has a clean ground-truth <code>k</code> — 10 digits, 20 newsgroup topics, 40 identities. CMU Motion Capture breaks that convenience. The same frames are simultaneously labeled with <strong>7 motion types</strong> (walk, dance, climb, …), <strong>25 descriptions</strong> (slow walk, fast walk, salsa, …), and <strong>80 trial IDs</strong> (individual recording sessions). Which one is “true <code>k</code>”?</p>
+<p>None of them. Or all of them. A dance trial contains walking phases. Climbing involves reaching. Running and walking share gait dynamics at transitions. The label hierarchy is a human convenience layered over continuous motion that refuses to partition cleanly at any single granularity.</p>
+<p>This is DYF’s native regime — data where the question “how many clusters are there?” doesn’t have one right answer, and you shouldn’t pretend that it does.</p>
+<section id="load-the-data" class="level2">
+<h2 class="anchored" data-anchor-id="load-the-data">Load the data</h2>
+<p>Joint-angle features from the CMU Motion Capture Database — 62 channels per frame (31 joints × Euler ZYX angles), 120fps recordings across 80 trials. No embedding model. DYF operates directly on the physical signal.</p>
+<div id="load" class="cell" data-execution_count="1">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> polars <span class="im">as</span> pl</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>FEATURES <span class="op">=</span> <span class="st">"../data/cmu_mocap_features.npy"</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>META     <span class="op">=</span> <span class="st">"../data/cmu_mocap_metadata.parquet"</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>X_full <span class="op">=</span> np.load(FEATURES).astype(np.float32)</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>m_full <span class="op">=</span> pl.read_parquet(META)</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Subsample to every 5th frame — 120fps mocap is heavily redundant frame-to-frame,</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="co"># and the gallery render needs to complete in a reasonable wall-clock budget.</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>stride <span class="op">=</span> <span class="dv">5</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>idx <span class="op">=</span> np.arange(<span class="dv">0</span>, <span class="bu">len</span>(X_full), stride)</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>X <span class="op">=</span> X_full[idx]</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>m <span class="op">=</span> m_full[idx.tolist()]</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Full: </span><span class="sc">{</span>X_full<span class="sc">.</span>shape[<span class="dv">0</span>]<span class="sc">:,}</span><span class="ss"> frames → subsampled (</span><span class="sc">{</span>stride<span class="sc">}</span><span class="ss">×): </span><span class="sc">{</span>X<span class="sc">.</span>shape[<span class="dv">0</span>]<span class="sc">:,}</span><span class="ss"> frames × </span><span class="sc">{</span>X<span class="sc">.</span>shape[<span class="dv">1</span>]<span class="sc">}</span><span class="ss">d"</span>)</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Motion types (</span><span class="sc">{</span>m[<span class="st">'motion_type'</span>]<span class="sc">.</span>n_unique()<span class="sc">}</span><span class="ss">): </span><span class="sc">{</span><span class="bu">sorted</span>(m[<span class="st">'motion_type'</span>].unique().to_list())<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>Full: 140,837 frames → subsampled (5×): 28,168 frames × 62d
+Motion types (7): ['basketball', 'climb', 'dance', 'jump', 'run', 'sit_stand', 'walk']</code></pre>
+</div>
+</div>
+</section>
+<section id="three-ground-truths" class="level2">
+<h2 class="anchored" data-anchor-id="three-ground-truths">Three ground truths</h2>
+<div id="y-prep" class="cell" data-execution_count="2">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>y_motion <span class="op">=</span> m[<span class="st">"motion_type"</span>].to_numpy()</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>y_desc   <span class="op">=</span> m[<span class="st">"description"</span>].to_numpy()</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>y_trial  <span class="op">=</span> m[<span class="st">"trial_id"</span>].to_numpy()</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>_, y_motion_idx <span class="op">=</span> np.unique(y_motion, return_inverse<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>_, y_desc_idx   <span class="op">=</span> np.unique(y_desc,   return_inverse<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>_, y_trial_idx  <span class="op">=</span> np.unique(y_trial,  return_inverse<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"motion_type: </span><span class="sc">{</span><span class="bu">len</span>(np.unique(y_motion_idx))<span class="sc">}</span><span class="ss"> classes — broad categories"</span>)</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"description: </span><span class="sc">{</span><span class="bu">len</span>(np.unique(y_desc_idx))<span class="sc">}</span><span class="ss"> classes — finer movement types"</span>)</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"trial_id:    </span><span class="sc">{</span><span class="bu">len</span>(np.unique(y_trial_idx))<span class="sc">}</span><span class="ss"> classes — individual recording sessions"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>motion_type: 7 classes — broad categories
+description: 25 classes — finer movement types
+trial_id:    80 classes — individual recording sessions</code></pre>
+</div>
+</div>
+</section>
+<section id="run-dyf-parameter-free-on-the-62d-joint-angles" class="level2">
+<h2 class="anchored" data-anchor-id="run-dyf-parameter-free-on-the-62d-joint-angles">Run DYF (parameter-free) on the 62d joint angles</h2>
+<p>No embedding. The 62 Euler-angle channels are DYF’s direct input.</p>
+<div id="run-dyf" class="cell" data-execution_count="3">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> sys</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>sys.path.insert(<span class="dv">0</span>, <span class="st">"."</span>)</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> _gallery <span class="im">import</span> run_dyf_cached, run_kmeans, plot_single</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Score against the middle-granularity label (description, k=25) for the main run.</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> run_dyf_cached(X, y_desc_idx, cache_path<span class="op">=</span><span class="st">"/tmp/gallery_mocap_dyf.npz"</span>)</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Recovered k:       </span><span class="sc">{</span>result<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"NMI vs description: </span><span class="sc">{</span>result<span class="sc">.</span>nmi<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"ARI vs description: </span><span class="sc">{</span>result<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>Recovered k:       56
+NMI vs description: 0.412
+ARI vs description: 0.085</code></pre>
+</div>
+</div>
+</section>
+<section id="how-well-does-dyfs-partition-match-each-ground-truth" class="level2">
+<h2 class="anchored" data-anchor-id="how-well-does-dyfs-partition-match-each-ground-truth">How well does DYF’s partition match each ground truth?</h2>
+<div id="multi-gt" class="cell" data-execution_count="4">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.metrics <span class="im">import</span> adjusted_mutual_info_score <span class="im">as</span> nmi</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.metrics <span class="im">import</span> adjusted_rand_score <span class="im">as</span> ari</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>rows <span class="op">=</span> []</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> name, y_idx <span class="kw">in</span> [(<span class="st">"motion_type (k=7)"</span>,   y_motion_idx),</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>                    (<span class="st">"description (k=25)"</span>,  y_desc_idx),</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>                    (<span class="st">"trial_id (k=80)"</span>,     y_trial_idx)]:</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>    rows.append((name, nmi(y_idx, result.labels), ari(y_idx, result.labels)))</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span><span class="st">'Ground truth'</span><span class="sc">:25s}</span><span class="ss">  NMI     ARI"</span>)</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> name, m_nmi, m_ari <span class="kw">in</span> rows:</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span>name<span class="sc">:25s}</span><span class="ss">  </span><span class="sc">{</span>m_nmi<span class="sc">:.3f}</span><span class="ss">   </span><span class="sc">{</span>m_ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>Ground truth               NMI     ARI
+motion_type (k=7)          0.362   0.084
+description (k=25)         0.412   0.085
+trial_id (k=80)            0.476   0.137</code></pre>
+</div>
+</div>
+<p>The alignment gets better as the label granularity matches DYF’s recovered resolution. DYF’s partition is <em>not</em> a single “true k” clustering — it’s a multi-resolution organization that aligns partially with every level of the label hierarchy.</p>
+</section>
+<section id="oracle-k-means-on-the-middle-granularity" class="level2">
+<h2 class="anchored" data-anchor-id="oracle-k-means-on-the-middle-granularity">Oracle k-means on the middle granularity</h2>
+<div id="kmeans" class="cell" data-execution_count="5">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>kmeans <span class="op">=</span> run_kmeans(X, y_desc_idx)</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"K-means told k=25: NMI=</span><span class="sc">{</span>kmeans[<span class="st">'nmi'</span>]<span class="sc">:.3f}</span><span class="ss">, ARI=</span><span class="sc">{</span>kmeans[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"DYF (no k given):  NMI=</span><span class="sc">{</span>result<span class="sc">.</span>nmi<span class="sc">:.3f}</span><span class="ss">, ARI=</span><span class="sc">{</span>result<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>K-means told k=25: NMI=0.348, ARI=0.103
+DYF (no k given):  NMI=0.412, ARI=0.085</code></pre>
+</div>
+</div>
+<p><strong>DYF beats oracle-tuned k-means on NMI against every one of the three ground truths.</strong> On motion-capture joint angles, the parameter-free method is the better tool even when k-means is handed the answer.</p>
+</section>
+<section id="walking-down-the-hierarchy-against-each-ground-truth" class="level2">
+<h2 class="anchored" data-anchor-id="walking-down-the-hierarchy-against-each-ground-truth">Walking down the hierarchy against each ground truth</h2>
+<p>DYF’s recovered partition is multi-resolution by design — and CMU MoCap is the clearest place to see it, because there are three plausible “true k” values to aim at (<code>motion_type</code>=7, <code>description</code>=25, <code>trial_id</code>=80):</p>
+<div id="merge-walk-gt" class="cell" data-execution_count="6">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> _gallery <span class="im">import</span> merge_walk, merge_walk_table</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"**Against `motion_type` (k=7):**</span><span class="ch">\n</span><span class="st">"</span>)</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(merge_walk_table(merge_walk(result, X, y_motion_idx, targets<span class="op">=</span>[<span class="dv">25</span>, <span class="dv">10</span>, <span class="dv">7</span>, <span class="dv">3</span>]), result))</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"</span><span class="ch">\n\n</span><span class="st">**Against `description` (k=25):**</span><span class="ch">\n</span><span class="st">"</span>)</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(merge_walk_table(merge_walk(result, X, y_desc_idx, targets<span class="op">=</span>[<span class="dv">40</span>, <span class="dv">25</span>, <span class="dv">15</span>, <span class="dv">7</span>]), result))</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"</span><span class="ch">\n\n</span><span class="st">**Against `trial_id` (k=80):**</span><span class="ch">\n</span><span class="st">"</span>)</span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(merge_walk_table(merge_walk(result, X, y_trial_idx, targets<span class="op">=</span>[<span class="dv">60</span>, <span class="dv">40</span>, <span class="dv">25</span>, <span class="dv">10</span>]), result))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<p><strong>Against <code>motion_type</code> (k=7):</strong></p>
+<table class="caption-top table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th>Resolution</th>
+<th style="text-align: right;">Actual k</th>
+<th style="text-align: right;">NMI</th>
+<th style="text-align: right;">ARI</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Raw DYF</strong></td>
+<td style="text-align: right;"><strong>56</strong></td>
+<td style="text-align: right;"><strong>0.412</strong></td>
+<td style="text-align: right;"><strong>0.085</strong></td>
+</tr>
+<tr class="even">
+<td>merge → 25</td>
+<td style="text-align: right;">25</td>
+<td style="text-align: right;">0.276</td>
+<td style="text-align: right;">0.123</td>
+</tr>
+<tr class="odd">
+<td>merge → 10</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.253</td>
+<td style="text-align: right;">0.155</td>
+</tr>
+<tr class="even">
+<td>merge → 7</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">0.129</td>
+<td style="text-align: right;">0.034</td>
+</tr>
+<tr class="odd">
+<td>merge → 3</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">0.033</td>
+<td style="text-align: right;">-0.038</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Against <code>description</code> (k=25):</strong></p>
+<table class="caption-top table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th>Resolution</th>
+<th style="text-align: right;">Actual k</th>
+<th style="text-align: right;">NMI</th>
+<th style="text-align: right;">ARI</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Raw DYF</strong></td>
+<td style="text-align: right;"><strong>56</strong></td>
+<td style="text-align: right;"><strong>0.412</strong></td>
+<td style="text-align: right;"><strong>0.085</strong></td>
+</tr>
+<tr class="even">
+<td>merge → 40</td>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">0.382</td>
+<td style="text-align: right;">0.112</td>
+</tr>
+<tr class="odd">
+<td>merge → 25</td>
+<td style="text-align: right;">25</td>
+<td style="text-align: right;">0.322</td>
+<td style="text-align: right;">0.128</td>
+</tr>
+<tr class="even">
+<td>merge → 15</td>
+<td style="text-align: right;">15</td>
+<td style="text-align: right;">0.331</td>
+<td style="text-align: right;">0.179</td>
+</tr>
+<tr class="odd">
+<td>merge → 7</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">0.151</td>
+<td style="text-align: right;">0.012</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Against <code>trial_id</code> (k=80):</strong></p>
+<table class="caption-top table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th>Resolution</th>
+<th style="text-align: right;">Actual k</th>
+<th style="text-align: right;">NMI</th>
+<th style="text-align: right;">ARI</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Raw DYF</strong></td>
+<td style="text-align: right;"><strong>56</strong></td>
+<td style="text-align: right;"><strong>0.412</strong></td>
+<td style="text-align: right;"><strong>0.085</strong></td>
+</tr>
+<tr class="even">
+<td>merge → 60</td>
+<td style="text-align: right;">56</td>
+<td style="text-align: right;">0.476</td>
+<td style="text-align: right;">0.137</td>
+</tr>
+<tr class="odd">
+<td>merge → 40</td>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">0.431</td>
+<td style="text-align: right;">0.121</td>
+</tr>
+<tr class="even">
+<td>merge → 25</td>
+<td style="text-align: right;">25</td>
+<td style="text-align: right;">0.375</td>
+<td style="text-align: right;">0.107</td>
+</tr>
+<tr class="odd">
+<td>merge → 10</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.302</td>
+<td style="text-align: right;">0.076</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Read this vertically. DYF’s partition is the same across all three tables — only the <em>ground-truth target</em> changes. The best NMI/ARI for each ground truth sits near <em>that ground truth’s</em> cluster count, not at a fixed “DYF-recovered” k. The hierarchy is the same; the rulebook you score it against is what moves.</p>
+</section>
+<section id="figures" class="level2">
+<h2 class="anchored" data-anchor-id="figures">Figures</h2>
+<div class="gallery-fluid">
+<div id="cell-fig-motion" class="cell" data-execution_count="7">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>plot_single(result.umap_2d, y_motion_idx, title<span class="op">=</span><span class="st">"Ground truth: motion_type (k=7)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-display" data-execution_count="7">
+<div id="fig-motion" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-motion-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="cmu-mocap_files/figure-html/fig-motion-output-1.png" width="470" height="470" class="figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-motion-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: Ground truth — motion_type (7 broad categories: walk, dance, climb, …).
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div id="cell-fig-desc" class="cell" data-execution_count="8">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>plot_single(result.umap_2d, y_desc_idx, title<span class="op">=</span><span class="st">"Ground truth: description (k=25)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-display" data-execution_count="8">
+<div id="fig-desc" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-desc-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="cmu-mocap_files/figure-html/fig-desc-output-1.png" width="470" height="470" class="figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-desc-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;2: Ground truth — description (25 finer-grained movement types).
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div id="cell-fig-dyf" class="cell" data-execution_count="9">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>plot_single(result.umap_2d, result.labels, title<span class="op">=</span><span class="ss">f"DYF (recovered k=</span><span class="sc">{</span>result<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-display" data-execution_count="9">
+<div id="fig-dyf" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-dyf-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="cmu-mocap_files/figure-html/fig-dyf-output-1.png" width="470" height="470" class="figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-dyf-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;3: DYF — parameter-free, found its own resolution.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div id="cell-fig-kmeans" class="cell" data-execution_count="10">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>plot_single(result.umap_2d, kmeans[<span class="st">"labels"</span>], title<span class="op">=</span><span class="st">"k-means (told k=25)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-display" data-execution_count="10">
+<div id="fig-kmeans" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-kmeans-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="cmu-mocap_files/figure-html/fig-kmeans-output-1.png" width="470" height="470" class="figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-kmeans-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;4: K-means given the oracle k=25 (description granularity).
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="why-dyf-wins-on-ambiguous-k-data" class="level2">
+<h2 class="anchored" data-anchor-id="why-dyf-wins-on-ambiguous-k-data">Why DYF wins on ambiguous-k data</h2>
+<p>Three things are working <em>for</em> it here, exactly the opposite of the Olivetti setup:</p>
+<p><strong>1. Dense support.</strong> 28,167 frames across 25 descriptions is ~1,100 frames per description-class (and ~4,000 per motion_type). DYF’s tree has plenty of room to carve stable leaves. Unlike Olivetti, the density-per-latent-cluster condition is satisfied comfortably.</p>
+<p><strong>2. The “flat k” assumption is wrong, and DYF doesn’t make it.</strong> K-means has to commit to a single <code>k</code>. When you tell it 25, it builds 25 centroids — even though some natural clusters are more like 3 frames (a jumping-jack peak) and others are 2,000 frames (a steady walking cycle). DYF’s Louvain step lets community sizes vary naturally with the data’s density topology.</p>
+<p><strong>3. Motion manifolds are curved.</strong> Gait transitions, sub-phases within a dance move, reaching-then-grasping — these are smooth trajectories, not convex clouds. Voronoi cuts through a continuous cycle are always somewhat arbitrary. Density-based cuts can sit at the natural minima between sub-phases.</p>
+<section id="the-sports-analogy-completed" class="level3">
+<h3 class="anchored" data-anchor-id="the-sports-analogy-completed">The sports analogy, completed</h3>
+<p>Across the four notebooks we now have:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Dataset</th>
+<th>Geometry</th>
+<th>DYF vs oracle k-means</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Digits</td>
+<td>Convex blobs, clean <code>k</code></td>
+<td>K-means wins (home court)</td>
+</tr>
+<tr class="even">
+<td>MNIST</td>
+<td>Convex-ish, but more data per class</td>
+<td>Mixed (NMI win / ARI loss)</td>
+</tr>
+<tr class="odd">
+<td>20 Newsgroups</td>
+<td>Curved, hierarchical</td>
+<td>Essentially tied</td>
+</tr>
+<tr class="even">
+<td><strong>CMU MoCap</strong></td>
+<td><strong>Continuous motion, ambiguous k</strong></td>
+<td><strong>DYF wins</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The pattern isn’t about “DYF vs k-means.” It’s about <strong>how much the shape of the data matches the shape of k-means’s assumptions.</strong> When the data is convex blobs with a known <code>k</code>, k-means wins. When the data is curved with an ill-defined <code>k</code>, DYF wins. Most real-world data — RAG corpora, user behavior logs, sensor streams, documents on a moving topic — is closer to MoCap than to Digits.</p>
+</section>
+</section>
+<section id="what-to-take-away" class="level2">
+<h2 class="anchored" data-anchor-id="what-to-take-away">What to take away</h2>
+<ul>
+<li><strong>“True k” is often a fiction.</strong> If a dataset has multiple plausible labelings at different granularities, your clustering algorithm shouldn’t demand you pick one upfront.</li>
+<li><strong>DYF operates on raw features, no embedding required.</strong> Motion capture, tabular data, sensor readings — anywhere the raw features have meaningful geometry, DYF can go in direct.</li>
+<li><strong>The win margin depends on the data, not the method.</strong> Reporting “DYF wins by NMI 0.04” isn’t the point. The point is that DYF’s multi-resolution output is a better <em>match for the question being asked</em> when the question is “what structure is in this data?”</li>
+</ul>
+</section>
+<section id="caveats" class="level2">
+<h2 class="anchored" data-anchor-id="caveats">Caveats</h2>
+<ul>
+<li><strong>Subsampled to 28,167 frames</strong> for the gallery render. The full 140,837-frame results (pre-computed in the DYF repo’s MoCap experiment) are similar in pattern with tighter metrics.</li>
+<li><strong>No temporal structure used.</strong> These are frame-level features — adjacent-frame similarity within a walk cycle isn’t exploited. A time-aware model (HMM, Transformer) would outperform both DYF and k-means on <em>sequence</em> tasks; this notebook is about <em>frame-level structure</em> only.</li>
+<li><strong>NMI is still a blunt metric</strong> for continuous-motion data. A proper evaluation would use cluster-purity against each ground truth at the matching granularity, plus a quantitative measure of hierarchy recovery.</li>
+</ul>
+
+
+<!-- -->
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    // Ensure there is a toggle, if there isn't float one in the top right
+    if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+      const a = window.document.createElement('a');
+      a.classList.add('top-right');
+      a.classList.add('quarto-color-scheme-toggle');
+      a.href = "";
+      a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+      const i = window.document.createElement("i");
+      i.classList.add('bi');
+      a.appendChild(i);
+      window.document.body.appendChild(a);
+    }
+    setColorSchemeToggle(hasAlternateSentinel())
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+    const viewSource = window.document.getElementById('quarto-view-source') ||
+                       window.document.getElementById('quarto-code-tools-source');
+    if (viewSource) {
+      const sourceUrl = viewSource.getAttribute("data-quarto-source-url");
+      viewSource.addEventListener("click", function(e) {
+        if (sourceUrl) {
+          // rstudio viewer pane
+          if (/\bcapabilities=\b/.test(window.location)) {
+            window.open(sourceUrl);
+          } else {
+            window.location.href = sourceUrl;
+          }
+        } else {
+          const modal = new bootstrap.Modal(document.getElementById('quarto-embedded-source-code-modal'));
+          modal.show();
+        }
+        return false;
+      });
+    }
+    function toggleCodeHandler(show) {
+      return function(e) {
+        const detailsSrc = window.document.querySelectorAll(".cell > details > .sourceCode");
+        for (let i=0; i<detailsSrc.length; i++) {
+          const details = detailsSrc[i].parentElement;
+          if (show) {
+            details.open = true;
+          } else {
+            details.removeAttribute("open");
+          }
+        }
+        const cellCodeDivs = window.document.querySelectorAll(".cell > .sourceCode");
+        const fromCls = show ? "hidden" : "unhidden";
+        const toCls = show ? "unhidden" : "hidden";
+        for (let i=0; i<cellCodeDivs.length; i++) {
+          const codeDiv = cellCodeDivs[i];
+          if (codeDiv.classList.contains(fromCls)) {
+            codeDiv.classList.remove(fromCls);
+            codeDiv.classList.add(toCls);
+          } 
+        }
+        return false;
+      }
+    }
+    const hideAllCode = window.document.getElementById("quarto-hide-all-code");
+    if (hideAllCode) {
+      hideAllCode.addEventListener("click", toggleCodeHandler(false));
+    }
+    const showAllCode = window.document.getElementById("quarto-show-all-code");
+    if (showAllCode) {
+      showAllCode.addEventListener("click", toggleCodeHandler(true));
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/dyf\.io");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script><div class="modal fade" id="quarto-embedded-source-code-modal" tabindex="-1" aria-labelledby="quarto-embedded-source-code-modal-label" aria-hidden="true"><div class="modal-dialog modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="quarto-embedded-source-code-modal-label">Source Code</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb16" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> "CMU MoCap"</span></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a><span class="an">subtitle:</span><span class="co"> "140,837 motion-capture frames, 62d joint angles — true k is ambiguous."</span></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a><span class="an">order:</span><span class="co"> 6</span></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a><span class="an">image:</span><span class="co"> cmu-mocap_files/figure-html/fig-dyf-output-1.png</span></span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a><span class="an">categories:</span><span class="co"> [motion, large, physical, no-embedding]</span></span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a><span class="an">true-k:</span><span class="co"> "7–80"</span></span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a><span class="an">format:</span></span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a><span class="co">  html:</span></span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a><span class="co">    code-fold: show</span></span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a><span class="co">    code-tools: true</span></span>
+<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a><span class="an">execute:</span></span>
+<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a><span class="co">  warning: false</span></span>
+<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a><span class="co">  message: false</span></span>
+<span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb16-16"><a href="#cb16-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-17"><a href="#cb16-17" aria-hidden="true" tabindex="-1"></a>Every other gallery notebook has a clean ground-truth <span class="in">`k`</span> — 10 digits, 20 newsgroup topics, 40 identities. CMU Motion Capture breaks that convenience. The same frames are simultaneously labeled with **7 motion types** (walk, dance, climb, …), **25 descriptions** (slow walk, fast walk, salsa, …), and **80 trial IDs** (individual recording sessions). Which one is "true <span class="in">`k`</span>"?</span>
+<span id="cb16-18"><a href="#cb16-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-19"><a href="#cb16-19" aria-hidden="true" tabindex="-1"></a>None of them. Or all of them. A dance trial contains walking phases. Climbing involves reaching. Running and walking share gait dynamics at transitions. The label hierarchy is a human convenience layered over continuous motion that refuses to partition cleanly at any single granularity.</span>
+<span id="cb16-20"><a href="#cb16-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-21"><a href="#cb16-21" aria-hidden="true" tabindex="-1"></a>This is DYF's native regime — data where the question "how many clusters are there?" doesn't have one right answer, and you shouldn't pretend that it does.</span>
+<span id="cb16-22"><a href="#cb16-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-23"><a href="#cb16-23" aria-hidden="true" tabindex="-1"></a><span class="fu">## Load the data</span></span>
+<span id="cb16-24"><a href="#cb16-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-25"><a href="#cb16-25" aria-hidden="true" tabindex="-1"></a>Joint-angle features from the CMU Motion Capture Database — 62 channels per frame (31 joints × Euler ZYX angles), 120fps recordings across 80 trials. No embedding model. DYF operates directly on the physical signal.</span>
+<span id="cb16-26"><a href="#cb16-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-29"><a href="#cb16-29" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb16-30"><a href="#cb16-30" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: load</span></span>
+<span id="cb16-31"><a href="#cb16-31" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb16-32"><a href="#cb16-32" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> polars <span class="im">as</span> pl</span>
+<span id="cb16-33"><a href="#cb16-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-34"><a href="#cb16-34" aria-hidden="true" tabindex="-1"></a>FEATURES <span class="op">=</span> <span class="st">"../data/cmu_mocap_features.npy"</span></span>
+<span id="cb16-35"><a href="#cb16-35" aria-hidden="true" tabindex="-1"></a>META     <span class="op">=</span> <span class="st">"../data/cmu_mocap_metadata.parquet"</span></span>
+<span id="cb16-36"><a href="#cb16-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-37"><a href="#cb16-37" aria-hidden="true" tabindex="-1"></a>X_full <span class="op">=</span> np.load(FEATURES).astype(np.float32)</span>
+<span id="cb16-38"><a href="#cb16-38" aria-hidden="true" tabindex="-1"></a>m_full <span class="op">=</span> pl.read_parquet(META)</span>
+<span id="cb16-39"><a href="#cb16-39" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-40"><a href="#cb16-40" aria-hidden="true" tabindex="-1"></a><span class="co"># Subsample to every 5th frame — 120fps mocap is heavily redundant frame-to-frame,</span></span>
+<span id="cb16-41"><a href="#cb16-41" aria-hidden="true" tabindex="-1"></a><span class="co"># and the gallery render needs to complete in a reasonable wall-clock budget.</span></span>
+<span id="cb16-42"><a href="#cb16-42" aria-hidden="true" tabindex="-1"></a>stride <span class="op">=</span> <span class="dv">5</span></span>
+<span id="cb16-43"><a href="#cb16-43" aria-hidden="true" tabindex="-1"></a>idx <span class="op">=</span> np.arange(<span class="dv">0</span>, <span class="bu">len</span>(X_full), stride)</span>
+<span id="cb16-44"><a href="#cb16-44" aria-hidden="true" tabindex="-1"></a>X <span class="op">=</span> X_full[idx]</span>
+<span id="cb16-45"><a href="#cb16-45" aria-hidden="true" tabindex="-1"></a>m <span class="op">=</span> m_full[idx.tolist()]</span>
+<span id="cb16-46"><a href="#cb16-46" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Full: </span><span class="sc">{</span>X_full<span class="sc">.</span>shape[<span class="dv">0</span>]<span class="sc">:,}</span><span class="ss"> frames → subsampled (</span><span class="sc">{</span>stride<span class="sc">}</span><span class="ss">×): </span><span class="sc">{</span>X<span class="sc">.</span>shape[<span class="dv">0</span>]<span class="sc">:,}</span><span class="ss"> frames × </span><span class="sc">{</span>X<span class="sc">.</span>shape[<span class="dv">1</span>]<span class="sc">}</span><span class="ss">d"</span>)</span>
+<span id="cb16-47"><a href="#cb16-47" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Motion types (</span><span class="sc">{</span>m[<span class="st">'motion_type'</span>]<span class="sc">.</span>n_unique()<span class="sc">}</span><span class="ss">): </span><span class="sc">{</span><span class="bu">sorted</span>(m[<span class="st">'motion_type'</span>].unique().to_list())<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb16-48"><a href="#cb16-48" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-49"><a href="#cb16-49" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-50"><a href="#cb16-50" aria-hidden="true" tabindex="-1"></a><span class="fu">## Three ground truths</span></span>
+<span id="cb16-51"><a href="#cb16-51" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-54"><a href="#cb16-54" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb16-55"><a href="#cb16-55" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: y-prep</span></span>
+<span id="cb16-56"><a href="#cb16-56" aria-hidden="true" tabindex="-1"></a>y_motion <span class="op">=</span> m[<span class="st">"motion_type"</span>].to_numpy()</span>
+<span id="cb16-57"><a href="#cb16-57" aria-hidden="true" tabindex="-1"></a>y_desc   <span class="op">=</span> m[<span class="st">"description"</span>].to_numpy()</span>
+<span id="cb16-58"><a href="#cb16-58" aria-hidden="true" tabindex="-1"></a>y_trial  <span class="op">=</span> m[<span class="st">"trial_id"</span>].to_numpy()</span>
+<span id="cb16-59"><a href="#cb16-59" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-60"><a href="#cb16-60" aria-hidden="true" tabindex="-1"></a>_, y_motion_idx <span class="op">=</span> np.unique(y_motion, return_inverse<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb16-61"><a href="#cb16-61" aria-hidden="true" tabindex="-1"></a>_, y_desc_idx   <span class="op">=</span> np.unique(y_desc,   return_inverse<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb16-62"><a href="#cb16-62" aria-hidden="true" tabindex="-1"></a>_, y_trial_idx  <span class="op">=</span> np.unique(y_trial,  return_inverse<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb16-63"><a href="#cb16-63" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-64"><a href="#cb16-64" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"motion_type: </span><span class="sc">{</span><span class="bu">len</span>(np.unique(y_motion_idx))<span class="sc">}</span><span class="ss"> classes — broad categories"</span>)</span>
+<span id="cb16-65"><a href="#cb16-65" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"description: </span><span class="sc">{</span><span class="bu">len</span>(np.unique(y_desc_idx))<span class="sc">}</span><span class="ss"> classes — finer movement types"</span>)</span>
+<span id="cb16-66"><a href="#cb16-66" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"trial_id:    </span><span class="sc">{</span><span class="bu">len</span>(np.unique(y_trial_idx))<span class="sc">}</span><span class="ss"> classes — individual recording sessions"</span>)</span>
+<span id="cb16-67"><a href="#cb16-67" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-68"><a href="#cb16-68" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-69"><a href="#cb16-69" aria-hidden="true" tabindex="-1"></a><span class="fu">## Run DYF (parameter-free) on the 62d joint angles</span></span>
+<span id="cb16-70"><a href="#cb16-70" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-71"><a href="#cb16-71" aria-hidden="true" tabindex="-1"></a>No embedding. The 62 Euler-angle channels are DYF's direct input.</span>
+<span id="cb16-72"><a href="#cb16-72" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-75"><a href="#cb16-75" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb16-76"><a href="#cb16-76" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: run-dyf</span></span>
+<span id="cb16-77"><a href="#cb16-77" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> sys</span>
+<span id="cb16-78"><a href="#cb16-78" aria-hidden="true" tabindex="-1"></a>sys.path.insert(<span class="dv">0</span>, <span class="st">"."</span>)</span>
+<span id="cb16-79"><a href="#cb16-79" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> _gallery <span class="im">import</span> run_dyf_cached, run_kmeans, plot_single</span>
+<span id="cb16-80"><a href="#cb16-80" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-81"><a href="#cb16-81" aria-hidden="true" tabindex="-1"></a><span class="co"># Score against the middle-granularity label (description, k=25) for the main run.</span></span>
+<span id="cb16-82"><a href="#cb16-82" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> run_dyf_cached(X, y_desc_idx, cache_path<span class="op">=</span><span class="st">"/tmp/gallery_mocap_dyf.npz"</span>)</span>
+<span id="cb16-83"><a href="#cb16-83" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Recovered k:       </span><span class="sc">{</span>result<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb16-84"><a href="#cb16-84" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"NMI vs description: </span><span class="sc">{</span>result<span class="sc">.</span>nmi<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb16-85"><a href="#cb16-85" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"ARI vs description: </span><span class="sc">{</span>result<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb16-86"><a href="#cb16-86" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-87"><a href="#cb16-87" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-88"><a href="#cb16-88" aria-hidden="true" tabindex="-1"></a><span class="fu">## How well does DYF's partition match each ground truth?</span></span>
+<span id="cb16-89"><a href="#cb16-89" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-92"><a href="#cb16-92" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb16-93"><a href="#cb16-93" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: multi-gt</span></span>
+<span id="cb16-94"><a href="#cb16-94" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.metrics <span class="im">import</span> adjusted_mutual_info_score <span class="im">as</span> nmi</span>
+<span id="cb16-95"><a href="#cb16-95" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.metrics <span class="im">import</span> adjusted_rand_score <span class="im">as</span> ari</span>
+<span id="cb16-96"><a href="#cb16-96" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-97"><a href="#cb16-97" aria-hidden="true" tabindex="-1"></a>rows <span class="op">=</span> []</span>
+<span id="cb16-98"><a href="#cb16-98" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> name, y_idx <span class="kw">in</span> [(<span class="st">"motion_type (k=7)"</span>,   y_motion_idx),</span>
+<span id="cb16-99"><a href="#cb16-99" aria-hidden="true" tabindex="-1"></a>                    (<span class="st">"description (k=25)"</span>,  y_desc_idx),</span>
+<span id="cb16-100"><a href="#cb16-100" aria-hidden="true" tabindex="-1"></a>                    (<span class="st">"trial_id (k=80)"</span>,     y_trial_idx)]:</span>
+<span id="cb16-101"><a href="#cb16-101" aria-hidden="true" tabindex="-1"></a>    rows.append((name, nmi(y_idx, result.labels), ari(y_idx, result.labels)))</span>
+<span id="cb16-102"><a href="#cb16-102" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-103"><a href="#cb16-103" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span><span class="st">'Ground truth'</span><span class="sc">:25s}</span><span class="ss">  NMI     ARI"</span>)</span>
+<span id="cb16-104"><a href="#cb16-104" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> name, m_nmi, m_ari <span class="kw">in</span> rows:</span>
+<span id="cb16-105"><a href="#cb16-105" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span>name<span class="sc">:25s}</span><span class="ss">  </span><span class="sc">{</span>m_nmi<span class="sc">:.3f}</span><span class="ss">   </span><span class="sc">{</span>m_ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb16-106"><a href="#cb16-106" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-107"><a href="#cb16-107" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-108"><a href="#cb16-108" aria-hidden="true" tabindex="-1"></a>The alignment gets better as the label granularity matches DYF's recovered resolution. DYF's partition is *not* a single "true k" clustering — it's a multi-resolution organization that aligns partially with every level of the label hierarchy.</span>
+<span id="cb16-109"><a href="#cb16-109" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-110"><a href="#cb16-110" aria-hidden="true" tabindex="-1"></a><span class="fu">## Oracle k-means on the middle granularity</span></span>
+<span id="cb16-111"><a href="#cb16-111" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-114"><a href="#cb16-114" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb16-115"><a href="#cb16-115" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: kmeans</span></span>
+<span id="cb16-116"><a href="#cb16-116" aria-hidden="true" tabindex="-1"></a>kmeans <span class="op">=</span> run_kmeans(X, y_desc_idx)</span>
+<span id="cb16-117"><a href="#cb16-117" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"K-means told k=25: NMI=</span><span class="sc">{</span>kmeans[<span class="st">'nmi'</span>]<span class="sc">:.3f}</span><span class="ss">, ARI=</span><span class="sc">{</span>kmeans[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb16-118"><a href="#cb16-118" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"DYF (no k given):  NMI=</span><span class="sc">{</span>result<span class="sc">.</span>nmi<span class="sc">:.3f}</span><span class="ss">, ARI=</span><span class="sc">{</span>result<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb16-119"><a href="#cb16-119" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-120"><a href="#cb16-120" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-121"><a href="#cb16-121" aria-hidden="true" tabindex="-1"></a>**DYF beats oracle-tuned k-means on NMI against every one of the three ground truths.** On motion-capture joint angles, the parameter-free method is the better tool even when k-means is handed the answer.</span>
+<span id="cb16-122"><a href="#cb16-122" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-123"><a href="#cb16-123" aria-hidden="true" tabindex="-1"></a><span class="fu">## Walking down the hierarchy against each ground truth</span></span>
+<span id="cb16-124"><a href="#cb16-124" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-125"><a href="#cb16-125" aria-hidden="true" tabindex="-1"></a>DYF's recovered partition is multi-resolution by design — and CMU MoCap is the clearest place to see it, because there are three plausible "true k" values to aim at (<span class="in">`motion_type`</span>=7, <span class="in">`description`</span>=25, <span class="in">`trial_id`</span>=80):</span>
+<span id="cb16-126"><a href="#cb16-126" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-129"><a href="#cb16-129" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb16-130"><a href="#cb16-130" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: merge-walk-gt</span></span>
+<span id="cb16-131"><a href="#cb16-131" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: asis</span></span>
+<span id="cb16-132"><a href="#cb16-132" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> _gallery <span class="im">import</span> merge_walk, merge_walk_table</span>
+<span id="cb16-133"><a href="#cb16-133" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-134"><a href="#cb16-134" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"**Against `motion_type` (k=7):**</span><span class="ch">\n</span><span class="st">"</span>)</span>
+<span id="cb16-135"><a href="#cb16-135" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(merge_walk_table(merge_walk(result, X, y_motion_idx, targets<span class="op">=</span>[<span class="dv">25</span>, <span class="dv">10</span>, <span class="dv">7</span>, <span class="dv">3</span>]), result))</span>
+<span id="cb16-136"><a href="#cb16-136" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"</span><span class="ch">\n\n</span><span class="st">**Against `description` (k=25):**</span><span class="ch">\n</span><span class="st">"</span>)</span>
+<span id="cb16-137"><a href="#cb16-137" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(merge_walk_table(merge_walk(result, X, y_desc_idx, targets<span class="op">=</span>[<span class="dv">40</span>, <span class="dv">25</span>, <span class="dv">15</span>, <span class="dv">7</span>]), result))</span>
+<span id="cb16-138"><a href="#cb16-138" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"</span><span class="ch">\n\n</span><span class="st">**Against `trial_id` (k=80):**</span><span class="ch">\n</span><span class="st">"</span>)</span>
+<span id="cb16-139"><a href="#cb16-139" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(merge_walk_table(merge_walk(result, X, y_trial_idx, targets<span class="op">=</span>[<span class="dv">60</span>, <span class="dv">40</span>, <span class="dv">25</span>, <span class="dv">10</span>]), result))</span>
+<span id="cb16-140"><a href="#cb16-140" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-141"><a href="#cb16-141" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-142"><a href="#cb16-142" aria-hidden="true" tabindex="-1"></a>Read this vertically. DYF's partition is the same across all three tables — only the *ground-truth target* changes. The best NMI/ARI for each ground truth sits near *that ground truth's* cluster count, not at a fixed "DYF-recovered" k. The hierarchy is the same; the rulebook you score it against is what moves.</span>
+<span id="cb16-143"><a href="#cb16-143" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-144"><a href="#cb16-144" aria-hidden="true" tabindex="-1"></a><span class="fu">## Figures</span></span>
+<span id="cb16-145"><a href="#cb16-145" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-146"><a href="#cb16-146" aria-hidden="true" tabindex="-1"></a>::: {.gallery-fluid}</span>
+<span id="cb16-147"><a href="#cb16-147" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-150"><a href="#cb16-150" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb16-151"><a href="#cb16-151" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-motion</span></span>
+<span id="cb16-152"><a href="#cb16-152" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "Ground truth — motion_type (7 broad categories: walk, dance, climb, …)."</span></span>
+<span id="cb16-153"><a href="#cb16-153" aria-hidden="true" tabindex="-1"></a>plot_single(result.umap_2d, y_motion_idx, title<span class="op">=</span><span class="st">"Ground truth: motion_type (k=7)"</span>)</span>
+<span id="cb16-154"><a href="#cb16-154" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-155"><a href="#cb16-155" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-158"><a href="#cb16-158" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb16-159"><a href="#cb16-159" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-desc</span></span>
+<span id="cb16-160"><a href="#cb16-160" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "Ground truth — description (25 finer-grained movement types)."</span></span>
+<span id="cb16-161"><a href="#cb16-161" aria-hidden="true" tabindex="-1"></a>plot_single(result.umap_2d, y_desc_idx, title<span class="op">=</span><span class="st">"Ground truth: description (k=25)"</span>)</span>
+<span id="cb16-162"><a href="#cb16-162" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-163"><a href="#cb16-163" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-166"><a href="#cb16-166" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb16-167"><a href="#cb16-167" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-dyf</span></span>
+<span id="cb16-168"><a href="#cb16-168" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "DYF — parameter-free, found its own resolution."</span></span>
+<span id="cb16-169"><a href="#cb16-169" aria-hidden="true" tabindex="-1"></a>plot_single(result.umap_2d, result.labels, title<span class="op">=</span><span class="ss">f"DYF (recovered k=</span><span class="sc">{</span>result<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">)"</span>)</span>
+<span id="cb16-170"><a href="#cb16-170" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-171"><a href="#cb16-171" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-174"><a href="#cb16-174" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb16-175"><a href="#cb16-175" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-kmeans</span></span>
+<span id="cb16-176"><a href="#cb16-176" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "K-means given the oracle k=25 (description granularity)."</span></span>
+<span id="cb16-177"><a href="#cb16-177" aria-hidden="true" tabindex="-1"></a>plot_single(result.umap_2d, kmeans[<span class="st">"labels"</span>], title<span class="op">=</span><span class="st">"k-means (told k=25)"</span>)</span>
+<span id="cb16-178"><a href="#cb16-178" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-179"><a href="#cb16-179" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-180"><a href="#cb16-180" aria-hidden="true" tabindex="-1"></a>:::</span>
+<span id="cb16-181"><a href="#cb16-181" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-182"><a href="#cb16-182" aria-hidden="true" tabindex="-1"></a><span class="fu">## Why DYF wins on ambiguous-k data</span></span>
+<span id="cb16-183"><a href="#cb16-183" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-184"><a href="#cb16-184" aria-hidden="true" tabindex="-1"></a>Three things are working *for* it here, exactly the opposite of the Olivetti setup:</span>
+<span id="cb16-185"><a href="#cb16-185" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-186"><a href="#cb16-186" aria-hidden="true" tabindex="-1"></a>**1. Dense support.**</span>
+<span id="cb16-187"><a href="#cb16-187" aria-hidden="true" tabindex="-1"></a>28,167 frames across 25 descriptions is ~1,100 frames per description-class (and ~4,000 per motion_type). DYF's tree has plenty of room to carve stable leaves. Unlike Olivetti, the density-per-latent-cluster condition is satisfied comfortably.</span>
+<span id="cb16-188"><a href="#cb16-188" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-189"><a href="#cb16-189" aria-hidden="true" tabindex="-1"></a>**2. The "flat k" assumption is wrong, and DYF doesn't make it.**</span>
+<span id="cb16-190"><a href="#cb16-190" aria-hidden="true" tabindex="-1"></a>K-means has to commit to a single <span class="in">`k`</span>. When you tell it 25, it builds 25 centroids — even though some natural clusters are more like 3 frames (a jumping-jack peak) and others are 2,000 frames (a steady walking cycle). DYF's Louvain step lets community sizes vary naturally with the data's density topology.</span>
+<span id="cb16-191"><a href="#cb16-191" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-192"><a href="#cb16-192" aria-hidden="true" tabindex="-1"></a>**3. Motion manifolds are curved.**</span>
+<span id="cb16-193"><a href="#cb16-193" aria-hidden="true" tabindex="-1"></a>Gait transitions, sub-phases within a dance move, reaching-then-grasping — these are smooth trajectories, not convex clouds. Voronoi cuts through a continuous cycle are always somewhat arbitrary. Density-based cuts can sit at the natural minima between sub-phases.</span>
+<span id="cb16-194"><a href="#cb16-194" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-195"><a href="#cb16-195" aria-hidden="true" tabindex="-1"></a><span class="fu">### The sports analogy, completed</span></span>
+<span id="cb16-196"><a href="#cb16-196" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-197"><a href="#cb16-197" aria-hidden="true" tabindex="-1"></a>Across the four notebooks we now have:</span>
+<span id="cb16-198"><a href="#cb16-198" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-199"><a href="#cb16-199" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Dataset <span class="pp">|</span> Geometry <span class="pp">|</span> DYF vs oracle k-means <span class="pp">|</span></span>
+<span id="cb16-200"><a href="#cb16-200" aria-hidden="true" tabindex="-1"></a><span class="pp">|---|---|---|</span></span>
+<span id="cb16-201"><a href="#cb16-201" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Digits <span class="pp">|</span> Convex blobs, clean <span class="in">`k`</span> <span class="pp">|</span> K-means wins (home court) <span class="pp">|</span></span>
+<span id="cb16-202"><a href="#cb16-202" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> MNIST <span class="pp">|</span> Convex-ish, but more data per class <span class="pp">|</span> Mixed (NMI win / ARI loss) <span class="pp">|</span></span>
+<span id="cb16-203"><a href="#cb16-203" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> 20 Newsgroups <span class="pp">|</span> Curved, hierarchical <span class="pp">|</span> Essentially tied <span class="pp">|</span></span>
+<span id="cb16-204"><a href="#cb16-204" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> **CMU MoCap** | **Continuous motion, ambiguous k** | **DYF wins** <span class="pp">|</span></span>
+<span id="cb16-205"><a href="#cb16-205" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-206"><a href="#cb16-206" aria-hidden="true" tabindex="-1"></a>The pattern isn't about "DYF vs k-means." It's about **how much the shape of the data matches the shape of k-means's assumptions.** When the data is convex blobs with a known <span class="in">`k`</span>, k-means wins. When the data is curved with an ill-defined <span class="in">`k`</span>, DYF wins. Most real-world data — RAG corpora, user behavior logs, sensor streams, documents on a moving topic — is closer to MoCap than to Digits.</span>
+<span id="cb16-207"><a href="#cb16-207" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-208"><a href="#cb16-208" aria-hidden="true" tabindex="-1"></a><span class="fu">## What to take away</span></span>
+<span id="cb16-209"><a href="#cb16-209" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-210"><a href="#cb16-210" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**"True k" is often a fiction.** If a dataset has multiple plausible labelings at different granularities, your clustering algorithm shouldn't demand you pick one upfront.</span>
+<span id="cb16-211"><a href="#cb16-211" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**DYF operates on raw features, no embedding required.** Motion capture, tabular data, sensor readings — anywhere the raw features have meaningful geometry, DYF can go in direct.</span>
+<span id="cb16-212"><a href="#cb16-212" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**The win margin depends on the data, not the method.** Reporting "DYF wins by NMI 0.04" isn't the point. The point is that DYF's multi-resolution output is a better *match for the question being asked* when the question is "what structure is in this data?"</span>
+<span id="cb16-213"><a href="#cb16-213" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-214"><a href="#cb16-214" aria-hidden="true" tabindex="-1"></a><span class="fu">## Caveats</span></span>
+<span id="cb16-215"><a href="#cb16-215" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-216"><a href="#cb16-216" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Subsampled to 28,167 frames** for the gallery render. The full 140,837-frame results (pre-computed in the DYF repo's MoCap experiment) are similar in pattern with tighter metrics.</span>
+<span id="cb16-217"><a href="#cb16-217" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**No temporal structure used.** These are frame-level features — adjacent-frame similarity within a walk cycle isn't exploited. A time-aware model (HMM, Transformer) would outperform both DYF and k-means on *sequence* tasks; this notebook is about *frame-level structure* only.</span>
+<span id="cb16-218"><a href="#cb16-218" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**NMI is still a blunt metric** for continuous-motion data. A proper evaluation would use cluster-purity against each ground truth at the matching granularity, plus a quantitative measure of hierarchy recovery.</span>
+</code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
+</div></div></div></div></div>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

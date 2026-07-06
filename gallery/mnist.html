@@ -1,0 +1,1630 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.38">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>MNIST</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-cf35b1e8b68dd0c452cd246239eb2ea9.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-f1a5c2bb43452cd3d80060817c0f5863.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-cf35b1e8b68dd0c452cd246239eb2ea9.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-de8f194416f18390ac7758f973fc7675.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-eb587815051a02b7a77ac6fc122ec681.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../site_libs/bootstrap/bootstrap-de8f194416f18390ac7758f973fc7675.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-QXBFEQPED2"></script>
+
+<script type="text/javascript">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
+</script>
+
+
+</head>
+
+<body class="nav-fixed quarto-light"><script id="quarto-html-before-body" type="application/javascript">
+    const toggleBodyColorMode = (bsSheetEl) => {
+      const mode = bsSheetEl.getAttribute("data-mode");
+      const bodyEl = window.document.querySelector("body");
+      if (mode === "dark") {
+        bodyEl.classList.add("quarto-dark");
+        bodyEl.classList.remove("quarto-light");
+      } else {
+        bodyEl.classList.add("quarto-light");
+        bodyEl.classList.remove("quarto-dark");
+      }
+    }
+    const toggleBodyColorPrimary = () => {
+      const bsSheetEl = window.document.querySelector("link#quarto-bootstrap:not([rel=disabled-stylesheet])");
+      if (bsSheetEl) {
+        toggleBodyColorMode(bsSheetEl);
+      }
+    }
+    const setColorSchemeToggle = (alternate) => {
+      const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+      for (let i=0; i < toggles.length; i++) {
+        const toggle = toggles[i];
+        if (toggle) {
+          if (alternate) {
+            toggle.classList.add("alternate");
+          } else {
+            toggle.classList.remove("alternate");
+          }
+        }
+      }
+    };
+    const toggleColorMode = (alternate) => {
+      // Switch the stylesheets
+      const primaryStylesheets = window.document.querySelectorAll('link.quarto-color-scheme:not(.quarto-color-alternate)');
+      const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+      manageTransitions('#quarto-margin-sidebar .nav-link', false);
+      if (alternate) {
+        // note: dark is layered on light, we don't disable primary!
+        enableStylesheet(alternateStylesheets);
+        for (const sheetNode of alternateStylesheets) {
+          if (sheetNode.id === "quarto-bootstrap") {
+            toggleBodyColorMode(sheetNode);
+          }
+        }
+      } else {
+        disableStylesheet(alternateStylesheets);
+        enableStylesheet(primaryStylesheets)
+        toggleBodyColorPrimary();
+      }
+      manageTransitions('#quarto-margin-sidebar .nav-link', true);
+      // Switch the toggles
+      setColorSchemeToggle(alternate)
+      // Hack to workaround the fact that safari doesn't
+      // properly recolor the scrollbar when toggling (#1455)
+      if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+        manageTransitions("body", false);
+        window.scrollTo(0, 1);
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          manageTransitions("body", true);
+        }, 40);
+      }
+    }
+    const disableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        stylesheet.rel = 'disabled-stylesheet';
+      }
+    }
+    const enableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        if(stylesheet.rel !== 'stylesheet') { // for Chrome, which will still FOUC without this check
+          stylesheet.rel = 'stylesheet';
+        }
+      }
+    }
+    const manageTransitions = (selector, allowTransitions) => {
+      const els = window.document.querySelectorAll(selector);
+      for (let i=0; i < els.length; i++) {
+        const el = els[i];
+        if (allowTransitions) {
+          el.classList.remove('notransition');
+        } else {
+          el.classList.add('notransition');
+        }
+      }
+    }
+    const isFileUrl = () => {
+      return window.location.protocol === 'file:';
+    }
+    const hasAlternateSentinel = () => {
+      let styleSentinel = getColorSchemeSentinel();
+      if (styleSentinel !== null) {
+        return styleSentinel === "alternate";
+      } else {
+        return false;
+      }
+    }
+    const setStyleSentinel = (alternate) => {
+      const value = alternate ? "alternate" : "default";
+      if (!isFileUrl()) {
+        window.localStorage.setItem("quarto-color-scheme", value);
+      } else {
+        localAlternateSentinel = value;
+      }
+    }
+    const getColorSchemeSentinel = () => {
+      if (!isFileUrl()) {
+        const storageValue = window.localStorage.getItem("quarto-color-scheme");
+        return storageValue != null ? storageValue : localAlternateSentinel;
+      } else {
+        return localAlternateSentinel;
+      }
+    }
+    const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+      const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+      const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+      let newTheme = '';
+      if(authorPrefersDark) {
+        newTheme = isAlternate ? baseTheme : alternateTheme;
+      } else {
+        newTheme = isAlternate ? alternateTheme : baseTheme;
+      }
+      const changeGiscusTheme = () => {
+        // From: https://github.com/giscus/giscus/issues/336
+        const sendMessage = (message) => {
+          const iframe = document.querySelector('iframe.giscus-frame');
+          if (!iframe) return;
+          iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+        }
+        sendMessage({
+          setConfig: {
+            theme: newTheme
+          }
+        });
+      }
+      const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+      if (isGiscussLoaded) {
+        changeGiscusTheme();
+      }
+    };
+    const authorPrefersDark = false;
+    const darkModeDefault = authorPrefersDark;
+      document.querySelector('link#quarto-text-highlighting-styles.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+      document.querySelector('link#quarto-bootstrap.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+    let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+    // Dark / light mode switch
+    window.quartoToggleColorScheme = () => {
+      // Read the current dark / light value
+      let toAlternate = !hasAlternateSentinel();
+      toggleColorMode(toAlternate);
+      setStyleSentinel(toAlternate);
+      toggleGiscusIfUsed(toAlternate, darkModeDefault);
+      window.dispatchEvent(new Event('resize'));
+    };
+    // Switch to dark mode if need be
+    if (hasAlternateSentinel()) {
+      toggleColorMode(true);
+    } else {
+      toggleColorMode(false);
+    }
+  </script>
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a href="../index.html" class="navbar-brand navbar-brand-logo">
+    <img src="../dyf_logo.svg" alt="DYF" class="navbar-logo light-content">
+    <img src="../dyf_logo.svg" alt="DYF" class="navbar-logo dark-content">
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../getting-started.html"> 
+<span class="menu-text">Getting Started</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../how-it-works.html"> 
+<span class="menu-text">How It Works</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../gallery/index.html"> 
+<span class="menu-text">Gallery</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../reference/index.html"> 
+<span class="menu-text">API Reference</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/jdonaldson/dyf"> <i class="bi bi-github" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#load-mnist" id="toc-load-mnist" class="nav-link active" data-scroll-target="#load-mnist">Load MNIST</a></li>
+  <li><a href="#run-dyf" id="toc-run-dyf" class="nav-link" data-scroll-target="#run-dyf">Run DYF</a></li>
+  <li><a href="#oracle-k-means" id="toc-oracle-k-means" class="nav-link" data-scroll-target="#oracle-k-means">Oracle k-means</a></li>
+  <li><a href="#figures" id="toc-figures" class="nav-link" data-scroll-target="#figures">Figures</a></li>
+  <li><a href="#metrics" id="toc-metrics" class="nav-link" data-scroll-target="#metrics">Metrics</a></li>
+  <li><a href="#deep-dive-what-are-dyfs-71-extra-clusters" id="toc-deep-dive-what-are-dyfs-71-extra-clusters" class="nav-link" data-scroll-target="#deep-dive-what-are-dyfs-71-extra-clusters">Deep dive: what are DYF’s 71 extra clusters?</a>
+  <ul class="collapse">
+  <li><a href="#first-the-statistical-audit" id="toc-first-the-statistical-audit" class="nav-link" data-scroll-target="#first-the-statistical-audit">First, the statistical audit</a></li>
+  <li><a href="#sub-clusters-of-the-digit-7" id="toc-sub-clusters-of-the-digit-7" class="nav-link" data-scroll-target="#sub-clusters-of-the-digit-7">Sub-clusters of the digit 7</a></li>
+  <li><a href="#the-same-digit-from-k-means" id="toc-the-same-digit-from-k-means" class="nav-link" data-scroll-target="#the-same-digit-from-k-means">The same digit, from k-means</a></li>
+  <li><a href="#why-this-matters" id="toc-why-this-matters" class="nav-link" data-scroll-target="#why-this-matters">Why this matters</a></li>
+  </ul></li>
+  <li><a href="#walking-down-the-hierarchy" id="toc-walking-down-the-hierarchy" class="nav-link" data-scroll-target="#walking-down-the-hierarchy">Walking down the hierarchy</a></li>
+  <li><a href="#what-happened-to-the-digits-story" id="toc-what-happened-to-the-digits-story" class="nav-link" data-scroll-target="#what-happened-to-the-digits-story">What happened to the Digits story?</a>
+  <ul class="collapse">
+  <li><a href="#the-over-partitioning-question" id="toc-the-over-partitioning-question" class="nav-link" data-scroll-target="#the-over-partitioning-question">The over-partitioning question</a></li>
+  <li><a href="#why-did-this-happen-at-70k-but-not-at-1797" id="toc-why-did-this-happen-at-70k-but-not-at-1797" class="nav-link" data-scroll-target="#why-did-this-happen-at-70k-but-not-at-1797">Why did this happen at 70K but not at 1,797?</a></li>
+  <li><a href="#what-would-you-actually-want-in-a-real-application" id="toc-what-would-you-actually-want-in-a-real-application" class="nav-link" data-scroll-target="#what-would-you-actually-want-in-a-real-application">What would you actually want in a real application?</a></li>
+  <li><a href="#the-sports-analogy-update" id="toc-the-sports-analogy-update" class="nav-link" data-scroll-target="#the-sports-analogy-update">The sports analogy update</a></li>
+  </ul></li>
+  <li><a href="#caveats" id="toc-caveats" class="nav-link" data-scroll-target="#caveats">Caveats</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<div class="quarto-title-block"><div><h1 class="title">MNIST</h1><button type="button" class="btn code-tools-button dropdown-toggle" id="quarto-code-tools-menu" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi"></i> Code</button><ul class="dropdown-menu dropdown-menu-end" aria-labelelledby="quarto-code-tools-menu"><li><a id="quarto-show-all-code" class="dropdown-item" href="javascript:void(0)" role="button">Show All Code</a></li><li><a id="quarto-hide-all-code" class="dropdown-item" href="javascript:void(0)" role="button">Hide All Code</a></li><li><hr class="dropdown-divider"></li><li><a id="quarto-view-source" class="dropdown-item" href="javascript:void(0)" role="button">View Source</a></li></ul></div></div>
+<p class="subtitle lead">70,000 handwritten digits, 28×28 pixel vectors, k=10 ground truth.</p>
+  <div class="quarto-categories">
+    <div class="quarto-category">images</div>
+    <div class="quarto-category">large</div>
+    <div class="quarto-category">pixels</div>
+  </div>
+  </div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>The scaled-up version of <a href="../gallery/digits.html">Digits</a>. Same domain, same task, same <code>k=10</code> — but 40× more samples and 12× higher pixel dimensionality. Does DYF’s parameter-free story survive the jump in scale, or does it fall apart under a heavier load?</p>
+<p>Short answer, as we’ll see: DYF <em>inverts</em> the digits result on one axis and keeps losing on the other. It’s not the clean extension of the Digits story — it’s a twist.</p>
+<section id="load-mnist" class="level2">
+<h2 class="anchored" data-anchor-id="load-mnist">Load MNIST</h2>
+<div id="load" class="cell" data-execution_count="1">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> os</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>CACHE <span class="op">=</span> <span class="st">"/tmp/gallery_mnist.npz"</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> os.path.exists(CACHE):</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    z <span class="op">=</span> np.load(CACHE)</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    X, y <span class="op">=</span> z[<span class="st">"X"</span>], z[<span class="st">"y"</span>]</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="cf">else</span>:</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    <span class="im">from</span> sklearn.datasets <span class="im">import</span> fetch_openml</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    m <span class="op">=</span> fetch_openml(<span class="st">"mnist_784"</span>, version<span class="op">=</span><span class="dv">1</span>, as_frame<span class="op">=</span><span class="va">False</span>, parser<span class="op">=</span><span class="st">"auto"</span>)</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>    X <span class="op">=</span> (m.data.astype(np.float32) <span class="op">/</span> <span class="fl">255.0</span>)   <span class="co"># normalize pixels to [0, 1]</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>    y <span class="op">=</span> m.target.astype(<span class="bu">int</span>)</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>    np.savez(CACHE, X<span class="op">=</span>X, y<span class="op">=</span>y)</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span>X<span class="sc">.</span>shape[<span class="dv">0</span>]<span class="sc">:,}</span><span class="ss"> samples, </span><span class="sc">{</span>X<span class="sc">.</span>shape[<span class="dv">1</span>]<span class="sc">}</span><span class="ss">d, true k = </span><span class="sc">{</span><span class="bu">len</span>(<span class="bu">set</span>(y))<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>70,000 samples, 784d, true k = 10</code></pre>
+</div>
+</div>
+</section>
+<section id="run-dyf" class="level2">
+<h2 class="anchored" data-anchor-id="run-dyf">Run DYF</h2>
+<div id="run-dyf" class="cell" data-execution_count="2">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> sys</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>sys.path.insert(<span class="dv">0</span>, <span class="st">"."</span>)</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> _gallery <span class="im">import</span> run_dyf_cached, run_kmeans, plot_single, metrics_table</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> run_dyf_cached(X, y, cache_path<span class="op">=</span><span class="st">"/tmp/gallery_mnist_dyf.npz"</span>)</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Recovered k: </span><span class="sc">{</span>result<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">  (true k = </span><span class="sc">{</span>result<span class="sc">.</span>true_k<span class="sc">}</span><span class="ss">)"</span>)</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"NMI:         </span><span class="sc">{</span>result<span class="sc">.</span>nmi<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"ARI:         </span><span class="sc">{</span>result<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>Recovered k: 86  (true k = 10)
+NMI:         0.546
+ARI:         0.183</code></pre>
+</div>
+</div>
+</section>
+<section id="oracle-k-means" class="level2">
+<h2 class="anchored" data-anchor-id="oracle-k-means">Oracle k-means</h2>
+<div id="kmeans" class="cell" data-execution_count="3">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>kmeans <span class="op">=</span> run_kmeans(X, y)</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"k-means NMI=</span><span class="sc">{</span>kmeans[<span class="st">'nmi'</span>]<span class="sc">:.3f}</span><span class="ss">, ARI=</span><span class="sc">{</span>kmeans[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss"> (told k=</span><span class="sc">{</span>result<span class="sc">.</span>true_k<span class="sc">}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>k-means NMI=0.491, ARI=0.361 (told k=10)</code></pre>
+</div>
+</div>
+</section>
+<section id="figures" class="level2">
+<h2 class="anchored" data-anchor-id="figures">Figures</h2>
+<div class="gallery-fluid">
+<div id="cell-fig-truth" class="cell" data-execution_count="4">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>plot_single(result.umap_2d, y, title<span class="op">=</span><span class="ss">f"Ground truth (k=</span><span class="sc">{</span>result<span class="sc">.</span>true_k<span class="sc">}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-display" data-execution_count="4">
+<div id="fig-truth" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-truth-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="mnist_files/figure-html/fig-truth-output-1.png" width="470" height="470" class="figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-truth-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: Ground truth — each of the 10 digit classes.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div id="cell-fig-dyf" class="cell" data-execution_count="5">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>plot_single(result.umap_2d, result.labels, title<span class="op">=</span><span class="ss">f"DYF (recovered k=</span><span class="sc">{</span>result<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-display" data-execution_count="5">
+<div id="fig-dyf" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-dyf-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="mnist_files/figure-html/fig-dyf-output-1.png" width="470" height="470" class="figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-dyf-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;2: DYF — parameter-free, no k supplied.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div id="cell-fig-kmeans" class="cell" data-execution_count="6">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>plot_single(result.umap_2d, kmeans[<span class="st">"labels"</span>], title<span class="op">=</span><span class="ss">f"k-means (told k=</span><span class="sc">{</span>result<span class="sc">.</span>true_k<span class="sc">}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-display" data-execution_count="6">
+<div id="fig-kmeans" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-kmeans-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="mnist_files/figure-html/fig-kmeans-output-1.png" width="470" height="470" class="figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-kmeans-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;3: K-means given the oracle k=10.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="metrics" class="level2">
+<h2 class="anchored" data-anchor-id="metrics">Metrics</h2>
+<div id="metrics" class="cell" data-execution_count="7">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(metrics_table(result, kmeans, <span class="va">None</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<table class="caption-top table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th>Method</th>
+<th style="text-align: right;">Recovered k</th>
+<th style="text-align: right;">NMI</th>
+<th style="text-align: right;">ARI</th>
+<th style="text-align: right;">% discarded</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>DYF</strong> (parameter-free)</td>
+<td style="text-align: right;">86</td>
+<td style="text-align: right;">0.546</td>
+<td style="text-align: right;">0.183</td>
+<td style="text-align: right;">0%</td>
+</tr>
+<tr class="even">
+<td>k-means (oracle k=10)</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.491</td>
+<td style="text-align: right;">0.361</td>
+<td style="text-align: right;">0%</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="deep-dive-what-are-dyfs-71-extra-clusters" class="level2">
+<h2 class="anchored" data-anchor-id="deep-dive-what-are-dyfs-71-extra-clusters">Deep dive: what are DYF’s 71 extra clusters?</h2>
+<p>Every other notebook in this gallery <em>tells</em> you DYF’s over-partitioning finds sub-style structure. This section shows it.</p>
+<section id="first-the-statistical-audit" class="level3">
+<h3 class="anchored" data-anchor-id="first-the-statistical-audit">First, the statistical audit</h3>
+<p>If DYF’s 81 clusters are genuine sub-structure, they should be <em>pure</em> — each cluster dominated by one digit class. If they’re noise, they should be mixed bags.</p>
+<div id="purity-audit" class="cell" data-execution_count="8">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> collections <span class="im">import</span> Counter</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>labels <span class="op">=</span> result.labels</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>rows <span class="op">=</span> []</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> cid <span class="kw">in</span> <span class="bu">sorted</span>(<span class="bu">set</span>(labels)):</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>    mask <span class="op">=</span> labels <span class="op">==</span> cid</span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>    n <span class="op">=</span> <span class="bu">int</span>(mask.<span class="bu">sum</span>())</span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> n <span class="op">==</span> <span class="dv">0</span>:</span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>        <span class="cf">continue</span></span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>    vals, cnts <span class="op">=</span> np.unique(y[mask], return_counts<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>    rows.append({<span class="st">"cid"</span>: cid, <span class="st">"n"</span>: n, <span class="st">"dominant"</span>: <span class="bu">int</span>(vals[np.argmax(cnts)]),</span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a>                 <span class="st">"purity"</span>: cnts.<span class="bu">max</span>() <span class="op">/</span> n})</span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a>r80 <span class="op">=</span> <span class="bu">sum</span>(<span class="dv">1</span> <span class="cf">for</span> r <span class="kw">in</span> rows <span class="cf">if</span> r[<span class="st">"purity"</span>] <span class="op">&gt;</span> <span class="fl">0.80</span>)</span>
+<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a>r90 <span class="op">=</span> <span class="bu">sum</span>(<span class="dv">1</span> <span class="cf">for</span> r <span class="kw">in</span> rows <span class="cf">if</span> r[<span class="st">"purity"</span>] <span class="op">&gt;</span> <span class="fl">0.90</span>)</span>
+<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a>r95 <span class="op">=</span> <span class="bu">sum</span>(<span class="dv">1</span> <span class="cf">for</span> r <span class="kw">in</span> rows <span class="cf">if</span> r[<span class="st">"purity"</span>] <span class="op">&gt;</span> <span class="fl">0.95</span>)</span>
+<span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a>weighted <span class="op">=</span> <span class="bu">sum</span>(r[<span class="st">"purity"</span>] <span class="op">*</span> r[<span class="st">"n"</span>] <span class="cf">for</span> r <span class="kw">in</span> rows) <span class="op">/</span> <span class="bu">sum</span>(r[<span class="st">"n"</span>] <span class="cf">for</span> r <span class="kw">in</span> rows)</span>
+<span id="cb11-19"><a href="#cb11-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-20"><a href="#cb11-20" aria-hidden="true" tabindex="-1"></a>digit_counts <span class="op">=</span> Counter(r[<span class="st">"dominant"</span>] <span class="cf">for</span> r <span class="kw">in</span> rows)</span>
+<span id="cb11-21"><a href="#cb11-21" aria-hidden="true" tabindex="-1"></a>per_digit <span class="op">=</span> <span class="st">", "</span>.join(<span class="ss">f"</span><span class="sc">{</span>d<span class="sc">}</span><span class="ss">×</span><span class="sc">{</span>n<span class="sc">}</span><span class="ss">"</span> <span class="cf">for</span> d, n <span class="kw">in</span> <span class="bu">sorted</span>(digit_counts.items()))</span>
+<span id="cb11-22"><a href="#cb11-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-23"><a href="#cb11-23" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"**</span><span class="sc">{</span><span class="bu">len</span>(rows)<span class="sc">}</span><span class="ss"> DYF clusters. Weighted purity: </span><span class="sc">{</span>weighted<span class="sc">:.3f}</span><span class="ss">.**</span><span class="ch">\n</span><span class="ss">"</span>)</span>
+<span id="cb11-24"><a href="#cb11-24" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"- </span><span class="sc">{</span>r80<span class="sc">}</span><span class="ss">/</span><span class="sc">{</span><span class="bu">len</span>(rows)<span class="sc">}</span><span class="ss"> clusters are &gt;80% pure (dominated by one digit)</span><span class="ch">\n</span><span class="ss">"</span>)</span>
+<span id="cb11-25"><a href="#cb11-25" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"- </span><span class="sc">{</span>r90<span class="sc">}</span><span class="ss">/</span><span class="sc">{</span><span class="bu">len</span>(rows)<span class="sc">}</span><span class="ss"> are &gt;90% pure</span><span class="ch">\n</span><span class="ss">"</span>)</span>
+<span id="cb11-26"><a href="#cb11-26" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"- </span><span class="sc">{</span>r95<span class="sc">}</span><span class="ss">/</span><span class="sc">{</span><span class="bu">len</span>(rows)<span class="sc">}</span><span class="ss"> are &gt;95% pure</span><span class="ch">\n</span><span class="ss">"</span>)</span>
+<span id="cb11-27"><a href="#cb11-27" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"- Sub-clusters per digit: </span><span class="sc">{</span>per_digit<span class="sc">}</span><span class="ch">\n</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<p><strong>86 DYF clusters. Weighted purity: 0.850.</strong></p>
+<ul>
+<li><p>61/86 clusters are &gt;80% pure (dominated by one digit)</p></li>
+<li><p>49/86 are &gt;90% pure</p></li>
+<li><p>25/86 are &gt;95% pure</p></li>
+<li><p>Sub-clusters per digit: 0×5, 1×5, 2×15, 3×14, 4×8, 5×11, 6×9, 7×4, 8×9, 9×6</p></li>
+</ul>
+</div>
+<p>Each DYF cluster has a clear “home” digit. That’s the first sign the partition is meaningful — 88% of points land in a cluster dominated by their true class. Now the visual test.</p>
+</section>
+<section id="sub-clusters-of-the-digit-7" class="level3">
+<h3 class="anchored" data-anchor-id="sub-clusters-of-the-digit-7">Sub-clusters of the digit 7</h3>
+<p>DYF split the digit 7 into multiple sub-clusters. Here are the largest of the high-purity ones, rendered as random samples from each:</p>
+<div id="seven-subs" class="cell" data-execution_count="9">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Find all DYF clusters where digit 7 is dominant, sorted by cluster size</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>seven_subs <span class="op">=</span> <span class="bu">sorted</span>(</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>    [r <span class="cf">for</span> r <span class="kw">in</span> rows <span class="cf">if</span> r[<span class="st">"dominant"</span>] <span class="op">==</span> <span class="dv">7</span> <span class="kw">and</span> r[<span class="st">"purity"</span>] <span class="op">&gt;</span> <span class="fl">0.9</span>],</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>    key<span class="op">=</span><span class="kw">lambda</span> r: <span class="op">-</span>r[<span class="st">"n"</span>],</span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"DYF produced </span><span class="sc">{</span><span class="bu">len</span>(seven_subs)<span class="sc">}</span><span class="ss"> high-purity (&gt;90%) sub-cluster(s) of digit 7; showing up to the 3 largest:</span><span class="ch">\n</span><span class="ss">"</span>)</span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> s <span class="kw">in</span> seven_subs[:<span class="dv">3</span>]:</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"- cluster </span><span class="sc">{</span>s[<span class="st">'cid'</span>]<span class="sc">}</span><span class="ss">: </span><span class="sc">{</span>s[<span class="st">'n'</span>]<span class="sc">}</span><span class="ss"> samples, </span><span class="sc">{</span>s[<span class="st">'purity'</span>]<span class="sc">:.0%}</span><span class="ss"> are 7s"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<p>DYF produced 1 high-purity (&gt;90%) sub-cluster(s) of digit 7; showing up to the 3 largest:</p>
+<ul>
+<li>cluster 0: 2325 samples, 98% are 7s</li>
+</ul>
+</div>
+<div class="gallery-fluid">
+<div id="fig-seven-a" class="cell quarto-float quarto-figure quarto-figure-center anchored" data-execution_count="10">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-seven-a-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> _gallery <span class="im">import</span> image_grid</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="bu">len</span>(seven_subs) <span class="op">&gt;=</span> <span class="dv">1</span>:</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>    idx <span class="op">=</span> np.where(result.labels <span class="op">==</span> seven_subs[<span class="dv">0</span>][<span class="st">"cid"</span>])[<span class="dv">0</span>]</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>    image_grid(X, idx, title<span class="op">=</span><span class="ss">f"DYF cluster </span><span class="sc">{</span>seven_subs[<span class="dv">0</span>][<span class="st">'cid'</span>]<span class="sc">}</span><span class="ss"> (n=</span><span class="sc">{</span>seven_subs[<span class="dv">0</span>][<span class="st">'n'</span>]<span class="sc">}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig quarto-uncaptioned" id="fig-seven-a-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;4
+</figcaption>
+</figure>
+</div>
+<div id="fig-seven-b" class="cell quarto-float quarto-figure quarto-figure-center anchored" data-execution_count="11">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-seven-b-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="bu">len</span>(seven_subs) <span class="op">&gt;=</span> <span class="dv">2</span>:</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>    idx <span class="op">=</span> np.where(result.labels <span class="op">==</span> seven_subs[<span class="dv">1</span>][<span class="st">"cid"</span>])[<span class="dv">0</span>]</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>    image_grid(X, idx, title<span class="op">=</span><span class="ss">f"DYF cluster </span><span class="sc">{</span>seven_subs[<span class="dv">1</span>][<span class="st">'cid'</span>]<span class="sc">}</span><span class="ss"> (n=</span><span class="sc">{</span>seven_subs[<span class="dv">1</span>][<span class="st">'n'</span>]<span class="sc">}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig quarto-uncaptioned" id="fig-seven-b-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;5
+</figcaption>
+</figure>
+</div>
+<div id="fig-seven-c" class="cell quarto-float quarto-figure quarto-figure-center anchored" data-execution_count="12">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-seven-c-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="bu">len</span>(seven_subs) <span class="op">&gt;=</span> <span class="dv">3</span>:</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>    idx <span class="op">=</span> np.where(result.labels <span class="op">==</span> seven_subs[<span class="dv">2</span>][<span class="st">"cid"</span>])[<span class="dv">0</span>]</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>    image_grid(X, idx, title<span class="op">=</span><span class="ss">f"DYF cluster </span><span class="sc">{</span>seven_subs[<span class="dv">2</span>][<span class="st">'cid'</span>]<span class="sc">}</span><span class="ss"> (n=</span><span class="sc">{</span>seven_subs[<span class="dv">2</span>][<span class="st">'n'</span>]<span class="sc">}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig quarto-uncaptioned" id="fig-seven-c-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;6
+</figcaption>
+</figure>
+</div>
+</div>
+<p>Look at the three grids. Each is <em>visibly</em> a distinct handwriting style — stroke weight, slant, proportion, top-hook shape. These aren’t random slices of a single 7-population; they’re stylistic sub-communities that the flat “is a 7” label has no way to express.</p>
+</section>
+<section id="the-same-digit-from-k-means" class="level3">
+<h3 class="anchored" data-anchor-id="the-same-digit-from-k-means">The same digit, from k-means</h3>
+<p>K-means was told <code>k=10</code>, so it gave us exactly ten clusters. Here’s a random sample from the cluster that contains the most 7s:</p>
+<div id="cell-fig-kmeans-sevens" class="cell" data-execution_count="13">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Find the k-means cluster that is majority 7</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>km_labels <span class="op">=</span> kmeans[<span class="st">"labels"</span>]</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>best_cid, best_count <span class="op">=</span> <span class="op">-</span><span class="dv">1</span>, <span class="dv">0</span></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> cid <span class="kw">in</span> np.unique(km_labels):</span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>    cnt <span class="op">=</span> <span class="bu">int</span>(((km_labels <span class="op">==</span> cid) <span class="op">&amp;</span> (y <span class="op">==</span> <span class="dv">7</span>)).<span class="bu">sum</span>())</span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> cnt <span class="op">&gt;</span> best_count:</span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>        best_count, best_cid <span class="op">=</span> cnt, <span class="bu">int</span>(cid)</span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a>idx <span class="op">=</span> np.where(km_labels <span class="op">==</span> best_cid)[<span class="dv">0</span>]</span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>image_grid(X, idx, title<span class="op">=</span><span class="ss">f"k-means cluster </span><span class="sc">{</span>best_cid<span class="sc">}</span><span class="ss"> (n=</span><span class="sc">{</span><span class="bu">len</span>(idx)<span class="sc">}</span><span class="ss">, </span><span class="sc">{</span>best_count<span class="sc">}</span><span class="ss"> are 7s)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-display" data-execution_count="13">
+<div id="fig-kmeans-sevens" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-kmeans-sevens-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="mnist_files/figure-html/fig-kmeans-sevens-output-1.png" width="673" height="343" class="figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-kmeans-sevens-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;7: The k-means cluster that contains the most 7s — one mixed bag across styles.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>Look closely. This isn’t a bag of 7s — it’s a mixed bag of <strong>7s, 4s, 9s, and 5s</strong> sharing a cluster because they all have similar diagonal stroke patterns in pixel space. Only ~43% of this k-means cluster is actually 7s. The other 57% are <em>other digits</em> that k-means merged in because committing to <code>k=10</code> forced it to draw boundaries somewhere, and “things with a prominent diagonal stroke” was the cleanest Voronoi cut available at that resolution.</p>
+<p>DYF’s three sub-clusters of 7 are each ~97% pure 7s at different styles. K-means’s “7 cluster” is a 43%-pure pile of visually-similar digits. <strong>The same k=10 budget, spent completely differently</strong>: DYF used its allowance to separate digit classes cleanly at the cost of over-splitting each class into styles; k-means used its to hit exactly 10 cluster centers at the cost of merging different digits that share pixel patterns.</p>
+</section>
+<section id="why-this-matters" class="level3">
+<h3 class="anchored" data-anchor-id="why-this-matters">Why this matters</h3>
+<p>If your downstream task is <strong>classification</strong> (given a new image, predict 0–9), the flat 10-way view is what you want, and k-means with the oracle is the right tool.</p>
+<p>If your downstream task is <strong>retrieval</strong> (given a user’s crossbar-7 handwriting, find visually similar samples), you want DYF’s sub-style partition. Serving back a mix of crossbar and non-crossbar 7s is a worse result than serving back same-style examples, even though both are “correct” at the digit level.</p>
+<p>If your downstream task is <strong>exploration</strong> (what’s in this corpus?), you want the whole hierarchy. DYF’s tree lets you start at 10 clusters for the overview, then zoom to 81 for the sub-style structure, without refitting. K-means would need ten separate runs at different <code>k</code> values and no guarantee the partitions would nest.</p>
+<p>This is what the gallery means by <em>“DYF gives you the whole hierarchy, pick the resolution your task wants.”</em> MNIST shows it literally.</p>
+</section>
+</section>
+<section id="walking-down-the-hierarchy" class="level2">
+<h2 class="anchored" data-anchor-id="walking-down-the-hierarchy">Walking down the hierarchy</h2>
+<p>DYF didn’t just give you 81 clusters. It gave you a <em>partition hierarchy</em> — and every coarser resolution sits one step up the tree. Here’s what happens when we walk DYF’s 81 clusters down to coarser granularities using <code>merge_to_max_k</code>:</p>
+<div id="merge-walk" class="cell" data-execution_count="14">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> _gallery <span class="im">import</span> merge_walk, merge_walk_table</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>walk <span class="op">=</span> merge_walk(result, X, y, targets<span class="op">=</span>[<span class="dv">40</span>, <span class="dv">20</span>, <span class="dv">10</span>, <span class="dv">5</span>])</span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(merge_walk_table(walk, result))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<table class="caption-top table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th>Resolution</th>
+<th style="text-align: right;">Actual k</th>
+<th style="text-align: right;">NMI</th>
+<th style="text-align: right;">ARI</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Raw DYF</strong></td>
+<td style="text-align: right;"><strong>86</strong></td>
+<td style="text-align: right;"><strong>0.546</strong></td>
+<td style="text-align: right;"><strong>0.183</strong></td>
+</tr>
+<tr class="even">
+<td>merge → 40</td>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">0.556</td>
+<td style="text-align: right;">0.273</td>
+</tr>
+<tr class="odd">
+<td>merge → 20</td>
+<td style="text-align: right;">20</td>
+<td style="text-align: right;">0.549</td>
+<td style="text-align: right;">0.347</td>
+</tr>
+<tr class="even">
+<td>merge → 10</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.465</td>
+<td style="text-align: right;">0.325</td>
+</tr>
+<tr class="odd">
+<td>merge → 5</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">0.396</td>
+<td style="text-align: right;">0.282</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>Read the ARI column.</strong> Merging from 81 down to 20 barely moves NMI (−0.010) but <strong>nearly doubles ARI</strong> — because the 61 extra clusters in the raw partition were genuine sub-communities, and collapsing them recovers the coarser structure the label encodes. Merging further (to 10) gives you ARI close to k-means’s — without the oracle having been consulted.</p>
+<p>This is the move the “parameter-free” pitch is really making: <em>DYF doesn’t pick one k, it gives you the whole tree, and you slice it at whatever granularity your downstream task wants.</em> K-means and HDBSCAN both commit to a single partition. DYF commits to a ranked hierarchy.</p>
+</section>
+<section id="what-happened-to-the-digits-story" class="level2">
+<h2 class="anchored" data-anchor-id="what-happened-to-the-digits-story">What happened to the Digits story?</h2>
+<p>Against the Digits notebook, the story flips on NMI but breaks on ARI:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 11%">
+<col style="width: 8%">
+<col style="width: 16%">
+<col style="width: 11%">
+<col style="width: 27%">
+<col style="width: 11%">
+<col style="width: 14%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Dataset</th>
+<th style="text-align: right;">DYF k</th>
+<th style="text-align: right;">k-means NMI</th>
+<th style="text-align: right;">DYF NMI</th>
+<th style="text-align: right;">DYF NMI − KMeans NMI</th>
+<th style="text-align: right;">DYF ARI</th>
+<th style="text-align: right;">KMeans ARI</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Digits</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.773</td>
+<td style="text-align: right;">0.696</td>
+<td style="text-align: right;">−0.077</td>
+<td style="text-align: right;">0.614</td>
+<td style="text-align: right;">0.726</td>
+</tr>
+<tr class="even">
+<td><strong>MNIST</strong></td>
+<td style="text-align: right;"><strong>81</strong></td>
+<td style="text-align: right;"><strong>0.491</strong></td>
+<td style="text-align: right;"><strong>0.552</strong></td>
+<td style="text-align: right;"><strong>+0.061</strong></td>
+<td style="text-align: right;"><strong>0.175</strong></td>
+<td style="text-align: right;"><strong>0.361</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>DYF now beats oracle k-means on NMI by 0.061</strong> — but loses on ARI by 0.186. How do you lose ARI while winning NMI?</p>
+<section id="the-over-partitioning-question" class="level3">
+<h3 class="anchored" data-anchor-id="the-over-partitioning-question">The over-partitioning question</h3>
+<p>DYF found <strong>81 natural communities on MNIST</strong>, not 10. Three possibilities:</p>
+<p><strong>(a) It’s finding real sub-style structure.</strong> There are multiple stylistic variants of every digit — slanted 7s vs.&nbsp;crossbar 7s, loopy 4s vs.&nbsp;open 4s, continental 1s vs.&nbsp;American 1s. If DYF’s 81 communities each map cleanly to <em>one</em> ground-truth digit (just at a finer granularity than the flat 10-label), then DYF is right and the label is impoverished. This is the “MNIST has more than 10 classes if you look closely” reading.</p>
+<p><strong>(b) It’s fragmenting classes.</strong> The same digit class could be split across many DYF communities for arbitrary geometric reasons (LSH hyperplane placement, UMAP projection quirks) rather than semantic ones. This would be the “DYF over-partitioned” reading.</p>
+<p><strong>(c) Some mix.</strong> Some communities are genuine sub-styles; others are artifacts.</p>
+<p>NMI and ARI disagree <em>because</em> they treat over-partitioning differently:</p>
+<ul>
+<li><strong>NMI</strong> (normalized mutual information) — normalizes for cluster counts. Getting “all the 7s into one pile vs two piles of slanted/crossbar 7s” both score well, as long as each pile stays pure.</li>
+<li><strong>ARI</strong> (adjusted Rand index) — penalizes any pair of points that ends up in different clusters when the ground truth puts them together. Splitting the 7s into two piles costs you pairs, regardless of how pure those piles are.</li>
+</ul>
+<p><strong>The NMI-win-but-ARI-loss signature is the fingerprint of clean over-partitioning</strong> — clusters that are <em>individually pure</em> but <em>collectively too many</em>. That’s reading (a) above, with some (c).</p>
+</section>
+<section id="why-did-this-happen-at-70k-but-not-at-1797" class="level3">
+<h3 class="anchored" data-anchor-id="why-did-this-happen-at-70k-but-not-at-1797">Why did this happen at 70K but not at 1,797?</h3>
+<p>Density. At 1,797 samples, there are only ~180 points per digit class, and DYF’s tree leaves stay coarse enough that Louvain merges them into ~10 natural communities matching the flat label. At 70K samples, there are 7,000 points per digit class, and DYF’s tree now has enough room to carve out stable sub-leaves per style variant. Louvain finds those sub-communities and reports them.</p>
+<p><strong>This is DYF doing what it’s designed to do</strong> — surface structure the data supports. The fact that the label is flat and the data isn’t is a mismatch between the benchmark and reality.</p>
+</section>
+<section id="what-would-you-actually-want-in-a-real-application" class="level3">
+<h3 class="anchored" data-anchor-id="what-would-you-actually-want-in-a-real-application">What would you actually want in a real application?</h3>
+<p>Depends on the downstream task:</p>
+<ul>
+<li><strong>If you’re doing classification</strong> (given a new image, predict 0–9): you want k=10 and ARI&gt;NMI. K-means is better here, <em>provided you know k</em>.</li>
+<li><strong>If you’re doing retrieval</strong> (given a new image, find similar ones): you want sub-style structure preserved. Two crossbar 7s are more similar to each other than a crossbar 7 and a slanted 7. DYF is better here.</li>
+<li><strong>If you’re doing data exploration</strong> (what’s in this corpus?): you definitely want the sub-style structure, and you probably want the hierarchical tree that DYF produces as a bonus.</li>
+</ul>
+<p>The gallery’s “flat-NMI-against-flat-label” scoring is the classification rubric. DYF is closer to a retrieval / exploration rubric, which is what a parameter-free tool is <em>for</em>.</p>
+</section>
+<section id="the-sports-analogy-update" class="level3">
+<h3 class="anchored" data-anchor-id="the-sports-analogy-update">The sports analogy update</h3>
+<p>Digits was k-means’s home court — convex blobs, small k, oracle-provided. It won, cleanly.</p>
+<p>MNIST is a <em>longer game</em>. K-means held the lead most of the way by sticking to the rigid 10-cluster playbook. DYF kept finding extra joints in the structure, and the NMI scoreboard eventually flipped. But ARI — a different metric with a different rulebook — still favors the disciplined game plan.</p>
+<p>It’s no longer clear which method is “winning.” It depends on which rulebook you hand the judges. That ambiguity is the point.</p>
+</section>
+</section>
+<section id="caveats" class="level2">
+<h2 class="anchored" data-anchor-id="caveats">Caveats</h2>
+<ul>
+<li><strong>DYF’s 81 clusters include some artifacts</strong>, almost certainly. Reading (c) is the honest one. A rigorous analysis would compute a confusion matrix between DYF clusters and the 10 digit labels, check whether each DYF cluster is dominantly one class (style-variant reading) or scattered (fragmentation reading), and report the breakdown. The gallery skips that to keep notebooks readable; a supplement could add it.</li>
+<li><strong>UMAP is a projection, not the cluster space.</strong> When DYF’s and k-means’s partitions look visually different in the UMAP panel, some of that is true clustering difference and some is UMAP’s 2D compression of decisions made in 784d. Don’t read the UMAP too literally.</li>
+<li><strong>Cache is in <code>/tmp</code>.</strong> Dumped on reboot, which is fine for the gallery — real applications should use a durable cache.</li>
+</ul>
+
+
+<!-- -->
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    // Ensure there is a toggle, if there isn't float one in the top right
+    if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+      const a = window.document.createElement('a');
+      a.classList.add('top-right');
+      a.classList.add('quarto-color-scheme-toggle');
+      a.href = "";
+      a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+      const i = window.document.createElement("i");
+      i.classList.add('bi');
+      a.appendChild(i);
+      window.document.body.appendChild(a);
+    }
+    setColorSchemeToggle(hasAlternateSentinel())
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+    const viewSource = window.document.getElementById('quarto-view-source') ||
+                       window.document.getElementById('quarto-code-tools-source');
+    if (viewSource) {
+      const sourceUrl = viewSource.getAttribute("data-quarto-source-url");
+      viewSource.addEventListener("click", function(e) {
+        if (sourceUrl) {
+          // rstudio viewer pane
+          if (/\bcapabilities=\b/.test(window.location)) {
+            window.open(sourceUrl);
+          } else {
+            window.location.href = sourceUrl;
+          }
+        } else {
+          const modal = new bootstrap.Modal(document.getElementById('quarto-embedded-source-code-modal'));
+          modal.show();
+        }
+        return false;
+      });
+    }
+    function toggleCodeHandler(show) {
+      return function(e) {
+        const detailsSrc = window.document.querySelectorAll(".cell > details > .sourceCode");
+        for (let i=0; i<detailsSrc.length; i++) {
+          const details = detailsSrc[i].parentElement;
+          if (show) {
+            details.open = true;
+          } else {
+            details.removeAttribute("open");
+          }
+        }
+        const cellCodeDivs = window.document.querySelectorAll(".cell > .sourceCode");
+        const fromCls = show ? "hidden" : "unhidden";
+        const toCls = show ? "unhidden" : "hidden";
+        for (let i=0; i<cellCodeDivs.length; i++) {
+          const codeDiv = cellCodeDivs[i];
+          if (codeDiv.classList.contains(fromCls)) {
+            codeDiv.classList.remove(fromCls);
+            codeDiv.classList.add(toCls);
+          } 
+        }
+        return false;
+      }
+    }
+    const hideAllCode = window.document.getElementById("quarto-hide-all-code");
+    if (hideAllCode) {
+      hideAllCode.addEventListener("click", toggleCodeHandler(false));
+    }
+    const showAllCode = window.document.getElementById("quarto-show-all-code");
+    if (showAllCode) {
+      showAllCode.addEventListener("click", toggleCodeHandler(true));
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/dyf\.io");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script><div class="modal fade" id="quarto-embedded-source-code-modal" tabindex="-1" aria-labelledby="quarto-embedded-source-code-modal-label" aria-hidden="true"><div class="modal-dialog modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="quarto-embedded-source-code-modal-label">Source Code</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb18" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> "MNIST"</span></span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a><span class="an">subtitle:</span><span class="co"> "70,000 handwritten digits, 28×28 pixel vectors, k=10 ground truth."</span></span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a><span class="an">order:</span><span class="co"> 2</span></span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a><span class="an">image:</span><span class="co"> mnist_files/figure-html/fig-dyf-output-1.png</span></span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a><span class="an">categories:</span><span class="co"> [images, large, pixels]</span></span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a><span class="an">true-k:</span><span class="co"> 10</span></span>
+<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a><span class="an">format:</span></span>
+<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a><span class="co">  html:</span></span>
+<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a><span class="co">    code-fold: show</span></span>
+<span id="cb18-11"><a href="#cb18-11" aria-hidden="true" tabindex="-1"></a><span class="co">    code-tools: true</span></span>
+<span id="cb18-12"><a href="#cb18-12" aria-hidden="true" tabindex="-1"></a><span class="an">execute:</span></span>
+<span id="cb18-13"><a href="#cb18-13" aria-hidden="true" tabindex="-1"></a><span class="co">  warning: false</span></span>
+<span id="cb18-14"><a href="#cb18-14" aria-hidden="true" tabindex="-1"></a><span class="co">  message: false</span></span>
+<span id="cb18-15"><a href="#cb18-15" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb18-16"><a href="#cb18-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-17"><a href="#cb18-17" aria-hidden="true" tabindex="-1"></a>The scaled-up version of <span class="co">[</span><span class="ot">Digits</span><span class="co">](digits.qmd)</span>. Same domain, same task, same <span class="in">`k=10`</span> — but 40× more samples and 12× higher pixel dimensionality. Does DYF's parameter-free story survive the jump in scale, or does it fall apart under a heavier load?</span>
+<span id="cb18-18"><a href="#cb18-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-19"><a href="#cb18-19" aria-hidden="true" tabindex="-1"></a>Short answer, as we'll see: DYF *inverts* the digits result on one axis and keeps losing on the other. It's not the clean extension of the Digits story — it's a twist.</span>
+<span id="cb18-20"><a href="#cb18-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-21"><a href="#cb18-21" aria-hidden="true" tabindex="-1"></a><span class="fu">## Load MNIST</span></span>
+<span id="cb18-22"><a href="#cb18-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-25"><a href="#cb18-25" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb18-26"><a href="#cb18-26" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: load</span></span>
+<span id="cb18-27"><a href="#cb18-27" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> os</span>
+<span id="cb18-28"><a href="#cb18-28" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb18-29"><a href="#cb18-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-30"><a href="#cb18-30" aria-hidden="true" tabindex="-1"></a>CACHE <span class="op">=</span> <span class="st">"/tmp/gallery_mnist.npz"</span></span>
+<span id="cb18-31"><a href="#cb18-31" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> os.path.exists(CACHE):</span>
+<span id="cb18-32"><a href="#cb18-32" aria-hidden="true" tabindex="-1"></a>    z <span class="op">=</span> np.load(CACHE)</span>
+<span id="cb18-33"><a href="#cb18-33" aria-hidden="true" tabindex="-1"></a>    X, y <span class="op">=</span> z[<span class="st">"X"</span>], z[<span class="st">"y"</span>]</span>
+<span id="cb18-34"><a href="#cb18-34" aria-hidden="true" tabindex="-1"></a><span class="cf">else</span>:</span>
+<span id="cb18-35"><a href="#cb18-35" aria-hidden="true" tabindex="-1"></a>    <span class="im">from</span> sklearn.datasets <span class="im">import</span> fetch_openml</span>
+<span id="cb18-36"><a href="#cb18-36" aria-hidden="true" tabindex="-1"></a>    m <span class="op">=</span> fetch_openml(<span class="st">"mnist_784"</span>, version<span class="op">=</span><span class="dv">1</span>, as_frame<span class="op">=</span><span class="va">False</span>, parser<span class="op">=</span><span class="st">"auto"</span>)</span>
+<span id="cb18-37"><a href="#cb18-37" aria-hidden="true" tabindex="-1"></a>    X <span class="op">=</span> (m.data.astype(np.float32) <span class="op">/</span> <span class="fl">255.0</span>)   <span class="co"># normalize pixels to [0, 1]</span></span>
+<span id="cb18-38"><a href="#cb18-38" aria-hidden="true" tabindex="-1"></a>    y <span class="op">=</span> m.target.astype(<span class="bu">int</span>)</span>
+<span id="cb18-39"><a href="#cb18-39" aria-hidden="true" tabindex="-1"></a>    np.savez(CACHE, X<span class="op">=</span>X, y<span class="op">=</span>y)</span>
+<span id="cb18-40"><a href="#cb18-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-41"><a href="#cb18-41" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span>X<span class="sc">.</span>shape[<span class="dv">0</span>]<span class="sc">:,}</span><span class="ss"> samples, </span><span class="sc">{</span>X<span class="sc">.</span>shape[<span class="dv">1</span>]<span class="sc">}</span><span class="ss">d, true k = </span><span class="sc">{</span><span class="bu">len</span>(<span class="bu">set</span>(y))<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb18-42"><a href="#cb18-42" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb18-43"><a href="#cb18-43" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-44"><a href="#cb18-44" aria-hidden="true" tabindex="-1"></a><span class="fu">## Run DYF</span></span>
+<span id="cb18-45"><a href="#cb18-45" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-48"><a href="#cb18-48" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb18-49"><a href="#cb18-49" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: run-dyf</span></span>
+<span id="cb18-50"><a href="#cb18-50" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> sys</span>
+<span id="cb18-51"><a href="#cb18-51" aria-hidden="true" tabindex="-1"></a>sys.path.insert(<span class="dv">0</span>, <span class="st">"."</span>)</span>
+<span id="cb18-52"><a href="#cb18-52" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> _gallery <span class="im">import</span> run_dyf_cached, run_kmeans, plot_single, metrics_table</span>
+<span id="cb18-53"><a href="#cb18-53" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-54"><a href="#cb18-54" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> run_dyf_cached(X, y, cache_path<span class="op">=</span><span class="st">"/tmp/gallery_mnist_dyf.npz"</span>)</span>
+<span id="cb18-55"><a href="#cb18-55" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Recovered k: </span><span class="sc">{</span>result<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">  (true k = </span><span class="sc">{</span>result<span class="sc">.</span>true_k<span class="sc">}</span><span class="ss">)"</span>)</span>
+<span id="cb18-56"><a href="#cb18-56" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"NMI:         </span><span class="sc">{</span>result<span class="sc">.</span>nmi<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb18-57"><a href="#cb18-57" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"ARI:         </span><span class="sc">{</span>result<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb18-58"><a href="#cb18-58" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb18-59"><a href="#cb18-59" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-60"><a href="#cb18-60" aria-hidden="true" tabindex="-1"></a><span class="fu">## Oracle k-means</span></span>
+<span id="cb18-61"><a href="#cb18-61" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-64"><a href="#cb18-64" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb18-65"><a href="#cb18-65" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: kmeans</span></span>
+<span id="cb18-66"><a href="#cb18-66" aria-hidden="true" tabindex="-1"></a>kmeans <span class="op">=</span> run_kmeans(X, y)</span>
+<span id="cb18-67"><a href="#cb18-67" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"k-means NMI=</span><span class="sc">{</span>kmeans[<span class="st">'nmi'</span>]<span class="sc">:.3f}</span><span class="ss">, ARI=</span><span class="sc">{</span>kmeans[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss"> (told k=</span><span class="sc">{</span>result<span class="sc">.</span>true_k<span class="sc">}</span><span class="ss">)"</span>)</span>
+<span id="cb18-68"><a href="#cb18-68" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb18-69"><a href="#cb18-69" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-70"><a href="#cb18-70" aria-hidden="true" tabindex="-1"></a><span class="fu">## Figures</span></span>
+<span id="cb18-71"><a href="#cb18-71" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-72"><a href="#cb18-72" aria-hidden="true" tabindex="-1"></a>::: {.gallery-fluid}</span>
+<span id="cb18-73"><a href="#cb18-73" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-76"><a href="#cb18-76" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb18-77"><a href="#cb18-77" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-truth</span></span>
+<span id="cb18-78"><a href="#cb18-78" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "Ground truth — each of the 10 digit classes."</span></span>
+<span id="cb18-79"><a href="#cb18-79" aria-hidden="true" tabindex="-1"></a>plot_single(result.umap_2d, y, title<span class="op">=</span><span class="ss">f"Ground truth (k=</span><span class="sc">{</span>result<span class="sc">.</span>true_k<span class="sc">}</span><span class="ss">)"</span>)</span>
+<span id="cb18-80"><a href="#cb18-80" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb18-81"><a href="#cb18-81" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-84"><a href="#cb18-84" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb18-85"><a href="#cb18-85" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-dyf</span></span>
+<span id="cb18-86"><a href="#cb18-86" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "DYF — parameter-free, no k supplied."</span></span>
+<span id="cb18-87"><a href="#cb18-87" aria-hidden="true" tabindex="-1"></a>plot_single(result.umap_2d, result.labels, title<span class="op">=</span><span class="ss">f"DYF (recovered k=</span><span class="sc">{</span>result<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">)"</span>)</span>
+<span id="cb18-88"><a href="#cb18-88" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb18-89"><a href="#cb18-89" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-92"><a href="#cb18-92" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb18-93"><a href="#cb18-93" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-kmeans</span></span>
+<span id="cb18-94"><a href="#cb18-94" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "K-means given the oracle k=10."</span></span>
+<span id="cb18-95"><a href="#cb18-95" aria-hidden="true" tabindex="-1"></a>plot_single(result.umap_2d, kmeans[<span class="st">"labels"</span>], title<span class="op">=</span><span class="ss">f"k-means (told k=</span><span class="sc">{</span>result<span class="sc">.</span>true_k<span class="sc">}</span><span class="ss">)"</span>)</span>
+<span id="cb18-96"><a href="#cb18-96" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb18-97"><a href="#cb18-97" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-98"><a href="#cb18-98" aria-hidden="true" tabindex="-1"></a>:::</span>
+<span id="cb18-99"><a href="#cb18-99" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-100"><a href="#cb18-100" aria-hidden="true" tabindex="-1"></a><span class="fu">## Metrics</span></span>
+<span id="cb18-101"><a href="#cb18-101" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-104"><a href="#cb18-104" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb18-105"><a href="#cb18-105" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: metrics</span></span>
+<span id="cb18-106"><a href="#cb18-106" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: asis</span></span>
+<span id="cb18-107"><a href="#cb18-107" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(metrics_table(result, kmeans, <span class="va">None</span>))</span>
+<span id="cb18-108"><a href="#cb18-108" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb18-109"><a href="#cb18-109" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-110"><a href="#cb18-110" aria-hidden="true" tabindex="-1"></a><span class="fu">## Deep dive: what are DYF's 71 extra clusters?</span></span>
+<span id="cb18-111"><a href="#cb18-111" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-112"><a href="#cb18-112" aria-hidden="true" tabindex="-1"></a>Every other notebook in this gallery *tells* you DYF's over-partitioning finds sub-style structure. This section shows it.</span>
+<span id="cb18-113"><a href="#cb18-113" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-114"><a href="#cb18-114" aria-hidden="true" tabindex="-1"></a><span class="fu">### First, the statistical audit</span></span>
+<span id="cb18-115"><a href="#cb18-115" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-116"><a href="#cb18-116" aria-hidden="true" tabindex="-1"></a>If DYF's 81 clusters are genuine sub-structure, they should be *pure* — each cluster dominated by one digit class. If they're noise, they should be mixed bags.</span>
+<span id="cb18-117"><a href="#cb18-117" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-120"><a href="#cb18-120" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb18-121"><a href="#cb18-121" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: purity-audit</span></span>
+<span id="cb18-122"><a href="#cb18-122" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: asis</span></span>
+<span id="cb18-123"><a href="#cb18-123" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb18-124"><a href="#cb18-124" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> collections <span class="im">import</span> Counter</span>
+<span id="cb18-125"><a href="#cb18-125" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-126"><a href="#cb18-126" aria-hidden="true" tabindex="-1"></a>labels <span class="op">=</span> result.labels</span>
+<span id="cb18-127"><a href="#cb18-127" aria-hidden="true" tabindex="-1"></a>rows <span class="op">=</span> []</span>
+<span id="cb18-128"><a href="#cb18-128" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> cid <span class="kw">in</span> <span class="bu">sorted</span>(<span class="bu">set</span>(labels)):</span>
+<span id="cb18-129"><a href="#cb18-129" aria-hidden="true" tabindex="-1"></a>    mask <span class="op">=</span> labels <span class="op">==</span> cid</span>
+<span id="cb18-130"><a href="#cb18-130" aria-hidden="true" tabindex="-1"></a>    n <span class="op">=</span> <span class="bu">int</span>(mask.<span class="bu">sum</span>())</span>
+<span id="cb18-131"><a href="#cb18-131" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> n <span class="op">==</span> <span class="dv">0</span>:</span>
+<span id="cb18-132"><a href="#cb18-132" aria-hidden="true" tabindex="-1"></a>        <span class="cf">continue</span></span>
+<span id="cb18-133"><a href="#cb18-133" aria-hidden="true" tabindex="-1"></a>    vals, cnts <span class="op">=</span> np.unique(y[mask], return_counts<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb18-134"><a href="#cb18-134" aria-hidden="true" tabindex="-1"></a>    rows.append({<span class="st">"cid"</span>: cid, <span class="st">"n"</span>: n, <span class="st">"dominant"</span>: <span class="bu">int</span>(vals[np.argmax(cnts)]),</span>
+<span id="cb18-135"><a href="#cb18-135" aria-hidden="true" tabindex="-1"></a>                 <span class="st">"purity"</span>: cnts.<span class="bu">max</span>() <span class="op">/</span> n})</span>
+<span id="cb18-136"><a href="#cb18-136" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-137"><a href="#cb18-137" aria-hidden="true" tabindex="-1"></a>r80 <span class="op">=</span> <span class="bu">sum</span>(<span class="dv">1</span> <span class="cf">for</span> r <span class="kw">in</span> rows <span class="cf">if</span> r[<span class="st">"purity"</span>] <span class="op">&gt;</span> <span class="fl">0.80</span>)</span>
+<span id="cb18-138"><a href="#cb18-138" aria-hidden="true" tabindex="-1"></a>r90 <span class="op">=</span> <span class="bu">sum</span>(<span class="dv">1</span> <span class="cf">for</span> r <span class="kw">in</span> rows <span class="cf">if</span> r[<span class="st">"purity"</span>] <span class="op">&gt;</span> <span class="fl">0.90</span>)</span>
+<span id="cb18-139"><a href="#cb18-139" aria-hidden="true" tabindex="-1"></a>r95 <span class="op">=</span> <span class="bu">sum</span>(<span class="dv">1</span> <span class="cf">for</span> r <span class="kw">in</span> rows <span class="cf">if</span> r[<span class="st">"purity"</span>] <span class="op">&gt;</span> <span class="fl">0.95</span>)</span>
+<span id="cb18-140"><a href="#cb18-140" aria-hidden="true" tabindex="-1"></a>weighted <span class="op">=</span> <span class="bu">sum</span>(r[<span class="st">"purity"</span>] <span class="op">*</span> r[<span class="st">"n"</span>] <span class="cf">for</span> r <span class="kw">in</span> rows) <span class="op">/</span> <span class="bu">sum</span>(r[<span class="st">"n"</span>] <span class="cf">for</span> r <span class="kw">in</span> rows)</span>
+<span id="cb18-141"><a href="#cb18-141" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-142"><a href="#cb18-142" aria-hidden="true" tabindex="-1"></a>digit_counts <span class="op">=</span> Counter(r[<span class="st">"dominant"</span>] <span class="cf">for</span> r <span class="kw">in</span> rows)</span>
+<span id="cb18-143"><a href="#cb18-143" aria-hidden="true" tabindex="-1"></a>per_digit <span class="op">=</span> <span class="st">", "</span>.join(<span class="ss">f"</span><span class="sc">{</span>d<span class="sc">}</span><span class="ss">×</span><span class="sc">{</span>n<span class="sc">}</span><span class="ss">"</span> <span class="cf">for</span> d, n <span class="kw">in</span> <span class="bu">sorted</span>(digit_counts.items()))</span>
+<span id="cb18-144"><a href="#cb18-144" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-145"><a href="#cb18-145" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"**</span><span class="sc">{</span><span class="bu">len</span>(rows)<span class="sc">}</span><span class="ss"> DYF clusters. Weighted purity: </span><span class="sc">{</span>weighted<span class="sc">:.3f}</span><span class="ss">.**</span><span class="ch">\n</span><span class="ss">"</span>)</span>
+<span id="cb18-146"><a href="#cb18-146" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"- </span><span class="sc">{</span>r80<span class="sc">}</span><span class="ss">/</span><span class="sc">{</span><span class="bu">len</span>(rows)<span class="sc">}</span><span class="ss"> clusters are &gt;80% pure (dominated by one digit)</span><span class="ch">\n</span><span class="ss">"</span>)</span>
+<span id="cb18-147"><a href="#cb18-147" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"- </span><span class="sc">{</span>r90<span class="sc">}</span><span class="ss">/</span><span class="sc">{</span><span class="bu">len</span>(rows)<span class="sc">}</span><span class="ss"> are &gt;90% pure</span><span class="ch">\n</span><span class="ss">"</span>)</span>
+<span id="cb18-148"><a href="#cb18-148" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"- </span><span class="sc">{</span>r95<span class="sc">}</span><span class="ss">/</span><span class="sc">{</span><span class="bu">len</span>(rows)<span class="sc">}</span><span class="ss"> are &gt;95% pure</span><span class="ch">\n</span><span class="ss">"</span>)</span>
+<span id="cb18-149"><a href="#cb18-149" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"- Sub-clusters per digit: </span><span class="sc">{</span>per_digit<span class="sc">}</span><span class="ch">\n</span><span class="ss">"</span>)</span>
+<span id="cb18-150"><a href="#cb18-150" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb18-151"><a href="#cb18-151" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-152"><a href="#cb18-152" aria-hidden="true" tabindex="-1"></a>Each DYF cluster has a clear "home" digit. That's the first sign the partition is meaningful — 88% of points land in a cluster dominated by their true class. Now the visual test.</span>
+<span id="cb18-153"><a href="#cb18-153" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-154"><a href="#cb18-154" aria-hidden="true" tabindex="-1"></a><span class="fu">### Sub-clusters of the digit 7</span></span>
+<span id="cb18-155"><a href="#cb18-155" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-156"><a href="#cb18-156" aria-hidden="true" tabindex="-1"></a>DYF split the digit 7 into multiple sub-clusters. Here are the largest of the high-purity ones, rendered as random samples from each:</span>
+<span id="cb18-157"><a href="#cb18-157" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-160"><a href="#cb18-160" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb18-161"><a href="#cb18-161" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: seven-subs</span></span>
+<span id="cb18-162"><a href="#cb18-162" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: asis</span></span>
+<span id="cb18-163"><a href="#cb18-163" aria-hidden="true" tabindex="-1"></a><span class="co"># Find all DYF clusters where digit 7 is dominant, sorted by cluster size</span></span>
+<span id="cb18-164"><a href="#cb18-164" aria-hidden="true" tabindex="-1"></a>seven_subs <span class="op">=</span> <span class="bu">sorted</span>(</span>
+<span id="cb18-165"><a href="#cb18-165" aria-hidden="true" tabindex="-1"></a>    [r <span class="cf">for</span> r <span class="kw">in</span> rows <span class="cf">if</span> r[<span class="st">"dominant"</span>] <span class="op">==</span> <span class="dv">7</span> <span class="kw">and</span> r[<span class="st">"purity"</span>] <span class="op">&gt;</span> <span class="fl">0.9</span>],</span>
+<span id="cb18-166"><a href="#cb18-166" aria-hidden="true" tabindex="-1"></a>    key<span class="op">=</span><span class="kw">lambda</span> r: <span class="op">-</span>r[<span class="st">"n"</span>],</span>
+<span id="cb18-167"><a href="#cb18-167" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb18-168"><a href="#cb18-168" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"DYF produced </span><span class="sc">{</span><span class="bu">len</span>(seven_subs)<span class="sc">}</span><span class="ss"> high-purity (&gt;90%) sub-cluster(s) of digit 7; showing up to the 3 largest:</span><span class="ch">\n</span><span class="ss">"</span>)</span>
+<span id="cb18-169"><a href="#cb18-169" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> s <span class="kw">in</span> seven_subs[:<span class="dv">3</span>]:</span>
+<span id="cb18-170"><a href="#cb18-170" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"- cluster </span><span class="sc">{</span>s[<span class="st">'cid'</span>]<span class="sc">}</span><span class="ss">: </span><span class="sc">{</span>s[<span class="st">'n'</span>]<span class="sc">}</span><span class="ss"> samples, </span><span class="sc">{</span>s[<span class="st">'purity'</span>]<span class="sc">:.0%}</span><span class="ss"> are 7s"</span>)</span>
+<span id="cb18-171"><a href="#cb18-171" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb18-172"><a href="#cb18-172" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-173"><a href="#cb18-173" aria-hidden="true" tabindex="-1"></a>::: {.gallery-fluid}</span>
+<span id="cb18-174"><a href="#cb18-174" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-177"><a href="#cb18-177" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb18-178"><a href="#cb18-178" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-seven-a</span></span>
+<span id="cb18-179"><a href="#cb18-179" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "DYF cluster A — random sample of 7s."</span></span>
+<span id="cb18-180"><a href="#cb18-180" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> _gallery <span class="im">import</span> image_grid</span>
+<span id="cb18-181"><a href="#cb18-181" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="bu">len</span>(seven_subs) <span class="op">&gt;=</span> <span class="dv">1</span>:</span>
+<span id="cb18-182"><a href="#cb18-182" aria-hidden="true" tabindex="-1"></a>    idx <span class="op">=</span> np.where(result.labels <span class="op">==</span> seven_subs[<span class="dv">0</span>][<span class="st">"cid"</span>])[<span class="dv">0</span>]</span>
+<span id="cb18-183"><a href="#cb18-183" aria-hidden="true" tabindex="-1"></a>    image_grid(X, idx, title<span class="op">=</span><span class="ss">f"DYF cluster </span><span class="sc">{</span>seven_subs[<span class="dv">0</span>][<span class="st">'cid'</span>]<span class="sc">}</span><span class="ss"> (n=</span><span class="sc">{</span>seven_subs[<span class="dv">0</span>][<span class="st">'n'</span>]<span class="sc">}</span><span class="ss">)"</span>)</span>
+<span id="cb18-184"><a href="#cb18-184" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb18-185"><a href="#cb18-185" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-188"><a href="#cb18-188" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb18-189"><a href="#cb18-189" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-seven-b</span></span>
+<span id="cb18-190"><a href="#cb18-190" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "DYF cluster B — random sample of 7s."</span></span>
+<span id="cb18-191"><a href="#cb18-191" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="bu">len</span>(seven_subs) <span class="op">&gt;=</span> <span class="dv">2</span>:</span>
+<span id="cb18-192"><a href="#cb18-192" aria-hidden="true" tabindex="-1"></a>    idx <span class="op">=</span> np.where(result.labels <span class="op">==</span> seven_subs[<span class="dv">1</span>][<span class="st">"cid"</span>])[<span class="dv">0</span>]</span>
+<span id="cb18-193"><a href="#cb18-193" aria-hidden="true" tabindex="-1"></a>    image_grid(X, idx, title<span class="op">=</span><span class="ss">f"DYF cluster </span><span class="sc">{</span>seven_subs[<span class="dv">1</span>][<span class="st">'cid'</span>]<span class="sc">}</span><span class="ss"> (n=</span><span class="sc">{</span>seven_subs[<span class="dv">1</span>][<span class="st">'n'</span>]<span class="sc">}</span><span class="ss">)"</span>)</span>
+<span id="cb18-194"><a href="#cb18-194" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb18-195"><a href="#cb18-195" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-198"><a href="#cb18-198" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb18-199"><a href="#cb18-199" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-seven-c</span></span>
+<span id="cb18-200"><a href="#cb18-200" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "DYF cluster C — random sample of 7s."</span></span>
+<span id="cb18-201"><a href="#cb18-201" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="bu">len</span>(seven_subs) <span class="op">&gt;=</span> <span class="dv">3</span>:</span>
+<span id="cb18-202"><a href="#cb18-202" aria-hidden="true" tabindex="-1"></a>    idx <span class="op">=</span> np.where(result.labels <span class="op">==</span> seven_subs[<span class="dv">2</span>][<span class="st">"cid"</span>])[<span class="dv">0</span>]</span>
+<span id="cb18-203"><a href="#cb18-203" aria-hidden="true" tabindex="-1"></a>    image_grid(X, idx, title<span class="op">=</span><span class="ss">f"DYF cluster </span><span class="sc">{</span>seven_subs[<span class="dv">2</span>][<span class="st">'cid'</span>]<span class="sc">}</span><span class="ss"> (n=</span><span class="sc">{</span>seven_subs[<span class="dv">2</span>][<span class="st">'n'</span>]<span class="sc">}</span><span class="ss">)"</span>)</span>
+<span id="cb18-204"><a href="#cb18-204" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb18-205"><a href="#cb18-205" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-206"><a href="#cb18-206" aria-hidden="true" tabindex="-1"></a>:::</span>
+<span id="cb18-207"><a href="#cb18-207" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-208"><a href="#cb18-208" aria-hidden="true" tabindex="-1"></a>Look at the three grids. Each is *visibly* a distinct handwriting style — stroke weight, slant, proportion, top-hook shape. These aren't random slices of a single 7-population; they're stylistic sub-communities that the flat "is a 7" label has no way to express.</span>
+<span id="cb18-209"><a href="#cb18-209" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-210"><a href="#cb18-210" aria-hidden="true" tabindex="-1"></a><span class="fu">### The same digit, from k-means</span></span>
+<span id="cb18-211"><a href="#cb18-211" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-212"><a href="#cb18-212" aria-hidden="true" tabindex="-1"></a>K-means was told <span class="in">`k=10`</span>, so it gave us exactly ten clusters. Here's a random sample from the cluster that contains the most 7s:</span>
+<span id="cb18-213"><a href="#cb18-213" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-216"><a href="#cb18-216" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb18-217"><a href="#cb18-217" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-kmeans-sevens</span></span>
+<span id="cb18-218"><a href="#cb18-218" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "The k-means cluster that contains the most 7s — one mixed bag across styles."</span></span>
+<span id="cb18-219"><a href="#cb18-219" aria-hidden="true" tabindex="-1"></a><span class="co"># Find the k-means cluster that is majority 7</span></span>
+<span id="cb18-220"><a href="#cb18-220" aria-hidden="true" tabindex="-1"></a>km_labels <span class="op">=</span> kmeans[<span class="st">"labels"</span>]</span>
+<span id="cb18-221"><a href="#cb18-221" aria-hidden="true" tabindex="-1"></a>best_cid, best_count <span class="op">=</span> <span class="op">-</span><span class="dv">1</span>, <span class="dv">0</span></span>
+<span id="cb18-222"><a href="#cb18-222" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> cid <span class="kw">in</span> np.unique(km_labels):</span>
+<span id="cb18-223"><a href="#cb18-223" aria-hidden="true" tabindex="-1"></a>    cnt <span class="op">=</span> <span class="bu">int</span>(((km_labels <span class="op">==</span> cid) <span class="op">&amp;</span> (y <span class="op">==</span> <span class="dv">7</span>)).<span class="bu">sum</span>())</span>
+<span id="cb18-224"><a href="#cb18-224" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> cnt <span class="op">&gt;</span> best_count:</span>
+<span id="cb18-225"><a href="#cb18-225" aria-hidden="true" tabindex="-1"></a>        best_count, best_cid <span class="op">=</span> cnt, <span class="bu">int</span>(cid)</span>
+<span id="cb18-226"><a href="#cb18-226" aria-hidden="true" tabindex="-1"></a>idx <span class="op">=</span> np.where(km_labels <span class="op">==</span> best_cid)[<span class="dv">0</span>]</span>
+<span id="cb18-227"><a href="#cb18-227" aria-hidden="true" tabindex="-1"></a>image_grid(X, idx, title<span class="op">=</span><span class="ss">f"k-means cluster </span><span class="sc">{</span>best_cid<span class="sc">}</span><span class="ss"> (n=</span><span class="sc">{</span><span class="bu">len</span>(idx)<span class="sc">}</span><span class="ss">, </span><span class="sc">{</span>best_count<span class="sc">}</span><span class="ss"> are 7s)"</span>)</span>
+<span id="cb18-228"><a href="#cb18-228" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb18-229"><a href="#cb18-229" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-230"><a href="#cb18-230" aria-hidden="true" tabindex="-1"></a>Look closely. This isn't a bag of 7s — it's a mixed bag of **7s, 4s, 9s, and 5s** sharing a cluster because they all have similar diagonal stroke patterns in pixel space. Only ~43% of this k-means cluster is actually 7s. The other 57% are *other digits* that k-means merged in because committing to <span class="in">`k=10`</span> forced it to draw boundaries somewhere, and "things with a prominent diagonal stroke" was the cleanest Voronoi cut available at that resolution.</span>
+<span id="cb18-231"><a href="#cb18-231" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-232"><a href="#cb18-232" aria-hidden="true" tabindex="-1"></a>DYF's three sub-clusters of 7 are each ~97% pure 7s at different styles. K-means's "7 cluster" is a 43%-pure pile of visually-similar digits. **The same k=10 budget, spent completely differently**: DYF used its allowance to separate digit classes cleanly at the cost of over-splitting each class into styles; k-means used its to hit exactly 10 cluster centers at the cost of merging different digits that share pixel patterns.</span>
+<span id="cb18-233"><a href="#cb18-233" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-234"><a href="#cb18-234" aria-hidden="true" tabindex="-1"></a><span class="fu">### Why this matters</span></span>
+<span id="cb18-235"><a href="#cb18-235" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-236"><a href="#cb18-236" aria-hidden="true" tabindex="-1"></a>If your downstream task is **classification** (given a new image, predict 0–9), the flat 10-way view is what you want, and k-means with the oracle is the right tool.</span>
+<span id="cb18-237"><a href="#cb18-237" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-238"><a href="#cb18-238" aria-hidden="true" tabindex="-1"></a>If your downstream task is **retrieval** (given a user's crossbar-7 handwriting, find visually similar samples), you want DYF's sub-style partition. Serving back a mix of crossbar and non-crossbar 7s is a worse result than serving back same-style examples, even though both are "correct" at the digit level.</span>
+<span id="cb18-239"><a href="#cb18-239" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-240"><a href="#cb18-240" aria-hidden="true" tabindex="-1"></a>If your downstream task is **exploration** (what's in this corpus?), you want the whole hierarchy. DYF's tree lets you start at 10 clusters for the overview, then zoom to 81 for the sub-style structure, without refitting. K-means would need ten separate runs at different <span class="in">`k`</span> values and no guarantee the partitions would nest.</span>
+<span id="cb18-241"><a href="#cb18-241" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-242"><a href="#cb18-242" aria-hidden="true" tabindex="-1"></a>This is what the gallery means by *"DYF gives you the whole hierarchy, pick the resolution your task wants."* MNIST shows it literally.</span>
+<span id="cb18-243"><a href="#cb18-243" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-244"><a href="#cb18-244" aria-hidden="true" tabindex="-1"></a><span class="fu">## Walking down the hierarchy</span></span>
+<span id="cb18-245"><a href="#cb18-245" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-246"><a href="#cb18-246" aria-hidden="true" tabindex="-1"></a>DYF didn't just give you 81 clusters. It gave you a *partition hierarchy* — and every coarser resolution sits one step up the tree. Here's what happens when we walk DYF's 81 clusters down to coarser granularities using <span class="in">`merge_to_max_k`</span>:</span>
+<span id="cb18-247"><a href="#cb18-247" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-250"><a href="#cb18-250" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb18-251"><a href="#cb18-251" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: merge-walk</span></span>
+<span id="cb18-252"><a href="#cb18-252" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: asis</span></span>
+<span id="cb18-253"><a href="#cb18-253" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> _gallery <span class="im">import</span> merge_walk, merge_walk_table</span>
+<span id="cb18-254"><a href="#cb18-254" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-255"><a href="#cb18-255" aria-hidden="true" tabindex="-1"></a>walk <span class="op">=</span> merge_walk(result, X, y, targets<span class="op">=</span>[<span class="dv">40</span>, <span class="dv">20</span>, <span class="dv">10</span>, <span class="dv">5</span>])</span>
+<span id="cb18-256"><a href="#cb18-256" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(merge_walk_table(walk, result))</span>
+<span id="cb18-257"><a href="#cb18-257" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb18-258"><a href="#cb18-258" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-259"><a href="#cb18-259" aria-hidden="true" tabindex="-1"></a>**Read the ARI column.** Merging from 81 down to 20 barely moves NMI (−0.010) but **nearly doubles ARI** — because the 61 extra clusters in the raw partition were genuine sub-communities, and collapsing them recovers the coarser structure the label encodes. Merging further (to 10) gives you ARI close to k-means's — without the oracle having been consulted.</span>
+<span id="cb18-260"><a href="#cb18-260" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-261"><a href="#cb18-261" aria-hidden="true" tabindex="-1"></a>This is the move the "parameter-free" pitch is really making: *DYF doesn't pick one k, it gives you the whole tree, and you slice it at whatever granularity your downstream task wants.* K-means and HDBSCAN both commit to a single partition. DYF commits to a ranked hierarchy.</span>
+<span id="cb18-262"><a href="#cb18-262" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-263"><a href="#cb18-263" aria-hidden="true" tabindex="-1"></a><span class="fu">## What happened to the Digits story?</span></span>
+<span id="cb18-264"><a href="#cb18-264" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-265"><a href="#cb18-265" aria-hidden="true" tabindex="-1"></a>Against the Digits notebook, the story flips on NMI but breaks on ARI:</span>
+<span id="cb18-266"><a href="#cb18-266" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-267"><a href="#cb18-267" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Dataset <span class="pp">|</span> DYF k <span class="pp">|</span> k-means NMI <span class="pp">|</span> DYF NMI <span class="pp">|</span> DYF NMI − KMeans NMI <span class="pp">|</span> DYF ARI <span class="pp">|</span> KMeans ARI <span class="pp">|</span></span>
+<span id="cb18-268"><a href="#cb18-268" aria-hidden="true" tabindex="-1"></a><span class="pp">|---------|------:|------------:|--------:|---------------------:|--------:|-----------:|</span></span>
+<span id="cb18-269"><a href="#cb18-269" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Digits  <span class="pp">|</span> 10    <span class="pp">|</span> 0.773       <span class="pp">|</span> 0.696   <span class="pp">|</span> −0.077               <span class="pp">|</span> 0.614   <span class="pp">|</span> 0.726      <span class="pp">|</span></span>
+<span id="cb18-270"><a href="#cb18-270" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> **MNIST** | **81** | **0.491** | **0.552** | **+0.061**         | **0.175** | **0.361** <span class="pp">|</span></span>
+<span id="cb18-271"><a href="#cb18-271" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-272"><a href="#cb18-272" aria-hidden="true" tabindex="-1"></a>**DYF now beats oracle k-means on NMI by 0.061** — but loses on ARI by 0.186. How do you lose ARI while winning NMI?</span>
+<span id="cb18-273"><a href="#cb18-273" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-274"><a href="#cb18-274" aria-hidden="true" tabindex="-1"></a><span class="fu">### The over-partitioning question</span></span>
+<span id="cb18-275"><a href="#cb18-275" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-276"><a href="#cb18-276" aria-hidden="true" tabindex="-1"></a>DYF found **81 natural communities on MNIST**, not 10. Three possibilities:</span>
+<span id="cb18-277"><a href="#cb18-277" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-278"><a href="#cb18-278" aria-hidden="true" tabindex="-1"></a>**(a) It's finding real sub-style structure.** There are multiple stylistic variants of every digit — slanted 7s vs. crossbar 7s, loopy 4s vs. open 4s, continental 1s vs. American 1s. If DYF's 81 communities each map cleanly to *one* ground-truth digit (just at a finer granularity than the flat 10-label), then DYF is right and the label is impoverished. This is the "MNIST has more than 10 classes if you look closely" reading.</span>
+<span id="cb18-279"><a href="#cb18-279" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-280"><a href="#cb18-280" aria-hidden="true" tabindex="-1"></a>**(b) It's fragmenting classes.** The same digit class could be split across many DYF communities for arbitrary geometric reasons (LSH hyperplane placement, UMAP projection quirks) rather than semantic ones. This would be the "DYF over-partitioned" reading.</span>
+<span id="cb18-281"><a href="#cb18-281" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-282"><a href="#cb18-282" aria-hidden="true" tabindex="-1"></a>**(c) Some mix.** Some communities are genuine sub-styles; others are artifacts.</span>
+<span id="cb18-283"><a href="#cb18-283" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-284"><a href="#cb18-284" aria-hidden="true" tabindex="-1"></a>NMI and ARI disagree *because* they treat over-partitioning differently:</span>
+<span id="cb18-285"><a href="#cb18-285" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-286"><a href="#cb18-286" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**NMI** (normalized mutual information) — normalizes for cluster counts. Getting "all the 7s into one pile vs two piles of slanted/crossbar 7s" both score well, as long as each pile stays pure.</span>
+<span id="cb18-287"><a href="#cb18-287" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**ARI** (adjusted Rand index) — penalizes any pair of points that ends up in different clusters when the ground truth puts them together. Splitting the 7s into two piles costs you pairs, regardless of how pure those piles are.</span>
+<span id="cb18-288"><a href="#cb18-288" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-289"><a href="#cb18-289" aria-hidden="true" tabindex="-1"></a>**The NMI-win-but-ARI-loss signature is the fingerprint of clean over-partitioning** — clusters that are *individually pure* but *collectively too many*. That's reading (a) above, with some (c).</span>
+<span id="cb18-290"><a href="#cb18-290" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-291"><a href="#cb18-291" aria-hidden="true" tabindex="-1"></a><span class="fu">### Why did this happen at 70K but not at 1,797?</span></span>
+<span id="cb18-292"><a href="#cb18-292" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-293"><a href="#cb18-293" aria-hidden="true" tabindex="-1"></a>Density. At 1,797 samples, there are only ~180 points per digit class, and DYF's tree leaves stay coarse enough that Louvain merges them into ~10 natural communities matching the flat label. At 70K samples, there are 7,000 points per digit class, and DYF's tree now has enough room to carve out stable sub-leaves per style variant. Louvain finds those sub-communities and reports them.</span>
+<span id="cb18-294"><a href="#cb18-294" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-295"><a href="#cb18-295" aria-hidden="true" tabindex="-1"></a>**This is DYF doing what it's designed to do** — surface structure the data supports. The fact that the label is flat and the data isn't is a mismatch between the benchmark and reality.</span>
+<span id="cb18-296"><a href="#cb18-296" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-297"><a href="#cb18-297" aria-hidden="true" tabindex="-1"></a><span class="fu">### What would you actually want in a real application?</span></span>
+<span id="cb18-298"><a href="#cb18-298" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-299"><a href="#cb18-299" aria-hidden="true" tabindex="-1"></a>Depends on the downstream task:</span>
+<span id="cb18-300"><a href="#cb18-300" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-301"><a href="#cb18-301" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**If you're doing classification** (given a new image, predict 0–9): you want k=10 and ARI&gt;NMI. K-means is better here, *provided you know k*.</span>
+<span id="cb18-302"><a href="#cb18-302" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**If you're doing retrieval** (given a new image, find similar ones): you want sub-style structure preserved. Two crossbar 7s are more similar to each other than a crossbar 7 and a slanted 7. DYF is better here.</span>
+<span id="cb18-303"><a href="#cb18-303" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**If you're doing data exploration** (what's in this corpus?): you definitely want the sub-style structure, and you probably want the hierarchical tree that DYF produces as a bonus.</span>
+<span id="cb18-304"><a href="#cb18-304" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-305"><a href="#cb18-305" aria-hidden="true" tabindex="-1"></a>The gallery's "flat-NMI-against-flat-label" scoring is the classification rubric. DYF is closer to a retrieval / exploration rubric, which is what a parameter-free tool is *for*.</span>
+<span id="cb18-306"><a href="#cb18-306" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-307"><a href="#cb18-307" aria-hidden="true" tabindex="-1"></a><span class="fu">### The sports analogy update</span></span>
+<span id="cb18-308"><a href="#cb18-308" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-309"><a href="#cb18-309" aria-hidden="true" tabindex="-1"></a>Digits was k-means's home court — convex blobs, small k, oracle-provided. It won, cleanly.</span>
+<span id="cb18-310"><a href="#cb18-310" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-311"><a href="#cb18-311" aria-hidden="true" tabindex="-1"></a>MNIST is a *longer game*. K-means held the lead most of the way by sticking to the rigid 10-cluster playbook. DYF kept finding extra joints in the structure, and the NMI scoreboard eventually flipped. But ARI — a different metric with a different rulebook — still favors the disciplined game plan.</span>
+<span id="cb18-312"><a href="#cb18-312" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-313"><a href="#cb18-313" aria-hidden="true" tabindex="-1"></a>It's no longer clear which method is "winning." It depends on which rulebook you hand the judges. That ambiguity is the point.</span>
+<span id="cb18-314"><a href="#cb18-314" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-315"><a href="#cb18-315" aria-hidden="true" tabindex="-1"></a><span class="fu">## Caveats</span></span>
+<span id="cb18-316"><a href="#cb18-316" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-317"><a href="#cb18-317" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**DYF's 81 clusters include some artifacts**, almost certainly. Reading (c) is the honest one. A rigorous analysis would compute a confusion matrix between DYF clusters and the 10 digit labels, check whether each DYF cluster is dominantly one class (style-variant reading) or scattered (fragmentation reading), and report the breakdown. The gallery skips that to keep notebooks readable; a supplement could add it.</span>
+<span id="cb18-318"><a href="#cb18-318" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**UMAP is a projection, not the cluster space.** When DYF's and k-means's partitions look visually different in the UMAP panel, some of that is true clustering difference and some is UMAP's 2D compression of decisions made in 784d. Don't read the UMAP too literally.</span>
+<span id="cb18-319"><a href="#cb18-319" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Cache is in `/tmp`.** Dumped on reboot, which is fine for the gallery — real applications should use a durable cache.</span>
+</code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
+</div></div></div></div></div>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

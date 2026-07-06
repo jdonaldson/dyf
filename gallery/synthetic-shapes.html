@@ -1,0 +1,1567 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.38">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>Synthetic Shapes</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-cf35b1e8b68dd0c452cd246239eb2ea9.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-f1a5c2bb43452cd3d80060817c0f5863.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-cf35b1e8b68dd0c452cd246239eb2ea9.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-de8f194416f18390ac7758f973fc7675.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-eb587815051a02b7a77ac6fc122ec681.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../site_libs/bootstrap/bootstrap-de8f194416f18390ac7758f973fc7675.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-QXBFEQPED2"></script>
+
+<script type="text/javascript">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
+</script>
+
+
+</head>
+
+<body class="nav-fixed quarto-light"><script id="quarto-html-before-body" type="application/javascript">
+    const toggleBodyColorMode = (bsSheetEl) => {
+      const mode = bsSheetEl.getAttribute("data-mode");
+      const bodyEl = window.document.querySelector("body");
+      if (mode === "dark") {
+        bodyEl.classList.add("quarto-dark");
+        bodyEl.classList.remove("quarto-light");
+      } else {
+        bodyEl.classList.add("quarto-light");
+        bodyEl.classList.remove("quarto-dark");
+      }
+    }
+    const toggleBodyColorPrimary = () => {
+      const bsSheetEl = window.document.querySelector("link#quarto-bootstrap:not([rel=disabled-stylesheet])");
+      if (bsSheetEl) {
+        toggleBodyColorMode(bsSheetEl);
+      }
+    }
+    const setColorSchemeToggle = (alternate) => {
+      const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+      for (let i=0; i < toggles.length; i++) {
+        const toggle = toggles[i];
+        if (toggle) {
+          if (alternate) {
+            toggle.classList.add("alternate");
+          } else {
+            toggle.classList.remove("alternate");
+          }
+        }
+      }
+    };
+    const toggleColorMode = (alternate) => {
+      // Switch the stylesheets
+      const primaryStylesheets = window.document.querySelectorAll('link.quarto-color-scheme:not(.quarto-color-alternate)');
+      const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+      manageTransitions('#quarto-margin-sidebar .nav-link', false);
+      if (alternate) {
+        // note: dark is layered on light, we don't disable primary!
+        enableStylesheet(alternateStylesheets);
+        for (const sheetNode of alternateStylesheets) {
+          if (sheetNode.id === "quarto-bootstrap") {
+            toggleBodyColorMode(sheetNode);
+          }
+        }
+      } else {
+        disableStylesheet(alternateStylesheets);
+        enableStylesheet(primaryStylesheets)
+        toggleBodyColorPrimary();
+      }
+      manageTransitions('#quarto-margin-sidebar .nav-link', true);
+      // Switch the toggles
+      setColorSchemeToggle(alternate)
+      // Hack to workaround the fact that safari doesn't
+      // properly recolor the scrollbar when toggling (#1455)
+      if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+        manageTransitions("body", false);
+        window.scrollTo(0, 1);
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          manageTransitions("body", true);
+        }, 40);
+      }
+    }
+    const disableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        stylesheet.rel = 'disabled-stylesheet';
+      }
+    }
+    const enableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        if(stylesheet.rel !== 'stylesheet') { // for Chrome, which will still FOUC without this check
+          stylesheet.rel = 'stylesheet';
+        }
+      }
+    }
+    const manageTransitions = (selector, allowTransitions) => {
+      const els = window.document.querySelectorAll(selector);
+      for (let i=0; i < els.length; i++) {
+        const el = els[i];
+        if (allowTransitions) {
+          el.classList.remove('notransition');
+        } else {
+          el.classList.add('notransition');
+        }
+      }
+    }
+    const isFileUrl = () => {
+      return window.location.protocol === 'file:';
+    }
+    const hasAlternateSentinel = () => {
+      let styleSentinel = getColorSchemeSentinel();
+      if (styleSentinel !== null) {
+        return styleSentinel === "alternate";
+      } else {
+        return false;
+      }
+    }
+    const setStyleSentinel = (alternate) => {
+      const value = alternate ? "alternate" : "default";
+      if (!isFileUrl()) {
+        window.localStorage.setItem("quarto-color-scheme", value);
+      } else {
+        localAlternateSentinel = value;
+      }
+    }
+    const getColorSchemeSentinel = () => {
+      if (!isFileUrl()) {
+        const storageValue = window.localStorage.getItem("quarto-color-scheme");
+        return storageValue != null ? storageValue : localAlternateSentinel;
+      } else {
+        return localAlternateSentinel;
+      }
+    }
+    const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+      const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+      const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+      let newTheme = '';
+      if(authorPrefersDark) {
+        newTheme = isAlternate ? baseTheme : alternateTheme;
+      } else {
+        newTheme = isAlternate ? alternateTheme : baseTheme;
+      }
+      const changeGiscusTheme = () => {
+        // From: https://github.com/giscus/giscus/issues/336
+        const sendMessage = (message) => {
+          const iframe = document.querySelector('iframe.giscus-frame');
+          if (!iframe) return;
+          iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+        }
+        sendMessage({
+          setConfig: {
+            theme: newTheme
+          }
+        });
+      }
+      const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+      if (isGiscussLoaded) {
+        changeGiscusTheme();
+      }
+    };
+    const authorPrefersDark = false;
+    const darkModeDefault = authorPrefersDark;
+      document.querySelector('link#quarto-text-highlighting-styles.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+      document.querySelector('link#quarto-bootstrap.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+    let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+    // Dark / light mode switch
+    window.quartoToggleColorScheme = () => {
+      // Read the current dark / light value
+      let toAlternate = !hasAlternateSentinel();
+      toggleColorMode(toAlternate);
+      setStyleSentinel(toAlternate);
+      toggleGiscusIfUsed(toAlternate, darkModeDefault);
+      window.dispatchEvent(new Event('resize'));
+    };
+    // Switch to dark mode if need be
+    if (hasAlternateSentinel()) {
+      toggleColorMode(true);
+    } else {
+      toggleColorMode(false);
+    }
+  </script>
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a href="../index.html" class="navbar-brand navbar-brand-logo">
+    <img src="../dyf_logo.svg" alt="DYF" class="navbar-logo light-content">
+    <img src="../dyf_logo.svg" alt="DYF" class="navbar-logo dark-content">
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../getting-started.html"> 
+<span class="menu-text">Getting Started</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../how-it-works.html"> 
+<span class="menu-text">How It Works</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../gallery/index.html"> 
+<span class="menu-text">Gallery</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../reference/index.html"> 
+<span class="menu-text">API Reference</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/jdonaldson/dyf"> <i class="bi bi-github" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#shape-1-two-moons" id="toc-shape-1-two-moons" class="nav-link active" data-scroll-target="#shape-1-two-moons">Shape 1: Two moons</a>
+  <ul class="collapse">
+  <li><a href="#and-the-merge-walk-cant-rescue-it" id="toc-and-the-merge-walk-cant-rescue-it" class="nav-link" data-scroll-target="#and-the-merge-walk-cant-rescue-it">And the merge walk can’t rescue it</a></li>
+  </ul></li>
+  <li><a href="#shape-2-concentric-circles" id="toc-shape-2-concentric-circles" class="nav-link" data-scroll-target="#shape-2-concentric-circles">Shape 2: Concentric circles</a></li>
+  <li><a href="#shape-3-varied-density-blobs" id="toc-shape-3-varied-density-blobs" class="nav-link" data-scroll-target="#shape-3-varied-density-blobs">Shape 3: Varied-density blobs</a></li>
+  <li><a href="#summary" id="toc-summary" class="nav-link" data-scroll-target="#summary">Summary</a></li>
+  <li><a href="#why-hdbscan-isnt-in-every-other-notebook" id="toc-why-hdbscan-isnt-in-every-other-notebook" class="nav-link" data-scroll-target="#why-hdbscan-isnt-in-every-other-notebook">Why HDBSCAN isn’t in every other notebook</a>
+  <ul class="collapse">
+  <li><a href="#the-home-court-away-game-framing-continued" id="toc-the-home-court-away-game-framing-continued" class="nav-link" data-scroll-target="#the-home-court-away-game-framing-continued">The home court / away game framing, continued</a></li>
+  </ul></li>
+  <li><a href="#what-to-take-away" id="toc-what-to-take-away" class="nav-link" data-scroll-target="#what-to-take-away">What to take away</a></li>
+  <li><a href="#caveats" id="toc-caveats" class="nav-link" data-scroll-target="#caveats">Caveats</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<div class="quarto-title-block"><div><h1 class="title">Synthetic Shapes</h1><button type="button" class="btn code-tools-button dropdown-toggle" id="quarto-code-tools-menu" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi"></i> Code</button><ul class="dropdown-menu dropdown-menu-end" aria-labelelledby="quarto-code-tools-menu"><li><a id="quarto-show-all-code" class="dropdown-item" href="javascript:void(0)" role="button">Show All Code</a></li><li><a id="quarto-hide-all-code" class="dropdown-item" href="javascript:void(0)" role="button">Hide All Code</a></li><li><hr class="dropdown-divider"></li><li><a id="quarto-view-source" class="dropdown-item" href="javascript:void(0)" role="button">View Source</a></li></ul></div></div>
+<p class="subtitle lead">Moons, circles, and varied-density blobs — where DYF is not the best tool, and why that’s OK.</p>
+  <div class="quarto-categories">
+    <div class="quarto-category">synthetic</div>
+    <div class="quarto-category">2d</div>
+    <div class="quarto-category">pedagogical</div>
+  </div>
+  </div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>Before this notebook, I was going to tell you DYF handles curved non-convex shapes well. The tests I ran told a different, more useful story: <strong>on low-dimensional toy shapes, HDBSCAN beats DYF decisively — and the right conclusion isn’t to pretend otherwise, it’s to understand <em>when</em> each method earns its keep.</strong></p>
+<p>This notebook runs all three methods (DYF, HDBSCAN, and oracle-k k-means) on three canonical synthetic datasets. HDBSCAN wins every one. The point isn’t that DYF is bad; it’s that DYF’s value prop lives at scales and dimensionalities where HDBSCAN itself starts to struggle — which is what the real-world notebooks in this gallery show.</p>
+<section id="shape-1-two-moons" class="level2">
+<h2 class="anchored" data-anchor-id="shape-1-two-moons">Shape 1: Two moons</h2>
+<p>Two interleaved crescents. The textbook “k-means fails, density-based methods succeed” case.</p>
+<div id="moons-run" class="cell" data-execution_count="1">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> sys</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>sys.path.insert(<span class="dv">0</span>, <span class="st">"."</span>)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.datasets <span class="im">import</span> make_moons</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> _gallery <span class="im">import</span> run_dyf, run_kmeans, run_hdbscan, plot_single</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>X, y <span class="op">=</span> make_moons(n_samples<span class="op">=</span><span class="dv">3000</span>, noise<span class="op">=</span><span class="fl">0.08</span>, random_state<span class="op">=</span><span class="dv">42</span>)</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>X <span class="op">=</span> X.astype(np.float32)</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>r_moons   <span class="op">=</span> run_dyf(X, y)</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>km_moons  <span class="op">=</span> run_kmeans(X, y)</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>hdb_moons <span class="op">=</span> run_hdbscan(X, y)</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"DYF       k=</span><span class="sc">{</span>r_moons<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">       NMI=</span><span class="sc">{</span>r_moons<span class="sc">.</span>nmi<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>r_moons<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"k-means   told k=2  NMI=</span><span class="sc">{</span>km_moons[<span class="st">'nmi'</span>]<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>km_moons[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"HDBSCAN   k=</span><span class="sc">{</span>hdb_moons[<span class="st">'recovered_k'</span>]<span class="sc">}</span><span class="ss"> noise=</span><span class="sc">{</span>hdb_moons[<span class="st">'noise_frac'</span>]<span class="sc">:.1%}</span><span class="ss">  NMI=</span><span class="sc">{</span>hdb_moons[<span class="st">'nmi'</span>]<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>hdb_moons[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>DYF       k=3       NMI=0.328 ARI=0.359
+k-means   told k=2  NMI=0.192 ARI=0.254
+HDBSCAN   k=2 noise=0.2%  NMI=1.000 ARI=1.000</code></pre>
+</div>
+</div>
+<div class="gallery-fluid">
+<div id="cell-fig-moons-truth" class="cell" data-execution_count="2">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>plot_single(X, y, title<span class="op">=</span><span class="st">"Moons: ground truth (k=2)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-display" data-execution_count="2">
+<div id="fig-moons-truth" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-moons-truth-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="synthetic-shapes_files/figure-html/fig-moons-truth-output-1.png" width="470" height="470" class="figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-moons-truth-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: Ground truth — two crescents.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div id="cell-fig-moons-dyf" class="cell" data-execution_count="3">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>plot_single(X, r_moons.labels, title<span class="op">=</span><span class="ss">f"Moons: DYF (k=</span><span class="sc">{</span>r_moons<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-display" data-execution_count="3">
+<div id="fig-moons-dyf" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-moons-dyf-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="synthetic-shapes_files/figure-html/fig-moons-dyf-output-1.png" width="470" height="470" class="figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-moons-dyf-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;2: DYF partially follows the shape but splits one moon in half.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div id="cell-fig-moons-hdb" class="cell" data-execution_count="4">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>plot_single(X, hdb_moons[<span class="st">"labels"</span>], title<span class="op">=</span><span class="ss">f"Moons: HDBSCAN (k=</span><span class="sc">{</span>hdb_moons[<span class="st">'recovered_k'</span>]<span class="sc">}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-display" data-execution_count="4">
+<div id="fig-moons-hdb" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-moons-hdb-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="synthetic-shapes_files/figure-html/fig-moons-hdb-output-1.png" width="470" height="470" class="figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-moons-hdb-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;3: HDBSCAN — perfect separation, 0.2% noise.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div id="cell-fig-moons-kmeans" class="cell" data-execution_count="5">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>plot_single(X, km_moons[<span class="st">"labels"</span>], title<span class="op">=</span><span class="st">"Moons: k-means (told k=2)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-display" data-execution_count="5">
+<div id="fig-moons-kmeans" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-moons-kmeans-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="synthetic-shapes_files/figure-html/fig-moons-kmeans-output-1.png" width="470" height="470" class="figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-moons-kmeans-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;4: K-means — straight-line cut bisects both crescents.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<p><strong>HDBSCAN nails this perfectly (NMI=ARI=1.000).</strong> DYF modestly beats k-means but splits one crescent into two clusters — a crosstab against ground truth shows DYF’s largest cluster is 83% moon-1, a middle cluster is 97% moon-0, and the third is 76% moon-0 with bleeder points. It’s not “following the crescents” — it’s doing LSH hyperplane splits that happen to correlate with the ground truth.</p>
+<p>Why does HDBSCAN beat DYF here? HDBSCAN uses <em>mutual reachability</em> distances — it literally follows density ridges through the data, tracking connected-density regions. That’s the right tool for a curved 2D manifold. DYF’s mechanism is different: recursive LSH splits → leaf centroids → Louvain on the centroid KNN graph. That’s designed for <em>scale</em>, not <em>shape</em>. The 2D regime is HDBSCAN’s turf.</p>
+<section id="and-the-merge-walk-cant-rescue-it" class="level3">
+<h3 class="anchored" data-anchor-id="and-the-merge-walk-cant-rescue-it">And the merge walk can’t rescue it</h3>
+<p>DYF’s multi-resolution pitch — <a href="../gallery/mnist.html#walking-down-the-hierarchy">seen on MNIST</a> and <a href="../gallery/twenty-newsgroups.html#walking-down-the-hierarchy">20 Newsgroups</a> — is that you can walk down the partition hierarchy to coarser resolutions post-hoc. On moons, merging DYF’s k=3 output down to k=2 produces:</p>
+<div id="moons-merge" class="cell" data-execution_count="6">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> _gallery <span class="im">import</span> merge_walk, merge_walk_table</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(merge_walk_table(merge_walk(r_moons, X, y, targets<span class="op">=</span>[<span class="dv">2</span>]), r_moons))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<table class="caption-top table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th>Resolution</th>
+<th style="text-align: right;">Actual k</th>
+<th style="text-align: right;">NMI</th>
+<th style="text-align: right;">ARI</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Raw DYF</strong></td>
+<td style="text-align: right;"><strong>3</strong></td>
+<td style="text-align: right;"><strong>0.328</strong></td>
+<td style="text-align: right;"><strong>0.359</strong></td>
+</tr>
+<tr class="even">
+<td>merge → 2</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">0.258</td>
+<td style="text-align: right;">0.322</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>NMI <em>decreases</em> from 0.323 to 0.258. The merge walk assumes the raw over-partition contains the coarser structure as a sub-partition — when it doesn’t (because the original LSH cuts went <em>across</em> the ground truth), merging just averages the wrong fragments together. <strong>Merging walks hierarchy; it doesn’t fix geometry.</strong> This is the honest failure mode to contrast against MNIST, where merging from 81 → 20 roughly doubled ARI while barely moving NMI.</p>
+</section>
+</section>
+<section id="shape-2-concentric-circles" class="level2">
+<h2 class="anchored" data-anchor-id="shape-2-concentric-circles">Shape 2: Concentric circles</h2>
+<p>Inner ring nested inside outer ring. This is traditionally described as a spectral-clustering problem, because neither k-means nor classic density methods are supposed to handle topological nesting. Let’s check.</p>
+<div id="circles-run" class="cell" data-execution_count="7">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.datasets <span class="im">import</span> make_circles</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>X, y <span class="op">=</span> make_circles(n_samples<span class="op">=</span><span class="dv">3000</span>, noise<span class="op">=</span><span class="fl">0.05</span>, factor<span class="op">=</span><span class="fl">0.5</span>, random_state<span class="op">=</span><span class="dv">42</span>)</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>X <span class="op">=</span> X.astype(np.float32)</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>r_circ   <span class="op">=</span> run_dyf(X, y)</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>km_circ  <span class="op">=</span> run_kmeans(X, y)</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>hdb_circ <span class="op">=</span> run_hdbscan(X, y)</span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"DYF       k=</span><span class="sc">{</span>r_circ<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">       NMI=</span><span class="sc">{</span>r_circ<span class="sc">.</span>nmi<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>r_circ<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"k-means   told k=2  NMI=</span><span class="sc">{</span>km_circ[<span class="st">'nmi'</span>]<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>km_circ[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"HDBSCAN   k=</span><span class="sc">{</span>hdb_circ[<span class="st">'recovered_k'</span>]<span class="sc">}</span><span class="ss"> noise=</span><span class="sc">{</span>hdb_circ[<span class="st">'noise_frac'</span>]<span class="sc">:.1%}</span><span class="ss">  NMI=</span><span class="sc">{</span>hdb_circ[<span class="st">'nmi'</span>]<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>hdb_circ[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>DYF       k=3       NMI=-0.000 ARI=-0.000
+k-means   told k=2  NMI=-0.000 ARI=-0.000
+HDBSCAN   k=2 noise=0.0%  NMI=1.000 ARI=1.000</code></pre>
+</div>
+</div>
+<div class="gallery-fluid">
+<div id="cell-fig-circles-truth" class="cell" data-execution_count="8">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>plot_single(X, y, title<span class="op">=</span><span class="st">"Circles: ground truth (k=2)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-display" data-execution_count="8">
+<div id="fig-circles-truth" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-circles-truth-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="synthetic-shapes_files/figure-html/fig-circles-truth-output-1.png" width="470" height="470" class="figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-circles-truth-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;5: Ground truth — inner ring nested inside outer.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div id="cell-fig-circles-dyf" class="cell" data-execution_count="9">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>plot_single(X, r_circ.labels, title<span class="op">=</span><span class="ss">f"Circles: DYF (k=</span><span class="sc">{</span>r_circ<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-display" data-execution_count="9">
+<div id="fig-circles-dyf" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-circles-dyf-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="synthetic-shapes_files/figure-html/fig-circles-dyf-output-1.png" width="470" height="470" class="figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-circles-dyf-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;6: DYF — cuts by angle, misses the nesting.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div id="cell-fig-circles-hdb" class="cell" data-execution_count="10">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>plot_single(X, hdb_circ[<span class="st">"labels"</span>], title<span class="op">=</span><span class="ss">f"Circles: HDBSCAN (k=</span><span class="sc">{</span>hdb_circ[<span class="st">'recovered_k'</span>]<span class="sc">}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-display" data-execution_count="10">
+<div id="fig-circles-hdb" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-circles-hdb-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="synthetic-shapes_files/figure-html/fig-circles-hdb-output-1.png" width="470" height="470" class="figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-circles-hdb-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;7: HDBSCAN — separates the rings cleanly.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div id="cell-fig-circles-kmeans" class="cell" data-execution_count="11">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>plot_single(X, km_circ[<span class="st">"labels"</span>], title<span class="op">=</span><span class="st">"Circles: k-means (told k=2)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-display" data-execution_count="11">
+<div id="fig-circles-kmeans" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-circles-kmeans-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="synthetic-shapes_files/figure-html/fig-circles-kmeans-output-1.png" width="470" height="470" class="figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-circles-kmeans-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;8: K-means — same angular failure as DYF.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<p><strong>Both DYF and k-means score NMI ≈ 0. HDBSCAN scores NMI=1.000.</strong> The conventional wisdom — <em>“concentric rings require spectral clustering”</em> — turns out to be overstated. HDBSCAN handles them because the <em>gap between the rings</em> is a density valley, and HDBSCAN’s mutual-reachability metric picks that gap up as a cluster boundary. DYF, which cuts by LSH hyperplane rather than by density valley, cannot see the gap.</p>
+</section>
+<section id="shape-3-varied-density-blobs" class="level2">
+<h2 class="anchored" data-anchor-id="shape-3-varied-density-blobs">Shape 3: Varied-density blobs</h2>
+<p>Five Gaussians with unequal sample sizes and spreads: <code>[200, 400, 200, 1000, 3000]</code> samples at <code>[0.3, 0.8, 0.5, 1.5, 2.0]</code> std. Uneven density is where parameter-free methods traditionally disagree.</p>
+<div id="blobs-run" class="cell" data-execution_count="12">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.datasets <span class="im">import</span> make_blobs</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>X, y <span class="op">=</span> make_blobs(</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>    n_samples<span class="op">=</span>[<span class="dv">200</span>, <span class="dv">400</span>, <span class="dv">200</span>, <span class="dv">1000</span>, <span class="dv">3000</span>],</span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>    cluster_std<span class="op">=</span>[<span class="fl">0.3</span>, <span class="fl">0.8</span>, <span class="fl">0.5</span>, <span class="fl">1.5</span>, <span class="fl">2.0</span>],</span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>    n_features<span class="op">=</span><span class="dv">2</span>,</span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>    random_state<span class="op">=</span><span class="dv">42</span>,</span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>X <span class="op">=</span> X.astype(np.float32)</span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>r_blobs   <span class="op">=</span> run_dyf(X, y)</span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>km_blobs  <span class="op">=</span> run_kmeans(X, y)</span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>hdb_blobs <span class="op">=</span> run_hdbscan(X, y)</span>
+<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"DYF       k=</span><span class="sc">{</span>r_blobs<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">       NMI=</span><span class="sc">{</span>r_blobs<span class="sc">.</span>nmi<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>r_blobs<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"k-means   told k=5  NMI=</span><span class="sc">{</span>km_blobs[<span class="st">'nmi'</span>]<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>km_blobs[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"HDBSCAN   k=</span><span class="sc">{</span>hdb_blobs[<span class="st">'recovered_k'</span>]<span class="sc">}</span><span class="ss"> noise=</span><span class="sc">{</span>hdb_blobs[<span class="st">'noise_frac'</span>]<span class="sc">:.1%}</span><span class="ss">  NMI=</span><span class="sc">{</span>hdb_blobs[<span class="st">'nmi'</span>]<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>hdb_blobs[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>DYF       k=3       NMI=0.524 ARI=0.444
+k-means   told k=5  NMI=0.626 ARI=0.353
+HDBSCAN   k=5 noise=2.5%  NMI=0.853 ARI=0.785</code></pre>
+</div>
+</div>
+<div class="gallery-fluid">
+<div id="cell-fig-blobs-truth" class="cell" data-execution_count="13">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>plot_single(X, y, title<span class="op">=</span><span class="st">"Blobs: ground truth (k=5)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-display" data-execution_count="13">
+<div id="fig-blobs-truth" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-blobs-truth-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="synthetic-shapes_files/figure-html/fig-blobs-truth-output-1.png" width="470" height="470" class="figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-blobs-truth-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;9: Ground truth — five blobs, varied sizes and spreads.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div id="cell-fig-blobs-dyf" class="cell" data-execution_count="14">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>plot_single(X, r_blobs.labels, title<span class="op">=</span><span class="ss">f"Blobs: DYF (k=</span><span class="sc">{</span>r_blobs<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-display" data-execution_count="14">
+<div id="fig-blobs-dyf" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-blobs-dyf-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="synthetic-shapes_files/figure-html/fig-blobs-dyf-output-1.png" width="470" height="470" class="figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-blobs-dyf-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;10: DYF — under-partitions, merges diffuse blobs.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div id="cell-fig-blobs-hdb" class="cell" data-execution_count="15">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>plot_single(X, hdb_blobs[<span class="st">"labels"</span>], title<span class="op">=</span><span class="ss">f"Blobs: HDBSCAN (k=</span><span class="sc">{</span>hdb_blobs[<span class="st">'recovered_k'</span>]<span class="sc">}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-display" data-execution_count="15">
+<div id="fig-blobs-hdb" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-blobs-hdb-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="synthetic-shapes_files/figure-html/fig-blobs-hdb-output-1.png" width="470" height="470" class="figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-blobs-hdb-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;11: HDBSCAN — finds 5 clusters with minimal noise.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div id="cell-fig-blobs-kmeans" class="cell" data-execution_count="16">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>plot_single(X, km_blobs[<span class="st">"labels"</span>], title<span class="op">=</span><span class="st">"Blobs: k-means (told k=5)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-display" data-execution_count="16">
+<div id="fig-blobs-kmeans" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-blobs-kmeans-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="synthetic-shapes_files/figure-html/fig-blobs-kmeans-output-1.png" width="470" height="470" class="figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-blobs-kmeans-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;12: K-means — correct k, noisy borders between tight and diffuse blobs.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<p>HDBSCAN again wins — 5 clusters with 2.5% noise, NMI=0.853. DYF under-partitions to 3 clusters. The metric tradeoff between under- and over-partitioning is still worth noting:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 12%">
+<col style="width: 23%">
+<col style="width: 12%">
+<col style="width: 26%">
+<col style="width: 26%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Dataset</th>
+<th style="text-align: right;">DYF recovered_k</th>
+<th>vs true</th>
+<th style="text-align: right;">DYF NMI vs kmeans</th>
+<th style="text-align: right;">DYF ARI vs kmeans</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>MNIST</td>
+<td style="text-align: right;">81</td>
+<td>8× over</td>
+<td style="text-align: right;">DYF +0.061</td>
+<td style="text-align: right;">DYF <strong>−0.186</strong></td>
+</tr>
+<tr class="even">
+<td>Blobs</td>
+<td style="text-align: right;">3</td>
+<td>40% under</td>
+<td style="text-align: right;">DYF <strong>−0.102</strong></td>
+<td style="text-align: right;">DYF +0.091</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Under-partitioning flips the signs</strong> — NMI loses, ARI wins. Over-partitioning on MNIST produced the mirror image. The two metrics disagree predictably about which direction of error they prefer.</p>
+</section>
+<section id="summary" class="level2">
+<h2 class="anchored" data-anchor-id="summary">Summary</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 18%">
+<col style="width: 16%">
+<col style="width: 9%">
+<col style="width: 33%">
+<col style="width: 20%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Shape</th>
+<th>HDBSCAN</th>
+<th>DYF</th>
+<th>k-means (oracle)</th>
+<th>Best tool</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Moons</td>
+<td><strong>1.000</strong> / 1.000</td>
+<td>0.323 / 0.350</td>
+<td>0.192 / 0.254</td>
+<td><strong>HDBSCAN</strong></td>
+</tr>
+<tr class="even">
+<td>Circles</td>
+<td><strong>1.000</strong> / 1.000</td>
+<td>0.000 / 0.000</td>
+<td>0.000 / 0.000</td>
+<td><strong>HDBSCAN</strong></td>
+</tr>
+<tr class="odd">
+<td>Blobs</td>
+<td><strong>0.853</strong> / 0.785</td>
+<td>0.524 / 0.444</td>
+<td>0.626 / 0.353</td>
+<td><strong>HDBSCAN</strong></td>
+</tr>
+</tbody>
+</table>
+<p>HDBSCAN wins cleanly on all three. So why is DYF in the gallery at all?</p>
+</section>
+<section id="why-hdbscan-isnt-in-every-other-notebook" class="level2">
+<h2 class="anchored" data-anchor-id="why-hdbscan-isnt-in-every-other-notebook">Why HDBSCAN isn’t in every other notebook</h2>
+<p>Because HDBSCAN’s synthetic-shape performance doesn’t generalize. On the real-world notebooks — <a href="../gallery/digits.html">Digits</a>, <a href="../gallery/twenty-newsgroups.html">20 Newsgroups</a>, <a href="../gallery/cifar10-clip.html">CIFAR-10 + CLIP</a>, <a href="../gallery/cmu-mocap.html">CMU MoCap</a> — HDBSCAN starts to break:</p>
+<ul>
+<li><strong>Digits (1,797 × 64d)</strong>: HDBSCAN labels most points as noise. Its 0.935 NMI is computed on only the 40% of points it was willing to cluster; the other 60% got <code>-1</code>. That’s not an honest apples-to-apples comparison with methods that partition every point.</li>
+<li><strong>20 Newsgroups (18,846 × 384d)</strong>: HDBSCAN takes 144 seconds of wall clock and discards 84% of posts as noise. The real-world notebook documents this and omits HDBSCAN from the comparison because it’s not usable at that scale.</li>
+<li><strong>CIFAR-10 (10,000 × 512d)</strong> and <strong>MNIST (70,000 × 784d)</strong>: HDBSCAN’s runtime and noise fractions scale badly with both sample count and dimensionality. It can technically run, but the output is a small clustered subset plus a large “I don’t know” bucket.</li>
+</ul>
+<p>HDBSCAN’s mechanism — pairwise mutual reachability, densities estimated from k-nearest-neighbors — is <strong>O(n²) in the worst case</strong>, and its density estimator gets noisy as dimensionality grows. It’s optimized for clean low-dimensional data where every point has clear neighbors.</p>
+<p>DYF’s mechanism — LSH-based hash buckets, tree splits on PCA of leaf centroids, Louvain on a sparse KNN graph of centroids — is designed for the opposite regime: <strong>hundreds of thousands of points at hundreds of dimensions, where you need every point assigned and you can’t afford an O(n²) pairwise comparison.</strong> That’s the scale where RAG corpora, recommender embeddings, and sensor streams actually live.</p>
+<section id="the-home-court-away-game-framing-continued" class="level3">
+<h3 class="anchored" data-anchor-id="the-home-court-away-game-framing-continued">The home court / away game framing, continued</h3>
+<p>If <a href="../gallery/digits.html">Digits</a> was k-means’s home court (convex blobs, oracle k), <strong>synthetic 2D shapes are HDBSCAN’s home court</strong> (clean, low-dim, density-valleys visible in the raw coordinates). DYF is the away team in both cases — it doesn’t <em>win</em> either one, but it doesn’t <em>collapse</em> either. At scale and in higher dimensions, the home courts disappear and DYF is the one left standing with a complete partition, reasonable runtime, and no noise bucket.</p>
+</section>
+</section>
+<section id="what-to-take-away" class="level2">
+<h2 class="anchored" data-anchor-id="what-to-take-away">What to take away</h2>
+<ul>
+<li><strong>DYF is not the best parameter-free clustering method for every regime.</strong> On clean low-dimensional toy shapes, HDBSCAN wins decisively.</li>
+<li><strong>The right question is not “which method is best?”</strong> It’s “which method stays useful as n and d grow?” DYF’s answer to that is better than HDBSCAN’s, which is why it earns its place downstream.</li>
+<li><strong>If your data is 2D, clean, and has clear density valleys</strong>, use HDBSCAN. It will beat DYF and it will beat k-means. The gallery’s other notebooks show what happens when it isn’t.</li>
+<li><strong>NMI and ARI still disagree predictably</strong> about over- vs under-partitioning. That observation holds whatever clustering method you use.</li>
+</ul>
+</section>
+<section id="caveats" class="level2">
+<h2 class="anchored" data-anchor-id="caveats">Caveats</h2>
+<ul>
+<li>The HDBSCAN results above used default hyperparameters (<code>min_cluster_size=5</code>, <code>min_samples=None</code>). Tuning these would change the outputs; the point is that <em>at defaults</em>, HDBSCAN is the better tool here.</li>
+<li>A proper benchmark would include DBSCAN, OPTICS, spectral clustering, and Mean Shift for full comparison. The gallery uses HDBSCAN as a representative density-based baseline; other methods would place somewhere similar on the shape-vs-scale axis.</li>
+<li>Synthetic shapes are a <em>diagnostic</em>, not an evaluation. Use them to understand mechanism; use real data to judge usefulness.</li>
+</ul>
+
+
+<!-- -->
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    // Ensure there is a toggle, if there isn't float one in the top right
+    if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+      const a = window.document.createElement('a');
+      a.classList.add('top-right');
+      a.classList.add('quarto-color-scheme-toggle');
+      a.href = "";
+      a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+      const i = window.document.createElement("i");
+      i.classList.add('bi');
+      a.appendChild(i);
+      window.document.body.appendChild(a);
+    }
+    setColorSchemeToggle(hasAlternateSentinel())
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+    const viewSource = window.document.getElementById('quarto-view-source') ||
+                       window.document.getElementById('quarto-code-tools-source');
+    if (viewSource) {
+      const sourceUrl = viewSource.getAttribute("data-quarto-source-url");
+      viewSource.addEventListener("click", function(e) {
+        if (sourceUrl) {
+          // rstudio viewer pane
+          if (/\bcapabilities=\b/.test(window.location)) {
+            window.open(sourceUrl);
+          } else {
+            window.location.href = sourceUrl;
+          }
+        } else {
+          const modal = new bootstrap.Modal(document.getElementById('quarto-embedded-source-code-modal'));
+          modal.show();
+        }
+        return false;
+      });
+    }
+    function toggleCodeHandler(show) {
+      return function(e) {
+        const detailsSrc = window.document.querySelectorAll(".cell > details > .sourceCode");
+        for (let i=0; i<detailsSrc.length; i++) {
+          const details = detailsSrc[i].parentElement;
+          if (show) {
+            details.open = true;
+          } else {
+            details.removeAttribute("open");
+          }
+        }
+        const cellCodeDivs = window.document.querySelectorAll(".cell > .sourceCode");
+        const fromCls = show ? "hidden" : "unhidden";
+        const toCls = show ? "unhidden" : "hidden";
+        for (let i=0; i<cellCodeDivs.length; i++) {
+          const codeDiv = cellCodeDivs[i];
+          if (codeDiv.classList.contains(fromCls)) {
+            codeDiv.classList.remove(fromCls);
+            codeDiv.classList.add(toCls);
+          } 
+        }
+        return false;
+      }
+    }
+    const hideAllCode = window.document.getElementById("quarto-hide-all-code");
+    if (hideAllCode) {
+      hideAllCode.addEventListener("click", toggleCodeHandler(false));
+    }
+    const showAllCode = window.document.getElementById("quarto-show-all-code");
+    if (showAllCode) {
+      showAllCode.addEventListener("click", toggleCodeHandler(true));
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/dyf\.io");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script><div class="modal fade" id="quarto-embedded-source-code-modal" tabindex="-1" aria-labelledby="quarto-embedded-source-code-modal-label" aria-hidden="true"><div class="modal-dialog modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="quarto-embedded-source-code-modal-label">Source Code</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb20" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> "Synthetic Shapes"</span></span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a><span class="an">subtitle:</span><span class="co"> "Moons, circles, and varied-density blobs — where DYF is not the best tool, and why that's OK."</span></span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a><span class="an">order:</span><span class="co"> 0</span></span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a><span class="an">image:</span><span class="co"> synthetic-shapes_files/figure-html/fig-moons-dyf-output-1.png</span></span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a><span class="an">categories:</span><span class="co"> [synthetic, 2d, pedagogical]</span></span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a><span class="an">true-k:</span><span class="co"> "2–5"</span></span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a><span class="an">format:</span></span>
+<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a><span class="co">  html:</span></span>
+<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a><span class="co">    code-fold: show</span></span>
+<span id="cb20-11"><a href="#cb20-11" aria-hidden="true" tabindex="-1"></a><span class="co">    code-tools: true</span></span>
+<span id="cb20-12"><a href="#cb20-12" aria-hidden="true" tabindex="-1"></a><span class="an">execute:</span></span>
+<span id="cb20-13"><a href="#cb20-13" aria-hidden="true" tabindex="-1"></a><span class="co">  warning: false</span></span>
+<span id="cb20-14"><a href="#cb20-14" aria-hidden="true" tabindex="-1"></a><span class="co">  message: false</span></span>
+<span id="cb20-15"><a href="#cb20-15" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb20-16"><a href="#cb20-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-17"><a href="#cb20-17" aria-hidden="true" tabindex="-1"></a>Before this notebook, I was going to tell you DYF handles curved non-convex shapes well. The tests I ran told a different, more useful story: **on low-dimensional toy shapes, HDBSCAN beats DYF decisively — and the right conclusion isn't to pretend otherwise, it's to understand *when* each method earns its keep.**</span>
+<span id="cb20-18"><a href="#cb20-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-19"><a href="#cb20-19" aria-hidden="true" tabindex="-1"></a>This notebook runs all three methods (DYF, HDBSCAN, and oracle-k k-means) on three canonical synthetic datasets. HDBSCAN wins every one. The point isn't that DYF is bad; it's that DYF's value prop lives at scales and dimensionalities where HDBSCAN itself starts to struggle — which is what the real-world notebooks in this gallery show.</span>
+<span id="cb20-20"><a href="#cb20-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-21"><a href="#cb20-21" aria-hidden="true" tabindex="-1"></a><span class="fu">## Shape 1: Two moons</span></span>
+<span id="cb20-22"><a href="#cb20-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-23"><a href="#cb20-23" aria-hidden="true" tabindex="-1"></a>Two interleaved crescents. The textbook "k-means fails, density-based methods succeed" case.</span>
+<span id="cb20-24"><a href="#cb20-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-27"><a href="#cb20-27" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb20-28"><a href="#cb20-28" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: moons-run</span></span>
+<span id="cb20-29"><a href="#cb20-29" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> sys</span>
+<span id="cb20-30"><a href="#cb20-30" aria-hidden="true" tabindex="-1"></a>sys.path.insert(<span class="dv">0</span>, <span class="st">"."</span>)</span>
+<span id="cb20-31"><a href="#cb20-31" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb20-32"><a href="#cb20-32" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.datasets <span class="im">import</span> make_moons</span>
+<span id="cb20-33"><a href="#cb20-33" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> _gallery <span class="im">import</span> run_dyf, run_kmeans, run_hdbscan, plot_single</span>
+<span id="cb20-34"><a href="#cb20-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-35"><a href="#cb20-35" aria-hidden="true" tabindex="-1"></a>X, y <span class="op">=</span> make_moons(n_samples<span class="op">=</span><span class="dv">3000</span>, noise<span class="op">=</span><span class="fl">0.08</span>, random_state<span class="op">=</span><span class="dv">42</span>)</span>
+<span id="cb20-36"><a href="#cb20-36" aria-hidden="true" tabindex="-1"></a>X <span class="op">=</span> X.astype(np.float32)</span>
+<span id="cb20-37"><a href="#cb20-37" aria-hidden="true" tabindex="-1"></a>r_moons   <span class="op">=</span> run_dyf(X, y)</span>
+<span id="cb20-38"><a href="#cb20-38" aria-hidden="true" tabindex="-1"></a>km_moons  <span class="op">=</span> run_kmeans(X, y)</span>
+<span id="cb20-39"><a href="#cb20-39" aria-hidden="true" tabindex="-1"></a>hdb_moons <span class="op">=</span> run_hdbscan(X, y)</span>
+<span id="cb20-40"><a href="#cb20-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-41"><a href="#cb20-41" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"DYF       k=</span><span class="sc">{</span>r_moons<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">       NMI=</span><span class="sc">{</span>r_moons<span class="sc">.</span>nmi<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>r_moons<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb20-42"><a href="#cb20-42" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"k-means   told k=2  NMI=</span><span class="sc">{</span>km_moons[<span class="st">'nmi'</span>]<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>km_moons[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb20-43"><a href="#cb20-43" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"HDBSCAN   k=</span><span class="sc">{</span>hdb_moons[<span class="st">'recovered_k'</span>]<span class="sc">}</span><span class="ss"> noise=</span><span class="sc">{</span>hdb_moons[<span class="st">'noise_frac'</span>]<span class="sc">:.1%}</span><span class="ss">  NMI=</span><span class="sc">{</span>hdb_moons[<span class="st">'nmi'</span>]<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>hdb_moons[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb20-44"><a href="#cb20-44" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb20-45"><a href="#cb20-45" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-46"><a href="#cb20-46" aria-hidden="true" tabindex="-1"></a>::: {.gallery-fluid}</span>
+<span id="cb20-47"><a href="#cb20-47" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-50"><a href="#cb20-50" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb20-51"><a href="#cb20-51" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-moons-truth</span></span>
+<span id="cb20-52"><a href="#cb20-52" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "Ground truth — two crescents."</span></span>
+<span id="cb20-53"><a href="#cb20-53" aria-hidden="true" tabindex="-1"></a>plot_single(X, y, title<span class="op">=</span><span class="st">"Moons: ground truth (k=2)"</span>)</span>
+<span id="cb20-54"><a href="#cb20-54" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb20-55"><a href="#cb20-55" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-58"><a href="#cb20-58" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb20-59"><a href="#cb20-59" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-moons-dyf</span></span>
+<span id="cb20-60"><a href="#cb20-60" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "DYF partially follows the shape but splits one moon in half."</span></span>
+<span id="cb20-61"><a href="#cb20-61" aria-hidden="true" tabindex="-1"></a>plot_single(X, r_moons.labels, title<span class="op">=</span><span class="ss">f"Moons: DYF (k=</span><span class="sc">{</span>r_moons<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">)"</span>)</span>
+<span id="cb20-62"><a href="#cb20-62" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb20-63"><a href="#cb20-63" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-66"><a href="#cb20-66" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb20-67"><a href="#cb20-67" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-moons-hdb</span></span>
+<span id="cb20-68"><a href="#cb20-68" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "HDBSCAN — perfect separation, 0.2% noise."</span></span>
+<span id="cb20-69"><a href="#cb20-69" aria-hidden="true" tabindex="-1"></a>plot_single(X, hdb_moons[<span class="st">"labels"</span>], title<span class="op">=</span><span class="ss">f"Moons: HDBSCAN (k=</span><span class="sc">{</span>hdb_moons[<span class="st">'recovered_k'</span>]<span class="sc">}</span><span class="ss">)"</span>)</span>
+<span id="cb20-70"><a href="#cb20-70" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb20-71"><a href="#cb20-71" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-74"><a href="#cb20-74" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb20-75"><a href="#cb20-75" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-moons-kmeans</span></span>
+<span id="cb20-76"><a href="#cb20-76" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "K-means — straight-line cut bisects both crescents."</span></span>
+<span id="cb20-77"><a href="#cb20-77" aria-hidden="true" tabindex="-1"></a>plot_single(X, km_moons[<span class="st">"labels"</span>], title<span class="op">=</span><span class="st">"Moons: k-means (told k=2)"</span>)</span>
+<span id="cb20-78"><a href="#cb20-78" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb20-79"><a href="#cb20-79" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-80"><a href="#cb20-80" aria-hidden="true" tabindex="-1"></a>:::</span>
+<span id="cb20-81"><a href="#cb20-81" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-82"><a href="#cb20-82" aria-hidden="true" tabindex="-1"></a>**HDBSCAN nails this perfectly (NMI=ARI=1.000).** DYF modestly beats k-means but splits one crescent into two clusters — a crosstab against ground truth shows DYF's largest cluster is 83% moon-1, a middle cluster is 97% moon-0, and the third is 76% moon-0 with bleeder points. It's not "following the crescents" — it's doing LSH hyperplane splits that happen to correlate with the ground truth.</span>
+<span id="cb20-83"><a href="#cb20-83" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-84"><a href="#cb20-84" aria-hidden="true" tabindex="-1"></a>Why does HDBSCAN beat DYF here? HDBSCAN uses *mutual reachability* distances — it literally follows density ridges through the data, tracking connected-density regions. That's the right tool for a curved 2D manifold. DYF's mechanism is different: recursive LSH splits → leaf centroids → Louvain on the centroid KNN graph. That's designed for *scale*, not *shape*. The 2D regime is HDBSCAN's turf.</span>
+<span id="cb20-85"><a href="#cb20-85" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-86"><a href="#cb20-86" aria-hidden="true" tabindex="-1"></a><span class="fu">### And the merge walk can't rescue it</span></span>
+<span id="cb20-87"><a href="#cb20-87" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-88"><a href="#cb20-88" aria-hidden="true" tabindex="-1"></a>DYF's multi-resolution pitch — <span class="co">[</span><span class="ot">seen on MNIST</span><span class="co">](mnist.qmd#walking-down-the-hierarchy)</span> and <span class="co">[</span><span class="ot">20 Newsgroups</span><span class="co">](twenty-newsgroups.qmd#walking-down-the-hierarchy)</span> — is that you can walk down the partition hierarchy to coarser resolutions post-hoc. On moons, merging DYF's k=3 output down to k=2 produces:</span>
+<span id="cb20-89"><a href="#cb20-89" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-92"><a href="#cb20-92" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb20-93"><a href="#cb20-93" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: moons-merge</span></span>
+<span id="cb20-94"><a href="#cb20-94" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: asis</span></span>
+<span id="cb20-95"><a href="#cb20-95" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> _gallery <span class="im">import</span> merge_walk, merge_walk_table</span>
+<span id="cb20-96"><a href="#cb20-96" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(merge_walk_table(merge_walk(r_moons, X, y, targets<span class="op">=</span>[<span class="dv">2</span>]), r_moons))</span>
+<span id="cb20-97"><a href="#cb20-97" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb20-98"><a href="#cb20-98" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-99"><a href="#cb20-99" aria-hidden="true" tabindex="-1"></a>NMI *decreases* from 0.323 to 0.258. The merge walk assumes the raw over-partition contains the coarser structure as a sub-partition — when it doesn't (because the original LSH cuts went *across* the ground truth), merging just averages the wrong fragments together. **Merging walks hierarchy; it doesn't fix geometry.** This is the honest failure mode to contrast against MNIST, where merging from 81 → 20 roughly doubled ARI while barely moving NMI.</span>
+<span id="cb20-100"><a href="#cb20-100" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-101"><a href="#cb20-101" aria-hidden="true" tabindex="-1"></a><span class="fu">## Shape 2: Concentric circles</span></span>
+<span id="cb20-102"><a href="#cb20-102" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-103"><a href="#cb20-103" aria-hidden="true" tabindex="-1"></a>Inner ring nested inside outer ring. This is traditionally described as a spectral-clustering problem, because neither k-means nor classic density methods are supposed to handle topological nesting. Let's check.</span>
+<span id="cb20-104"><a href="#cb20-104" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-107"><a href="#cb20-107" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb20-108"><a href="#cb20-108" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: circles-run</span></span>
+<span id="cb20-109"><a href="#cb20-109" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.datasets <span class="im">import</span> make_circles</span>
+<span id="cb20-110"><a href="#cb20-110" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-111"><a href="#cb20-111" aria-hidden="true" tabindex="-1"></a>X, y <span class="op">=</span> make_circles(n_samples<span class="op">=</span><span class="dv">3000</span>, noise<span class="op">=</span><span class="fl">0.05</span>, factor<span class="op">=</span><span class="fl">0.5</span>, random_state<span class="op">=</span><span class="dv">42</span>)</span>
+<span id="cb20-112"><a href="#cb20-112" aria-hidden="true" tabindex="-1"></a>X <span class="op">=</span> X.astype(np.float32)</span>
+<span id="cb20-113"><a href="#cb20-113" aria-hidden="true" tabindex="-1"></a>r_circ   <span class="op">=</span> run_dyf(X, y)</span>
+<span id="cb20-114"><a href="#cb20-114" aria-hidden="true" tabindex="-1"></a>km_circ  <span class="op">=</span> run_kmeans(X, y)</span>
+<span id="cb20-115"><a href="#cb20-115" aria-hidden="true" tabindex="-1"></a>hdb_circ <span class="op">=</span> run_hdbscan(X, y)</span>
+<span id="cb20-116"><a href="#cb20-116" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-117"><a href="#cb20-117" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"DYF       k=</span><span class="sc">{</span>r_circ<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">       NMI=</span><span class="sc">{</span>r_circ<span class="sc">.</span>nmi<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>r_circ<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb20-118"><a href="#cb20-118" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"k-means   told k=2  NMI=</span><span class="sc">{</span>km_circ[<span class="st">'nmi'</span>]<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>km_circ[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb20-119"><a href="#cb20-119" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"HDBSCAN   k=</span><span class="sc">{</span>hdb_circ[<span class="st">'recovered_k'</span>]<span class="sc">}</span><span class="ss"> noise=</span><span class="sc">{</span>hdb_circ[<span class="st">'noise_frac'</span>]<span class="sc">:.1%}</span><span class="ss">  NMI=</span><span class="sc">{</span>hdb_circ[<span class="st">'nmi'</span>]<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>hdb_circ[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb20-120"><a href="#cb20-120" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb20-121"><a href="#cb20-121" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-122"><a href="#cb20-122" aria-hidden="true" tabindex="-1"></a>::: {.gallery-fluid}</span>
+<span id="cb20-123"><a href="#cb20-123" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-126"><a href="#cb20-126" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb20-127"><a href="#cb20-127" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-circles-truth</span></span>
+<span id="cb20-128"><a href="#cb20-128" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "Ground truth — inner ring nested inside outer."</span></span>
+<span id="cb20-129"><a href="#cb20-129" aria-hidden="true" tabindex="-1"></a>plot_single(X, y, title<span class="op">=</span><span class="st">"Circles: ground truth (k=2)"</span>)</span>
+<span id="cb20-130"><a href="#cb20-130" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb20-131"><a href="#cb20-131" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-134"><a href="#cb20-134" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb20-135"><a href="#cb20-135" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-circles-dyf</span></span>
+<span id="cb20-136"><a href="#cb20-136" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "DYF — cuts by angle, misses the nesting."</span></span>
+<span id="cb20-137"><a href="#cb20-137" aria-hidden="true" tabindex="-1"></a>plot_single(X, r_circ.labels, title<span class="op">=</span><span class="ss">f"Circles: DYF (k=</span><span class="sc">{</span>r_circ<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">)"</span>)</span>
+<span id="cb20-138"><a href="#cb20-138" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb20-139"><a href="#cb20-139" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-142"><a href="#cb20-142" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb20-143"><a href="#cb20-143" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-circles-hdb</span></span>
+<span id="cb20-144"><a href="#cb20-144" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "HDBSCAN — separates the rings cleanly."</span></span>
+<span id="cb20-145"><a href="#cb20-145" aria-hidden="true" tabindex="-1"></a>plot_single(X, hdb_circ[<span class="st">"labels"</span>], title<span class="op">=</span><span class="ss">f"Circles: HDBSCAN (k=</span><span class="sc">{</span>hdb_circ[<span class="st">'recovered_k'</span>]<span class="sc">}</span><span class="ss">)"</span>)</span>
+<span id="cb20-146"><a href="#cb20-146" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb20-147"><a href="#cb20-147" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-150"><a href="#cb20-150" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb20-151"><a href="#cb20-151" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-circles-kmeans</span></span>
+<span id="cb20-152"><a href="#cb20-152" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "K-means — same angular failure as DYF."</span></span>
+<span id="cb20-153"><a href="#cb20-153" aria-hidden="true" tabindex="-1"></a>plot_single(X, km_circ[<span class="st">"labels"</span>], title<span class="op">=</span><span class="st">"Circles: k-means (told k=2)"</span>)</span>
+<span id="cb20-154"><a href="#cb20-154" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb20-155"><a href="#cb20-155" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-156"><a href="#cb20-156" aria-hidden="true" tabindex="-1"></a>:::</span>
+<span id="cb20-157"><a href="#cb20-157" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-158"><a href="#cb20-158" aria-hidden="true" tabindex="-1"></a>**Both DYF and k-means score NMI ≈ 0. HDBSCAN scores NMI=1.000.** The conventional wisdom — *"concentric rings require spectral clustering"* — turns out to be overstated. HDBSCAN handles them because the *gap between the rings* is a density valley, and HDBSCAN's mutual-reachability metric picks that gap up as a cluster boundary. DYF, which cuts by LSH hyperplane rather than by density valley, cannot see the gap.</span>
+<span id="cb20-159"><a href="#cb20-159" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-160"><a href="#cb20-160" aria-hidden="true" tabindex="-1"></a><span class="fu">## Shape 3: Varied-density blobs</span></span>
+<span id="cb20-161"><a href="#cb20-161" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-162"><a href="#cb20-162" aria-hidden="true" tabindex="-1"></a>Five Gaussians with unequal sample sizes and spreads: <span class="in">`[200, 400, 200, 1000, 3000]`</span> samples at <span class="in">`[0.3, 0.8, 0.5, 1.5, 2.0]`</span> std. Uneven density is where parameter-free methods traditionally disagree.</span>
+<span id="cb20-163"><a href="#cb20-163" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-166"><a href="#cb20-166" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb20-167"><a href="#cb20-167" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: blobs-run</span></span>
+<span id="cb20-168"><a href="#cb20-168" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.datasets <span class="im">import</span> make_blobs</span>
+<span id="cb20-169"><a href="#cb20-169" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-170"><a href="#cb20-170" aria-hidden="true" tabindex="-1"></a>X, y <span class="op">=</span> make_blobs(</span>
+<span id="cb20-171"><a href="#cb20-171" aria-hidden="true" tabindex="-1"></a>    n_samples<span class="op">=</span>[<span class="dv">200</span>, <span class="dv">400</span>, <span class="dv">200</span>, <span class="dv">1000</span>, <span class="dv">3000</span>],</span>
+<span id="cb20-172"><a href="#cb20-172" aria-hidden="true" tabindex="-1"></a>    cluster_std<span class="op">=</span>[<span class="fl">0.3</span>, <span class="fl">0.8</span>, <span class="fl">0.5</span>, <span class="fl">1.5</span>, <span class="fl">2.0</span>],</span>
+<span id="cb20-173"><a href="#cb20-173" aria-hidden="true" tabindex="-1"></a>    n_features<span class="op">=</span><span class="dv">2</span>,</span>
+<span id="cb20-174"><a href="#cb20-174" aria-hidden="true" tabindex="-1"></a>    random_state<span class="op">=</span><span class="dv">42</span>,</span>
+<span id="cb20-175"><a href="#cb20-175" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb20-176"><a href="#cb20-176" aria-hidden="true" tabindex="-1"></a>X <span class="op">=</span> X.astype(np.float32)</span>
+<span id="cb20-177"><a href="#cb20-177" aria-hidden="true" tabindex="-1"></a>r_blobs   <span class="op">=</span> run_dyf(X, y)</span>
+<span id="cb20-178"><a href="#cb20-178" aria-hidden="true" tabindex="-1"></a>km_blobs  <span class="op">=</span> run_kmeans(X, y)</span>
+<span id="cb20-179"><a href="#cb20-179" aria-hidden="true" tabindex="-1"></a>hdb_blobs <span class="op">=</span> run_hdbscan(X, y)</span>
+<span id="cb20-180"><a href="#cb20-180" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-181"><a href="#cb20-181" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"DYF       k=</span><span class="sc">{</span>r_blobs<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">       NMI=</span><span class="sc">{</span>r_blobs<span class="sc">.</span>nmi<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>r_blobs<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb20-182"><a href="#cb20-182" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"k-means   told k=5  NMI=</span><span class="sc">{</span>km_blobs[<span class="st">'nmi'</span>]<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>km_blobs[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb20-183"><a href="#cb20-183" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"HDBSCAN   k=</span><span class="sc">{</span>hdb_blobs[<span class="st">'recovered_k'</span>]<span class="sc">}</span><span class="ss"> noise=</span><span class="sc">{</span>hdb_blobs[<span class="st">'noise_frac'</span>]<span class="sc">:.1%}</span><span class="ss">  NMI=</span><span class="sc">{</span>hdb_blobs[<span class="st">'nmi'</span>]<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>hdb_blobs[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb20-184"><a href="#cb20-184" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb20-185"><a href="#cb20-185" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-186"><a href="#cb20-186" aria-hidden="true" tabindex="-1"></a>::: {.gallery-fluid}</span>
+<span id="cb20-187"><a href="#cb20-187" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-190"><a href="#cb20-190" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb20-191"><a href="#cb20-191" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-blobs-truth</span></span>
+<span id="cb20-192"><a href="#cb20-192" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "Ground truth — five blobs, varied sizes and spreads."</span></span>
+<span id="cb20-193"><a href="#cb20-193" aria-hidden="true" tabindex="-1"></a>plot_single(X, y, title<span class="op">=</span><span class="st">"Blobs: ground truth (k=5)"</span>)</span>
+<span id="cb20-194"><a href="#cb20-194" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb20-195"><a href="#cb20-195" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-198"><a href="#cb20-198" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb20-199"><a href="#cb20-199" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-blobs-dyf</span></span>
+<span id="cb20-200"><a href="#cb20-200" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "DYF — under-partitions, merges diffuse blobs."</span></span>
+<span id="cb20-201"><a href="#cb20-201" aria-hidden="true" tabindex="-1"></a>plot_single(X, r_blobs.labels, title<span class="op">=</span><span class="ss">f"Blobs: DYF (k=</span><span class="sc">{</span>r_blobs<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">)"</span>)</span>
+<span id="cb20-202"><a href="#cb20-202" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb20-203"><a href="#cb20-203" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-206"><a href="#cb20-206" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb20-207"><a href="#cb20-207" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-blobs-hdb</span></span>
+<span id="cb20-208"><a href="#cb20-208" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "HDBSCAN — finds 5 clusters with minimal noise."</span></span>
+<span id="cb20-209"><a href="#cb20-209" aria-hidden="true" tabindex="-1"></a>plot_single(X, hdb_blobs[<span class="st">"labels"</span>], title<span class="op">=</span><span class="ss">f"Blobs: HDBSCAN (k=</span><span class="sc">{</span>hdb_blobs[<span class="st">'recovered_k'</span>]<span class="sc">}</span><span class="ss">)"</span>)</span>
+<span id="cb20-210"><a href="#cb20-210" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb20-211"><a href="#cb20-211" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-214"><a href="#cb20-214" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb20-215"><a href="#cb20-215" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-blobs-kmeans</span></span>
+<span id="cb20-216"><a href="#cb20-216" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "K-means — correct k, noisy borders between tight and diffuse blobs."</span></span>
+<span id="cb20-217"><a href="#cb20-217" aria-hidden="true" tabindex="-1"></a>plot_single(X, km_blobs[<span class="st">"labels"</span>], title<span class="op">=</span><span class="st">"Blobs: k-means (told k=5)"</span>)</span>
+<span id="cb20-218"><a href="#cb20-218" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb20-219"><a href="#cb20-219" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-220"><a href="#cb20-220" aria-hidden="true" tabindex="-1"></a>:::</span>
+<span id="cb20-221"><a href="#cb20-221" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-222"><a href="#cb20-222" aria-hidden="true" tabindex="-1"></a>HDBSCAN again wins — 5 clusters with 2.5% noise, NMI=0.853. DYF under-partitions to 3 clusters. The metric tradeoff between under- and over-partitioning is still worth noting:</span>
+<span id="cb20-223"><a href="#cb20-223" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-224"><a href="#cb20-224" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Dataset <span class="pp">|</span> DYF recovered_k <span class="pp">|</span> vs true <span class="pp">|</span> DYF NMI vs kmeans <span class="pp">|</span> DYF ARI vs kmeans <span class="pp">|</span></span>
+<span id="cb20-225"><a href="#cb20-225" aria-hidden="true" tabindex="-1"></a><span class="pp">|---------|----------------:|---------|------------------:|------------------:|</span></span>
+<span id="cb20-226"><a href="#cb20-226" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> MNIST   <span class="pp">|</span> 81              <span class="pp">|</span> 8× over <span class="pp">|</span> DYF +0.061        <span class="pp">|</span> DYF **−0.186**    <span class="pp">|</span></span>
+<span id="cb20-227"><a href="#cb20-227" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Blobs   <span class="pp">|</span> 3               <span class="pp">|</span> 40% under <span class="pp">|</span> DYF **−0.102**  <span class="pp">|</span> DYF +0.091        <span class="pp">|</span></span>
+<span id="cb20-228"><a href="#cb20-228" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-229"><a href="#cb20-229" aria-hidden="true" tabindex="-1"></a>**Under-partitioning flips the signs** — NMI loses, ARI wins. Over-partitioning on MNIST produced the mirror image. The two metrics disagree predictably about which direction of error they prefer.</span>
+<span id="cb20-230"><a href="#cb20-230" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-231"><a href="#cb20-231" aria-hidden="true" tabindex="-1"></a><span class="fu">## Summary</span></span>
+<span id="cb20-232"><a href="#cb20-232" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-233"><a href="#cb20-233" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Shape    <span class="pp">|</span> HDBSCAN <span class="pp">|</span> DYF <span class="pp">|</span> k-means (oracle) <span class="pp">|</span> Best tool <span class="pp">|</span></span>
+<span id="cb20-234"><a href="#cb20-234" aria-hidden="true" tabindex="-1"></a><span class="pp">|----------|---------|-----|------------------|-----------|</span></span>
+<span id="cb20-235"><a href="#cb20-235" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Moons    <span class="pp">|</span> **1.000** / 1.000 | 0.323 / 0.350 | 0.192 / 0.254 | **HDBSCAN** <span class="pp">|</span></span>
+<span id="cb20-236"><a href="#cb20-236" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Circles  <span class="pp">|</span> **1.000** / 1.000 | 0.000 / 0.000 | 0.000 / 0.000 | **HDBSCAN** <span class="pp">|</span></span>
+<span id="cb20-237"><a href="#cb20-237" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Blobs    <span class="pp">|</span> **0.853** / 0.785 | 0.524 / 0.444 | 0.626 / 0.353 | **HDBSCAN** <span class="pp">|</span></span>
+<span id="cb20-238"><a href="#cb20-238" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-239"><a href="#cb20-239" aria-hidden="true" tabindex="-1"></a>HDBSCAN wins cleanly on all three. So why is DYF in the gallery at all?</span>
+<span id="cb20-240"><a href="#cb20-240" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-241"><a href="#cb20-241" aria-hidden="true" tabindex="-1"></a><span class="fu">## Why HDBSCAN isn't in every other notebook</span></span>
+<span id="cb20-242"><a href="#cb20-242" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-243"><a href="#cb20-243" aria-hidden="true" tabindex="-1"></a>Because HDBSCAN's synthetic-shape performance doesn't generalize. On the real-world notebooks — <span class="co">[</span><span class="ot">Digits</span><span class="co">](digits.qmd)</span>, <span class="co">[</span><span class="ot">20 Newsgroups</span><span class="co">](twenty-newsgroups.qmd)</span>, <span class="co">[</span><span class="ot">CIFAR-10 + CLIP</span><span class="co">](cifar10-clip.qmd)</span>, <span class="co">[</span><span class="ot">CMU MoCap</span><span class="co">](cmu-mocap.qmd)</span> — HDBSCAN starts to break:</span>
+<span id="cb20-244"><a href="#cb20-244" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-245"><a href="#cb20-245" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Digits (1,797 × 64d)**: HDBSCAN labels most points as noise. Its 0.935 NMI is computed on only the 40% of points it was willing to cluster; the other 60% got <span class="in">`-1`</span>. That's not an honest apples-to-apples comparison with methods that partition every point.</span>
+<span id="cb20-246"><a href="#cb20-246" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**20 Newsgroups (18,846 × 384d)**: HDBSCAN takes 144 seconds of wall clock and discards 84% of posts as noise. The real-world notebook documents this and omits HDBSCAN from the comparison because it's not usable at that scale.</span>
+<span id="cb20-247"><a href="#cb20-247" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**CIFAR-10 (10,000 × 512d)** and **MNIST (70,000 × 784d)**: HDBSCAN's runtime and noise fractions scale badly with both sample count and dimensionality. It can technically run, but the output is a small clustered subset plus a large "I don't know" bucket.</span>
+<span id="cb20-248"><a href="#cb20-248" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-249"><a href="#cb20-249" aria-hidden="true" tabindex="-1"></a>HDBSCAN's mechanism — pairwise mutual reachability, densities estimated from k-nearest-neighbors — is **O(n²) in the worst case**, and its density estimator gets noisy as dimensionality grows. It's optimized for clean low-dimensional data where every point has clear neighbors.</span>
+<span id="cb20-250"><a href="#cb20-250" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-251"><a href="#cb20-251" aria-hidden="true" tabindex="-1"></a>DYF's mechanism — LSH-based hash buckets, tree splits on PCA of leaf centroids, Louvain on a sparse KNN graph of centroids — is designed for the opposite regime: **hundreds of thousands of points at hundreds of dimensions, where you need every point assigned and you can't afford an O(n²) pairwise comparison.** That's the scale where RAG corpora, recommender embeddings, and sensor streams actually live.</span>
+<span id="cb20-252"><a href="#cb20-252" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-253"><a href="#cb20-253" aria-hidden="true" tabindex="-1"></a><span class="fu">### The home court / away game framing, continued</span></span>
+<span id="cb20-254"><a href="#cb20-254" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-255"><a href="#cb20-255" aria-hidden="true" tabindex="-1"></a>If <span class="co">[</span><span class="ot">Digits</span><span class="co">](digits.qmd)</span> was k-means's home court (convex blobs, oracle k), **synthetic 2D shapes are HDBSCAN's home court** (clean, low-dim, density-valleys visible in the raw coordinates). DYF is the away team in both cases — it doesn't *win* either one, but it doesn't *collapse* either. At scale and in higher dimensions, the home courts disappear and DYF is the one left standing with a complete partition, reasonable runtime, and no noise bucket.</span>
+<span id="cb20-256"><a href="#cb20-256" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-257"><a href="#cb20-257" aria-hidden="true" tabindex="-1"></a><span class="fu">## What to take away</span></span>
+<span id="cb20-258"><a href="#cb20-258" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-259"><a href="#cb20-259" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**DYF is not the best parameter-free clustering method for every regime.** On clean low-dimensional toy shapes, HDBSCAN wins decisively.</span>
+<span id="cb20-260"><a href="#cb20-260" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**The right question is not "which method is best?"** It's "which method stays useful as n and d grow?" DYF's answer to that is better than HDBSCAN's, which is why it earns its place downstream.</span>
+<span id="cb20-261"><a href="#cb20-261" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**If your data is 2D, clean, and has clear density valleys**, use HDBSCAN. It will beat DYF and it will beat k-means. The gallery's other notebooks show what happens when it isn't.</span>
+<span id="cb20-262"><a href="#cb20-262" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**NMI and ARI still disagree predictably** about over- vs under-partitioning. That observation holds whatever clustering method you use.</span>
+<span id="cb20-263"><a href="#cb20-263" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-264"><a href="#cb20-264" aria-hidden="true" tabindex="-1"></a><span class="fu">## Caveats</span></span>
+<span id="cb20-265"><a href="#cb20-265" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-266"><a href="#cb20-266" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>The HDBSCAN results above used default hyperparameters (<span class="in">`min_cluster_size=5`</span>, <span class="in">`min_samples=None`</span>). Tuning these would change the outputs; the point is that *at defaults*, HDBSCAN is the better tool here.</span>
+<span id="cb20-267"><a href="#cb20-267" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>A proper benchmark would include DBSCAN, OPTICS, spectral clustering, and Mean Shift for full comparison. The gallery uses HDBSCAN as a representative density-based baseline; other methods would place somewhere similar on the shape-vs-scale axis.</span>
+<span id="cb20-268"><a href="#cb20-268" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Synthetic shapes are a *diagnostic*, not an evaluation. Use them to understand mechanism; use real data to judge usefulness.</span>
+</code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
+</div></div></div></div></div>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

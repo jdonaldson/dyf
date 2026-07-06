@@ -1,0 +1,16 @@
+[
+  {
+    "listing": "/gallery/index.html",
+    "items": [
+      "/gallery/diagnostic-stack.html",
+      "/gallery/synthetic-shapes.html",
+      "/gallery/digits.html",
+      "/gallery/mnist.html",
+      "/gallery/cifar10-clip.html",
+      "/gallery/twenty-newsgroups.html",
+      "/gallery/cifar100-deck.html",
+      "/gallery/olivetti-faces.html",
+      "/gallery/cmu-mocap.html"
+    ]
+  }
+]
