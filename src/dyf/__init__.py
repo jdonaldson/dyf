@@ -30,6 +30,7 @@ try:
         DensityClassifier,
         DensityReport,
     )
+
     _HAS_RUST = True
 except ImportError:
     _HAS_RUST = False
@@ -42,6 +43,7 @@ except ImportError:
 # by stale editable-install metadata.
 if _HAS_RUST:
     import warnings as _warnings
+
     _DYF_RS_FLOOR = (0, 7, 0)
     _rs_ver_str = getattr(__import__("dyf_rs"), "__version__", None)
     if _rs_ver_str:
@@ -83,15 +85,15 @@ from .configs import (
 # Unified tree-cutting dispatcher (routes to the right impl per tree shape)
 from .cut import cut_tree_to_labels
 
+# Dense in-memory multiprobe search (Rust-backed, dyf-rs >= 0.8.0)
+from .dense_search import DenseSearchIndex, flatten_tree
+
 # DYF tree (recursive k-ary LSH splits)
 from .dyf_tree import (
     build_dyf_tree,
     refine_clusters,
     refine_dyf_tree,
 )
-
-# Dense in-memory multiprobe search (Rust-backed, dyf-rs >= 0.8.0)
-from .dense_search import DenseSearchIndex, flatten_tree
 
 # PCA tree
 from .pca_tree import (
@@ -119,6 +121,7 @@ try:
         split_dyf3,
         write_lazy_index,
     )
+
     _HAS_LAZY = True
 except ImportError:
     _HAS_LAZY = False
@@ -145,6 +148,9 @@ from . import (
     concept_graph,  # noqa: F401
     pipeline,  # noqa: F401
 )
+
+# Tree-leaf agglomeration
+from .agglomerate import agglomerate_tree_leaves, louvain_cluster_leaves, merge_to_max_k
 from .catalog import (
     CatalogConfig,
     CatalogMatch,
@@ -154,9 +160,6 @@ from .catalog import (
     JointMatchResult,
     compute_similarity_entropy,
 )
-
-# Tree-leaf agglomeration
-from .agglomerate import agglomerate_tree_leaves, louvain_cluster_leaves, merge_to_max_k
 
 # Categorical DAG
 from .categorical import (
@@ -386,6 +389,7 @@ __all__ = [
     "rerank_bridge_mmr",
     # Concept graph — dev tooling, import directly from dyf.concept_graph
 ]
+
 
 def check_rust_available():
     """Check if Rust acceleration is available."""

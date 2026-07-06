@@ -29,8 +29,7 @@ def rerank_standard(sims, candidate_indices, top_k):
     return candidate_indices[order]
 
 
-def rerank_mmr(query_emb, candidate_indices, embeddings_normed, top_k,
-               lam=0.5):
+def rerank_mmr(query_emb, candidate_indices, embeddings_normed, top_k, lam=0.5):
     """Maximal Marginal Relevance re-ranking.
 
     Iteratively selects candidates that maximize:
@@ -83,8 +82,7 @@ def rerank_mmr(query_emb, candidate_indices, embeddings_normed, top_k,
     return candidate_indices[np.array(selected)]
 
 
-def rerank_bridge_boost(sims, candidate_indices, bridge_scores, top_k,
-                        alpha=0.3):
+def rerank_bridge_boost(sims, candidate_indices, bridge_scores, top_k, alpha=0.3):
     """Re-rank by blending similarity with normalized bridge score.
 
     score = (1-alpha) * sim_normalized + alpha * bridge_normalized
@@ -117,9 +115,9 @@ def rerank_bridge_boost(sims, candidate_indices, bridge_scores, top_k,
     return candidate_indices[order]
 
 
-def rerank_bridge_mmr(query_emb, candidate_indices, embeddings_normed,
-                      bridge_scores, cluster_labels, top_k, lam=0.5,
-                      meta_clusters=None):
+def rerank_bridge_mmr(
+    query_emb, candidate_indices, embeddings_normed, bridge_scores, cluster_labels, top_k, lam=0.5, meta_clusters=None
+):
     """MMR with bridge-weighted diversity and optional meta-cluster awareness.
 
     Instead of max cosine similarity to selected set, penalizes candidates

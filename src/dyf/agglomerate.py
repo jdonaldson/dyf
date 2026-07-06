@@ -18,18 +18,19 @@ logger = logging.getLogger(__name__)
 
 class LouvainHierarchy(TypedDict):
     """Return type for compute_louvain_hierarchy()."""
-    point_labels: np.ndarray                    # int32 (N,)
+
+    point_labels: np.ndarray  # int32 (N,)
     leaf_to_community: dict[int, int]
     community_sizes: dict[int, int]
-    Z: np.ndarray                               # (k-1, 4) float64
+    Z: np.ndarray  # (k-1, 4) float64
     unique_community_ids: list[int]
     leaf_item_map: dict[int, list[int]]
     natural_k: int
     resolution: float
-    centroid_dist: np.ndarray                   # float32 (N,)
-    nearest_other_dist: np.ndarray              # float32 (N,)
+    centroid_dist: np.ndarray  # float32 (N,)
+    nearest_other_dist: np.ndarray  # float32 (N,)
     community_cohesion: dict[int, float]
-    community_embedding_centroids: np.ndarray   # float32 (k, D)
+    community_embedding_centroids: np.ndarray  # float32 (k, D)
 
 
 def _collect_leaf_data(idx):
@@ -45,7 +46,7 @@ def _collect_leaf_data(idx):
         *  ``tree`` – raw tree node list from ``idx.get_tree_structure()``.
     """
     tree = idx.get_tree_structure()
-    leaves = [n for n in tree if n['is_leaf'] and n['batch_index'] >= 0]
+    leaves = [n for n in tree if n["is_leaf"] and n["batch_index"] >= 0]
 
     if len(leaves) < 2:
         return None
@@ -59,15 +60,15 @@ def _collect_leaf_data(idx):
     leaf_point_indices = []
 
     for leaf in leaves:
-        batch = idx.get_leaf(leaf['batch_index'])
-        item_ids = batch.column('item_index').to_numpy()
-        emb_col = batch.column('embedding')
+        batch = idx.get_leaf(leaf["batch_index"])
+        item_ids = batch.column("item_index").to_numpy()
+        emb_col = batch.column("embedding")
         flat = emb_col.values.to_numpy()
         n_rows = len(emb_col)
 
         if is_pq:
             meta = idx._get_metadata()
-            m = int(meta['pq_n_subquantizers'])
+            m = int(meta["pq_n_subquantizers"])
             codes = flat.reshape(n_rows, m)
             leaf_emb = idx._pq_reconstruct(codes)
         else:
@@ -85,7 +86,7 @@ def _build_item_leaf_map(leaves, leaf_point_indices, n_points):
     item_leaf_map = np.full(n_points, -1, dtype=np.int32)
     for leaf, item_ids in zip(leaves, leaf_point_indices):
         valid = item_ids < n_points
-        item_leaf_map[item_ids[valid]] = leaf['node_id']
+        item_leaf_map[item_ids[valid]] = leaf["node_id"]
     return item_leaf_map
 
 
@@ -105,8 +106,7 @@ def _reassign_points(point_labels, embeddings):
     # Iterative reassignment (converges in 2-3 rounds)
     changed = 0
     for _iter in range(5):
-        bucket_centroids = np.zeros((n_buckets, embeddings.shape[1]),
-                                    dtype=np.float32)
+        bucket_centroids = np.zeros((n_buckets, embeddings.shape[1]), dtype=np.float32)
         for gid in unique_groups:
             mask = point_labels == gid
             pts = np.where(mask)[0]
@@ -119,16 +119,14 @@ def _reassign_points(point_labels, embeddings):
 
         all_sims = emb_normed @ bucket_centroids.T
         best_bucket_idx = np.argmax(all_sims, axis=1)
-        new_labels = np.array([unique_groups[bi] for bi in best_bucket_idx],
-                              dtype=np.int32)
+        new_labels = np.array([unique_groups[bi] for bi in best_bucket_idx], dtype=np.int32)
 
         changed = int((new_labels != point_labels).sum())
         point_labels = new_labels
         if changed == 0:
             break
 
-    logger.info(f"    Point reassignment: {_iter + 1} iterations, "
-                f"{changed} changed in last round")
+    logger.info(f"    Point reassignment: {_iter + 1} iterations, {changed} changed in last round")
     return point_labels
 
 
@@ -142,15 +140,17 @@ def _build_output(point_labels, coords):
         mask = point_labels == gid
         pts = np.where(mask)[0]
         centroid = coords[pts].mean(axis=0)
-        lsh_label_data.append({
-            "x": float(centroid[0]),
-            "y": float(centroid[1]),
-            "z": float(centroid[2]) if ndim >= 3 else 0.0,
-            "text": f"Bucket {gid}",
-            "size": int(mask.sum()),
-            "cid": int(gid),
-            "leaf_cids": [int(gid)],
-        })
+        lsh_label_data.append(
+            {
+                "x": float(centroid[0]),
+                "y": float(centroid[1]),
+                "z": float(centroid[2]) if ndim >= 3 else 0.0,
+                "text": f"Bucket {gid}",
+                "size": int(mask.sum()),
+                "cid": int(gid),
+                "leaf_cids": [int(gid)],
+            }
+        )
     return lsh_names, lsh_label_data
 
 
@@ -190,12 +190,11 @@ def merge_to_max_k(point_labels, embeddings, max_k=12):
     centroids_normed = centroids / norms
 
     # Complete linkage → fcluster at max_k
-    Z = linkage(centroids_normed, method='complete')
-    merge_labels = fcluster(Z, max_k, criterion='maxclust')  # 1-based
+    Z = linkage(centroids_normed, method="complete")
+    merge_labels = fcluster(Z, max_k, criterion="maxclust")  # 1-based
 
     # Remap point labels: old_gid → merge group (0-based)
-    remap = {gid: int(merge_labels[id_to_idx[gid]]) - 1
-             for gid in unique_ids}
+    remap = {gid: int(merge_labels[id_to_idx[gid]]) - 1 for gid in unique_ids}
     merged = np.array([remap[int(g)] for g in point_labels], dtype=np.int32)
 
     # Reassign points to nearest merged centroid
@@ -239,12 +238,11 @@ def _compute_community_linkage(point_labels, embeddings):
     norms[norms == 0] = 1.0
     centroids_normed = centroids / norms
 
-    Z = linkage(centroids_normed, method='complete')
+    Z = linkage(centroids_normed, method="complete")
     return Z, unique_ids, centroids
 
 
-def _run_louvain_on_centroids(centroids_normed, k, resolution,
-                              similarity_threshold):
+def _run_louvain_on_centroids(centroids_normed, k, resolution, similarity_threshold):
     """Run Louvain community detection on L2-normalized leaf centroids.
 
     Tries the Rust implementation first (faster, weighted, deterministic),
@@ -263,19 +261,23 @@ def _run_louvain_on_centroids(centroids_normed, k, resolution,
     """
     try:
         from dyf_rs import louvain_from_centroids
+
         from ._arrays import ensure_f32
+
         labels_arr, n_communities = louvain_from_centroids(
-            ensure_f32(centroids_normed, "centroids_normed"),
-            k=k, resolution=resolution)
+            ensure_f32(centroids_normed, "centroids_normed"), k=k, resolution=resolution
+        )
         leaf_labels = labels_arr.astype(np.int32)
-        logger.info(f"    Louvain (Rust) found {n_communities} communities "
-                    f"from {len(centroids_normed)} leaves (k={k}, res={resolution})")
+        logger.info(
+            f"    Louvain (Rust) found {n_communities} communities "
+            f"from {len(centroids_normed)} leaves (k={k}, res={resolution})"
+        )
     except ImportError:
         # Fall back to NetworkX Louvain
         import networkx as nx
         from sklearn.neighbors import NearestNeighbors
 
-        nn = NearestNeighbors(n_neighbors=k + 1, metric='cosine')
+        nn = NearestNeighbors(n_neighbors=k + 1, metric="cosine")
         nn.fit(centroids_normed)
         distances, indices = nn.kneighbors(centroids_normed)
 
@@ -290,8 +292,7 @@ def _run_louvain_on_centroids(centroids_normed, k, resolution,
                     G.add_edge(i, j, weight=sim)
 
         # Louvain community detection
-        communities = nx.community.louvain_communities(
-            G, weight='weight', resolution=resolution, seed=42)
+        communities = nx.community.louvain_communities(G, weight="weight", resolution=resolution, seed=42)
 
         # Map communities → leaf labels (0-based)
         leaf_labels = np.full(len(centroids_normed), -1, dtype=np.int32)
@@ -308,14 +309,15 @@ def _run_louvain_on_centroids(centroids_normed, k, resolution,
                 next_id += 1
 
         n_communities = len(set(leaf_labels.tolist()))
-        logger.info(f"    Louvain (NetworkX) found {n_communities} communities "
-                    f"from {len(centroids_normed)} leaves (k={k}, res={resolution})")
+        logger.info(
+            f"    Louvain (NetworkX) found {n_communities} communities "
+            f"from {len(centroids_normed)} leaves (k={k}, res={resolution})"
+        )
 
     return leaf_labels, n_communities
 
 
-def _compute_point_metrics(point_labels, embeddings, community_centroids_emb,
-                           unique_ids):
+def _compute_point_metrics(point_labels, embeddings, community_centroids_emb, unique_ids):
     """Compute per-point cosine distances and per-community cohesion.
 
     Args:
@@ -364,8 +366,9 @@ def _compute_point_metrics(point_labels, embeddings, community_centroids_emb,
     return centroid_dist, nearest_other_dist, community_cohesion
 
 
-def compute_louvain_hierarchy(idx, coords, embeddings, leaf_k=10,
-                               similarity_threshold=0.5, resolution=1.0) -> LouvainHierarchy | None:
+def compute_louvain_hierarchy(
+    idx, coords, embeddings, leaf_k=10, similarity_threshold=0.5, resolution=1.0
+) -> LouvainHierarchy | None:
     """Compute Louvain communities with dendrogram for continuous cluster slider.
 
     Returns the three artifacts needed for the dendrogram-based slider:
@@ -414,8 +417,7 @@ def compute_louvain_hierarchy(idx, coords, embeddings, leaf_k=10,
     if k < 1:
         k = 1
 
-    leaf_labels, n_communities = _run_louvain_on_centroids(
-        centroids_normed, k, resolution, similarity_threshold)
+    leaf_labels, n_communities = _run_louvain_on_centroids(centroids_normed, k, resolution, similarity_threshold)
 
     # Map points -> leaf -> community
     point_labels = np.full(n_points, -1, dtype=np.int32)
@@ -449,27 +451,26 @@ def compute_louvain_hierarchy(idx, coords, embeddings, leaf_k=10,
         community_sizes[cid] = int((point_labels == cid).sum())
 
     # Compute linkage dendrogram over community centroids
-    Z, unique_ids, community_centroids_emb = _compute_community_linkage(
-        point_labels, embeddings)
+    Z, unique_ids, community_centroids_emb = _compute_community_linkage(point_labels, embeddings)
 
     # Per-point metrics: cosine distance to own centroid and nearest other
-    centroid_dist, nearest_other_dist, community_cohesion = \
-        _compute_point_metrics(point_labels, embeddings,
-                               community_centroids_emb, unique_ids)
+    centroid_dist, nearest_other_dist, community_cohesion = _compute_point_metrics(
+        point_labels, embeddings, community_centroids_emb, unique_ids
+    )
 
     return {
-        'point_labels': point_labels,
-        'leaf_to_community': leaf_to_community,
-        'community_sizes': community_sizes,
-        'Z': Z,
-        'unique_community_ids': unique_ids,
-        'leaf_item_map': leaf_item_map,
-        'natural_k': n_communities,
-        'resolution': resolution,
-        'centroid_dist': centroid_dist,
-        'nearest_other_dist': nearest_other_dist,
-        'community_cohesion': community_cohesion,
-        'community_embedding_centroids': community_centroids_emb,
+        "point_labels": point_labels,
+        "leaf_to_community": leaf_to_community,
+        "community_sizes": community_sizes,
+        "Z": Z,
+        "unique_community_ids": unique_ids,
+        "leaf_item_map": leaf_item_map,
+        "natural_k": n_communities,
+        "resolution": resolution,
+        "centroid_dist": centroid_dist,
+        "nearest_other_dist": nearest_other_dist,
+        "community_cohesion": community_cohesion,
+        "community_embedding_centroids": community_centroids_emb,
     }
 
 
@@ -526,8 +527,8 @@ def agglomerate_tree_leaves(idx, coords, embeddings, n_groups=50):
     # dissimilar pair across two groups exceeds the threshold, which
     # prevents merging semantically distinct subgroups.
     actual_groups = min(n_groups, len(centroids_normed))
-    Z = linkage(centroids_normed, method='complete')
-    agg_labels = fcluster(Z, actual_groups, criterion='maxclust')  # 1-based
+    Z = linkage(centroids_normed, method="complete")
+    agg_labels = fcluster(Z, actual_groups, criterion="maxclust")  # 1-based
 
     # Map points -> leaf -> agglomerated group (initial assignment)
     point_labels = np.full(n_points, -1, dtype=np.int32)
@@ -549,8 +550,7 @@ def agglomerate_tree_leaves(idx, coords, embeddings, n_groups=50):
     return point_labels, lsh_names, lsh_label_data, item_leaf_map, tree
 
 
-def louvain_cluster_leaves(idx, coords, embeddings, leaf_k=10,
-                           similarity_threshold=0.5, resolution=1.0):
+def louvain_cluster_leaves(idx, coords, embeddings, leaf_k=10, similarity_threshold=0.5, resolution=1.0):
     """Cluster tree leaves via centroid KNN + Louvain community detection.
 
     Finds natural communities without requiring a target k.  Builds a KNN
@@ -598,8 +598,7 @@ def louvain_cluster_leaves(idx, coords, embeddings, leaf_k=10,
         # Degenerate: only 2 leaves, put everything in one bucket
         k = 1
 
-    leaf_labels, _n_communities = _run_louvain_on_centroids(
-        centroids_normed, k, resolution, similarity_threshold)
+    leaf_labels, _n_communities = _run_louvain_on_centroids(centroids_normed, k, resolution, similarity_threshold)
 
     # Map points -> leaf -> community (initial assignment)
     point_labels = np.full(n_points, -1, dtype=np.int32)

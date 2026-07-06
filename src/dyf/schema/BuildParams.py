@@ -7,8 +7,9 @@ from flatbuffers.compat import import_numpy
 
 np = import_numpy()
 
+
 class BuildParams:
-    __slots__ = ['_tab']
+    __slots__ = ["_tab"]
 
     @classmethod
     def GetRootAs(cls, buf, offset=0):
@@ -21,6 +22,7 @@ class BuildParams:
     def GetRootAsBuildParams(cls, buf, offset=0):
         """This method is deprecated. Please switch to GetRootAs."""
         return cls.GetRootAs(buf, offset)
+
     # BuildParams
     def Init(self, buf, pos):
         self._tab = flatbuffers.table.Table(buf, pos)
@@ -67,50 +69,66 @@ class BuildParams:
             return self._tab.String(o + self._tab.Pos)
         return None
 
+
 def BuildParamsStart(builder):
     builder.StartObject(6)
+
 
 def Start(builder):
     BuildParamsStart(builder)
 
+
 def BuildParamsAddMaxDepth(builder, maxDepth):
     builder.PrependUint8Slot(0, maxDepth, 0)
+
 
 def AddMaxDepth(builder, maxDepth):
     BuildParamsAddMaxDepth(builder, maxDepth)
 
+
 def BuildParamsAddNumBits(builder, numBits):
     builder.PrependUint8Slot(1, numBits, 0)
+
 
 def AddNumBits(builder, numBits):
     BuildParamsAddNumBits(builder, numBits)
 
+
 def BuildParamsAddMinLeafSize(builder, minLeafSize):
     builder.PrependUint32Slot(2, minLeafSize, 0)
+
 
 def AddMinLeafSize(builder, minLeafSize):
     BuildParamsAddMinLeafSize(builder, minLeafSize)
 
+
 def BuildParamsAddSeed(builder, seed):
     builder.PrependUint64Slot(3, seed, 0)
+
 
 def AddSeed(builder, seed):
     BuildParamsAddSeed(builder, seed)
 
+
 def BuildParamsAddQuantization(builder, quantization):
     builder.PrependUOffsetTRelativeSlot(4, flatbuffers.number_types.UOffsetTFlags.py_type(quantization), 0)
+
 
 def AddQuantization(builder, quantization):
     BuildParamsAddQuantization(builder, quantization)
 
+
 def BuildParamsAddCompression(builder, compression):
     builder.PrependUOffsetTRelativeSlot(5, flatbuffers.number_types.UOffsetTFlags.py_type(compression), 0)
+
 
 def AddCompression(builder, compression):
     BuildParamsAddCompression(builder, compression)
 
+
 def BuildParamsEnd(builder):
     return builder.EndObject()
+
 
 def End(builder):
     return BuildParamsEnd(builder)

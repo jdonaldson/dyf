@@ -235,9 +235,7 @@ class CategoryGraph:
                     break
                 frontier = next_frontier
             # Pick the first parent at target depth (deterministic sort)
-            at_depth = sorted(
-                n for n in frontier if node_depths.get(n, -1) == depth
-            )
+            at_depth = sorted(n for n in frontier if node_depths.get(n, -1) == depth)
             result = at_depth[0] if at_depth else label
             cache[label] = result
             return result
@@ -355,10 +353,7 @@ class CategoryGraph:
     @classmethod
     def from_dict(cls, data: dict) -> CategoryGraph:
         """Reconstruct from ``to_dict()`` output."""
-        edges = [
-            (e["parent"], e["child"], e.get("weight", 1.0))
-            for e in data["edges"]
-        ]
+        edges = [(e["parent"], e["child"], e.get("weight", 1.0)) for e in data["edges"]]
         return cls.from_edges(edges)
 
     def to_json(self) -> str:
@@ -399,10 +394,12 @@ def coarsen(
     if callable(strategy):
         transform = strategy
     elif strategy == "first_term":
+
         def transform(s: str) -> str:
             term = s.split(",")[0].strip().lower()
             return term if term else "_unknown_"
     elif strategy == "raw":
+
         def transform(s: str) -> str:
             return s
     elif isinstance(strategy, str) and strategy.startswith("prefix_"):
@@ -593,8 +590,7 @@ def diagnose_axes(
 
     # Coerce all label columns to numpy arrays
     label_arrays: dict[str, np.ndarray] = {
-        name: np.asarray(labels, dtype=str)
-        for name, labels in label_columns.items()
+        name: np.asarray(labels, dtype=str) for name, labels in label_columns.items()
     }
 
     # Subsample for speed
@@ -770,9 +766,7 @@ def discover_categorical_columns(
                 avg_len = df[col_name].str.len_chars().mean()
                 if avg_len is not None and avg_len > 100:
                     continue  # skip free-text columns
-                result[col_name] = np.array(
-                    df[col_name].fill_null("_unknown_").to_list(), dtype=str
-                )
+                result[col_name] = np.array(df[col_name].fill_null("_unknown_").to_list(), dtype=str)
             continue
 
         # Categorical columns (polars Categorical type)
@@ -829,8 +823,7 @@ def embed_with_diagnostics(
     """
     # Coerce label columns to numpy
     label_arrays: dict[str, np.ndarray | list] = {
-        name: np.asarray(labels, dtype=str)
-        for name, labels in label_columns.items()
+        name: np.asarray(labels, dtype=str) for name, labels in label_columns.items()
     }
 
     # First pass: diagnose
@@ -885,17 +878,20 @@ def diagnostics_to_metadata(
         Keys ``axis_diagnostics_before`` and ``axis_diagnostics_after``,
         each a JSON string.
     """
+
     def _serialize(diags: list[AxisDiagnostic]) -> str:
-        return json.dumps([
-            {
-                "name": d.name,
-                "knn_purity": round(d.knn_purity, 4),
-                "random_baseline": round(d.random_baseline, 4),
-                "lift": round(d.lift, 2),
-                "n_classes": d.n_classes,
-            }
-            for d in diags
-        ])
+        return json.dumps(
+            [
+                {
+                    "name": d.name,
+                    "knn_purity": round(d.knn_purity, 4),
+                    "random_baseline": round(d.random_baseline, 4),
+                    "lift": round(d.lift, 2),
+                    "n_classes": d.n_classes,
+                }
+                for d in diags
+            ]
+        )
 
     return {
         "axis_diagnostics_before": _serialize(before),

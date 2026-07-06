@@ -210,13 +210,10 @@ def cluster_quality(coherence, cluster_labels, threshold_pct=75):
             cluster_mean_coh[c] = coherence[mask].mean()
 
     coh_threshold = float(np.percentile(cluster_mean_coh, threshold_pct))
-    meta_clusters = {
-        int(c) for c in range(n_clusters)
-        if cluster_mean_coh[c] > coh_threshold
-    }
+    meta_clusters = {int(c) for c in range(n_clusters) if cluster_mean_coh[c] > coh_threshold}
 
     return {
-        'cluster_mean_coherence': cluster_mean_coh,
-        'meta_clusters': meta_clusters,
-        'threshold': coh_threshold,
+        "cluster_mean_coherence": cluster_mean_coh,
+        "meta_clusters": meta_clusters,
+        "threshold": coh_threshold,
     }

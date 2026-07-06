@@ -73,11 +73,13 @@ def spatial_color_map(labels: list[int] | np.ndarray, embeddings: np.ndarray) ->
     for rank, cid in enumerate(ordered):
         hue = rank / max(n, 1)
         r, g, b = colorsys.hls_to_rgb(hue, 0.45, 0.6)
-        cmap[int(cid)] = f"#{int(r*255):02x}{int(g*255):02x}{int(b*255):02x}"
+        cmap[int(cid)] = f"#{int(r * 255):02x}{int(g * 255):02x}{int(b * 255):02x}"
     return cmap
 
 
-def tree_rgb_map(labels: list[int] | np.ndarray, tree_structure: list[dict], item_leaf_map: np.ndarray) -> dict[int, list[int]]:
+def tree_rgb_map(
+    labels: list[int] | np.ndarray, tree_structure: list[dict], item_leaf_map: np.ndarray
+) -> dict[int, list[int]]:
     """Assign colors by DFS leaf order of the DYF tree.
 
     Leaves adjacent in DFS share subtree ancestry, so they get similar hues.
@@ -92,9 +94,9 @@ def tree_rgb_map(labels: list[int] | np.ndarray, tree_structure: list[dict], ite
     # Build children map
     children_map = {}
     for node in tree_structure:
-        pid = node['parent_id']
+        pid = node["parent_id"]
         if pid is not None:
-            children_map.setdefault(pid, []).append(node['node_id'])
+            children_map.setdefault(pid, []).append(node["node_id"])
 
     # DFS from root (node 0) — collect leaf node IDs in visit order
     dfs_leaf_order = []
@@ -120,8 +122,7 @@ def tree_rgb_map(labels: list[int] | np.ndarray, tree_structure: list[dict], ite
         mask = labels_arr == cid
         leaf_ids = item_leaf_arr[mask]
         # Average the DFS rank of all items' leaves in this bucket
-        ranks = np.array([leaf_rank.get(int(lid), 0) for lid in leaf_ids],
-                         dtype=np.float64)
+        ranks = np.array([leaf_rank.get(int(lid), 0) for lid in leaf_ids], dtype=np.float64)
         bucket_ranks[cid] = ranks.mean() if len(ranks) > 0 else 0.0
 
     # Sort buckets by their mean DFS rank, assign evenly-spaced hues
@@ -133,5 +134,3 @@ def tree_rgb_map(labels: list[int] | np.ndarray, tree_structure: list[dict], ite
         r, g, b = colorsys.hls_to_rgb(hue, 0.45, 0.6)
         cmap[int(cid)] = [int(r * 255), int(g * 255), int(b * 255)]
     return cmap
-
-

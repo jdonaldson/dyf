@@ -58,15 +58,9 @@ class CatalogConfig:
         self.node_names = np.asarray(self.node_names, dtype=str)
         n = len(self.node_ids)
         if self.embeddings.shape[0] != n:
-            raise ValueError(
-                f"embeddings rows ({self.embeddings.shape[0]}) != "
-                f"node_ids length ({n})"
-            )
+            raise ValueError(f"embeddings rows ({self.embeddings.shape[0]}) != node_ids length ({n})")
         if len(self.node_names) != n:
-            raise ValueError(
-                f"node_names length ({len(self.node_names)}) != "
-                f"node_ids length ({n})"
-            )
+            raise ValueError(f"node_names length ({len(self.node_names)}) != node_ids length ({n})")
 
 
 @dataclass
@@ -193,21 +187,21 @@ class FittedCatalog:
 
     config: CatalogConfig
     # Ontology-wide statistics
-    centroid: np.ndarray          # (d,) mean embedding
-    centroid_norm: np.ndarray     # (d,) L2-normalized centroid
-    tax_mean: float               # mean specificity
-    tax_std: float                # std specificity
-    node_z_scores: np.ndarray     # (n,) per-node z-scores
-    path_alignments: np.ndarray   # (n,) per-node path alignment
+    centroid: np.ndarray  # (d,) mean embedding
+    centroid_norm: np.ndarray  # (d,) L2-normalized centroid
+    tax_mean: float  # mean specificity
+    tax_std: float  # std specificity
+    node_z_scores: np.ndarray  # (n,) per-node z-scores
+    path_alignments: np.ndarray  # (n,) per-node path alignment
 
     # Depth-indexed structures
-    node_depths: np.ndarray       # (n,) depth of each node
-    depth_masks: dict[int, np.ndarray]   # depth -> boolean mask
-    id_to_idx: dict[str, int]     # node_id -> index
+    node_depths: np.ndarray  # (n,) depth of each node
+    depth_masks: dict[int, np.ndarray]  # depth -> boolean mask
+    id_to_idx: dict[str, int]  # node_id -> index
 
     # Term disambiguation
     branch_terms: dict[str, set[str]] = field(default_factory=dict)  # node_id → discriminating terms
-    term_boost: float = 0.04      # additive boost alpha
+    term_boost: float = 0.04  # additive boost alpha
 
 
 # Backcompat alias — the leading-underscore name was the legacy/private form.
@@ -332,10 +326,7 @@ def _compute_branch_terms(
     top-k discriminating unigrams via TF-IDF. Results are flattened
     into {node_id: set(discriminating terms in subtree)}.
     """
-    node_id_to_name: dict[str, str] = {
-        str(nid): str(name)
-        for nid, name in zip(config.node_ids, config.node_names)
-    }
+    node_id_to_name: dict[str, str] = {str(nid): str(name) for nid, name in zip(config.node_ids, config.node_names)}
 
     # For each internal node, compute discriminating terms per child
     child_terms: dict[str, set[str]] = {}
@@ -378,11 +369,7 @@ def _compute_branch_terms(
                 word_df[word] += 1
 
         # IDF: only keep terms that discriminate (not in ALL children)
-        idf = {
-            w: math.log(n_children / (1 + df))
-            for w, df in word_df.items()
-            if df < n_children
-        }
+        idf = {w: math.log(n_children / (1 + df)) for w, df in word_df.items() if df < n_children}
 
         # TF-IDF per child, store top-k terms
         for cid, tf in child_tf.items():
@@ -646,7 +633,9 @@ class CatalogSpace:
 
         # Per-depth analysis
         within_z, depth_entropy, depth_best_sim, best_depth = self._analyze_depths(
-            all_sims, fc.depth_masks, max_d,
+            all_sims,
+            fc.depth_masks,
+            max_d,
         )
 
         if best_depth is None:
@@ -655,7 +644,11 @@ class CatalogSpace:
         # Two-stage parent constraint
         parent_depth = best_depth - 1
         constrained_result = self._constrain_by_parent(
-            all_sims, fc, best_depth, parent_depth, query_tokens,
+            all_sims,
+            fc,
+            best_depth,
+            parent_depth,
+            query_tokens,
         )
 
         # Determine final match
@@ -684,13 +677,12 @@ class CatalogSpace:
 
         # Gap detection
         gap_detected, gap_score = self._detect_gap(
-            depth_entropy, depth_best_sim,
+            depth_entropy,
+            depth_best_sim,
         )
 
         # Diverse alternatives
-        alternatives = self._get_diverse_alternatives(
-            fc, query_emb, best_depth, best_idx, top_k
-        )
+        alternatives = self._get_diverse_alternatives(fc, query_emb, best_depth, best_idx, top_k)
 
         node_z = float(fc.node_z_scores[best_idx])
         pa = float(fc.path_alignments[best_idx])
@@ -838,10 +830,7 @@ class CatalogSpace:
         if target_mask is not None:
             target_indices = np.where(target_mask)[0]
 
-            constrained_indices = [
-                idx for idx in target_indices
-                if str(config.node_ids[idx]) in descendants
-            ]
+            constrained_indices = [idx for idx in target_indices if str(config.node_ids[idx]) in descendants]
 
             if constrained_indices:
                 constrained_sims = all_sims[constrained_indices]
@@ -872,7 +861,7 @@ class CatalogSpace:
         sorted_idx = np.argsort(all_sims)[::-1]
         alternatives = [
             (str(config.node_ids[i]), str(config.node_names[i]), round(float(all_sims[i]), 4))
-            for i in sorted_idx[1:k + 1]
+            for i in sorted_idx[1 : k + 1]
         ]
 
         return CatalogMatch(
@@ -1076,22 +1065,26 @@ class CatalogSpace:
                 # Independent matching — no coherence reranking
                 matches = {}
                 for cname in catalog_names:
-                    matches[cname] = self.match_single(
-                        cname, q_emb, top_k, query_text=q_text
-                    )
+                    matches[cname] = self.match_single(cname, q_emb, top_k, query_text=q_text)
 
-                results.append(JointMatchResult(
-                    query=query_labels[qi],
-                    matches=matches,
-                    coherence_score=1.0,
-                    coherence_detail={},
-                    reranked=False,
-                    reason="independent (no mappings or weight=0)",
-                ))
+                results.append(
+                    JointMatchResult(
+                        query=query_labels[qi],
+                        matches=matches,
+                        coherence_score=1.0,
+                        coherence_detail={},
+                        reranked=False,
+                        reason="independent (no mappings or weight=0)",
+                    )
+                )
             else:
                 result = self._match_joint(
-                    q_emb, query_labels[qi], catalog_names, top_k,
-                    coherence_weight, query_text=q_text,
+                    q_emb,
+                    query_labels[qi],
+                    catalog_names,
+                    top_k,
+                    coherence_weight,
+                    query_text=q_text,
                 )
                 results.append(result)
 
@@ -1117,9 +1110,7 @@ class CatalogSpace:
             candidates[cname] = [(int(idx), float(all_sims[idx])) for idx in top_idx]
 
         # Step 2: Check if independent top-1 choices are already coherent
-        independent_top1 = {
-            cname: cands[0] for cname, cands in candidates.items() if cands
-        }
+        independent_top1 = {cname: cands[0] for cname, cands in candidates.items() if cands}
 
         pair_coherence, all_coherent = self._compute_pair_coherence(independent_top1)
 
@@ -1127,14 +1118,9 @@ class CatalogSpace:
             # Top-1 independent choices are coherent
             matches = {}
             for cname in catalog_names:
-                matches[cname] = self.match_single(
-                    cname, query_emb, top_k, query_text=query_text
-                )
+                matches[cname] = self.match_single(cname, query_emb, top_k, query_text=query_text)
 
-            overall = (
-                float(np.mean(list(pair_coherence.values())))
-                if pair_coherence else 1.0
-            )
+            overall = float(np.mean(list(pair_coherence.values()))) if pair_coherence else 1.0
             return JointMatchResult(
                 query=query_label,
                 matches=matches,
@@ -1145,9 +1131,7 @@ class CatalogSpace:
             )
 
         # Step 3: Exhaustive search over top_k^N combinations
-        best_combo, _score, reason = self._rerank_joint(
-            candidates, catalog_names, coherence_weight
-        )
+        best_combo, _score, reason = self._rerank_joint(candidates, catalog_names, coherence_weight)
 
         # Build matches from best combo
         matches = {}
@@ -1159,9 +1143,7 @@ class CatalogSpace:
             pa = float(fc.path_alignments[idx])
 
             # Alternatives from match_single
-            single_match = self.match_single(
-                cname, query_emb, top_k, query_text=query_text
-            )
+            single_match = self.match_single(cname, query_emb, top_k, query_text=query_text)
 
             matches[cname] = CatalogMatch(
                 catalog_name=cname,
@@ -1182,10 +1164,7 @@ class CatalogSpace:
         # Recompute coherence for final combo
         final_coherence, _ = self._compute_pair_coherence(best_combo)
 
-        overall = (
-            float(np.mean(list(final_coherence.values())))
-            if final_coherence else 1.0
-        )
+        overall = float(np.mean(list(final_coherence.values()))) if final_coherence else 1.0
 
         return JointMatchResult(
             query=query_label,
@@ -1274,17 +1253,14 @@ class CatalogSpace:
                     id_a = str(self._fitted[ca].config.node_ids[combo[i][0]])
                     id_b = str(self._fitted[cb].config.node_ids[combo[j][0]])
                     score = self._mapping_score(mapping, id_a, id_b)
-                    coherence_bonus *= (1.0 + score)
+                    coherence_bonus *= 1.0 + score
                     n_pairs += 1
 
-            total = sim_product * (coherence_bonus ** coherence_weight)
+            total = sim_product * (coherence_bonus**coherence_weight)
 
             if total > best_score:
                 best_score = total
-                best_combo = {
-                    cname: combo[i]
-                    for i, cname in enumerate(catalog_names)
-                }
+                best_combo = {cname: combo[i] for i, cname in enumerate(catalog_names)}
 
         n_combos = 1
         for cl in cand_lists:
@@ -1328,13 +1304,15 @@ class CatalogSpace:
 
         mappings = []
         for m in self._mappings:
-            mappings.append({
-                "source_catalog": m.source_catalog,
-                "target_catalog": m.target_catalog,
-                "source_ids": m.source_ids.tolist(),
-                "target_ids": m.target_ids.tolist(),
-                "weights": m.weights.tolist(),
-            })
+            mappings.append(
+                {
+                    "source_catalog": m.source_catalog,
+                    "target_catalog": m.target_catalog,
+                    "source_ids": m.source_ids.tolist(),
+                    "target_ids": m.target_ids.tolist(),
+                    "weights": m.weights.tolist(),
+                }
+            )
 
         return {"catalogs": catalogs, "mappings": mappings}
 
@@ -1417,10 +1395,7 @@ class CatalogSpace:
         if not self._is_fitted:
             raise ValueError("CatalogSpace.fit() has not been called")
         if catalog_name not in self._fitted:
-            raise ValueError(
-                f"no catalog named {catalog_name!r}; "
-                f"known: {list(self._fitted.keys())}"
-            )
+            raise ValueError(f"no catalog named {catalog_name!r}; known: {list(self._fitted.keys())}")
         return self._fitted[catalog_name]
 
     def get_lca_depth(self, catalog_name: str, node_a: str, node_b: str) -> int:
@@ -1431,10 +1406,7 @@ class CatalogSpace:
         :meth:`CategoryGraph.lca_depth`.
         """
         if catalog_name not in self._configs:
-            raise ValueError(
-                f"no catalog named {catalog_name!r}; "
-                f"known: {list(self._configs.keys())}"
-            )
+            raise ValueError(f"no catalog named {catalog_name!r}; known: {list(self._configs.keys())}")
         return self._configs[catalog_name].graph.lca_depth(node_a, node_b)
 
     def get_cross_domain_affinity(
@@ -1449,9 +1421,7 @@ class CatalogSpace:
         Returns up to *n* (node_id, score) entries as a dict — useful as a
         coarse "which domain does this query belong to" signal.
         """
-        return self._get_cross_domain_affinity(
-            self.get_fitted(catalog_name), query_emb, n=n
-        )
+        return self._get_cross_domain_affinity(self.get_fitted(catalog_name), query_emb, n=n)
 
 
 # ── Helper on CatalogMatch for internal use ──────────────────────────────

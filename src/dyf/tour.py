@@ -34,14 +34,10 @@ def main(argv=None):
     if argv is None:
         argv = sys.argv[1:]
 
-    parser = argparse.ArgumentParser(
-        prog="dyf tour",
-        description="Launch the browser viewer with tour autoplay")
+    parser = argparse.ArgumentParser(prog="dyf tour", description="Launch the browser viewer with tour autoplay")
     parser.add_argument("dyf_path", help="Path to .dyf file")
-    parser.add_argument("--port", type=int, default=8766,
-                        help="Server port (default: 8766)")
-    parser.add_argument("--no-autoplay", action="store_true",
-                        help="Don't auto-start the tour")
+    parser.add_argument("--port", type=int, default=8766, help="Server port (default: 8766)")
+    parser.add_argument("--no-autoplay", action="store_true", help="Don't auto-start the tour")
     args = parser.parse_args(argv)
 
     dyf_file = Path(args.dyf_path).resolve()
@@ -66,12 +62,12 @@ def main(argv=None):
         def _cleanup():
             if symlink_path and symlink_path.is_symlink():
                 symlink_path.unlink(missing_ok=True)
+
         atexit.register(_cleanup)
 
     # Build viewer URL
     autoplay = "" if args.no_autoplay else "&autoplay=1"
-    url = (f"http://localhost:{args.port}/dyf_viewer.html"
-           f"?file={dyf_file.name}{autoplay}")
+    url = f"http://localhost:{args.port}/dyf_viewer.html?file={dyf_file.name}{autoplay}"
 
     # Start viz_server.py
     viz_server = demo_dir / "viz_server.py"
@@ -84,10 +80,7 @@ def main(argv=None):
     print(f"  URL: {url}")
 
     proc = subprocess.Popen(
-        [sys.executable, str(viz_server),
-         "--port", str(args.port),
-         "--dir", str(demo_dir),
-         "--no-browser"],
+        [sys.executable, str(viz_server), "--port", str(args.port), "--dir", str(demo_dir), "--no-browser"],
         cwd=str(demo_dir),
     )
 
@@ -101,6 +94,7 @@ def main(argv=None):
 
     # Give server a moment to start, then open browser
     import time
+
     time.sleep(1.0)
     webbrowser.open(url)
 

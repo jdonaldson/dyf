@@ -21,21 +21,23 @@ def reannotate(dyf_path, output_path=None):
             return
         data = idx.extract_all_fields()
 
-    label_cache_data = json.loads(data['metadata'].get('_label_cache', '{}'))
+    label_cache_data = json.loads(data["metadata"].get("_label_cache", "{}"))
     if not label_cache_data:
         print("  ERROR: No _label_cache in metadata. Run 'cluster' first.")
         return
 
-    embeddings = data['embeddings']
+    embeddings = data["embeddings"]
 
     # Discover cluster levels from stored fields
-    cluster_ks = sorted({
-        parts[1]
-        for sf_name in data['fields']
-        if sf_name.startswith('cluster_')
-        for parts in [sf_name.split('_')]
-        if len(parts) == 3 and parts[2] in ('2d', '3d')
-    })
+    cluster_ks = sorted(
+        {
+            parts[1]
+            for sf_name in data["fields"]
+            if sf_name.startswith("cluster_")
+            for parts in [sf_name.split("_")]
+            if len(parts) == 3 and parts[2] in ("2d", "3d")
+        }
+    )
 
     new_meta = {}
     for target_k in cluster_ks:
@@ -48,29 +50,22 @@ def reannotate(dyf_path, output_path=None):
             continue
         raw_2d = {int(k): v for k, v in raw_2d.items()}
 
-        sf_2d = f'cluster_{target_k}_2d'
-        if sf_2d in data['fields']:
-            labels_2d = data['fields'][sf_2d].astype(np.int32)
+        sf_2d = f"cluster_{target_k}_2d"
+        if sf_2d in data["fields"]:
+            labels_2d = data["fields"][sf_2d].astype(np.int32)
             print(f"  Reannotating {sf_2d}...")
-            ann_2d, gly_2d = annotate_cluster_names(
-                raw_2d, labels_2d, embeddings)
-            new_meta[f'cluster_names_{target_k}_2d'] = json.dumps(
-                {str(k): v for k, v in ann_2d.items()})
-            new_meta[f'cluster_glyphs_{target_k}_2d'] = json.dumps(
-                {str(k): v for k, v in gly_2d.items()})
+            ann_2d, gly_2d = annotate_cluster_names(raw_2d, labels_2d, embeddings)
+            new_meta[f"cluster_names_{target_k}_2d"] = json.dumps({str(k): v for k, v in ann_2d.items()})
+            new_meta[f"cluster_glyphs_{target_k}_2d"] = json.dumps({str(k): v for k, v in gly_2d.items()})
 
-        sf_3d = f'cluster_{target_k}_3d'
-        if sf_3d in data['fields'] and sf_2d in data['fields']:
-            labels_3d = data['fields'][sf_3d].astype(np.int32)
-            raw_3d = transfer_labels_majority_vote(
-                labels_2d, raw_2d, labels_3d)
+        sf_3d = f"cluster_{target_k}_3d"
+        if sf_3d in data["fields"] and sf_2d in data["fields"]:
+            labels_3d = data["fields"][sf_3d].astype(np.int32)
+            raw_3d = transfer_labels_majority_vote(labels_2d, raw_2d, labels_3d)
             print(f"  Reannotating {sf_3d}...")
-            ann_3d, gly_3d = annotate_cluster_names(
-                raw_3d, labels_3d, embeddings)
-            new_meta[f'cluster_names_{target_k}_3d'] = json.dumps(
-                {str(k): v for k, v in ann_3d.items()})
-            new_meta[f'cluster_glyphs_{target_k}_3d'] = json.dumps(
-                {str(k): v for k, v in gly_3d.items()})
+            ann_3d, gly_3d = annotate_cluster_names(raw_3d, labels_3d, embeddings)
+            new_meta[f"cluster_names_{target_k}_3d"] = json.dumps({str(k): v for k, v in ann_3d.items()})
+            new_meta[f"cluster_glyphs_{target_k}_3d"] = json.dumps({str(k): v for k, v in gly_3d.items()})
 
     out = output_path or dyf_path
     print(f"\n  Writing: {out}")

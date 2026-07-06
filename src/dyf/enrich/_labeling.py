@@ -14,18 +14,58 @@ from ._ollama import _call_ollama, _make_domain_context
 logger = logging.getLogger(__name__)
 
 
-def _compute_tfidf_keywords(titles: list[str], labels: np.ndarray, n_clusters: int, top_k: int = 10, min_df: int = 1) -> dict[int, list[tuple[str, float]]]:
+def _compute_tfidf_keywords(
+    titles: list[str], labels: np.ndarray, n_clusters: int, top_k: int = 10, min_df: int = 1
+) -> dict[int, list[tuple[str, float]]]:
     """TF-IDF keywords per cluster for contrastive labeling."""
     stop_words = {
-        'the', 'a', 'an', 'of', 'in', 'on', 'at', 'to', 'for', 'and', 'or',
-        'is', 'was', 'are', 'were', 'be', 'been', 'by', 'with', 'from', 'as',
-        'it', 'its', 'this', 'that', 'not', 'but', 'has', 'had', 'have', 'do',
-        'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might',
-        'list', 'disambiguation', 'episode', 'season',
+        "the",
+        "a",
+        "an",
+        "of",
+        "in",
+        "on",
+        "at",
+        "to",
+        "for",
+        "and",
+        "or",
+        "is",
+        "was",
+        "are",
+        "were",
+        "be",
+        "been",
+        "by",
+        "with",
+        "from",
+        "as",
+        "it",
+        "its",
+        "this",
+        "that",
+        "not",
+        "but",
+        "has",
+        "had",
+        "have",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "could",
+        "should",
+        "may",
+        "might",
+        "list",
+        "disambiguation",
+        "episode",
+        "season",
     }
 
     def tokenize(text):
-        words = re.findall(r'[a-z]+', text.lower())
+        words = re.findall(r"[a-z]+", text.lower())
         return [w for w in words if len(w) > 2 and w not in stop_words]
 
     cluster_titles = defaultdict(list)
@@ -69,7 +109,7 @@ def _compute_tfidf_keywords(titles: list[str], labels: np.ndarray, n_clusters: i
 def _find_nearest_cluster(cluster_id, centroids):
     """Find nearest cluster by centroid L2 distance."""
     target = centroids[cluster_id]
-    min_dist = float('inf')
+    min_dist = float("inf")
     nearest = 0
     for i, centroid in enumerate(centroids):
         if i != cluster_id:
@@ -89,20 +129,15 @@ def _sample_spatial(point_indices, coords, k):
     chosen = [np.random.randint(len(pts))]
     for _ in range(k - 1):
         chosen_coords = cluster_coords[chosen]
-        dists = np.min(
-            np.linalg.norm(
-                cluster_coords[:, None, :] - chosen_coords[None, :, :],
-                axis=2),
-            axis=1)
+        dists = np.min(np.linalg.norm(cluster_coords[:, None, :] - chosen_coords[None, :, :], axis=2), axis=1)
         dists[chosen] = -1
         chosen.append(int(np.argmax(dists)))
     return pts[chosen].tolist()
 
 
-def _get_cluster_path_context(point_indices, split_keywords, titles,
-                              sample_size=50, top_k=3):
+def _get_cluster_path_context(point_indices, split_keywords, titles, sample_size=50, top_k=3):
     """Get the majority tree path context for a cluster's points."""
-    splits = split_keywords.get('splits', {})
+    splits = split_keywords.get("splits", {})
     if not splits:
         return ""
 
@@ -114,42 +149,39 @@ def _get_cluster_path_context(point_indices, split_keywords, titles,
     split_votes: dict[str, Counter] = defaultdict(Counter)
 
     for nid_str, split in splits.items():
-        children = split.get('children', {})
+        children = split.get("children", {})
         if not children:
             continue
 
         for cid_str, cinfo in children.items():
-            unigrams = [w for w, _ in cinfo.get('unigrams', [])[:top_k]]
+            unigrams = [w for w, _ in cinfo.get("unigrams", [])[:top_k]]
             if not unigrams:
                 continue
             kw_set = set(unigrams)
             match_count = 0
             for idx in pts:
                 if idx < len(titles):
-                    words = set(re.findall(r'[a-z]{3,}', titles[idx].lower()))
+                    words = set(re.findall(r"[a-z]{3,}", titles[idx].lower()))
                     if words & kw_set:
                         match_count += 1
             split_votes[nid_str][cid_str] = match_count
 
     path_steps = []
-    sorted_splits = sorted(
-        splits.items(),
-        key=lambda x: x[1].get('depth', 0)
-    )
+    sorted_splits = sorted(splits.items(), key=lambda x: x[1].get("depth", 0))
     for nid_str, split in sorted_splits:
         votes = split_votes.get(nid_str)
         if not votes:
             continue
         winner = votes.most_common(1)[0][0]
-        children = split.get('children', {})
+        children = split.get("children", {})
         winner_info = children.get(winner, {})
-        words = [w for w, _ in winner_info.get('unigrams', [])[:top_k]]
+        words = [w for w, _ in winner_info.get("unigrams", [])[:top_k]]
         if words:
-            path_steps.append(','.join(words))
+            path_steps.append(",".join(words))
 
     if not path_steps:
         return ""
-    return ' → '.join(path_steps)
+    return " → ".join(path_steps)
 
 
 def _check_label_cache(cache_data, cache_file, cache_key, n_expected):
@@ -176,9 +208,19 @@ def _check_label_cache(cache_data, cache_file, cache_key, n_expected):
     return None
 
 
-def _prepare_labeling_tasks(unique_labels, cluster_points, titles, coords,
-                            embeddings, n_samples, model, path_labels,
-                            sibling_keywords, split_keywords, domain):
+def _prepare_labeling_tasks(
+    unique_labels,
+    cluster_points,
+    titles,
+    coords,
+    embeddings,
+    n_samples,
+    model,
+    path_labels,
+    sibling_keywords,
+    split_keywords,
+    domain,
+):
     """Build LLM prompts for each cluster.
 
     Returns list of (cid, prompt) tuples.
@@ -216,6 +258,7 @@ def _prepare_labeling_tasks(unique_labels, cluster_points, titles, coords,
         kw_str = ""
         if path_labels is not None and sibling_keywords is not None:
             from dyf.cluster_tree import format_cluster_context
+
             pl = path_labels.get(cid, "")
             sk = sibling_keywords.get(cid, [])
             ctx = format_cluster_context(cid, pl, sk)
@@ -223,11 +266,9 @@ def _prepare_labeling_tasks(unique_labels, cluster_points, titles, coords,
                 kw_str = f"\n{ctx}"
 
         if not kw_str and split_keywords:
-            path_context = _get_cluster_path_context(
-                pts, split_keywords, titles)
+            path_context = _get_cluster_path_context(pts, split_keywords, titles)
             if path_context:
-                kw_str = (f"\nTree path context (root → leaf): "
-                          f"{path_context}")
+                kw_str = f"\nTree path context (root → leaf): {path_context}"
 
         if not kw_str:
             nearest_idx = _find_nearest_cluster(cid_to_idx[cid], hd_centroids)
@@ -235,31 +276,25 @@ def _prepare_labeling_tasks(unique_labels, cluster_points, titles, coords,
             neighbor_pts = cluster_points[nearest_cid]
 
             if neighbor_pts:
-                combined = ([titles[p] for p in pts]
-                            + [titles[p] for p in neighbor_pts])
-                combined_labels = np.zeros(
-                    len(pts) + len(neighbor_pts), dtype=int)
-                combined_labels[len(pts):] = 1
-                kw = _compute_tfidf_keywords(combined, combined_labels, 2,
-                                             top_k=8, min_df=1)
+                combined = [titles[p] for p in pts] + [titles[p] for p in neighbor_pts]
+                combined_labels = np.zeros(len(pts) + len(neighbor_pts), dtype=int)
+                combined_labels[len(pts) :] = 1
+                kw = _compute_tfidf_keywords(combined, combined_labels, 2, top_k=8, min_df=1)
                 keywords = [w for w, _ in kw.get(0, [])][:8]
                 if keywords:
-                    kw_str = (f"\nDistinguishing keywords (vs neighbor): "
-                              f"{', '.join(keywords)}")
+                    kw_str = f"\nDistinguishing keywords (vs neighbor): {', '.join(keywords)}"
 
         dc = _make_domain_context(domain)
         prompt = (
             f"You are labeling clusters of {dc['domain']} in an embedding "
             f"space. This cluster has {len(pts)} {dc['items']}.\n"
             f"{kw_str}\n"
-            f"Sample {dc['items']} from across this cluster:\n"
-            + "\n".join(f"- {t}" for t in sample_titles)
-            + "\n\n"
+            f"Sample {dc['items']} from across this cluster:\n" + "\n".join(f"- {t}" for t in sample_titles) + "\n\n"
             "Give a short (2-5 word) label that DISTINGUISHES this cluster "
             "from similar ones. Use the distinguishing keywords and specific "
             "names to find what makes this group unique.\n\n"
-            f"BAD labels (too vague): \"{dc['domain'].title()}\", "
-            "\"General Items\", \"Miscellaneous\"\n"
+            f'BAD labels (too vague): "{dc["domain"].title()}", '
+            '"General Items", "Miscellaneous"\n'
             "GOOD labels: specific, distinguishing sub-category names\n\n"
             "Reply with ONLY the label, nothing else."
         )
@@ -268,8 +303,7 @@ def _prepare_labeling_tasks(unique_labels, cluster_points, titles, coords,
     return tasks
 
 
-def _relabel_duplicates(cluster_names, unique_labels, cluster_points, titles,
-                        coords, n_samples, model):
+def _relabel_duplicates(cluster_names, unique_labels, cluster_points, titles, coords, n_samples, model):
     """Detect duplicate labels and re-label them with sibling context.
 
     Modifies cluster_names in place. Returns None.
@@ -282,7 +316,7 @@ def _relabel_duplicates(cluster_names, unique_labels, cluster_points, titles,
     def _label_one(task):
         cid, prompt = task
         resp = _call_ollama(model, prompt)
-        label = resp.split('\n')[0][:50].strip('"\'').strip()
+        label = resp.split("\n")[0][:50].strip("\"'").strip()
         return cid, label if label else f"Cluster {cid}"
 
     dup_cids = [c for c in unique_labels if cluster_names[c] in duplicates]
@@ -308,8 +342,7 @@ def _relabel_duplicates(cluster_names, unique_labels, cluster_points, titles,
         prompt = (
             f"You are labeling clusters in an embedding space. "
             f"This cluster has {len(pts)} items.\n"
-            f"Sample items:\n"
-            + "\n".join(f"- {t}" for t in sample_titles) + "\n\n"
+            f"Sample items:\n" + "\n".join(f"- {t}" for t in sample_titles) + "\n\n"
             f"These labels are ALREADY TAKEN: {sibling_str}\n\n"
             "Give a short (2-5 word) label DIFFERENT from all taken "
             "labels. Reply with ONLY the label, nothing else."
@@ -325,11 +358,21 @@ def _relabel_duplicates(cluster_names, unique_labels, cluster_points, titles,
             cluster_names[cid] = label
 
 
-def label_clusters(titles, coords, labels, embeddings, model="gpt-oss:20b",
-                   n_samples=20, cache_file=None, cache_key=None,
-                   cache_data=None, split_keywords=None,
-                   path_labels=None, sibling_keywords=None,
-                   domain=None):
+def label_clusters(
+    titles,
+    coords,
+    labels,
+    embeddings,
+    model="gpt-oss:20b",
+    n_samples=20,
+    cache_file=None,
+    cache_key=None,
+    cache_data=None,
+    split_keywords=None,
+    path_labels=None,
+    sibling_keywords=None,
+    domain=None,
+):
     """Label clusters via contrastive TF-IDF + local Ollama LLM."""
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -337,8 +380,7 @@ def label_clusters(titles, coords, labels, embeddings, model="gpt-oss:20b",
 
     # Check cache: cache_data (in-memory) → cache_file (on-disk)
     _cache_key = cache_key or "default"
-    cached = _check_label_cache(cache_data, cache_file, _cache_key,
-                                len(unique_labels))
+    cached = _check_label_cache(cache_data, cache_file, _cache_key, len(unique_labels))
     if cached is not None:
         return cached
 
@@ -352,16 +394,25 @@ def label_clusters(titles, coords, labels, embeddings, model="gpt-oss:20b",
     logger.info(f"  Labeling {n_clusters} clusters with contrastive LLM ({model})...")
 
     tasks = _prepare_labeling_tasks(
-        unique_labels, cluster_points, titles, coords, embeddings,
-        n_samples, model, path_labels, sibling_keywords, split_keywords,
-        domain)
+        unique_labels,
+        cluster_points,
+        titles,
+        coords,
+        embeddings,
+        n_samples,
+        model,
+        path_labels,
+        sibling_keywords,
+        split_keywords,
+        domain,
+    )
 
     cluster_names = {cid: f"Cluster {cid}" for cid in unique_labels}
 
     def _label_one(task):
         cid, prompt = task
         resp = _call_ollama(model, prompt)
-        label = resp.split('\n')[0][:50].strip('"\'').strip()
+        label = resp.split("\n")[0][:50].strip("\"'").strip()
         return cid, label if label else f"Cluster {cid}"
 
     n_workers = min(4, len(tasks))
@@ -376,8 +427,7 @@ def label_clusters(titles, coords, labels, embeddings, model="gpt-oss:20b",
                 logger.info(f"    Labeled {completed}/{len(tasks)}...")
 
     # Re-label duplicates with sibling context
-    _relabel_duplicates(cluster_names, unique_labels, cluster_points, titles,
-                        coords, n_samples, model)
+    _relabel_duplicates(cluster_names, unique_labels, cluster_points, titles, coords, n_samples, model)
 
     for cid in unique_labels:
         n_pts = len(cluster_points[cid])
@@ -389,17 +439,14 @@ def label_clusters(titles, coords, labels, embeddings, model="gpt-oss:20b",
         file_cache = {}
         if cache_path.exists():
             file_cache = json.loads(cache_path.read_text())
-        file_cache[_cache_key] = {
-            str(k): v for k, v in cluster_names.items()
-        }
+        file_cache[_cache_key] = {str(k): v for k, v in cluster_names.items()}
         cache_path.write_text(json.dumps(file_cache, indent=2))
         logger.info(f"  Saved labels to cache ({cache_file})")
 
     return cluster_names
 
 
-def annotate_cluster_names(names, labels, embeddings,
-                           max_sample=200, seed=42):
+def annotate_cluster_names(names, labels, embeddings, max_sample=200, seed=42):
     """Compute size/purity glyphs and return clean names + separate glyph dict."""
     rng = np.random.RandomState(seed)
     cluster_ids = sorted(set(int(c) for c in labels))
@@ -437,10 +484,10 @@ def annotate_cluster_names(names, labels, embeddings,
 
     n_capitals = int(np.sum(size_vals > size_threshold))
     n_impure = int(np.sum(purity_vals < pur_threshold))
-    logger.info(f"    Size: mean={size_mean:.0f}, σ={size_std:.0f}, "
-                f"threshold={size_threshold:.0f} → {n_capitals} capitals")
-    logger.info(f"    Purity: mean={pur_mean:.3f}, σ={pur_std:.3f}, "
-                f"threshold={pur_threshold:.3f} → {n_impure} impure")
+    logger.info(
+        f"    Size: mean={size_mean:.0f}, σ={size_std:.0f}, threshold={size_threshold:.0f} → {n_capitals} capitals"
+    )
+    logger.info(f"    Purity: mean={pur_mean:.3f}, σ={pur_std:.3f}, threshold={pur_threshold:.3f} → {n_impure} impure")
 
     clean_names = {}
     glyphs_dict = {}
@@ -449,22 +496,20 @@ def annotate_cluster_names(names, labels, embeddings,
         clean_names[cid] = name
 
         if sizes[cid] > size_threshold:
-            star = '⭑'
+            star = "⭑"
         elif sizes[cid] > size_mean:
-            star = '⭒'
+            star = "⭒"
         else:
-            star = ''
-        impure = '≈' if purities[cid] < pur_threshold else ''
+            star = ""
+        impure = "≈" if purities[cid] < pur_threshold else ""
         glyphs_dict[cid] = {"size": star, "purity": impure}
 
-    n_flagged = sum(1 for g in glyphs_dict.values()
-                    if g['size'] or g['purity'])
+    n_flagged = sum(1 for g in glyphs_dict.values() if g["size"] or g["purity"])
     logger.info(f"    Flagged {n_flagged}/{len(cluster_ids)} clusters with glyphs")
     return clean_names, glyphs_dict
 
 
-def transfer_labels_majority_vote(labels_primary, names_primary,
-                                   labels_secondary):
+def transfer_labels_majority_vote(labels_primary, names_primary, labels_secondary):
     """Transfer cluster names from primary to secondary via majority vote."""
     labels_p = np.asarray(labels_primary)
     labels_s = np.asarray(labels_secondary)
@@ -474,8 +519,7 @@ def transfer_labels_majority_vote(labels_primary, names_primary,
         mask = labels_s == s_cid
         primary_ids = labels_p[mask]
         most_common = Counter(primary_ids.tolist()).most_common(1)[0][0]
-        secondary_names[s_cid] = names_primary.get(most_common,
-                                                    f"Cluster {s_cid}")
+        secondary_names[s_cid] = names_primary.get(most_common, f"Cluster {s_cid}")
 
     name_counts = Counter(secondary_names.values())
     duplicates = {name for name, cnt in name_counts.items() if cnt > 1}

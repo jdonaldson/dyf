@@ -125,6 +125,7 @@ def extract_fisher_labels(
     labels : (n,) str array
     """
     import warnings
+
     warnings.warn(
         "extract_fisher_labels is deprecated, use coarsen(raw_values, strategy=mode) instead",
         DeprecationWarning,

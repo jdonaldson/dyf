@@ -7,8 +7,9 @@ from flatbuffers.compat import import_numpy
 
 np = import_numpy()
 
+
 class Node:
-    __slots__ = ['_tab']
+    __slots__ = ["_tab"]
 
     @classmethod
     def GetRootAs(cls, buf, offset=0):
@@ -21,6 +22,7 @@ class Node:
     def GetRootAsNode(cls, buf, offset=0):
         """This method is deprecated. Please switch to GetRootAs."""
         return cls.GetRootAs(buf, offset)
+
     # Node
     def Init(self, buf, pos):
         self._tab = flatbuffers.table.Table(buf, pos)
@@ -30,7 +32,9 @@ class Node:
         o = flatbuffers.number_types.UOffsetTFlags.py_type(self._tab.Offset(4))
         if o != 0:
             a = self._tab.Vector(o)
-            return self._tab.Get(flatbuffers.number_types.Uint32Flags, a + flatbuffers.number_types.UOffsetTFlags.py_type(j * 4))
+            return self._tab.Get(
+                flatbuffers.number_types.Uint32Flags, a + flatbuffers.number_types.UOffsetTFlags.py_type(j * 4)
+            )
         return 0
 
     # Node
@@ -57,7 +61,9 @@ class Node:
         o = flatbuffers.number_types.UOffsetTFlags.py_type(self._tab.Offset(6))
         if o != 0:
             a = self._tab.Vector(o)
-            return self._tab.Get(flatbuffers.number_types.Float32Flags, a + flatbuffers.number_types.UOffsetTFlags.py_type(j * 4))
+            return self._tab.Get(
+                flatbuffers.number_types.Float32Flags, a + flatbuffers.number_types.UOffsetTFlags.py_type(j * 4)
+            )
         return 0
 
     # Node
@@ -91,7 +97,9 @@ class Node:
         o = flatbuffers.number_types.UOffsetTFlags.py_type(self._tab.Offset(10))
         if o != 0:
             a = self._tab.Vector(o)
-            return self._tab.Get(flatbuffers.number_types.Uint64Flags, a + flatbuffers.number_types.UOffsetTFlags.py_type(j * 8))
+            return self._tab.Get(
+                flatbuffers.number_types.Uint64Flags, a + flatbuffers.number_types.UOffsetTFlags.py_type(j * 8)
+            )
         return 0
 
     # Node
@@ -118,7 +126,9 @@ class Node:
         o = flatbuffers.number_types.UOffsetTFlags.py_type(self._tab.Offset(12))
         if o != 0:
             a = self._tab.Vector(o)
-            return self._tab.Get(flatbuffers.number_types.Float32Flags, a + flatbuffers.number_types.UOffsetTFlags.py_type(j * 4))
+            return self._tab.Get(
+                flatbuffers.number_types.Float32Flags, a + flatbuffers.number_types.UOffsetTFlags.py_type(j * 4)
+            )
         return 0
 
     # Node
@@ -166,7 +176,9 @@ class Node:
         o = flatbuffers.number_types.UOffsetTFlags.py_type(self._tab.Offset(20))
         if o != 0:
             a = self._tab.Vector(o)
-            return self._tab.Get(flatbuffers.number_types.Float32Flags, a + flatbuffers.number_types.UOffsetTFlags.py_type(j * 4))
+            return self._tab.Get(
+                flatbuffers.number_types.Float32Flags, a + flatbuffers.number_types.UOffsetTFlags.py_type(j * 4)
+            )
         return 0
 
     # Node
@@ -188,98 +200,130 @@ class Node:
         o = flatbuffers.number_types.UOffsetTFlags.py_type(self._tab.Offset(20))
         return o == 0
 
+
 def NodeStart(builder):
     builder.StartObject(9)
+
 
 def Start(builder):
     NodeStart(builder)
 
+
 def NodeAddChildren(builder, children):
     builder.PrependUOffsetTRelativeSlot(0, flatbuffers.number_types.UOffsetTFlags.py_type(children), 0)
+
 
 def AddChildren(builder, children):
     NodeAddChildren(builder, children)
 
+
 def NodeStartChildrenVector(builder, numElems):
     return builder.StartVector(4, numElems, 4)
+
 
 def StartChildrenVector(builder, numElems):
     return NodeStartChildrenVector(builder, numElems)
 
+
 def NodeAddHyperplanes(builder, hyperplanes):
     builder.PrependUOffsetTRelativeSlot(1, flatbuffers.number_types.UOffsetTFlags.py_type(hyperplanes), 0)
+
 
 def AddHyperplanes(builder, hyperplanes):
     NodeAddHyperplanes(builder, hyperplanes)
 
+
 def NodeStartHyperplanesVector(builder, numElems):
     return builder.StartVector(4, numElems, 4)
+
 
 def StartHyperplanesVector(builder, numElems):
     return NodeStartHyperplanesVector(builder, numElems)
 
+
 def NodeAddNumBits(builder, numBits):
     builder.PrependUint8Slot(2, numBits, 0)
+
 
 def AddNumBits(builder, numBits):
     NodeAddNumBits(builder, numBits)
 
+
 def NodeAddBucketIdsToChildren(builder, bucketIdsToChildren):
     builder.PrependUOffsetTRelativeSlot(3, flatbuffers.number_types.UOffsetTFlags.py_type(bucketIdsToChildren), 0)
+
 
 def AddBucketIdsToChildren(builder, bucketIdsToChildren):
     NodeAddBucketIdsToChildren(builder, bucketIdsToChildren)
 
+
 def NodeStartBucketIdsToChildrenVector(builder, numElems):
     return builder.StartVector(8, numElems, 8)
+
 
 def StartBucketIdsToChildrenVector(builder, numElems):
     return NodeStartBucketIdsToChildrenVector(builder, numElems)
 
+
 def NodeAddCentroid(builder, centroid):
     builder.PrependUOffsetTRelativeSlot(4, flatbuffers.number_types.UOffsetTFlags.py_type(centroid), 0)
+
 
 def AddCentroid(builder, centroid):
     NodeAddCentroid(builder, centroid)
 
+
 def NodeStartCentroidVector(builder, numElems):
     return builder.StartVector(4, numElems, 4)
+
 
 def StartCentroidVector(builder, numElems):
     return NodeStartCentroidVector(builder, numElems)
 
+
 def NodeAddNumItems(builder, numItems):
     builder.PrependUint32Slot(5, numItems, 0)
+
 
 def AddNumItems(builder, numItems):
     NodeAddNumItems(builder, numItems)
 
+
 def NodeAddBatchIndex(builder, batchIndex):
     builder.PrependInt32Slot(6, batchIndex, -1)
+
 
 def AddBatchIndex(builder, batchIndex):
     NodeAddBatchIndex(builder, batchIndex)
 
+
 def NodeAddDepth(builder, depth):
     builder.PrependUint8Slot(7, depth, 0)
+
 
 def AddDepth(builder, depth):
     NodeAddDepth(builder, depth)
 
+
 def NodeAddEigenvalues(builder, eigenvalues):
     builder.PrependUOffsetTRelativeSlot(8, flatbuffers.number_types.UOffsetTFlags.py_type(eigenvalues), 0)
+
 
 def AddEigenvalues(builder, eigenvalues):
     NodeAddEigenvalues(builder, eigenvalues)
 
+
 def NodeStartEigenvaluesVector(builder, numElems):
     return builder.StartVector(4, numElems, 4)
+
 
 def StartEigenvaluesVector(builder, numElems):
     return NodeStartEigenvaluesVector(builder, numElems)
 
+
 def NodeEnd(builder):
     return builder.EndObject()
+
 
 def End(builder):
     return NodeEnd(builder)

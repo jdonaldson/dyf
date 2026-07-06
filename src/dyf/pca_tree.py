@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 # Tree construction
 # ---------------------------------------------------------------------------
 
+
 def _build_pca_tree(embeddings, point_indices, depth, min_leaf_size=2):
     """Recursively bisect points along PC1, storing per-point margins.
 
@@ -35,9 +36,11 @@ def _build_pca_tree(embeddings, point_indices, depth, min_leaf_size=2):
     """
     if depth == 0 or len(point_indices) < min_leaf_size * 2:
         return {
-            'left': None, 'right': None,
-            'indices': point_indices, 'depth': depth,
-            'point_margin_map': None,
+            "left": None,
+            "right": None,
+            "indices": point_indices,
+            "depth": depth,
+            "point_margin_map": None,
         }
 
     subset = embeddings[point_indices]
@@ -50,14 +53,18 @@ def _build_pca_tree(embeddings, point_indices, depth, min_leaf_size=2):
             # Root-level failure degenerates the whole tree to a single leaf —
             # a valid-looking but useless result. Never benign; say so.
             logger.warning(
-                "PCA ROOT split failed — returning a single-leaf tree (all %d "
-                "points in one cluster). Cause: %s", len(point_indices), e)
+                "PCA ROOT split failed — returning a single-leaf tree (all %d points in one cluster). Cause: %s",
+                len(point_indices),
+                e,
+            )
         else:
             logger.debug("PCA split failed at depth %d: %s", depth, e)
         return {
-            'left': None, 'right': None,
-            'indices': point_indices, 'depth': depth,
-            'point_margin_map': None,
+            "left": None,
+            "right": None,
+            "indices": point_indices,
+            "depth": depth,
+            "point_margin_map": None,
         }
 
     median = np.median(projections)
@@ -79,13 +86,11 @@ def _build_pca_tree(embeddings, point_indices, depth, min_leaf_size=2):
         right_idx = point_indices[right_mask]
 
     return {
-        'left': _build_pca_tree(
-            embeddings, left_idx, depth - 1, min_leaf_size),
-        'right': _build_pca_tree(
-            embeddings, right_idx, depth - 1, min_leaf_size),
-        'indices': point_indices,
-        'depth': depth,
-        'point_margin_map': point_margin_map,
+        "left": _build_pca_tree(embeddings, left_idx, depth - 1, min_leaf_size),
+        "right": _build_pca_tree(embeddings, right_idx, depth - 1, min_leaf_size),
+        "indices": point_indices,
+        "depth": depth,
+        "point_margin_map": point_margin_map,
     }
 
 
@@ -109,6 +114,7 @@ def build_pca_tree(embeddings, max_depth, min_leaf_size=2):
 # ---------------------------------------------------------------------------
 # Boundary persistence detection
 # ---------------------------------------------------------------------------
+
 
 def extract_boundary_persistence(tree, margin_pct=0.10):
     """Identify points that persist as boundary across multiple tree depths.
@@ -138,14 +144,13 @@ def extract_boundary_persistence(tree, margin_pct=0.10):
     nodes_by_depth = defaultdict(list)
 
     def _collect(node, current_depth):
-        if node['point_margin_map'] is not None:
-            margins_by_depth[current_depth].extend(
-                node['point_margin_map'].values())
+        if node["point_margin_map"] is not None:
+            margins_by_depth[current_depth].extend(node["point_margin_map"].values())
             nodes_by_depth[current_depth].append(node)
-        if node['left'] is not None:
-            _collect(node['left'], current_depth + 1)
-        if node['right'] is not None:
-            _collect(node['right'], current_depth + 1)
+        if node["left"] is not None:
+            _collect(node["left"], current_depth + 1)
+        if node["right"] is not None:
+            _collect(node["right"], current_depth + 1)
 
     _collect(tree, 0)
 
@@ -158,19 +163,19 @@ def extract_boundary_persistence(tree, margin_pct=0.10):
     for depth, nodes in nodes_by_depth.items():
         threshold = thresholds[depth]
         for node in nodes:
-            for pt_idx, margin in node['point_margin_map'].items():
+            for pt_idx, margin in node["point_margin_map"].items():
                 if margin < threshold:
                     boundary_depths[pt_idx].append(depth)
 
-    n = len(tree['indices'])
+    n = len(tree["indices"])
     boundary_count = np.zeros(n, dtype=int)
     for pt_idx, depths in boundary_depths.items():
         boundary_count[pt_idx] = len(depths)
 
     return {
-        'boundary_depths': dict(boundary_depths),
-        'boundary_count': boundary_count,
-        'thresholds': thresholds,
+        "boundary_depths": dict(boundary_depths),
+        "boundary_count": boundary_count,
+        "thresholds": thresholds,
     }
 
 
@@ -192,12 +197,12 @@ def boundary_persistence_scores(tree, margin_pct=0.10, max_depth=None):
         np.ndarray of shape (n,) with non-negative bridge scores.
     """
     if max_depth is None:
-        max_depth = tree['depth']
+        max_depth = tree["depth"]
 
     result = extract_boundary_persistence(tree, margin_pct=margin_pct)
-    boundary_depths = result['boundary_depths']
+    boundary_depths = result["boundary_depths"]
 
-    n = len(tree['indices'])
+    n = len(tree["indices"])
     scores = np.zeros(n, dtype=np.float64)
     for pt_idx, depths in boundary_depths.items():
         scores[pt_idx] = sum(max_depth - d for d in depths)
@@ -209,20 +214,21 @@ def boundary_persistence_scores(tree, margin_pct=0.10, max_depth=None):
 # Tree to linkage matrix (for scipy fcluster)
 # ---------------------------------------------------------------------------
 
+
 def _pca_tree_to_Z(tree, max_depth):
     """Convert PCA tree to scipy Z linkage matrix."""
     leaves = []
     internals = []
 
     def _collect(node, current_depth):
-        if node['left'] is None and node['right'] is None:
+        if node["left"] is None and node["right"] is None:
             leaves.append((node, current_depth))
         else:
             internals.append((node, current_depth))
-            if node['left'] is not None:
-                _collect(node['left'], current_depth + 1)
-            if node['right'] is not None:
-                _collect(node['right'], current_depth + 1)
+            if node["left"] is not None:
+                _collect(node["left"], current_depth + 1)
+            if node["right"] is not None:
+                _collect(node["right"], current_depth + 1)
 
     _collect(tree, 0)
     n_leaves = len(leaves)
@@ -233,7 +239,7 @@ def _pca_tree_to_Z(tree, max_depth):
     for i, (leaf, _) in enumerate(leaves):
         leaf_id_map[id(leaf)] = i
         leaf_count[id(leaf)] = 1
-        leaf_points_list.append(leaf['indices'])
+        leaf_points_list.append(leaf["indices"])
 
     internals.sort(key=lambda x: -x[1])
     n_merges = len(internals)
@@ -241,8 +247,8 @@ def _pca_tree_to_Z(tree, max_depth):
     node_id_map = dict(leaf_id_map)
 
     for merge_idx, (node, node_depth) in enumerate(internals):
-        left_child = node['left']
-        right_child = node['right']
+        left_child = node["left"]
+        right_child = node["right"]
         left_id = node_id_map[id(left_child)]
         right_id = node_id_map[id(right_child)]
         distance = float(max_depth - node_depth + 1)
@@ -284,8 +290,7 @@ def _cut_pca_tree_to_labels(tree, max_depth, n_points, n_clusters):
     if n_leaves <= n_clusters:
         leaf_labels = np.arange(n_leaves)
     else:
-        leaf_labels = fcluster(Z, t=n_clusters, criterion='maxclust') - 1
+        leaf_labels = fcluster(Z, t=n_clusters, criterion="maxclust") - 1
 
-    point_labels = np.array(
-        [leaf_labels[point_to_leaf[i]] for i in range(n_points)])
+    point_labels = np.array([leaf_labels[point_to_leaf[i]] for i in range(n_points)])
     return point_labels

@@ -21,25 +21,120 @@ import numpy as np
 from dyf.lazy_index import TreeNode
 
 # English stop words (compact set covering common function words)
-_ENGLISH_STOP = frozenset({
-    'the', 'a', 'an', 'of', 'in', 'on', 'at', 'to', 'for', 'and', 'or',
-    'is', 'was', 'are', 'were', 'be', 'been', 'by', 'with', 'from', 'as',
-    'it', 'its', 'this', 'that', 'not', 'but', 'has', 'had', 'have', 'do',
-    'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might',
-    'can', 'shall', 'each', 'which', 'their', 'there', 'than', 'into', 'such', 'other', 'also', 'about', 'more', 'these', 'some',
-    'them', 'then', 'what', 'when', 'where', 'how', 'who', 'whom',
-    'all', 'any', 'both', 'most', 'many', 'very', 'just', 'only',
-    'own', 'same', 'being', 'because', 'through', 'during', 'before',
-    'after', 'above', 'below', 'between', 'under', 'over', 'again',
-    'further', 'once', 'here', 'why', 'out', 'off', 'down', 'up',
-    'too', 'nor', 'yet', 'so', 'if', 'while', 'until',
-    'list', 'disambiguation', 'episode', 'season', 'use', 'used',
-})
+_ENGLISH_STOP = frozenset(
+    {
+        "the",
+        "a",
+        "an",
+        "of",
+        "in",
+        "on",
+        "at",
+        "to",
+        "for",
+        "and",
+        "or",
+        "is",
+        "was",
+        "are",
+        "were",
+        "be",
+        "been",
+        "by",
+        "with",
+        "from",
+        "as",
+        "it",
+        "its",
+        "this",
+        "that",
+        "not",
+        "but",
+        "has",
+        "had",
+        "have",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "could",
+        "should",
+        "may",
+        "might",
+        "can",
+        "shall",
+        "each",
+        "which",
+        "their",
+        "there",
+        "than",
+        "into",
+        "such",
+        "other",
+        "also",
+        "about",
+        "more",
+        "these",
+        "some",
+        "them",
+        "then",
+        "what",
+        "when",
+        "where",
+        "how",
+        "who",
+        "whom",
+        "all",
+        "any",
+        "both",
+        "most",
+        "many",
+        "very",
+        "just",
+        "only",
+        "own",
+        "same",
+        "being",
+        "because",
+        "through",
+        "during",
+        "before",
+        "after",
+        "above",
+        "below",
+        "between",
+        "under",
+        "over",
+        "again",
+        "further",
+        "once",
+        "here",
+        "why",
+        "out",
+        "off",
+        "down",
+        "up",
+        "too",
+        "nor",
+        "yet",
+        "so",
+        "if",
+        "while",
+        "until",
+        "list",
+        "disambiguation",
+        "episode",
+        "season",
+        "use",
+        "used",
+    }
+)
 
 
 def tokenize(text: str) -> list[str]:
     """Lowercase, extract words of 3+ chars, filter stop words."""
-    words = re.findall(r'[a-z]{3,}', text.lower())
+    words = re.findall(r"[a-z]{3,}", text.lower())
     return [w for w in words if w not in _ENGLISH_STOP]
 
 
@@ -62,14 +157,14 @@ def build_tree_maps(idx):
 
     children_map: dict[int, list[int]] = defaultdict(list)
     for node in tree:
-        if node['parent_id'] is not None:
-            children_map[node['parent_id']].append(node['node_id'])
+        if node["parent_id"] is not None:
+            children_map[node["parent_id"]].append(node["node_id"])
 
     leaf_batches: dict[int, np.ndarray] = {}
     for node in tree:
-        if node['is_leaf'] and node['batch_index'] >= 0:
-            batch = idx.get_leaf(node['batch_index'])
-            leaf_batches[node['node_id']] = batch.column('item_index').to_numpy()
+        if node["is_leaf"] and node["batch_index"] >= 0:
+            batch = idx.get_leaf(node["batch_index"])
+            leaf_batches[node["node_id"]] = batch.column("item_index").to_numpy()
 
     return tree, dict(children_map), leaf_batches
 
@@ -85,15 +180,12 @@ def collect_descendant_indices(
     kids = children_map.get(node_id, [])
     if not kids:
         return np.array([], dtype=int)
-    return np.concatenate([
-        collect_descendant_indices(k, children_map, leaf_batches)
-        for k in kids
-    ])
+    return np.concatenate([collect_descendant_indices(k, children_map, leaf_batches) for k in kids])
 
 
 def _compute_depth_from_root(tree, children_map):
     """Compute depth-from-root for every node via BFS."""
-    root_id = next(n['node_id'] for n in tree if n['parent_id'] is None)
+    root_id = next(n["node_id"] for n in tree if n["parent_id"] is None)
     depth_from_root = {root_id: 0}
     queue = [root_id]
     while queue:
@@ -174,9 +266,12 @@ def assess_text_diversity(
     n = len(titles)
     if n == 0:
         return TextDiversityReport(
-            unique_token_count=0, token_item_ratio=0.0,
-            unique_title_ratio=0.0, n_items=0,
-            is_diverse=False, reason="empty title list",
+            unique_token_count=0,
+            token_item_ratio=0.0,
+            unique_title_ratio=0.0,
+            n_items=0,
+            is_diverse=False,
+            reason="empty title list",
         )
 
     unique_tokens: set[str] = set()
@@ -193,11 +288,9 @@ def assess_text_diversity(
     if utc < min_unique_tokens:
         reasons.append(f"only {utc} unique tokens (need {min_unique_tokens})")
     if token_ratio < min_token_ratio:
-        reasons.append(
-            f"token/item ratio {token_ratio:.6f} < {min_token_ratio}")
+        reasons.append(f"token/item ratio {token_ratio:.6f} < {min_token_ratio}")
     if title_ratio < min_unique_title_ratio:
-        reasons.append(
-            f"unique title ratio {title_ratio:.4f} < {min_unique_title_ratio}")
+        reasons.append(f"unique title ratio {title_ratio:.4f} < {min_unique_title_ratio}")
 
     is_diverse = len(reasons) == 0
     reason = "OK" if is_diverse else "; ".join(reasons)
@@ -323,7 +416,7 @@ def _compute_child_tfidf(child_data, n_children, top_k, bigram_check):
     # Compute unigram document frequency across children
     word_df: Counter = Counter()
     for cdata in child_data.values():
-        for word in cdata['word_counts']:
+        for word in cdata["word_counts"]:
             word_df[word] += 1
 
     # IDF: log(n_children / (1 + df))
@@ -336,54 +429,48 @@ def _compute_child_tfidf(child_data, n_children, top_k, bigram_check):
     # Compute TF-IDF per child for unigrams
     children_result = {}
     for cid, cdata in child_data.items():
-        total = cdata['total_words']
+        total = cdata["total_words"]
         if total == 0:
             children_result[cid] = {
-                'count': cdata['count'],
-                'unigrams': [],
+                "count": cdata["count"],
+                "unigrams": [],
             }
             if bigram_check:
-                children_result[cid]['bigrams'] = []
+                children_result[cid]["bigrams"] = []
             continue
 
         scores = []
-        for word, count in cdata['word_counts'].items():
+        for word, count in cdata["word_counts"].items():
             if word in idf:
                 tf = count / total
                 scores.append((word, tf * idf[word]))
 
         scores.sort(key=lambda x: -x[1])
         entry: dict = {
-            'count': cdata['count'],
-            'unigrams': [(w, round(s, 6)) for w, s in scores[:top_k]],
+            "count": cdata["count"],
+            "unigrams": [(w, round(s, 6)) for w, s in scores[:top_k]],
         }
 
         # Bigram TF-IDF if requested
         if bigram_check:
             bigram_df: Counter = Counter()
             for cd in child_data.values():
-                for bg in cd['bigram_counts']:
+                for bg in cd["bigram_counts"]:
                     bigram_df[bg] += 1
 
-            bg_idf = {
-                bg: math.log(n_children / (1 + df))
-                for bg, df in bigram_df.items()
-                if df < n_children
-            }
+            bg_idf = {bg: math.log(n_children / (1 + df)) for bg, df in bigram_df.items() if df < n_children}
 
-            bg_total = cdata['total_bigrams']
+            bg_total = cdata["total_bigrams"]
             if bg_total > 0:
                 bg_scores = []
-                for bg, count in cdata['bigram_counts'].items():
+                for bg, count in cdata["bigram_counts"].items():
                     if bg in bg_idf:
                         tf = count / bg_total
                         bg_scores.append((bg, tf * bg_idf[bg]))
                 bg_scores.sort(key=lambda x: -x[1])
-                entry['bigrams'] = [
-                    (bg, round(s, 6)) for bg, s in bg_scores[:top_k]
-                ]
+                entry["bigrams"] = [(bg, round(s, 6)) for bg, s in bg_scores[:top_k]]
             else:
-                entry['bigrams'] = []
+                entry["bigrams"] = []
 
         children_result[cid] = entry
 
@@ -438,15 +525,16 @@ def compute_split_keywords(
 
     # Find internal nodes within depth range from root.
     internal_nodes = [
-        n for n in tree
-        if depth_from_root.get(n['node_id'], 999) < max_depth_from_root
-        and children_map.get(n['node_id'])  # has children
+        n
+        for n in tree
+        if depth_from_root.get(n["node_id"], 999) < max_depth_from_root
+        and children_map.get(n["node_id"])  # has children
     ]
 
     splits = {}
 
     for node in internal_nodes:
-        nid = node['node_id']
+        nid = node["node_id"]
         child_ids = children_map[nid]
 
         # Collect titles for each child
@@ -463,54 +551,47 @@ def compute_split_keywords(
             total_bigrams = 0
             for idx in indices:
                 if idx < len(titles):
-                    words = [w for w in tokenize(titles[idx])
-                             if w not in all_stopwords]
+                    words = [w for w in tokenize(titles[idx]) if w not in all_stopwords]
                     word_counts.update(words)
                     total_words += len(words)
                     if bigram_check:
                         # Re-tokenize filtering stopwords for bigrams
-                        bigrams = [
-                            f"{words[i]}_{words[i+1]}"
-                            for i in range(len(words) - 1)
-                        ]
+                        bigrams = [f"{words[i]}_{words[i + 1]}" for i in range(len(words) - 1)]
                         bigram_counts.update(bigrams)
                         total_bigrams += len(bigrams)
 
             child_data[cid] = {
-                'count': int(len(indices)),
-                'word_counts': word_counts,
-                'total_words': total_words,
-                'bigram_counts': bigram_counts,
-                'total_bigrams': total_bigrams,
+                "count": int(len(indices)),
+                "word_counts": word_counts,
+                "total_words": total_words,
+                "bigram_counts": bigram_counts,
+                "total_bigrams": total_bigrams,
             }
 
         if len(child_data) < 2:
             continue
 
         n_children = len(child_data)
-        children_result = _compute_child_tfidf(
-            child_data, n_children, top_k, bigram_check)
+        children_result = _compute_child_tfidf(child_data, n_children, top_k, bigram_check)
 
         split_entry: dict = {
-            'depth': depth_from_root.get(nid, 0),
-            'children': children_result,
+            "depth": depth_from_root.get(nid, 0),
+            "children": children_result,
         }
 
         # Bigram necessity check
         if bigram_check:
-            split_entry['bigram_needed'] = _check_bigram_needed(
-                children_result, top_k=20)
+            split_entry["bigram_needed"] = _check_bigram_needed(children_result, top_k=20)
 
         splits[nid] = split_entry
 
     return {
-        'domain_stopwords': sorted(domain_stopwords or []),
-        'splits': splits,
+        "domain_stopwords": sorted(domain_stopwords or []),
+        "splits": splits,
     }
 
 
-def _project_terms_onto_hyperplane(term_items, embeddings, hp, all_stopwords,
-                                   min_term_count):
+def _project_terms_onto_hyperplane(term_items, embeddings, hp, all_stopwords, min_term_count):
     """Project vocabulary terms onto a hyperplane and rank them by projection score.
 
     Computes a "term embedding" for each term (centroid of item embeddings whose
@@ -527,8 +608,7 @@ def _project_terms_onto_hyperplane(term_items, embeddings, hp, all_stopwords,
         dict mapping term -> float projection score, or empty dict if no terms qualify.
     """
     # Filter by min_term_count
-    filtered = {w: idxs for w, idxs in term_items.items()
-                if len(idxs) >= min_term_count}
+    filtered = {w: idxs for w, idxs in term_items.items() if len(idxs) >= min_term_count}
 
     if not filtered:
         return {}
@@ -597,16 +677,17 @@ def compute_embedding_keywords(
 
     # Find internal nodes within depth range that have hyperplanes
     internal_nodes = [
-        n for n in tree
-        if depth_from_root.get(n['node_id'], 999) < max_depth_from_root
-        and children_map.get(n['node_id'])
-        and n['node_id'] in hyperplanes
+        n
+        for n in tree
+        if depth_from_root.get(n["node_id"], 999) < max_depth_from_root
+        and children_map.get(n["node_id"])
+        and n["node_id"] in hyperplanes
     ]
 
     splits = {}
 
     for node in internal_nodes:
-        nid = node['node_id']
+        nid = node["node_id"]
         child_ids = children_map[nid]
 
         # Get first PCA direction (highest variance), normalized
@@ -631,8 +712,7 @@ def compute_embedding_keywords(
                         term_items[w].append(idx)
 
         # Project terms onto hyperplane and rank by projection score
-        term_scores = _project_terms_onto_hyperplane(
-            term_items, embeddings, hp, all_stopwords, min_term_count)
+        term_scores = _project_terms_onto_hyperplane(term_items, embeddings, hp, all_stopwords, min_term_count)
 
         if not term_scores:
             continue
@@ -646,22 +726,22 @@ def compute_embedding_keywords(
             child_centroid = embeddings[child_indices].mean(axis=0).astype(np.float64)
             child_proj = float(child_centroid @ hp)
             child_data[cid] = {
-                'count': int(len(child_indices)),
-                'proj': child_proj,
-                'indices': child_indices,
+                "count": int(len(child_indices)),
+                "proj": child_proj,
+                "indices": child_indices,
             }
 
         if len(child_data) < 2:
             continue
 
         # Assign terms to the child whose centroid projection is closest
-        child_projs = {cid: cd['proj'] for cid, cd in child_data.items()}
+        child_projs = {cid: cd["proj"] for cid, cd in child_data.items()}
 
         children_result = {}
         for cid, cd in child_data.items():
             children_result[cid] = {
-                'count': cd['count'],
-                'unigrams': [],
+                "count": cd["count"],
+                "unigrams": [],
             }
 
         # For each term, assign to nearest child by projection
@@ -669,24 +749,22 @@ def compute_embedding_keywords(
             best_cid = min(child_projs, key=lambda c: abs(score - child_projs[c]))
             # Score = distance from midpoint of other children's projections
             magnitude = abs(score - child_projs[best_cid])
-            children_result[best_cid]['unigrams'].append((word, magnitude))
+            children_result[best_cid]["unigrams"].append((word, magnitude))
 
         # Sort by score descending and keep top_k per child
         for cid in children_result:
-            unigrams = children_result[cid]['unigrams']
+            unigrams = children_result[cid]["unigrams"]
             unigrams.sort(key=lambda x: -x[1])
-            children_result[cid]['unigrams'] = [
-                (w, round(s, 6)) for w, s in unigrams[:top_k]
-            ]
+            children_result[cid]["unigrams"] = [(w, round(s, 6)) for w, s in unigrams[:top_k]]
 
         splits[nid] = {
-            'depth': depth_from_root.get(nid, 0),
-            'children': children_result,
+            "depth": depth_from_root.get(nid, 0),
+            "children": children_result,
         }
 
     return {
-        'domain_stopwords': sorted(domain_stopwords or []),
-        'splits': splits,
+        "domain_stopwords": sorted(domain_stopwords or []),
+        "splits": splits,
     }
 
 
@@ -703,7 +781,7 @@ def _check_bigram_needed(
     # Collect top unigrams per child
     child_top_words: dict[int, set[str]] = {}
     for cid, entry in children_result.items():
-        child_top_words[cid] = {w for w, _ in entry['unigrams'][:top_k]}
+        child_top_words[cid] = {w for w, _ in entry["unigrams"][:top_k]}
 
     # Find words appearing in top-k of multiple children
     word_child_count: Counter = Counter()
@@ -717,7 +795,7 @@ def _check_bigram_needed(
     # Check if bigrams resolve ambiguity
     child_top_bigrams: dict[int, set[str]] = {}
     for cid, entry in children_result.items():
-        bgs = entry.get('bigrams', [])
+        bgs = entry.get("bigrams", [])
         child_top_bigrams[cid] = {bg for bg, _ in bgs[:top_k]}
 
     # For each ambiguous unigram, check if a bigram containing it
@@ -725,8 +803,7 @@ def _check_bigram_needed(
     resolved = 0
     for word in ambiguous:
         for cid, bgs in child_top_bigrams.items():
-            matching_bgs = {bg for bg in bgs
-                           if word in bg.split('_')}
+            matching_bgs = {bg for bg in bgs if word in bg.split("_")}
             if matching_bgs:
                 # Check if these bigrams are unique to this child
                 other_bgs = set()
@@ -769,11 +846,11 @@ def format_split_path(
         List of comma-separated keyword strings, one per split level.
         E.g.: ["screw,plate,fixation", "pedicle,cervical,spine"]
     """
-    splits = split_keywords.get('splits', {})
+    splits = split_keywords.get("splits", {})
     if not splits:
         return []
 
-    by_id = {n['node_id']: n for n in tree}
+    by_id = {n["node_id"]: n for n in tree}
 
     # Find which leaf contains this item
     item_leaf = None
@@ -789,7 +866,7 @@ def format_split_path(
     current = item_leaf
     while current is not None:
         leaf_to_root.append(current)
-        current = by_id[current].get('parent_id')
+        current = by_id[current].get("parent_id")
     root_to_leaf = list(reversed(leaf_to_root))
 
     # At each split node, find which child the item belongs to
@@ -799,15 +876,14 @@ def format_split_path(
             continue
         split = splits[nid]
         # Find which child the item is under
-        for child_id, child_info in split['children'].items():
+        for child_id, child_info in split["children"].items():
             child_id_int = int(child_id)
             # Check if item_index is a descendant of this child
-            desc = collect_descendant_indices(
-                child_id_int, children_map, leaf_batches)
+            desc = collect_descendant_indices(child_id_int, children_map, leaf_batches)
             if item_index in desc:
-                words = [w for w, _ in child_info['unigrams'][:top_k]]
+                words = [w for w, _ in child_info["unigrams"][:top_k]]
                 if words:
-                    path.append(','.join(words))
+                    path.append(",".join(words))
                 break
 
     return path

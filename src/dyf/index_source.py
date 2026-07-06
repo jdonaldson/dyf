@@ -82,12 +82,12 @@ SUPPORTED_EXTENSIONS: set[str] = set(_EXT_TO_LANG.keys())
 
 # Parent-like node types (class/struct containers) across languages
 _PARENT_TYPES = {
-    "class_definition",      # python
-    "class_declaration",     # js/ts/java
-    "class_specifier",       # cpp
-    "impl_item",             # rust
-    "trait_item",            # rust
-    "module_definition",     # ocaml
+    "class_definition",  # python
+    "class_declaration",  # js/ts/java
+    "class_specifier",  # cpp
+    "impl_item",  # rust
+    "trait_item",  # rust
+    "module_definition",  # ocaml
 }
 
 
@@ -178,8 +178,7 @@ def chunk_source_file(path: Path) -> list[dict]:
         from tree_sitter_language_pack import get_parser
     except ImportError:
         raise ImportError(
-            "tree-sitter-language-pack is required for source indexing.\n"
-            "Install it with: pip install \"dyf[source]\""
+            'tree-sitter-language-pack is required for source indexing.\nInstall it with: pip install "dyf[source]"'
         )
 
     ext = path.suffix.lower()
@@ -231,14 +230,16 @@ def chunk_source_file(path: Path) -> list[dict]:
 
         embed_text = f"search_document: {language} {kind} {title}\n{chunk_text[:2000]}"
 
-        chunks.append({
-            "title": title,
-            "file": path.name,
-            "kind": kind,
-            "line": start_line + 1,
-            "language": language,
-            "text": embed_text,
-        })
+        chunks.append(
+            {
+                "title": title,
+                "file": path.name,
+                "kind": kind,
+                "line": start_line + 1,
+                "language": language,
+                "text": embed_text,
+            }
+        )
 
     return chunks
 
@@ -253,11 +254,14 @@ def embed_batch(
     all_embeddings = []
 
     for i in range(0, len(texts), batch_size):
-        batch = texts[i:i + batch_size]
-        resp = requests.post(ollama_url, json={
-            "model": model,
-            "input": batch,
-        })
+        batch = texts[i : i + batch_size]
+        resp = requests.post(
+            ollama_url,
+            json={
+                "model": model,
+                "input": batch,
+            },
+        )
         resp.raise_for_status()
         embs = resp.json()["embeddings"]
         all_embeddings.extend(embs)
@@ -302,14 +306,14 @@ def index_source(
         sys.exit(1)
 
     langs_str = ", ".join(sorted(langs_seen))
-    logger.info(f"Total: {len(all_chunks)} chunks ({langs_str}) in {time.time()-t0:.1f}s")
+    logger.info(f"Total: {len(all_chunks)} chunks ({langs_str}) in {time.time() - t0:.1f}s")
 
     # Embed
     logger.info(f"Embedding with {model}...")
     t0 = time.time()
     texts = [c["text"] for c in all_chunks]
     embeddings = embed_batch(texts, ollama_url=ollama_url, model=model)
-    logger.info(f"  {embeddings.shape} in {time.time()-t0:.1f}s")
+    logger.info(f"  {embeddings.shape} in {time.time() - t0:.1f}s")
 
     # Normalize
     norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
@@ -326,7 +330,7 @@ def index_source(
         seed=seed,
         fit_method="itq",
     )
-    logger.info(f"  Tree built in {time.time()-t0:.1f}s")
+    logger.info(f"  Tree built in {time.time() - t0:.1f}s")
 
     # Write .dyf
     logger.info("Writing .dyf...")
@@ -364,7 +368,7 @@ def index_source(
         },
     )
     size_mb = output.stat().st_size / (1024 * 1024)
-    logger.info(f"  Written {output.name} ({size_mb:.1f} MB) in {time.time()-t0:.1f}s")
+    logger.info(f"  Written {output.name} ({size_mb:.1f} MB) in {time.time() - t0:.1f}s")
     logger.info(f"Done. {len(all_chunks)} chunks indexed.")
 
 
@@ -380,7 +384,8 @@ def main(argv: list[str] | None = None) -> int:
         help="Directory containing source files",
     )
     parser.add_argument(
-        "-o", "--output",
+        "-o",
+        "--output",
         type=Path,
         default=None,
         help="Output .dyf file path (default: <dirname>.dyf)",
@@ -396,19 +401,27 @@ def main(argv: list[str] | None = None) -> int:
         help=f"Ollama API URL (default: {DEFAULT_OLLAMA_URL})",
     )
     parser.add_argument(
-        "--max-depth", type=int, default=4,
+        "--max-depth",
+        type=int,
+        default=4,
         help="DYF tree max depth (default: 4)",
     )
     parser.add_argument(
-        "--num-bits", type=int, default=4,
+        "--num-bits",
+        type=int,
+        default=4,
         help="LSH bits per level (default: 4)",
     )
     parser.add_argument(
-        "--min-leaf-size", type=int, default=5,
+        "--min-leaf-size",
+        type=int,
+        default=5,
         help="Minimum leaf size (default: 5)",
     )
     parser.add_argument(
-        "--seed", type=int, default=42,
+        "--seed",
+        type=int,
+        default=42,
         help="Random seed (default: 42)",
     )
 

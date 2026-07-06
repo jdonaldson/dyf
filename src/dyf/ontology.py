@@ -49,6 +49,7 @@ class DAGChain:
         coherence: Average pairwise similarity within chain (higher = tighter)
         diversity_range: Difference between first and last diversity scores
     """
+
     indices: np.ndarray
     coherence: float
     diversity_range: float
@@ -73,6 +74,7 @@ class DAGMiningResult:
         parent_child_edges: List of (parent, child, similarity, gap) tuples
         n_components: Number of connected components in the DAG
     """
+
     chains: list[DAGChain]
     diversity: np.ndarray
     parent_child_edges: list[tuple[int, int, float, float]]
@@ -139,7 +141,8 @@ def compute_neighbor_diversity(
     # Compute k-NN if not provided
     if neighbors is None:
         from sklearn.neighbors import NearestNeighbors
-        nn = NearestNeighbors(n_neighbors=k + 1, metric='cosine')
+
+        nn = NearestNeighbors(n_neighbors=k + 1, metric="cosine")
         nn.fit(embeddings)
         _, neighbors = nn.kneighbors(embeddings)
 
@@ -147,7 +150,7 @@ def compute_neighbor_diversity(
 
     for i in range(n_points):
         # Get neighbor embeddings (exclude self)
-        neighb_idx = neighbors[i, 1:k + 1]
+        neighb_idx = neighbors[i, 1 : k + 1]
         neighb_emb = embeddings[neighb_idx]
 
         # Compute pairwise similarity among neighbors
@@ -185,6 +188,7 @@ class HubScoreResult:
         eigenvector_z: Z-scored eigenvector centrality
         distance_z: Z-scored distance to center
     """
+
     scores: np.ndarray
     eigenvector: np.ndarray
     distance_to_center: np.ndarray
@@ -246,7 +250,8 @@ def compute_hub_score(
     # Compute k-NN if not provided
     if neighbors is None or similarities is None:
         from sklearn.neighbors import NearestNeighbors
-        nn = NearestNeighbors(n_neighbors=k + 1, metric='cosine')
+
+        nn = NearestNeighbors(n_neighbors=k + 1, metric="cosine")
         nn.fit(embeddings)
         distances, neighbors = nn.kneighbors(embeddings)
         similarities = 1 - distances
@@ -314,7 +319,7 @@ def _prepare_knn_graph(
     norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
     embeddings = embeddings / np.where(norms > 0, norms, 1)
 
-    nn = NearestNeighbors(n_neighbors=k_neighbors + 1, metric='cosine')
+    nn = NearestNeighbors(n_neighbors=k_neighbors + 1, metric="cosine")
     nn.fit(embeddings)
     distances, neighbors = nn.kneighbors(embeddings)
     similarities = 1 - distances
@@ -372,10 +377,7 @@ def _extract_chains_from_component(
     follows the highest-similarity child edge to build chains.
     """
     # Find roots (nodes with no parents in this component)
-    roots = [
-        n for n in component_nodes
-        if n not in parents or all(p not in component_nodes for p, _, _ in parents[n])
-    ]
+    roots = [n for n in component_nodes if n not in parents or all(p not in component_nodes for p, _, _ in parents[n])]
 
     if not roots:
         # No clear root - pick highest diversity node
@@ -390,10 +392,7 @@ def _extract_chains_from_component(
         while True:
             if current not in children:
                 break
-            valid = [
-                (c, s, g) for c, s, g in children[current]
-                if c in component_nodes and c not in visited
-            ]
+            valid = [(c, s, g) for c, s, g in children[current] if c in component_nodes and c not in visited]
             if not valid:
                 break
             # Pick by highest similarity
@@ -475,8 +474,12 @@ def mine_dag_chains(
         logger.info("Finding parent-child pairs...")
 
     parent_child_edges = _find_parent_child_edges(
-        n_points, neighbors, similarities, diversity,
-        similarity_threshold, diversity_gap_threshold,
+        n_points,
+        neighbors,
+        similarities,
+        diversity,
+        similarity_threshold,
+        diversity_gap_threshold,
     )
 
     if verbose:
@@ -524,7 +527,11 @@ def mine_dag_chains(
     chains = []
     for comp_nodes in components.values():
         comp_chains = _extract_chains_from_component(
-            comp_nodes, children, parents, diversity, min_chain_length,
+            comp_nodes,
+            children,
+            parents,
+            diversity,
+            min_chain_length,
         )
         for chain in comp_chains:
             # Compute chain metrics
@@ -532,11 +539,7 @@ def mine_dag_chains(
             coherence = float((chain_emb @ chain_emb.T).mean())
             div_range = float(diversity[chain[0]] - diversity[chain[-1]])
 
-            chains.append(DAGChain(
-                indices=np.array(chain),
-                coherence=coherence,
-                diversity_range=div_range
-            ))
+            chains.append(DAGChain(indices=np.array(chain), coherence=coherence, diversity_range=div_range))
 
     # Sort by quality (coherence * length)
     chains.sort(key=lambda x: x.coherence * len(x), reverse=True)
@@ -548,10 +551,7 @@ def mine_dag_chains(
             logger.debug("Clean hierarchies (coh >= 0.65, len >= 4): %d", len(clean))
 
     return DAGMiningResult(
-        chains=chains,
-        diversity=diversity,
-        parent_child_edges=parent_child_edges,
-        n_components=n_components
+        chains=chains, diversity=diversity, parent_child_edges=parent_child_edges, n_components=n_components
     )
 
 
@@ -597,6 +597,7 @@ class DAGTaxonomy:
         >>> # Get convergence points (highly connected abstract concepts)
         >>> hubs = taxonomy.get_convergence_points(min_parents=10)
     """
+
     n_nodes: int
     diversity: np.ndarray
     children: dict[int, list[tuple[int, float, float]]]
@@ -621,7 +622,7 @@ class DAGTaxonomy:
             f"  Total edges: {n_edges}\n"
             f"  Roots (no parents): {len(self.roots)}\n"
             f"  Leaves (no children): {len(self.leaves)}\n"
-            f"  Multi-parent nodes: {n_multi_parent} ({100*n_multi_parent/max(len(self),1):.1f}%)\n"
+            f"  Multi-parent nodes: {n_multi_parent} ({100 * n_multi_parent / max(len(self), 1):.1f}%)\n"
             f"  Max parents: {max_parents}\n"
             f"  Max children: {max_children}"
         )
@@ -748,11 +749,7 @@ class DAGTaxonomy:
         Returns:
             List of (node_idx, parent_count) tuples, sorted by count descending
         """
-        convergence = [
-            (node, len(parents))
-            for node, parents in self.parents.items()
-            if len(parents) >= min_parents
-        ]
+        convergence = [(node, len(parents)) for node, parents in self.parents.items() if len(parents) >= min_parents]
         convergence.sort(key=lambda x: x[1], reverse=True)
         return convergence
 
@@ -769,9 +766,7 @@ class DAGTaxonomy:
             List of (node_idx, child_count) tuples, sorted by count descending
         """
         divergence = [
-            (node, len(children))
-            for node, children in self.children.items()
-            if len(children) >= min_children
+            (node, len(children)) for node, children in self.children.items() if len(children) >= min_children
         ]
         divergence.sort(key=lambda x: x[1], reverse=True)
         return divergence
@@ -797,7 +792,7 @@ class DAGTaxonomy:
 
             # Check if any two parents share a common parent (top of diamond)
             for i, p1 in enumerate(d_parents):
-                for p2 in d_parents[i + 1:]:
+                for p2 in d_parents[i + 1 :]:
                     common_grandparents = set(self.get_parents(p1)) & set(self.get_parents(p2))
                     for a in common_grandparents:
                         diamonds.append((a, p1, p2, d))
@@ -1027,6 +1022,7 @@ class UnifiedOntologyResult:
         main_threshold: Similarity threshold used for main ontology
         outlier_threshold: Similarity threshold used for outlier ontology
     """
+
     ontology: DAGTaxonomy
     main_nodes: np.ndarray
     outlier_nodes: np.ndarray
@@ -1046,7 +1042,7 @@ class UnifiedOntologyResult:
 
         return (
             f"UnifiedOntologyResult:\n"
-            f"  Coverage: {covered}/{total} ({100*covered/total:.1f}%)\n"
+            f"  Coverage: {covered}/{total} ({100 * covered / total:.1f}%)\n"
             f"  Main nodes (sim≥{self.main_threshold}): {len(self.main_nodes)}\n"
             f"  Outlier nodes (sim≥{self.outlier_threshold}): {len(self.outlier_nodes)}\n"
             f"  Bridge edges: {self.bridge_edges}\n"
@@ -1186,7 +1182,11 @@ def build_unified_ontology(
         outlier_to_global = {i: main_outlier_indices[i] for i in range(len(main_outlier_indices))}
 
         if verbose:
-            logger.debug("Outlier ontology: %d nodes, %d edges", len(outlier_connected), sum(len(v) for v in outlier_ont.children.values()))
+            logger.debug(
+                "Outlier ontology: %d nodes, %d edges",
+                len(outlier_connected),
+                sum(len(v) for v in outlier_ont.children.values()),
+            )
             logger.debug("Double outliers: %d", len(double_outlier_local))
     else:
         outlier_ont = None
@@ -1256,7 +1256,13 @@ def build_unified_ontology(
         outlier_edges = sum(len(v) for v in outlier_ont.children.values()) if outlier_ont else 0
         logger.info("Unified ontology complete:")
         logger.info("  Coverage: %d/%d (%.1f%%)", len(all_nodes), n_points, 100 * len(all_nodes) / n_points)
-        logger.info("  Edges: %d (main=%d, outlier=%d, bridge=%d)", n_edges, sum(len(v) for v in main_ont.children.values()), outlier_edges, bridge_edges)
+        logger.info(
+            "  Edges: %d (main=%d, outlier=%d, bridge=%d)",
+            n_edges,
+            sum(len(v) for v in main_ont.children.values()),
+            outlier_edges,
+            bridge_edges,
+        )
         logger.info("  Multi-parent: %d (%.1f%%)", n_multi, 100 * n_multi / max(len(all_nodes), 1))
         logger.info("  Excluded: %d double outliers", len(excluded_nodes))
 
@@ -1289,6 +1295,7 @@ class ROGLayer:
         n_edges: Number of edges
         coverage: Fraction of input covered by this layer
     """
+
     depth: int
     similarity_threshold: float
     node_indices: np.ndarray
@@ -1315,6 +1322,7 @@ class ROGResult:
         total_coverage: Fraction of input nodes in ontology
         bridge_edges: Edges connecting different layers
     """
+
     ontology: DAGTaxonomy
     layers: list[ROGLayer]
     excluded_nodes: np.ndarray
@@ -1328,7 +1336,7 @@ class ROGResult:
         """Return summary statistics."""
         lines = [
             "ROGResult (Recursive Ontological Generation):",
-            f"  Total coverage: {self.total_coverage*100:.1f}%",
+            f"  Total coverage: {self.total_coverage * 100:.1f}%",
             f"  Layers: {len(self.layers)}",
             f"  Bridge edges: {self.bridge_edges}",
             f"  Excluded: {len(self.excluded_nodes)}",
@@ -1353,6 +1361,7 @@ class ROGResult:
 @dataclass
 class _KNNData:
     """Bundled k-NN graph arrays for ROG construction."""
+
     neighbors: np.ndarray
     similarities: np.ndarray
     diversity: np.ndarray
@@ -1361,6 +1370,7 @@ class _KNNData:
 @dataclass
 class _ROGState:
     """Mutable global state accumulated across ROG layers."""
+
     all_children: dict[int, list[tuple[int, float, float]]]
     all_parents: dict[int, list[tuple[int, float, float]]]
 
@@ -1405,7 +1415,7 @@ def _build_rog_layer(
             gap = div_i - div_j
 
             # Adjust gap threshold for deeper layers
-            gap_thresh = diversity_gap_threshold * (0.9 ** depth)
+            gap_thresh = diversity_gap_threshold * (0.9**depth)
 
             if gap > gap_thresh:
                 layer_children[i].append((j, float(sim), float(gap)))
@@ -1588,9 +1598,14 @@ def build_rog_ontology(
             logger.info("Layer %d: threshold=%.3f, candidates=%d", depth, threshold, len(remaining_indices))
 
         layer = _build_rog_layer(
-            remaining_indices, knn,
-            threshold, diversity_gap_threshold, depth, n_points,
-            state, verbose=verbose,
+            remaining_indices,
+            knn,
+            threshold,
+            diversity_gap_threshold,
+            depth,
+            n_points,
+            state,
+            verbose=verbose,
         )
         if layer is not None:
             layers.append(layer)
@@ -1604,7 +1619,10 @@ def build_rog_ontology(
         logger.info("Adding bridge edges...")
 
     bridge_edges = _add_bridge_edges(
-        state, knn, min_threshold, diversity_gap_threshold,
+        state,
+        knn,
+        min_threshold,
+        diversity_gap_threshold,
     )
 
     if verbose:

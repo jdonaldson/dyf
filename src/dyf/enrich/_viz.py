@@ -21,8 +21,8 @@ def compute_bridge_edges(coords, embeddings, labels, n_clusters):
 
     logger.info("  Building ROG ontology for bridge detection...")
     result = dyf.build_rog_ontology(
-        embeddings, initial_threshold=0.55, min_threshold=0.35,
-        target_coverage=0.95, verbose=False)
+        embeddings, initial_threshold=0.55, min_threshold=0.35, target_coverage=0.95, verbose=False
+    )
 
     ont = result.ontology
     pair_counts = defaultdict(int)
@@ -46,21 +46,24 @@ def compute_bridge_edges(coords, embeddings, labels, n_clusters):
     if not edge_list:
         return [], {}
 
-    edge_pairs = [[int(c1), int(c2), int(pair_counts[(c1, c2)])]
-                  for c1, c2 in edge_list]
+    edge_pairs = [[int(c1), int(c2), int(pair_counts[(c1, c2)])] for c1, c2 in edge_list]
 
     import pandas as pd
     from datashader.bundling import hammer_bundle
 
     centroids_2d = centroids[:, :2]
-    nodes_df = pd.DataFrame({
-        "x": centroids_2d[:, 0].astype(float),
-        "y": centroids_2d[:, 1].astype(float),
-    })
-    edges_df = pd.DataFrame({
-        "source": [e[0] for e in edge_list],
-        "target": [e[1] for e in edge_list],
-    })
+    nodes_df = pd.DataFrame(
+        {
+            "x": centroids_2d[:, 0].astype(float),
+            "y": centroids_2d[:, 1].astype(float),
+        }
+    )
+    edges_df = pd.DataFrame(
+        {
+            "source": [e[0] for e in edge_list],
+            "target": [e[1] for e in edge_list],
+        }
+    )
     bundled_df = hammer_bundle(nodes_df, edges_df)
 
     edge_paths_2d = []
@@ -79,8 +82,9 @@ def compute_bridge_edges(coords, embeddings, labels, n_clusters):
     return edge_pairs, edge_paths_2d
 
 
-def enrich_viz(dyf_path, cluster_level=None, model="gpt-oss:20b",
-               title=None, output_path=None, force=False, domain=None):
+def enrich_viz(
+    dyf_path, cluster_level=None, model="gpt-oss:20b", title=None, output_path=None, force=False, domain=None
+):
     """Add bridge edges and tour narration (Level 2 → 3)."""
     logger.info("=== Level 3: Viz Enrichment ===")
     logger.info(f"  Input: {dyf_path}")
@@ -88,115 +92,97 @@ def enrich_viz(dyf_path, cluster_level=None, model="gpt-oss:20b",
     with LazyIndex(dyf_path) as idx:
         level = idx.detect_enrichment_level()
         if level < 2:
-            logger.warning(f"  Need level 2 (clusters), got level {level}. "
-                          f"Run 'cluster' first.")
+            logger.warning(f"  Need level 2 (clusters), got level {level}. Run 'cluster' first.")
             return
         if level >= 3 and not force:
-            logger.info(f"  Already at level {level} (viz-ready), skipping. "
-                       f"Use --force to re-run.")
+            logger.info(f"  Already at level {level} (viz-ready), skipping. Use --force to re-run.")
             return
 
     with LazyIndex(dyf_path) as idx:
         data = idx.extract_all_fields()
-    n = len(data['embeddings'])
+    n = len(data["embeddings"])
 
-    coords = np.column_stack([
-        data['fields']['umap_x'],
-        data['fields']['umap_y'],
-        data['fields']['umap_z'],
-    ])
-    embeddings = data['embeddings']
+    coords = np.column_stack(
+        [
+            data["fields"]["umap_x"],
+            data["fields"]["umap_y"],
+            data["fields"]["umap_z"],
+        ]
+    )
+    embeddings = data["embeddings"]
 
     if domain is None:
-        domain = data['metadata'].get('domain')
+        domain = data["metadata"].get("domain")
     if domain:
         logger.info(f"  Domain: {domain}")
 
     # Resolve cluster labels and names
-    use_louvain = ('community_id' in data['fields']
-                   and 'louvain_dendrogram' in data['metadata'])
+    use_louvain = "community_id" in data["fields"] and "louvain_dendrogram" in data["metadata"]
 
     if use_louvain:
-        labels = np.asarray(data['fields']['community_id'], dtype=np.int32)
+        labels = np.asarray(data["fields"]["community_id"], dtype=np.int32)
         n_clusters = len(set(labels.tolist()))
-        dendro = json.loads(data['metadata']['louvain_dendrogram'])
-        cluster_names = {int(k): v
-                         for k, v in dendro['community_names'].items()}
+        dendro = json.loads(data["metadata"]["louvain_dendrogram"])
+        cluster_names = {int(k): v for k, v in dendro["community_names"].items()}
         logger.info(f"  Using community_id ({n_clusters} communities)")
     else:
         if cluster_level is None:
-            available = [
-                f for f in data['fields']
-                if re.match(r'cluster_\d+_2d$', f)
-            ]
+            available = [f for f in data["fields"] if re.match(r"cluster_\d+_2d$", f)]
             if available:
-                cluster_level = min(
-                    int(re.match(r'cluster_(\d+)', f).group(1))
-                    for f in available)
+                cluster_level = min(int(re.match(r"cluster_(\d+)", f).group(1)) for f in available)
                 logger.info(f"  Auto-detected cluster_level={cluster_level}")
             else:
-                available_bare = [
-                    f for f in data['fields']
-                    if re.match(r'cluster_\d+$', f)
-                ]
+                available_bare = [f for f in data["fields"] if re.match(r"cluster_\d+$", f)]
                 if available_bare:
-                    cluster_level = min(
-                        int(re.match(r'cluster_(\d+)', f).group(1))
-                        for f in available_bare)
-                    logger.info(f"  Auto-detected cluster_level={cluster_level} "
-                               f"(bare)")
+                    cluster_level = min(int(re.match(r"cluster_(\d+)", f).group(1)) for f in available_bare)
+                    logger.info(f"  Auto-detected cluster_level={cluster_level} (bare)")
                 else:
                     logger.warning("  No cluster fields found in .dyf file.")
                     return
 
-        cluster_field_2d = f'cluster_{cluster_level}_2d'
-        cluster_field_bare = f'cluster_{cluster_level}'
-        if cluster_field_2d in data['fields']:
+        cluster_field_2d = f"cluster_{cluster_level}_2d"
+        cluster_field_bare = f"cluster_{cluster_level}"
+        if cluster_field_2d in data["fields"]:
             cluster_field = cluster_field_2d
-            names_key = f'cluster_names_{cluster_level}_2d'
-        elif cluster_field_bare in data['fields']:
+            names_key = f"cluster_names_{cluster_level}_2d"
+        elif cluster_field_bare in data["fields"]:
             cluster_field = cluster_field_bare
-            names_key = f'cluster_names_{cluster_level}'
+            names_key = f"cluster_names_{cluster_level}"
         else:
-            available = [f for f in data['fields']
-                         if f.startswith('cluster_')]
-            logger.warning(f"  cluster_{cluster_level} not found. "
-                          f"Available: {available}")
+            available = [f for f in data["fields"] if f.startswith("cluster_")]
+            logger.warning(f"  cluster_{cluster_level} not found. Available: {available}")
             return
-        labels = data['fields'][cluster_field]
+        labels = data["fields"][cluster_field]
         n_clusters = len(set(labels.tolist()))
-        names_json = data['metadata'].get(names_key, '{}')
-        cluster_names = {int(k): v
-                         for k, v in json.loads(names_json).items()}
+        names_json = data["metadata"].get(names_key, "{}")
+        cluster_names = {int(k): v for k, v in json.loads(names_json).items()}
 
     # Bridge edges
     logger.info(f"  Computing bridge edges for {n_clusters} clusters...")
-    edge_pairs, edge_paths_2d = compute_bridge_edges(
-        coords, embeddings, labels, n_clusters)
+    edge_pairs, edge_paths_2d = compute_bridge_edges(coords, embeddings, labels, n_clusters)
 
     # Generate narration
-    titles = data['fields'].get('title')
+    titles = data["fields"].get("title")
     if titles is None:
         titles = [f"Item {i}" for i in range(n)]
-    narration = _generate_narration(
-        cluster_names, titles, labels, coords, model=model, title=title,
-        domain=domain)
+    narration = _generate_narration(cluster_names, titles, labels, coords, model=model, title=title, domain=domain)
 
     new_meta = {
-        'edge_pairs': json.dumps(edge_pairs),
-        'edge_paths_2d': json.dumps(edge_paths_2d),
-        'tour_narration': json.dumps(
-            {str(k): v for k, v in narration.items()}),
+        "edge_pairs": json.dumps(edge_pairs),
+        "edge_paths_2d": json.dumps(edge_paths_2d),
+        "tour_narration": json.dumps({str(k): v for k, v in narration.items()}),
     }
 
-    new_meta['_provenance_level_3'] = json.dumps(provenance_to_dict(
-        create_provenance(
-            artifact_type="dyf",
-            n_items=n,
-            source_paths=[str(dyf_path)],
-            params={"cluster_level": cluster_level, "model": model},
+    new_meta["_provenance_level_3"] = json.dumps(
+        provenance_to_dict(
+            create_provenance(
+                artifact_type="dyf",
+                n_items=n,
+                source_paths=[str(dyf_path)],
+                params={"cluster_level": cluster_level, "model": model},
+            )
         )
-    ))
+    )
 
     out = output_path or dyf_path
     logger.info(f"  Writing enriched file: {out}")

@@ -42,7 +42,7 @@ def generate_tour_audio(dyf_path, voice="bf_emma", speed=1.0, output_path=None):
     logger.info(f"  Narration keys: {len(narration)} ({', '.join(sorted(narration.keys()))})")
 
     # Initialize Kokoro pipeline
-    lang_code = 'b' if voice.startswith('b') else 'a'
+    lang_code = "b" if voice.startswith("b") else "a"
     pipeline = KPipeline(lang_code=lang_code)
 
     audio_data = {}
@@ -54,10 +54,10 @@ def generate_tour_audio(dyf_path, voice="bf_emma", speed=1.0, output_path=None):
                     continue
                 duration_ms = int(len(audio) / 24000 * 1000)
                 buf = io.BytesIO()
-                sf.write(buf, audio, 24000, format='WAV')
+                sf.write(buf, audio, 24000, format="WAV")
                 buf.seek(0)
                 audio_data[str(cid)] = {
-                    "data": base64.b64encode(buf.read()).decode('ascii'),
+                    "data": base64.b64encode(buf.read()).decode("ascii"),
                     "duration": duration_ms,
                 }
                 break  # Only need first chunk
@@ -74,7 +74,11 @@ def generate_tour_audio(dyf_path, voice="bf_emma", speed=1.0, output_path=None):
 
     out = output_path or dyf_path
     logger.info(f"  Writing tour_audio to: {out}")
-    rewrite_lazy_index(dyf_path, new_metadata={
-        "tour_audio": json.dumps(audio_data),
-    }, output_path=out)
+    rewrite_lazy_index(
+        dyf_path,
+        new_metadata={
+            "tour_audio": json.dumps(audio_data),
+        },
+        output_path=out,
+    )
     logger.info("  Done.")

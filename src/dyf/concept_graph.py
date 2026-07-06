@@ -44,9 +44,11 @@ if TYPE_CHECKING:
 # Data classes
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class MarkdownChunk:
     """A section of a markdown file, identified by its ## header."""
+
     id: str
     header: str
     text: str
@@ -58,6 +60,7 @@ class MarkdownChunk:
 @dataclass
 class ConceptNode:
     """A node in the concept graph with its neighbors."""
+
     header: str
     source: str
     line: int
@@ -68,12 +71,15 @@ class ConceptNode:
 @dataclass
 class ConceptGraphConfig:
     """Configuration for building and querying the concept graph."""
-    sources: list[str] = field(default_factory=lambda: [
-        "~/.claude/CLAUDE.md",
-        "~/.claude/projects/*/memory/MEMORY.md",
-        "~/Projects/CLAUDE.md",
-        "/tmp/learnings_*.md",
-    ])
+
+    sources: list[str] = field(
+        default_factory=lambda: [
+            "~/.claude/CLAUDE.md",
+            "~/.claude/projects/*/memory/MEMORY.md",
+            "~/Projects/CLAUDE.md",
+            "/tmp/learnings_*.md",
+        ]
+    )
     output_path: str = "~/.dyf/concept_graph.json"
     embeddings_cache_path: str = "~/.dyf/concept_embeddings.npz"
     embedder: str = "low"
@@ -113,6 +119,7 @@ class ConceptGraphConfig:
 # Markdown chunking
 # ---------------------------------------------------------------------------
 
+
 def slugify(text: str) -> str:
     """Convert header text to a URL-safe slug."""
     text = text.lower().strip()
@@ -150,22 +157,22 @@ def chunk_markdown(
 
     for line in text.split("\n"):
         line_num += 1
-        if line.startswith(prefix) and (
-            len(line) <= len(prefix) or line[len(prefix)] != "#"
-        ):
+        if line.startswith(prefix) and (len(line) <= len(prefix) or line[len(prefix)] != "#"):
             # Save previous chunk
             if current_header is not None:
                 body = "\n".join(current_lines).strip()
                 if len(body) >= min_length:
                     chunk_id = f"{source_slug}/{slugify(current_header)}"
-                    chunks.append(MarkdownChunk(
-                        id=chunk_id,
-                        header=current_header,
-                        text=f"{current_header}: {body}",
-                        source=source,
-                        line=current_start_line,
-                    ))
-            current_header = line[len(prefix):].strip()
+                    chunks.append(
+                        MarkdownChunk(
+                            id=chunk_id,
+                            header=current_header,
+                            text=f"{current_header}: {body}",
+                            source=source,
+                            line=current_start_line,
+                        )
+                    )
+            current_header = line[len(prefix) :].strip()
             current_lines = []
             current_start_line = line_num
         else:
@@ -176,13 +183,15 @@ def chunk_markdown(
         body = "\n".join(current_lines).strip()
         if len(body) >= min_length:
             chunk_id = f"{source_slug}/{slugify(current_header)}"
-            chunks.append(MarkdownChunk(
-                id=chunk_id,
-                header=current_header,
-                text=f"{current_header}: {body}",
-                source=source,
-                line=current_start_line,
-            ))
+            chunks.append(
+                MarkdownChunk(
+                    id=chunk_id,
+                    header=current_header,
+                    text=f"{current_header}: {body}",
+                    source=source,
+                    line=current_start_line,
+                )
+            )
 
     return chunks
 
@@ -190,6 +199,7 @@ def chunk_markdown(
 # ---------------------------------------------------------------------------
 # Graph construction
 # ---------------------------------------------------------------------------
+
 
 def build_concept_graph(
     chunks: list[MarkdownChunk],
@@ -226,13 +236,15 @@ def build_concept_graph(
                 continue
             if sims[idx] < threshold:
                 break
-            neighbors.append({
-                "id": chunks[idx].id,
-                "header": chunks[idx].header,
-                "similarity": round(float(sims[idx]), 3),
-                "source": chunks[idx].source,
-                "line": chunks[idx].line,
-            })
+            neighbors.append(
+                {
+                    "id": chunks[idx].id,
+                    "header": chunks[idx].header,
+                    "similarity": round(float(sims[idx]), 3),
+                    "source": chunks[idx].source,
+                    "line": chunks[idx].line,
+                }
+            )
             if len(neighbors) >= top_k:
                 break
 
@@ -250,6 +262,7 @@ def build_concept_graph(
 # ---------------------------------------------------------------------------
 # Serialization
 # ---------------------------------------------------------------------------
+
 
 def save_graph(graph: dict[str, ConceptNode], path: str) -> None:
     """Save concept graph to JSON."""
@@ -276,6 +289,7 @@ def load_graph(path: str) -> dict[str, ConceptNode]:
 # ---------------------------------------------------------------------------
 # Search
 # ---------------------------------------------------------------------------
+
 
 def fuzzy_match(
     query: str,
@@ -362,6 +376,7 @@ def semantic_search(
 # Staleness check
 # ---------------------------------------------------------------------------
 
+
 def check_staleness(config: ConceptGraphConfig) -> bool:
     """Check if graph needs rebuilding based on source file mtimes.
 
@@ -381,6 +396,7 @@ def check_staleness(config: ConceptGraphConfig) -> bool:
 # ---------------------------------------------------------------------------
 # Formatting helpers
 # ---------------------------------------------------------------------------
+
 
 def _format_node(node: ConceptNode) -> str:
     """Format a single node with its neighbors for display."""
@@ -402,6 +418,7 @@ def _format_node(node: ConceptNode) -> str:
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def main(argv: list[str] | None = None) -> int:
     """CLI entry point for `dyf concepts`."""
     parser = argparse.ArgumentParser(
@@ -418,8 +435,7 @@ def main(argv: list[str] | None = None) -> int:
     # query
     query_p = sub.add_parser("query", help="Look up a concept")
     query_p.add_argument("text", nargs="+", help="Query text")
-    query_p.add_argument("--semantic", action="store_true",
-                         help="Force embedding-based search")
+    query_p.add_argument("--semantic", action="store_true", help="Force embedding-based search")
     query_p.add_argument("--top-k", type=int, default=5)
     query_p.add_argument("--config", help="Path to config JSON")
 
@@ -429,8 +445,7 @@ def main(argv: list[str] | None = None) -> int:
 
     # list
     list_p = sub.add_parser("list", help="List all concept nodes")
-    list_p.add_argument("--verbose", "-v", action="store_true",
-                        help="Show neighbors")
+    list_p.add_argument("--verbose", "-v", action="store_true", help="Show neighbors")
     list_p.add_argument("--config", help="Path to config JSON")
 
     args = parser.parse_args(argv)
@@ -439,9 +454,7 @@ def main(argv: list[str] | None = None) -> int:
         parser.print_help()
         return 1
 
-    config = ConceptGraphConfig.load(
-        getattr(args, "config", None)
-    )
+    config = ConceptGraphConfig.load(getattr(args, "config", None))
 
     if args.command == "build":
         return _cmd_build(config, getattr(args, "extra_sources", []))
@@ -506,6 +519,7 @@ def _cmd_build(config: ConceptGraphConfig, extra_sources: list[str]) -> int:
 
     # Save embeddings cache
     import numpy as np
+
     cache_path = config.expand_path("embeddings_cache_path")
     os.makedirs(os.path.dirname(cache_path), exist_ok=True)
     node_ids = list(graph.keys())
@@ -542,7 +556,8 @@ def _cmd_query(
 
     if force_semantic:
         results = semantic_search(
-            query_text, graph,
+            query_text,
+            graph,
             embeddings_cache_path=config.expand_path("embeddings_cache_path"),
             embedder_name=config.embedder,
             top_k=top_k,
@@ -554,9 +569,7 @@ def _cmd_query(
             logger.info("   %0.3f  %s", score, node.header)
             logger.debug("          %s:%d", node.source, node.line)
             if node.neighbors:
-                neighbor_headers = ", ".join(
-                    n["header"] for n in node.neighbors[:3]
-                )
+                neighbor_headers = ", ".join(n["header"] for n in node.neighbors[:3])
                 logger.info("          -> neighbors: %s", neighbor_headers)
         logger.debug("   (%.3fs)", elapsed)
         return 0
@@ -575,7 +588,8 @@ def _cmd_query(
     logger.info('No header match for "%s" (best=%.2f)', query_text, score)
     logger.info("Falling back to semantic search...")
     results = semantic_search(
-        query_text, graph,
+        query_text,
+        graph,
         embeddings_cache_path=config.expand_path("embeddings_cache_path"),
         embedder_name=config.embedder,
         top_k=top_k,
@@ -602,6 +616,6 @@ def _cmd_list(config: ConceptGraphConfig, verbose: bool) -> int:
         logger.debug("    %s:%d", node.source, node.line)
         if verbose and node.neighbors:
             for n in node.neighbors:
-                logger.info("      %0.3f  %s", n['similarity'], n['header'])
+                logger.info("      %0.3f  %s", n["similarity"], n["header"])
     logger.info("%d nodes total", len(graph))
     return 0

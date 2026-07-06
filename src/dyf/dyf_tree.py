@@ -34,8 +34,8 @@ logger = logging.getLogger(__name__)
 # Tree construction
 # ---------------------------------------------------------------------------
 
-def _build_dyf_tree(embeddings, point_indices, depth, num_bits, min_leaf_size,
-                    seed, fit_method='raw_pca'):
+
+def _build_dyf_tree(embeddings, point_indices, depth, num_bits, min_leaf_size, seed, fit_method="raw_pca"):
     """Recursively split points using DYF LSH, storing per-point margins.
 
     Returns nested dict tree with keys:
@@ -45,13 +45,13 @@ def _build_dyf_tree(embeddings, point_indices, depth, num_bits, min_leaf_size,
 
     if depth == 0 or len(point_indices) < min_leaf_size * 2:
         return {
-            'children': [],
-            'indices': point_indices,
-            'depth': depth,
-            'point_margin_map': None,
-            'hyperplanes': None,
-            'bucket_id_to_child': None,
-            'eigenvalues': None,
+            "children": [],
+            "indices": point_indices,
+            "depth": depth,
+            "point_margin_map": None,
+            "hyperplanes": None,
+            "bucket_id_to_child": None,
+            "eigenvalues": None,
         }
 
     subset = embeddings[point_indices]
@@ -63,9 +63,9 @@ def _build_dyf_tree(embeddings, point_indices, depth, num_bits, min_leaf_size,
             clf = DensityClassifier(embedding_dim=dim, num_bits=num_bits, seed=seed, skip_isolation=True)
         except TypeError:
             clf = DensityClassifier(embedding_dim=dim, num_bits=num_bits, seed=seed)
-        if fit_method == 'itq':
+        if fit_method == "itq":
             clf.fit_itq(subset)
-        elif fit_method == 'raw_pca' and hasattr(clf, 'fit_raw_pca'):
+        elif fit_method == "raw_pca" and hasattr(clf, "fit_raw_pca"):
             clf.fit_raw_pca(subset)
         else:
             clf.fit(subset)
@@ -73,7 +73,7 @@ def _build_dyf_tree(embeddings, point_indices, depth, num_bits, min_leaf_size,
         bucket_ids = np.asarray(clf.get_bucket_ids())
         centroid_sims = clf.get_centroid_similarities()
     except TypeError:
-        raise   # dtype/signature errors are bugs, never graceful-degradation
+        raise  # dtype/signature errors are bugs, never graceful-degradation
     except Exception as e:
         if len(point_indices) == len(embeddings):
             # Root-level fit failure is never benign: the whole tree degenerates
@@ -82,18 +82,20 @@ def _build_dyf_tree(embeddings, point_indices, depth, num_bits, min_leaf_size,
             # cluster purity). Seen in the wild when float64 embeddings hit
             # dyf-rs's typed f32 signature.
             logger.warning(
-                "DYF ROOT split failed — returning a single-leaf tree (all %d "
-                "points in one cluster). Cause: %s", len(point_indices), e)
+                "DYF ROOT split failed — returning a single-leaf tree (all %d points in one cluster). Cause: %s",
+                len(point_indices),
+                e,
+            )
         else:
             logger.debug("Tree split failed at depth %d: %s", depth, e)
         return {
-            'children': [],
-            'indices': point_indices,
-            'depth': depth,
-            'point_margin_map': None,
-            'hyperplanes': None,
-            'bucket_id_to_child': None,
-            'eigenvalues': None,
+            "children": [],
+            "indices": point_indices,
+            "depth": depth,
+            "point_margin_map": None,
+            "hyperplanes": None,
+            "bucket_id_to_child": None,
+            "eigenvalues": None,
         }
 
     # Use centroid_similarity as margin: low = far from center = boundary
@@ -122,13 +124,13 @@ def _build_dyf_tree(embeddings, point_indices, depth, num_bits, min_leaf_size,
     # If DYF produced only one bucket, can't split further
     if len(unique_buckets) <= 1:
         return {
-            'children': [],
-            'indices': point_indices,
-            'depth': depth,
-            'point_margin_map': point_margin_map,
-            'hyperplanes': None,
-            'bucket_id_to_child': None,
-            'eigenvalues': None,
+            "children": [],
+            "indices": point_indices,
+            "depth": depth,
+            "point_margin_map": point_margin_map,
+            "hyperplanes": None,
+            "bucket_id_to_child": None,
+            "eigenvalues": None,
         }
 
     children = []
@@ -139,34 +141,33 @@ def _build_dyf_tree(embeddings, point_indices, depth, num_bits, min_leaf_size,
         bucket_id_to_child[bid] = child_idx
         if len(child_indices) < min_leaf_size:
             # Too small to recurse — make a leaf
-            children.append({
-                'children': [],
-                'indices': child_indices,
-                'depth': depth - 1,
-                'point_margin_map': None,
-                'hyperplanes': None,
-                'bucket_id_to_child': None,
-                'eigenvalues': None,
-            })
+            children.append(
+                {
+                    "children": [],
+                    "indices": child_indices,
+                    "depth": depth - 1,
+                    "point_margin_map": None,
+                    "hyperplanes": None,
+                    "bucket_id_to_child": None,
+                    "eigenvalues": None,
+                }
+            )
         else:
-            child = _build_dyf_tree(
-                embeddings, child_indices, depth - 1, num_bits,
-                min_leaf_size, seed, fit_method)
+            child = _build_dyf_tree(embeddings, child_indices, depth - 1, num_bits, min_leaf_size, seed, fit_method)
             children.append(child)
 
     return {
-        'children': children,
-        'indices': point_indices,
-        'depth': depth,
-        'point_margin_map': point_margin_map,
-        'hyperplanes': node_hyperplanes,
-        'bucket_id_to_child': bucket_id_to_child,
-        'eigenvalues': node_eigenvalues,
+        "children": children,
+        "indices": point_indices,
+        "depth": depth,
+        "point_margin_map": point_margin_map,
+        "hyperplanes": node_hyperplanes,
+        "bucket_id_to_child": bucket_id_to_child,
+        "eigenvalues": node_eigenvalues,
     }
 
 
-def build_dyf_tree(embeddings, max_depth, num_bits=3, min_leaf_size=4,
-                   seed=42, fit_method='raw_pca'):
+def build_dyf_tree(embeddings, max_depth, num_bits=3, min_leaf_size=4, seed=42, fit_method="raw_pca"):
     """Build a DYF recursive tree over embeddings.
 
     At each level, fits a DensityClassifier with ``num_bits`` bits, producing
@@ -189,14 +190,13 @@ def build_dyf_tree(embeddings, max_depth, num_bits=3, min_leaf_size=4,
     """
     embeddings = ensure_f32(embeddings)
     all_indices = np.arange(len(embeddings))
-    return _build_dyf_tree(
-        embeddings, all_indices, max_depth, num_bits, min_leaf_size, seed,
-        fit_method)
+    return _build_dyf_tree(embeddings, all_indices, max_depth, num_bits, min_leaf_size, seed, fit_method)
 
 
 # ---------------------------------------------------------------------------
 # Boundary persistence detection
 # ---------------------------------------------------------------------------
+
 
 def extract_boundary_persistence(tree, margin_pct=0.10):
     """Identify points that persist as boundary across multiple tree depths.
@@ -219,11 +219,10 @@ def extract_boundary_persistence(tree, margin_pct=0.10):
     nodes_by_depth = defaultdict(list)
 
     def _collect(node, current_depth):
-        if node['point_margin_map'] is not None:
-            margins_by_depth[current_depth].extend(
-                node['point_margin_map'].values())
+        if node["point_margin_map"] is not None:
+            margins_by_depth[current_depth].extend(node["point_margin_map"].values())
             nodes_by_depth[current_depth].append(node)
-        for child in node['children']:
+        for child in node["children"]:
             _collect(child, current_depth + 1)
 
     _collect(tree, 0)
@@ -237,19 +236,19 @@ def extract_boundary_persistence(tree, margin_pct=0.10):
     for depth, nodes in nodes_by_depth.items():
         threshold = thresholds[depth]
         for node in nodes:
-            for pt_idx, margin in node['point_margin_map'].items():
+            for pt_idx, margin in node["point_margin_map"].items():
                 if margin < threshold:
                     boundary_depths[pt_idx].append(depth)
 
-    n = len(tree['indices'])
+    n = len(tree["indices"])
     boundary_count = np.zeros(n, dtype=int)
     for pt_idx, depths in boundary_depths.items():
         boundary_count[pt_idx] = len(depths)
 
     return {
-        'boundary_depths': dict(boundary_depths),
-        'boundary_count': boundary_count,
-        'thresholds': thresholds,
+        "boundary_depths": dict(boundary_depths),
+        "boundary_count": boundary_count,
+        "thresholds": thresholds,
     }
 
 
@@ -266,12 +265,12 @@ def boundary_persistence_scores(tree, margin_pct=0.10, max_depth=None):
         np.ndarray of shape (n,) with non-negative bridge scores.
     """
     if max_depth is None:
-        max_depth = tree['depth']
+        max_depth = tree["depth"]
 
     result = extract_boundary_persistence(tree, margin_pct=margin_pct)
-    boundary_depths = result['boundary_depths']
+    boundary_depths = result["boundary_depths"]
 
-    n = len(tree['indices'])
+    n = len(tree["indices"])
     scores = np.zeros(n, dtype=np.float64)
     for pt_idx, depths in boundary_depths.items():
         scores[pt_idx] = sum(max_depth - d for d in depths)
@@ -283,12 +282,13 @@ def boundary_persistence_scores(tree, margin_pct=0.10, max_depth=None):
 # Cut tree to flat labels
 # ---------------------------------------------------------------------------
 
+
 def _collect_leaves(node):
     """Collect all leaf nodes from a DYF tree."""
-    if not node['children']:
+    if not node["children"]:
         return [node]
     leaves = []
-    for child in node['children']:
+    for child in node["children"]:
         leaves.extend(_collect_leaves(child))
     return leaves
 
@@ -322,7 +322,7 @@ def _cut_dyf_tree_to_labels(tree, n_points, n_clusters, embeddings):
         # Fewer leaves than target — each leaf is its own cluster
         labels = np.zeros(n_points, dtype=int)
         for i, leaf in enumerate(leaves):
-            for p in leaf['indices']:
+            for p in leaf["indices"]:
                 labels[p] = i
         return labels
 
@@ -330,7 +330,7 @@ def _cut_dyf_tree_to_labels(tree, n_points, n_clusters, embeddings):
     dim = embeddings.shape[1]
     centroids = np.zeros((n_leaves, dim), dtype=np.float32)
     for i, leaf in enumerate(leaves):
-        cent = emb_n[leaf['indices']].mean(axis=0)
+        cent = emb_n[leaf["indices"]].mean(axis=0)
         norm = np.linalg.norm(cent)
         if norm > 1e-10:
             cent /= norm
@@ -340,13 +340,13 @@ def _cut_dyf_tree_to_labels(tree, n_points, n_clusters, embeddings):
     # Ward minimizes within-cluster variance, producing balanced merges.
     # On unit vectors, euclidean distance is monotonic with cosine distance
     # (||a-b||^2 = 2(1 - cos(a,b))), so semantics are preserved.
-    agg = AgglomerativeClustering(n_clusters=n_clusters, linkage='ward')
+    agg = AgglomerativeClustering(n_clusters=n_clusters, linkage="ward")
     leaf_labels = agg.fit_predict(centroids)
 
     # Map points to cluster labels
     labels = np.zeros(n_points, dtype=int)
     for i, leaf in enumerate(leaves):
-        for p in leaf['indices']:
+        for p in leaf["indices"]:
             labels[p] = leaf_labels[i]
 
     return labels
@@ -355,6 +355,7 @@ def _cut_dyf_tree_to_labels(tree, n_points, n_clusters, embeddings):
 # ---------------------------------------------------------------------------
 # Refinement helpers
 # ---------------------------------------------------------------------------
+
 
 def _leaf_coherence(indices, emb_normed):
     """Mean cosine similarity to centroid for a set of point indices."""
@@ -382,7 +383,7 @@ def _try_resplit(indices, embeddings, num_bits, seed):
         bucket_ids = np.asarray(clf.get_bucket_ids())
         centroid_sims = clf.get_centroid_similarities()
     except TypeError:
-        raise   # dtype/signature errors are bugs, never graceful-degradation
+        raise  # dtype/signature errors are bugs, never graceful-degradation
     except Exception as e:
         logger.debug("Resplit failed: %s", e)
         return None
@@ -403,19 +404,18 @@ def _try_resplit(indices, embeddings, num_bits, seed):
     return child_arrays, point_margin_map
 
 
-def _refine_recursive(node, embeddings, emb_normed, threshold, num_bits,
-                      min_leaf_size, max_retries, seed_offset):
+def _refine_recursive(node, embeddings, emb_normed, threshold, num_bits, min_leaf_size, max_retries, seed_offset):
     """Walk tree, re-split incoherent leaves. Returns count of refined leaves."""
-    if node['children']:
+    if node["children"]:
         count = 0
-        for child in node['children']:
+        for child in node["children"]:
             count += _refine_recursive(
-                child, embeddings, emb_normed, threshold, num_bits,
-                min_leaf_size, max_retries, seed_offset)
+                child, embeddings, emb_normed, threshold, num_bits, min_leaf_size, max_retries, seed_offset
+            )
         return count
 
     # Leaf node
-    indices = node['indices']
+    indices = node["indices"]
     if len(indices) < min_leaf_size * 2:
         return 0
 
@@ -435,10 +435,7 @@ def _refine_recursive(node, embeddings, emb_normed, threshold, num_bits,
 
         # Compute weighted-mean child coherence
         total = sum(len(ca) for ca in child_arrays)
-        weighted_coh = sum(
-            len(ca) * _leaf_coherence(ca, emb_normed)
-            for ca in child_arrays
-        ) / total
+        weighted_coh = sum(len(ca) * _leaf_coherence(ca, emb_normed) for ca in child_arrays) / total
 
         if weighted_coh > best_weighted_coh:
             best_weighted_coh = weighted_coh
@@ -448,18 +445,20 @@ def _refine_recursive(node, embeddings, emb_normed, threshold, num_bits,
         return 0
 
     child_arrays, pmm = best_split
-    node['point_margin_map'] = pmm
-    node['children'] = []
+    node["point_margin_map"] = pmm
+    node["children"] = []
     for ca in child_arrays:
-        node['children'].append({
-            'children': [],
-            'indices': ca,
-            'depth': node['depth'] - 1,
-            'point_margin_map': None,
-            'hyperplanes': None,
-            'bucket_id_to_child': None,
-            'eigenvalues': None,
-        })
+        node["children"].append(
+            {
+                "children": [],
+                "indices": ca,
+                "depth": node["depth"] - 1,
+                "point_margin_map": None,
+                "hyperplanes": None,
+                "bucket_id_to_child": None,
+                "eigenvalues": None,
+            }
+        )
     return 1
 
 
@@ -467,8 +466,8 @@ def _refine_recursive(node, embeddings, emb_normed, threshold, num_bits,
 # Public refinement API
 # ---------------------------------------------------------------------------
 
-def refine_dyf_tree(tree, embeddings, min_coherence=None, num_bits=3,
-                    min_leaf_size=4, max_retries=3, seed_offset=1000):
+
+def refine_dyf_tree(tree, embeddings, min_coherence=None, num_bits=3, min_leaf_size=4, max_retries=3, seed_offset=1000):
     """Re-split incoherent tree leaves with rotated LSH seeds.
 
     Walks the tree and finds leaves whose mean cosine similarity to centroid
@@ -500,8 +499,8 @@ def refine_dyf_tree(tree, embeddings, min_coherence=None, num_bits=3,
     n_leaves_before = len(leaves_before)
     coherences = []
     for leaf in leaves_before:
-        if len(leaf['indices']) >= 2:
-            coherences.append(_leaf_coherence(leaf['indices'], emb_normed))
+        if len(leaf["indices"]) >= 2:
+            coherences.append(_leaf_coherence(leaf["indices"], emb_normed))
     coherences = np.array(coherences)
 
     coherence_before = float(coherences.mean()) if len(coherences) > 0 else 0.0
@@ -512,29 +511,28 @@ def refine_dyf_tree(tree, embeddings, min_coherence=None, num_bits=3,
         threshold = float(min_coherence)
 
     n_refined = _refine_recursive(
-        tree, embeddings, emb_normed, threshold, num_bits,
-        min_leaf_size, max_retries, seed_offset)
+        tree, embeddings, emb_normed, threshold, num_bits, min_leaf_size, max_retries, seed_offset
+    )
 
     # Recompute stats
     leaves_after = _collect_leaves(tree)
     coherences_after = []
     for leaf in leaves_after:
-        if len(leaf['indices']) >= 2:
-            coherences_after.append(_leaf_coherence(leaf['indices'], emb_normed))
+        if len(leaf["indices"]) >= 2:
+            coherences_after.append(_leaf_coherence(leaf["indices"], emb_normed))
     coherences_after = np.array(coherences_after)
     coherence_after = float(coherences_after.mean()) if len(coherences_after) > 0 else 0.0
 
     return {
-        'n_refined': n_refined,
-        'n_leaves_before': n_leaves_before,
-        'n_leaves_after': len(leaves_after),
-        'coherence_before': coherence_before,
-        'coherence_after': coherence_after,
+        "n_refined": n_refined,
+        "n_leaves_before": n_leaves_before,
+        "n_leaves_after": len(leaves_after),
+        "coherence_before": coherence_before,
+        "coherence_after": coherence_after,
     }
 
 
-def _eject_periphery(labels, emb_normed, cluster_coherence, cluster_members,
-                     threshold):
+def _eject_periphery(labels, emb_normed, cluster_coherence, cluster_members, threshold):
     """Find points far from their cluster centroid and mark them as ejected.
 
     For each cluster below the coherence threshold, keeps core points (above
@@ -598,13 +596,12 @@ def _resplit_ejected(ejected_indices, embeddings, num_bits, seed_offset):
     dim = ejected_emb.shape[1]
 
     try:
-        clf = DensityClassifier(embedding_dim=dim, num_bits=num_bits,
-                                seed=seed_offset, skip_isolation=True)
+        clf = DensityClassifier(embedding_dim=dim, num_bits=num_bits, seed=seed_offset, skip_isolation=True)
         clf.fit(ejected_emb)
         # np.asarray: dyf-rs < 0.6.0 returned Python lists here
         bucket_ids = np.asarray(clf.get_bucket_ids())
     except TypeError:
-        raise   # dtype/signature errors are bugs, never graceful-degradation
+        raise  # dtype/signature errors are bugs, never graceful-degradation
     except Exception as e:
         logger.debug("Ejected re-split failed, falling back to zeros: %s", e)
         bucket_ids = np.zeros(len(ejected_indices), dtype=int)
@@ -661,8 +658,7 @@ def _merge_small_clusters(labels, emb_normed, min_cluster_size):
         best_i, best_j = 0, 1
         for i in range(len(small_cids)):
             for j in range(i + 1, len(small_cids)):
-                sim = float(cluster_cents[small_cids[i]] @
-                            cluster_cents[small_cids[j]])
+                sim = float(cluster_cents[small_cids[i]] @ cluster_cents[small_cids[j]])
                 if sim > best_sim:
                     best_sim = sim
                     best_i, best_j = i, j
@@ -700,8 +696,7 @@ def _merge_small_clusters(labels, emb_normed, min_cluster_size):
     return labels, n_merged_together, n_merged_into_large
 
 
-def refine_clusters(labels, embeddings, min_coherence=None,
-                    min_cluster_size=None, num_bits=6, seed_offset=2000):
+def refine_clusters(labels, embeddings, min_coherence=None, min_cluster_size=None, num_bits=6, seed_offset=2000):
     """Post-processing safety net: eject periphery from incoherent clusters.
 
     For each cluster below the coherence threshold, keeps core points (above
@@ -751,22 +746,18 @@ def refine_clusters(labels, embeddings, min_coherence=None,
         threshold = float(min_coherence)
 
     # Eject periphery from incoherent clusters
-    labels, ejected_indices = _eject_periphery(
-        labels, emb_normed, cluster_coherence, cluster_members, threshold)
+    labels, ejected_indices = _eject_periphery(labels, emb_normed, cluster_coherence, cluster_members, threshold)
 
     if len(ejected_indices) == 0:
         return labels
 
     n_ejected = len(ejected_indices)
     n_ejected_clusters = sum(
-        1 for cid in unique_labels
-        if cluster_coherence[cid] < threshold
-        and len(cluster_members[cid]) >= 4
+        1 for cid in unique_labels if cluster_coherence[cid] < threshold and len(cluster_members[cid]) >= 4
     )
 
     # Re-split the ejected pool
-    bucket_ids = _resplit_ejected(
-        ejected_indices, embeddings, num_bits, seed_offset)
+    bucket_ids = _resplit_ejected(ejected_indices, embeddings, num_bits, seed_offset)
 
     # Assign each re-split bucket a temporary label
     next_label = max(unique_labels) + 1
@@ -778,17 +769,18 @@ def refine_clusters(labels, embeddings, min_coherence=None,
         next_label += 1
 
     # Merge small clusters
-    labels, n_merged_together, n_merged_into_large = _merge_small_clusters(
-        labels, emb_normed, min_cluster_size)
+    labels, n_merged_together, n_merged_into_large = _merge_small_clusters(labels, emb_normed, min_cluster_size)
 
     # Compact labels to 0..k-1
     unique_final = sorted(set(labels.tolist()))
     remap = {old: new for new, old in enumerate(unique_final)}
     labels = np.array([remap[l] for l in labels], dtype=int)
 
-    logger.info(f"  refine_clusters: ejected {n_ejected} pts from "
-                f"{n_ejected_clusters} clusters, "
-                f"{n_merged_together} small merged together, "
-                f"{n_merged_into_large} merged into large")
+    logger.info(
+        f"  refine_clusters: ejected {n_ejected} pts from "
+        f"{n_ejected_clusters} clusters, "
+        f"{n_merged_together} small merged together, "
+        f"{n_merged_into_large} merged into large"
+    )
 
     return labels

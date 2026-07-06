@@ -75,10 +75,14 @@ def _group_label_from_names(member_names, member_sizes=None):
         return " + ".join(top2)
 
     # Fallback: check if mostly "surgical" or "instrument" keywords
-    surgical_score = sum(
-        size for name, size in zip(member_names, member_sizes)
-        if any(w in name.lower() for w in ["surgical", "instrument", "cannulated"])
-    ) / total_size
+    surgical_score = (
+        sum(
+            size
+            for name, size in zip(member_names, member_sizes)
+            if any(w in name.lower() for w in ["surgical", "instrument", "cannulated"])
+        )
+        / total_size
+    )
     if surgical_score > 0.5:
         return "general surgical"
 
@@ -105,11 +109,13 @@ def _build_dendrogram_groups(Z, cids, names, sizes, max_group_size=4):  # noqa: 
         member_names = [names[c] for c in members]
         member_sizes = [sizes[c] for c in members]
         label = _group_label_from_names(member_names, member_sizes)
-        groups.append({
-            "members": members,
-            "label": label,
-            "merge_distance": float(row[2]),
-        })
+        groups.append(
+            {
+                "members": members,
+                "label": label,
+                "merge_distance": float(row[2]),
+            }
+        )
 
     return groups
 
@@ -149,26 +155,25 @@ def _build_use_case_bundles(Z, cids, names, sizes):
             biggest = max(members, key=lambda c: sizes[c])
             label = names[biggest].split("(")[0].strip()
 
-        bundles.append({
-            "members": members,
-            "label": label,
-            "total_items": total_items,
-            "merge_distance": float(row[2]),
-            "member_details": [
-                {"id": c, "name": names[c], "size": sizes[c]}
-                for c in sorted(members, key=lambda c: sizes[c], reverse=True)
-            ],
-        })
+        bundles.append(
+            {
+                "members": members,
+                "label": label,
+                "total_items": total_items,
+                "merge_distance": float(row[2]),
+                "member_details": [
+                    {"id": c, "name": names[c], "size": sizes[c]}
+                    for c in sorted(members, key=lambda c: sizes[c], reverse=True)
+                ],
+            }
+        )
 
     # Keep only the largest (most members) bundle per branch.
     # A bundle is subsumed if another bundle fully contains it.
     final = []
     for b in bundles:
         member_set = set(b["members"])
-        subsumed = any(
-            set(other["members"]) > member_set
-            for other in bundles if other is not b
-        )
+        subsumed = any(set(other["members"]) > member_set for other in bundles if other is not b)
         if not subsumed:
             final.append(b)
 
@@ -188,7 +193,7 @@ def _compute_similarity_signals(centroids, cids):
     # All pairwise similarities
     pairs = []
     for i, a in enumerate(cids):
-        for b in cids[i + 1:]:
+        for b in cids[i + 1 :]:
             sim = float(np.dot(vecs[a], vecs[b]))
             pairs.append({"a": a, "b": b, "sim": round(sim, 3)})
     pairs.sort(key=lambda p: p["sim"], reverse=True)
@@ -216,7 +221,7 @@ def _find_structural_analogies(groups):
     for i, g1 in enumerate(groups):
         if len(g1["members"]) != 2:
             continue
-        for g2 in groups[i + 1:]:
+        for g2 in groups[i + 1 :]:
             if len(g2["members"]) != 2:
                 continue
             # No overlapping members
@@ -225,14 +230,16 @@ def _find_structural_analogies(groups):
             # Similar merge distance = similar structural role
             d1, d2 = g1["merge_distance"], g2["merge_distance"]
             if abs(d1 - d2) < 0.06:
-                analogies.append({
-                    "pair_a": g1["members"],
-                    "pair_b": g2["members"],
-                    "label_a": g1["label"],
-                    "label_b": g2["label"],
-                    "distance_a": round(d1, 3),
-                    "distance_b": round(d2, 3),
-                })
+                analogies.append(
+                    {
+                        "pair_a": g1["members"],
+                        "pair_b": g2["members"],
+                        "label_a": g1["label"],
+                        "label_b": g2["label"],
+                        "distance_a": round(d1, 3),
+                        "distance_b": round(d2, 3),
+                    }
+                )
     return analogies
 
 
@@ -289,10 +296,7 @@ def compute_scaffold(dyf_path):
         "size_ranking": by_size,
         "largest": by_size[0],
         "smallest": by_size[-1],
-        "groups": [
-            {"members": g["members"], "label": g["label"]}
-            for g in groups if len(g["members"]) >= 2
-        ],
+        "groups": [{"members": g["members"], "label": g["label"]} for g in groups if len(g["members"]) >= 2],
         "similarity": sim_signals,
         "analogies": analogies,
         "bundles": bundles,
@@ -336,16 +340,13 @@ def render_scaffold(scaffold_data):
         lines.append("")
         lines.append("Most similar:")
         for p in sim["top_pairs"][:6]:
-            lines.append(
-                f"  [{p['a']}] {names[p['a']]} <-> "
-                f"[{p['b']}] {names[p['b']]} ({p['sim']:.2f})")
+            lines.append(f"  [{p['a']}] {names[p['a']]} <-> [{p['b']}] {names[p['b']]} ({p['sim']:.2f})")
 
     if sim["most_distinct"]:
         lines.append("")
         lines.append("Most distinct:")
         for c in sim["most_distinct"]:
-            lines.append(
-                f"  [{c}] {names[c]} (avg sim {sim['avg_similarity'][c]:.2f})")
+            lines.append(f"  [{c}] {names[c]} (avg sim {sim['avg_similarity'][c]:.2f})")
 
     # Use-case bundles (pre-aggregated recommendations)
     if d.get("bundles"):
@@ -386,10 +387,12 @@ def enrich_scaffold(dyf_path, output_path=None):
     scaffold_data = compute_scaffold(dyf_path)
     scaffold_text = render_scaffold(scaffold_data)
 
-    logger.info(f"  Scaffold: {len(scaffold_data['communities'])} communities, "
-                f"{len(scaffold_data['groups'])} groups, "
-                f"{len(scaffold_data['analogies'])} analogies")
-    logger.info(f"  Rendered: {len(scaffold_text)} chars (~{len(scaffold_text)//4} tokens)")
+    logger.info(
+        f"  Scaffold: {len(scaffold_data['communities'])} communities, "
+        f"{len(scaffold_data['groups'])} groups, "
+        f"{len(scaffold_data['analogies'])} analogies"
+    )
+    logger.info(f"  Rendered: {len(scaffold_text)} chars (~{len(scaffold_text) // 4} tokens)")
 
     # Store both structured data and rendered text
     out = output_path or dyf_path

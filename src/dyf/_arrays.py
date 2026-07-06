@@ -15,6 +15,7 @@ Two rules enforced here and at the call sites:
      ``TypeError`` before their broad catch: a dtype/signature error is a
      programmer bug, never a data condition to degrade on.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -39,7 +40,5 @@ def ensure_f32(arr, name: str = "embeddings") -> np.ndarray:
     except (TypeError, ValueError) as e:
         raise TypeError(
             f"{name!r} must be convertible to a float32 array for the dyf-rs "
-            f"API (got {type(arr).__name__}"
-            + (f" with dtype {arr.dtype}" if hasattr(arr, "dtype") else "")
-            + f"): {e}"
+            f"API (got {type(arr).__name__}" + (f" with dtype {arr.dtype}" if hasattr(arr, "dtype") else "") + f"): {e}"
         ) from e

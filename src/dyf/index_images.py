@@ -40,8 +40,7 @@ def load_vision_model(model_name: str = DEFAULT_MODEL, device: str | None = None
         from transformers import AutoModel, AutoProcessor
     except ImportError:
         raise ImportError(
-            "transformers and torch are required for image indexing.\n"
-            "Install them with: pip install \"dyf[vision]\""
+            'transformers and torch are required for image indexing.\nInstall them with: pip install "dyf[vision]"'
         )
 
     if device is None:
@@ -66,7 +65,7 @@ def make_thumbnail(img, max_size: int = 128) -> str:
     try:
         from PIL import Image
     except ImportError:
-        raise ImportError("Pillow is required: pip install \"dyf[vision]\"")
+        raise ImportError('Pillow is required: pip install "dyf[vision]"')
 
     img_copy = img.copy()
     img_copy.thumbnail((max_size, max_size), Image.LANCZOS)
@@ -95,7 +94,7 @@ def embed_images(
     all_embeddings = []
 
     for i in range(0, len(images), batch_size):
-        batch = images[i:i + batch_size]
+        batch = images[i : i + batch_size]
         inputs = processor(images=batch, return_tensors="pt").to(device)
 
         with torch.no_grad():
@@ -149,13 +148,13 @@ def index_images(
     if not image_paths:
         logger.error("No images found.")
         sys.exit(1)
-    logger.info(f"Found {len(image_paths)} images in {time.time()-t0:.1f}s")
+    logger.info(f"Found {len(image_paths)} images in {time.time() - t0:.1f}s")
 
     # Load vision model
     logger.info("Loading vision model...")
     t0 = time.time()
     processor, vision_model, device = load_vision_model(model)
-    logger.info(f"  Model loaded on {device} in {time.time()-t0:.1f}s")
+    logger.info(f"  Model loaded on {device} in {time.time() - t0:.1f}s")
 
     # Load images, generate thumbnails, collect metadata
     logger.info("Loading images and generating thumbnails...")
@@ -189,13 +188,13 @@ def index_images(
         logger.error("No valid images could be loaded.")
         sys.exit(1)
 
-    logger.info(f"  Loaded {len(images)} images in {time.time()-t0:.1f}s")
+    logger.info(f"  Loaded {len(images)} images in {time.time() - t0:.1f}s")
 
     # Embed
     logger.info("Embedding images...")
     t0 = time.time()
     embeddings = embed_images(images, processor, vision_model, device, batch_size)
-    logger.info(f"  {embeddings.shape} in {time.time()-t0:.1f}s")
+    logger.info(f"  {embeddings.shape} in {time.time() - t0:.1f}s")
 
     # Normalize
     norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
@@ -212,7 +211,7 @@ def index_images(
         seed=seed,
         fit_method="itq",
     )
-    logger.info(f"  Tree built in {time.time()-t0:.1f}s")
+    logger.info(f"  Tree built in {time.time() - t0:.1f}s")
 
     # Write .dyf
     logger.info("Writing .dyf...")
@@ -244,7 +243,7 @@ def index_images(
         },
     )
     size_mb = output.stat().st_size / (1024 * 1024)
-    logger.info(f"  Written {output.name} ({size_mb:.1f} MB) in {time.time()-t0:.1f}s")
+    logger.info(f"  Written {output.name} ({size_mb:.1f} MB) in {time.time() - t0:.1f}s")
     logger.info(f"Done. {len(images)} images indexed.")
 
 
@@ -260,7 +259,8 @@ def main(argv: list[str] | None = None) -> int:
         help="Directory containing images",
     )
     parser.add_argument(
-        "-o", "--output",
+        "-o",
+        "--output",
         type=Path,
         default=None,
         help="Output .dyf file path (default: <dirname>.dyf)",
@@ -271,23 +271,33 @@ def main(argv: list[str] | None = None) -> int:
         help=f"HuggingFace vision model (default: {DEFAULT_MODEL})",
     )
     parser.add_argument(
-        "--max-depth", type=int, default=4,
+        "--max-depth",
+        type=int,
+        default=4,
         help="DYF tree max depth (default: 4)",
     )
     parser.add_argument(
-        "--num-bits", type=int, default=4,
+        "--num-bits",
+        type=int,
+        default=4,
         help="LSH bits per level (default: 4)",
     )
     parser.add_argument(
-        "--min-leaf-size", type=int, default=5,
+        "--min-leaf-size",
+        type=int,
+        default=5,
         help="Minimum leaf size (default: 5)",
     )
     parser.add_argument(
-        "--seed", type=int, default=42,
+        "--seed",
+        type=int,
+        default=42,
         help="Random seed (default: 42)",
     )
     parser.add_argument(
-        "--batch-size", type=int, default=16,
+        "--batch-size",
+        type=int,
+        default=16,
         help="Embedding batch size (default: 16)",
     )
 

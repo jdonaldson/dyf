@@ -12,10 +12,11 @@ Usage::
     indices, scores = idx.search(query, k=10, nprobe=256)
     I, S = idx.search(query_batch, k=10, nprobe=256)   # batched (nq, k)
 """
+
 from __future__ import annotations
 
-import numpy as np
 import dyf_rs
+import numpy as np
 
 from .dyf_tree import build_dyf_tree
 
@@ -34,7 +35,7 @@ def flatten_tree(tree: dict) -> dict:
         nid = len(nodes)
         nodes.append(node)
         idmap[id(node)] = nid
-        for c in (node.get("children") or []):
+        for c in node.get("children") or []:
             walk(c)
 
     walk(tree)
@@ -94,12 +95,15 @@ class DenseSearchIndex:
         Larger leaves (min_leaf_size ~128) are more latency-efficient per candidate.
     """
 
-    def __init__(self, embeddings, *, tree: dict | None = None,
-                 max_depth: int = 16, num_bits: int = 3, min_leaf_size: int = 128):
+    def __init__(
+        self, embeddings, *, tree: dict | None = None, max_depth: int = 16, num_bits: int = 3, min_leaf_size: int = 128
+    ):
         self.embeddings = np.ascontiguousarray(embeddings, dtype=np.float32)
-        self.tree = tree if tree is not None else build_dyf_tree(
-            self.embeddings, max_depth=max_depth, num_bits=num_bits,
-            min_leaf_size=min_leaf_size)
+        self.tree = (
+            tree
+            if tree is not None
+            else build_dyf_tree(self.embeddings, max_depth=max_depth, num_bits=num_bits, min_leaf_size=min_leaf_size)
+        )
         self._flat = flatten_tree(self.tree)
 
     def search(self, queries, k: int = 10, nprobe: int = 256):
@@ -116,8 +120,19 @@ class DenseSearchIndex:
             q = q[None, :]
         f = self._flat
         idx, sc = dyf_rs.dense_search_batch(
-            f["is_leaf"], f["num_bits"], f["hp_off"], f["hp_data"],
-            f["child_off"], f["child_ids"], f["child_bids"],
-            f["leaf_off"], f["leaf_items"], self.embeddings, q, int(k), int(nprobe))
+            f["is_leaf"],
+            f["num_bits"],
+            f["hp_off"],
+            f["hp_data"],
+            f["child_off"],
+            f["child_ids"],
+            f["child_bids"],
+            f["leaf_off"],
+            f["leaf_items"],
+            self.embeddings,
+            q,
+            int(k),
+            int(nprobe),
+        )
         idx, sc = np.asarray(idx), np.asarray(sc)
         return (idx[0], sc[0]) if single else (idx, sc)

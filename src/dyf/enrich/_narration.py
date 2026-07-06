@@ -12,12 +12,30 @@ from ._ollama import _call_ollama_chat, _make_domain_context
 def _number_to_words(n):
     """Convert a small integer to English words."""
     words = {
-        1: "one", 2: "two", 3: "three", 4: "four", 5: "five",
-        6: "six", 7: "seven", 8: "eight", 9: "nine", 10: "ten",
-        11: "eleven", 12: "twelve", 13: "thirteen", 14: "fourteen",
-        15: "fifteen", 16: "sixteen", 17: "seventeen", 18: "eighteen",
-        19: "nineteen", 20: "twenty", 25: "twenty-five", 30: "thirty",
-        40: "forty", 50: "fifty",
+        1: "one",
+        2: "two",
+        3: "three",
+        4: "four",
+        5: "five",
+        6: "six",
+        7: "seven",
+        8: "eight",
+        9: "nine",
+        10: "ten",
+        11: "eleven",
+        12: "twelve",
+        13: "thirteen",
+        14: "fourteen",
+        15: "fifteen",
+        16: "sixteen",
+        17: "seventeen",
+        18: "eighteen",
+        19: "nineteen",
+        20: "twenty",
+        25: "twenty-five",
+        30: "thirty",
+        40: "forty",
+        50: "fifty",
     }
     return words.get(n, str(n))
 
@@ -37,8 +55,7 @@ def _approx_number_words(n):
         return f"about {thousands:,}"
 
 
-def _build_narration_prompts(cluster_names, cluster_points, titles, coords,
-                             sorted_cids, model, domain):
+def _build_narration_prompts(cluster_names, cluster_points, titles, coords, sorted_cids, model, domain):
     """Build per-cluster LLM prompts for narration.
 
     Returns list of (cid, prompt, sample_titles) task tuples.
@@ -54,7 +71,7 @@ def _build_narration_prompts(cluster_names, cluster_points, titles, coords,
         seen = set()
         sample_titles = []
         for idx in sample_idx:
-            t = titles[idx] if hasattr(titles, '__getitem__') else str(idx)
+            t = titles[idx] if hasattr(titles, "__getitem__") else str(idx)
             if t not in seen:
                 seen.add(t)
                 sample_titles.append(t)
@@ -64,21 +81,21 @@ def _build_narration_prompts(cluster_names, cluster_points, titles, coords,
         dc = _make_domain_context(domain)
         items_str = "\n".join(f"  - {t}" for t in sample_titles)
         prompt = (
-            f'You are narrating a guided tour of a '
-            f'{dc["landscape"]} for a general audience.\n\n'
+            f"You are narrating a guided tour of a "
+            f"{dc['landscape']} for a general audience.\n\n"
             f'Cluster name: "{name}"\n'
-            f'Size: {n_approx} {dc["items"]}\n\n'
-            f'Sample {dc["items"]}:\n{items_str}\n\n'
-            f'Write 2-3 sentences that:\n'
+            f"Size: {n_approx} {dc['items']}\n\n"
+            f"Sample {dc['items']}:\n{items_str}\n\n"
+            f"Write 2-3 sentences that:\n"
             f'1. Start with "{name}."\n'
-            f'2. Explain in plain language what this category of '
-            f'{dc["items"]} represents\n'
-            f'3. Say roughly how many {dc["items"]} are in this '
+            f"2. Explain in plain language what this category of "
+            f"{dc['items']} represents\n"
+            f"3. Say roughly how many {dc['items']} are in this "
             f'group (use "{n_approx}")\n\n'
-            f'Style: calm British documentary narrator. '
-            f'Written for text-to-speech — spell out all numbers, '
-            f'no abbreviations, no special characters, no quotes. '
-            f'Do NOT list raw codes or model numbers.\n'
+            f"Style: calm British documentary narrator. "
+            f"Written for text-to-speech — spell out all numbers, "
+            f"no abbreviations, no special characters, no quotes. "
+            f"Do NOT list raw codes or model numbers.\n"
         )
         tasks.append((cid, prompt, sample_titles))
 
@@ -110,8 +127,7 @@ def _build_intro_outro(cluster_names, sorted_cids, total_pts, title):
     return {"intro": intro, "outro": outro}
 
 
-def _generate_narration(cluster_names, titles, labels, coords,
-                        model="gpt-oss:20b", title=None, domain=None):
+def _generate_narration(cluster_names, titles, labels, coords, model="gpt-oss:20b", title=None, domain=None):
     """Generate tour narration using Ollama, with sample-title fallback."""
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -121,9 +137,7 @@ def _generate_narration(cluster_names, titles, labels, coords,
         cluster_points[int(cid)].append(i)
 
     total_pts = sum(len(v) for v in cluster_points.values())
-    sorted_cids = sorted(cluster_names.keys(),
-                         key=lambda c: len(cluster_points.get(c, [])),
-                         reverse=True)
+    sorted_cids = sorted(cluster_names.keys(), key=lambda c: len(cluster_points.get(c, [])), reverse=True)
 
     # Check Ollama availability
     ollama_ok = _call_ollama_chat("Say OK.", model=model, timeout=30) is not None
@@ -135,9 +149,7 @@ def _generate_narration(cluster_names, titles, labels, coords,
     narration = {}
 
     if ollama_ok:
-        tasks = _build_narration_prompts(
-            cluster_names, cluster_points, titles, coords, sorted_cids,
-            model, domain)
+        tasks = _build_narration_prompts(cluster_names, cluster_points, titles, coords, sorted_cids, model, domain)
     else:
         tasks = []
         for cid in sorted_cids:
@@ -145,8 +157,7 @@ def _generate_narration(cluster_names, titles, labels, coords,
             pts = cluster_points.get(cid, [])
             n_approx = _approx_number_words(len(pts))
             dc = _make_domain_context(domain)
-            narration[cid] = (
-                f"{name}. {n_approx} {dc['items']} in this category.")
+            narration[cid] = f"{name}. {n_approx} {dc['items']} in this category."
 
     if ollama_ok and tasks:
         completed = 0
@@ -155,12 +166,11 @@ def _generate_narration(cluster_names, titles, labels, coords,
             cid, prompt, samples = task
             text = _call_ollama_chat(prompt, model=model, timeout=120)
             if text:
-                text = re.sub(r'\s+', ' ', text).strip().strip('"\'')
+                text = re.sub(r"\s+", " ", text).strip().strip("\"'")
                 return cid, text
             name = cluster_names[cid]
             dc = _make_domain_context(domain)
-            n_approx = _approx_number_words(
-                len(cluster_points.get(cid, [])))
+            n_approx = _approx_number_words(len(cluster_points.get(cid, [])))
             return cid, f"{name}. {n_approx} {dc['items']} in this category."
 
         n_workers = min(2, len(tasks))
@@ -171,12 +181,10 @@ def _generate_narration(cluster_names, titles, labels, coords,
                 narration[cid] = text
                 completed += 1
                 if completed % 5 == 0 or completed == len(tasks):
-                    print(f"    Narrated {completed}/{len(tasks)} "
-                          f"clusters...", flush=True)
+                    print(f"    Narrated {completed}/{len(tasks)} clusters...", flush=True)
 
     # Intro and outro
-    bookends = _build_intro_outro(cluster_names, sorted_cids, total_pts,
-                                  title)
+    bookends = _build_intro_outro(cluster_names, sorted_cids, total_pts, title)
     narration["intro"] = bookends["intro"]
     narration["outro"] = bookends["outro"]
 

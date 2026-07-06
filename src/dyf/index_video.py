@@ -42,12 +42,10 @@ def _load_scenedetect():
     try:
         from scenedetect import SceneManager, open_video
         from scenedetect.detectors import ContentDetector
+
         return open_video, SceneManager, ContentDetector
     except ImportError:
-        raise ImportError(
-            "scenedetect is required for video indexing.\n"
-            "Install it with: pip install \"dyf[video]\""
-        )
+        raise ImportError('scenedetect is required for video indexing.\nInstall it with: pip install "dyf[video]"')
 
 
 def detect_scenes(
@@ -64,10 +62,12 @@ def detect_scenes(
 
     video = open_video(str(video_path))
     scene_manager = SceneManager()
-    scene_manager.add_detector(ContentDetector(
-        threshold=threshold,
-        min_scene_len=min_scene_len,
-    ))
+    scene_manager.add_detector(
+        ContentDetector(
+            threshold=threshold,
+            min_scene_len=min_scene_len,
+        )
+    )
     scene_manager.detect_scenes(video)
     scene_list = scene_manager.get_scene_list()
 
@@ -84,13 +84,15 @@ def detect_scenes(
         scene_id = 0
         while t < video_duration:
             end_t = min(t + interval, video_duration)
-            scenes.append({
-                "scene_id": scene_id,
-                "start_time": t,
-                "end_time": end_t,
-                "duration": end_t - t,
-                "keyframe_time": (t + end_t) / 2,
-            })
+            scenes.append(
+                {
+                    "scene_id": scene_id,
+                    "start_time": t,
+                    "end_time": end_t,
+                    "duration": end_t - t,
+                    "keyframe_time": (t + end_t) / 2,
+                }
+            )
             scene_id += 1
             t = end_t
         return scenes
@@ -99,13 +101,15 @@ def detect_scenes(
     for i, (start, end) in enumerate(scene_list):
         start_sec = start.get_seconds()
         end_sec = end.get_seconds()
-        scenes.append({
-            "scene_id": i,
-            "start_time": start_sec,
-            "end_time": end_sec,
-            "duration": end_sec - start_sec,
-            "keyframe_time": (start_sec + end_sec) / 2,
-        })
+        scenes.append(
+            {
+                "scene_id": i,
+                "start_time": start_sec,
+                "end_time": end_sec,
+                "duration": end_sec - start_sec,
+                "keyframe_time": (start_sec + end_sec) / 2,
+            }
+        )
     return scenes
 
 
@@ -118,9 +122,7 @@ def extract_keyframes(video_path: Path, scenes: list[dict]) -> list:
         import cv2
         from PIL import Image
     except ImportError:
-        raise ImportError(
-            "opencv-python and Pillow are required: pip install \"dyf[video]\""
-        )
+        raise ImportError('opencv-python and Pillow are required: pip install "dyf[video]"')
 
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
@@ -174,13 +176,13 @@ def index_video(
     logger.info(f"Detecting scenes (threshold={threshold})...")
     t0 = time.time()
     scenes = detect_scenes(video_path, threshold=threshold, min_scene_len=min_scene_len)
-    logger.info(f"  {len(scenes)} scenes in {time.time()-t0:.1f}s")
+    logger.info(f"  {len(scenes)} scenes in {time.time() - t0:.1f}s")
 
     # Extract keyframes
     logger.info("Extracting keyframes...")
     t0 = time.time()
     raw_images = extract_keyframes(video_path, scenes)
-    logger.info(f"  Extracted in {time.time()-t0:.1f}s")
+    logger.info(f"  Extracted in {time.time() - t0:.1f}s")
 
     # Filter out failed extractions
     valid = [(s, img) for s, img in zip(scenes, raw_images) if img is not None]
@@ -197,7 +199,7 @@ def index_video(
     logger.info("Loading vision model...")
     t0 = time.time()
     processor, vision_model, device = load_vision_model(model)
-    logger.info(f"  Model loaded on {device} in {time.time()-t0:.1f}s")
+    logger.info(f"  Model loaded on {device} in {time.time() - t0:.1f}s")
 
     # Generate thumbnails
     logger.info("Generating thumbnails...")
@@ -207,17 +209,14 @@ def index_video(
     logger.info("Embedding keyframes...")
     t0 = time.time()
     embeddings = embed_images(images, processor, vision_model, device, batch_size)
-    logger.info(f"  {embeddings.shape} in {time.time()-t0:.1f}s")
+    logger.info(f"  {embeddings.shape} in {time.time() - t0:.1f}s")
 
     # Normalize
     norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
     embeddings = embeddings / np.where(norms > 0, norms, 1)
 
     # Build stored fields
-    titles = [
-        f"Scene {s['scene_id']} at {_format_timestamp(s['keyframe_time'])}"
-        for s in scenes_valid
-    ]
+    titles = [f"Scene {s['scene_id']} at {_format_timestamp(s['keyframe_time'])}" for s in scenes_valid]
     files = [str(video_path.name)] * len(scenes_valid)
     timestamps = [s["keyframe_time"] for s in scenes_valid]
     scene_ids = [s["scene_id"] for s in scenes_valid]
@@ -234,7 +233,7 @@ def index_video(
         seed=seed,
         fit_method="itq",
     )
-    logger.info(f"  Tree built in {time.time()-t0:.1f}s")
+    logger.info(f"  Tree built in {time.time() - t0:.1f}s")
 
     # Write .dyf
     logger.info("Writing .dyf...")
@@ -269,7 +268,7 @@ def index_video(
         },
     )
     size_mb = output.stat().st_size / (1024 * 1024)
-    logger.info(f"  Written {output.name} ({size_mb:.1f} MB) in {time.time()-t0:.1f}s")
+    logger.info(f"  Written {output.name} ({size_mb:.1f} MB) in {time.time() - t0:.1f}s")
     logger.info(f"Done. {len(images)} keyframes indexed.")
 
 
@@ -285,7 +284,8 @@ def main(argv: list[str] | None = None) -> int:
         help="Video file to index",
     )
     parser.add_argument(
-        "-o", "--output",
+        "-o",
+        "--output",
         type=Path,
         default=None,
         help="Output .dyf file path (default: <video_name>.dyf)",
@@ -296,31 +296,45 @@ def main(argv: list[str] | None = None) -> int:
         help=f"HuggingFace vision model (default: {DEFAULT_MODEL})",
     )
     parser.add_argument(
-        "--threshold", type=float, default=27.0,
+        "--threshold",
+        type=float,
+        default=27.0,
         help="Scene detection threshold (default: 27.0)",
     )
     parser.add_argument(
-        "--min-scene-len", type=int, default=15,
+        "--min-scene-len",
+        type=int,
+        default=15,
         help="Minimum scene length in frames (default: 15)",
     )
     parser.add_argument(
-        "--max-depth", type=int, default=4,
+        "--max-depth",
+        type=int,
+        default=4,
         help="DYF tree max depth (default: 4)",
     )
     parser.add_argument(
-        "--num-bits", type=int, default=4,
+        "--num-bits",
+        type=int,
+        default=4,
         help="LSH bits per level (default: 4)",
     )
     parser.add_argument(
-        "--min-leaf-size", type=int, default=5,
+        "--min-leaf-size",
+        type=int,
+        default=5,
         help="Minimum leaf size (default: 5)",
     )
     parser.add_argument(
-        "--seed", type=int, default=42,
+        "--seed",
+        type=int,
+        default=42,
         help="Random seed (default: 42)",
     )
     parser.add_argument(
-        "--batch-size", type=int, default=16,
+        "--batch-size",
+        type=int,
+        default=16,
         help="Embedding batch size (default: 16)",
     )
 

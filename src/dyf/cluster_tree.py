@@ -24,6 +24,7 @@ from dyf.splits import _compute_depth_from_root, collect_descendant_indices, tok
 @dataclass
 class _TreeContext:
     """Bundled tree structure data for cluster-tree edge building."""
+
     internal_nodes: list[int]
     children_map: dict[int, list[int]]
     leaf_batches: dict[int, np.ndarray]
@@ -64,9 +65,7 @@ def _compute_descendant_items(internal_nodes, children_map, leaf_batches):
     return descendant_items, child_descendant_items
 
 
-def _build_cluster_tree_edges(unique_clusters, cluster_items,
-                              tree_ctx: _TreeContext,
-                              n_clusters, straddle_threshold):
+def _build_cluster_tree_edges(unique_clusters, cluster_items, tree_ctx: _TreeContext, n_clusters, straddle_threshold):
     """Build edges connecting clusters to tree nodes based on item overlap.
 
     Produces tree-internal edges (parent -> child) and cluster-to-tree edges
@@ -90,11 +89,13 @@ def _build_cluster_tree_edges(unique_clusters, cluster_items,
     # Tree-internal edges: parent -> child
     for parent_nid in tree_ctx.internal_nodes:
         for child_nid in tree_ctx.children_map.get(parent_nid, []):
-            edges.append((
-                f"tree_{parent_nid}",
-                f"tree_{child_nid}",
-                1.0,
-            ))
+            edges.append(
+                (
+                    f"tree_{parent_nid}",
+                    f"tree_{child_nid}",
+                    1.0,
+                )
+            )
 
     # Collect all tree node IDs that are children of internal nodes
     # (these are the "attachment points" for clusters)
@@ -127,28 +128,31 @@ def _build_cluster_tree_edges(unique_clusters, cluster_items,
                 t_items = tree_ctx.descendant_items[tnid]
             else:
                 # Leaf node with no pre-computed descendants
-                desc = collect_descendant_indices(
-                    tnid, tree_ctx.children_map, tree_ctx.leaf_batches)
+                desc = collect_descendant_indices(tnid, tree_ctx.children_map, tree_ctx.leaf_batches)
                 t_items = set(desc.tolist())
 
             unclaimed_overlap = c_items & t_items - claimed
             overlap_frac = len(unclaimed_overlap) / c_size
 
             if overlap_frac >= straddle_threshold:
-                edges.append((
-                    f"tree_{tnid}",
-                    cluster_node_name,
-                    round(overlap_frac, 4),
-                ))
+                edges.append(
+                    (
+                        f"tree_{tnid}",
+                        cluster_node_name,
+                        round(overlap_frac, 4),
+                    )
+                )
                 claimed |= unclaimed_overlap
 
         # If no tree node claimed this cluster, attach to root
         if not any(e[1] == cluster_node_name for e in edges):
-            edges.append((
-                f"tree_{root_id}",
-                cluster_node_name,
-                1.0,
-            ))
+            edges.append(
+                (
+                    f"tree_{root_id}",
+                    cluster_node_name,
+                    1.0,
+                )
+            )
 
     return edges
 
@@ -197,7 +201,7 @@ def build_cluster_tree_dag(
     # Identify internal nodes (have children) within depth limit
     internal_nodes = []
     for node in tree:
-        nid = node['node_id']
+        nid = node["node_id"]
         if not children_map.get(nid):
             continue  # leaf
         d = depth_from_root.get(nid, 999)
@@ -206,8 +210,7 @@ def build_cluster_tree_dag(
         internal_nodes.append(nid)
 
     # Pre-compute descendant item sets for internal nodes and their children
-    descendant_items, child_descendant_items = _compute_descendant_items(
-        internal_nodes, children_map, leaf_batches)
+    descendant_items, child_descendant_items = _compute_descendant_items(internal_nodes, children_map, leaf_batches)
 
     # Pre-compute cluster item sets
     unique_clusters = sorted(set(int(c) for c in cluster_labels))
@@ -224,9 +227,7 @@ def build_cluster_tree_dag(
         descendant_items=descendant_items,
         child_descendant_items=child_descendant_items,
     )
-    edges = _build_cluster_tree_edges(
-        unique_clusters, cluster_items, tree_ctx,
-        n_clusters, straddle_threshold)
+    edges = _build_cluster_tree_edges(unique_clusters, cluster_items, tree_ctx, n_clusters, straddle_threshold)
 
     return CategoryGraph.from_edges(edges)
 
@@ -261,7 +262,7 @@ def derive_path_labels(
         Single path → ``"cardiac / pacemaker"``.
         Straddling → ``"cardiac / {pacemaker, defibrillator}"``.
     """
-    splits = split_keywords.get('splits', {})
+    splits = split_keywords.get("splits", {})
 
     # Build a quick lookup: tree node → its parent tree node
     tree_parent: dict[str, str] = {}
@@ -276,10 +277,10 @@ def derive_path_labels(
     # splits dict is keyed by node_id (int or str), children by child_id
     node_keywords: dict[str, str] = {}
     for nid_key, split_data in splits.items():
-        children = split_data.get('children', {})
+        children = split_data.get("children", {})
         for cid_key, cinfo in children.items():
             child_nid = int(cid_key)
-            words = [w for w, _ in cinfo.get('unigrams', [])[:top_k]]
+            words = [w for w, _ in cinfo.get("unigrams", [])[:top_k]]
             if words:
                 node_keywords[f"tree_{child_nid}"] = ", ".join(words)
 
@@ -403,8 +404,7 @@ def compute_sibling_keywords(
         if len(sibling_cids) < 2:
             # Lone cluster — fallback to corpus-wide TF-IDF
             for cid in sibling_cids:
-                result[cid] = _corpus_tfidf(
-                    titles, cluster_items[cid], top_k)
+                result[cid] = _corpus_tfidf(titles, cluster_items[cid], top_k)
             continue
 
         # Contrastive TF-IDF within sibling group
@@ -443,11 +443,7 @@ def _sibling_group_tfidf(
             word_df[word] += 1
 
     # IDF: only keep words that don't appear in ALL siblings
-    idf = {
-        w: math.log(n_siblings / (1 + df))
-        for w, df in word_df.items()
-        if df < n_siblings
-    }
+    idf = {w: math.log(n_siblings / (1 + df)) for w, df in word_df.items() if df < n_siblings}
 
     result: dict[int, list[tuple[str, float]]] = {}
     for cid in sibling_cids:
@@ -536,12 +532,10 @@ def format_cluster_context(
 
     if sibling_keywords:
         kw_str = ", ".join(w for w, _ in sibling_keywords)
-        parts.append(
-            f"Distinguishing keywords (vs path siblings): {kw_str}")
+        parts.append(f"Distinguishing keywords (vs path siblings): {kw_str}")
 
     if sibling_labels:
-        others = [f'"{v}"' for k, v in sorted(sibling_labels.items())
-                  if k != cluster_id]
+        others = [f'"{v}"' for k, v in sorted(sibling_labels.items()) if k != cluster_id]
         if others:
             parts.append(f"Sibling clusters: {', '.join(others[:10])}")
 

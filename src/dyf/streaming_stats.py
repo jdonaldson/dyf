@@ -154,8 +154,18 @@ class ColumnProfile:
         self.name = name
         self.dtype = dtype
         self._is_numeric = dtype in (
-            "float32", "float64", "float", "int", "int8", "int16", "int32", "int64",
-            "uint8", "uint16", "uint32", "uint64",
+            "float32",
+            "float64",
+            "float",
+            "int",
+            "int8",
+            "int16",
+            "int32",
+            "int64",
+            "uint8",
+            "uint16",
+            "uint32",
+            "uint64",
         )
         self._welford = WelfordStats()
         self._freq = SpaceSaving(k=20)
@@ -189,9 +199,7 @@ class ColumnProfile:
         if self._is_numeric:
             w = self._welford
             lines.append(
-                f"stats: n={_format_count(w.count)}, "
-                f"mean={w.mean:.2f}, std={w.std:.1f}, "
-                f"min={w.min}, max={w.max}"
+                f"stats: n={_format_count(w.count)}, mean={w.mean:.2f}, std={w.std:.1f}, min={w.min}, max={w.max}"
             )
             if "int" in self.dtype and self._freq.total > 0:
                 top_items = self._freq.top(5)
@@ -225,8 +233,7 @@ class TableProfile:
 
     def __init__(self, column_names: list[str], dtypes: list[str]) -> None:
         self.columns: dict[str, ColumnProfile] = {
-            name: ColumnProfile(name, dtype)
-            for name, dtype in zip(column_names, dtypes)
+            name: ColumnProfile(name, dtype) for name, dtype in zip(column_names, dtypes)
         }
         self._col_order = list(column_names)
 

@@ -23,11 +23,13 @@ def _make_domain_context(domain):
 
 def _call_ollama(model, prompt, timeout=300):
     """Call Ollama HTTP API and return text response."""
-    payload = json.dumps({
-        "model": model,
-        "prompt": prompt,
-        "stream": False,
-    }).encode()
+    payload = json.dumps(
+        {
+            "model": model,
+            "prompt": prompt,
+            "stream": False,
+        }
+    ).encode()
     req = urllib.request.Request(
         f"{OLLAMA_BASE_URL}/api/generate",
         data=payload,
@@ -44,11 +46,13 @@ def _call_ollama(model, prompt, timeout=300):
 
 def _call_ollama_chat(prompt, model="gpt-oss:20b", timeout=30):
     """Call Ollama via HTTP API. Returns response text or None."""
-    payload = json.dumps({
-        "model": model,
-        "messages": [{"role": "user", "content": prompt}],
-        "stream": False,
-    }).encode()
+    payload = json.dumps(
+        {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "stream": False,
+        }
+    ).encode()
     req = urllib.request.Request(
         f"{OLLAMA_BASE_URL}/api/chat",
         data=payload,

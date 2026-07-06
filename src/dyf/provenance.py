@@ -33,6 +33,7 @@ class Provenance:
 # Hashing helpers
 # ---------------------------------------------------------------------------
 
+
 def file_hash(path: str | Path) -> str:
     """Fast partial hash: first 64 KB + file size + mtime.
 
@@ -57,6 +58,7 @@ def params_hash(params: dict) -> str:
 # ---------------------------------------------------------------------------
 # Factory
 # ---------------------------------------------------------------------------
+
 
 def create_provenance(
     artifact_type: str,
@@ -94,6 +96,7 @@ def create_provenance(
 # Compatibility check
 # ---------------------------------------------------------------------------
 
+
 def check_compatible(
     upstream: Provenance,
     downstream_n_items: int | None = None,
@@ -107,10 +110,7 @@ def check_compatible(
     warnings: list[str] = []
 
     if downstream_n_items is not None and upstream.n_items != downstream_n_items:
-        warnings.append(
-            f"n_items mismatch: cache has {upstream.n_items}, "
-            f"current pipeline has {downstream_n_items}"
-        )
+        warnings.append(f"n_items mismatch: cache has {upstream.n_items}, current pipeline has {downstream_n_items}")
 
     if downstream_sample_n is not None and upstream.sample_n != downstream_sample_n:
         warnings.append(
@@ -123,10 +123,7 @@ def check_compatible(
         and upstream.sample_seed is not None
         and upstream.sample_seed != downstream_sample_seed
     ):
-        warnings.append(
-            f"sample_seed mismatch: cache={upstream.sample_seed}, "
-            f"current={downstream_sample_seed}"
-        )
+        warnings.append(f"sample_seed mismatch: cache={upstream.sample_seed}, current={downstream_sample_seed}")
 
     ok = len(warnings) == 0
     return ok, warnings
@@ -135,6 +132,7 @@ def check_compatible(
 # ---------------------------------------------------------------------------
 # Serialization
 # ---------------------------------------------------------------------------
+
 
 def provenance_to_dict(p: Provenance) -> dict[str, Any]:
     """JSON-serializable dict."""

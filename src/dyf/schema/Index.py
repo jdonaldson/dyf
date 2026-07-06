@@ -7,8 +7,9 @@ from flatbuffers.compat import import_numpy
 
 np = import_numpy()
 
+
 class Index:
-    __slots__ = ['_tab']
+    __slots__ = ["_tab"]
 
     @classmethod
     def GetRootAs(cls, buf, offset=0):
@@ -21,6 +22,7 @@ class Index:
     def GetRootAsIndex(cls, buf, offset=0):
         """This method is deprecated. Please switch to GetRootAs."""
         return cls.GetRootAs(buf, offset)
+
     # Index
     def Init(self, buf, pos):
         self._tab = flatbuffers.table.Table(buf, pos)
@@ -68,6 +70,7 @@ class Index:
             x += flatbuffers.number_types.UOffsetTFlags.py_type(j) * 4
             x = self._tab.Indirect(x)
             from dyf.schema.Node import Node
+
             obj = Node()
             obj.Init(self._tab.Bytes, x)
             return obj
@@ -93,6 +96,7 @@ class Index:
             x += flatbuffers.number_types.UOffsetTFlags.py_type(j) * 4
             x = self._tab.Indirect(x)
             from dyf.schema.BatchDescriptor import BatchDescriptor
+
             obj = BatchDescriptor()
             obj.Init(self._tab.Bytes, x)
             return obj
@@ -116,6 +120,7 @@ class Index:
         if o != 0:
             x = self._tab.Indirect(o + self._tab.Pos)
             from dyf.schema.BuildParams import BuildParams
+
             obj = BuildParams()
             obj.Init(self._tab.Bytes, x)
             return obj
@@ -129,6 +134,7 @@ class Index:
             x += flatbuffers.number_types.UOffsetTFlags.py_type(j) * 4
             x = self._tab.Indirect(x)
             from dyf.schema.KeyValue import KeyValue
+
             obj = KeyValue()
             obj.Init(self._tab.Bytes, x)
             return obj
@@ -146,86 +152,114 @@ class Index:
         o = flatbuffers.number_types.UOffsetTFlags.py_type(self._tab.Offset(20))
         return o == 0
 
+
 def IndexStart(builder):
     builder.StartObject(9)
+
 
 def Start(builder):
     IndexStart(builder)
 
+
 def IndexAddVersion(builder, version):
     builder.PrependUOffsetTRelativeSlot(0, flatbuffers.number_types.UOffsetTFlags.py_type(version), 0)
+
 
 def AddVersion(builder, version):
     IndexAddVersion(builder, version)
 
+
 def IndexAddEmbeddingDim(builder, embeddingDim):
     builder.PrependUint16Slot(1, embeddingDim, 0)
+
 
 def AddEmbeddingDim(builder, embeddingDim):
     IndexAddEmbeddingDim(builder, embeddingDim)
 
+
 def IndexAddTotalItems(builder, totalItems):
     builder.PrependUint64Slot(2, totalItems, 0)
+
 
 def AddTotalItems(builder, totalItems):
     IndexAddTotalItems(builder, totalItems)
 
+
 def IndexAddNumLeaves(builder, numLeaves):
     builder.PrependUint32Slot(3, numLeaves, 0)
+
 
 def AddNumLeaves(builder, numLeaves):
     IndexAddNumLeaves(builder, numLeaves)
 
+
 def IndexAddRoot(builder, root):
     builder.PrependUint32Slot(4, root, 0)
+
 
 def AddRoot(builder, root):
     IndexAddRoot(builder, root)
 
+
 def IndexAddNodes(builder, nodes):
     builder.PrependUOffsetTRelativeSlot(5, flatbuffers.number_types.UOffsetTFlags.py_type(nodes), 0)
+
 
 def AddNodes(builder, nodes):
     IndexAddNodes(builder, nodes)
 
+
 def IndexStartNodesVector(builder, numElems):
     return builder.StartVector(4, numElems, 4)
+
 
 def StartNodesVector(builder, numElems):
     return IndexStartNodesVector(builder, numElems)
 
+
 def IndexAddBatches(builder, batches):
     builder.PrependUOffsetTRelativeSlot(6, flatbuffers.number_types.UOffsetTFlags.py_type(batches), 0)
+
 
 def AddBatches(builder, batches):
     IndexAddBatches(builder, batches)
 
+
 def IndexStartBatchesVector(builder, numElems):
     return builder.StartVector(4, numElems, 4)
+
 
 def StartBatchesVector(builder, numElems):
     return IndexStartBatchesVector(builder, numElems)
 
+
 def IndexAddBuildParams(builder, buildParams):
     builder.PrependUOffsetTRelativeSlot(7, flatbuffers.number_types.UOffsetTFlags.py_type(buildParams), 0)
+
 
 def AddBuildParams(builder, buildParams):
     IndexAddBuildParams(builder, buildParams)
 
+
 def IndexAddMetadata(builder, metadata):
     builder.PrependUOffsetTRelativeSlot(8, flatbuffers.number_types.UOffsetTFlags.py_type(metadata), 0)
+
 
 def AddMetadata(builder, metadata):
     IndexAddMetadata(builder, metadata)
 
+
 def IndexStartMetadataVector(builder, numElems):
     return builder.StartVector(4, numElems, 4)
+
 
 def StartMetadataVector(builder, numElems):
     return IndexStartMetadataVector(builder, numElems)
 
+
 def IndexEnd(builder):
     return builder.EndObject()
+
 
 def End(builder):
     return IndexEnd(builder)

@@ -158,6 +158,7 @@ class Pipeline:
             elif suffix == ".dyf":
                 # Lazy import to avoid circular / heavy deps
                 from .lazy_index import LazyIndex
+
                 with LazyIndex(str(p)) as idx:
                     meta = idx._get_metadata()
                     raw_str = meta.get("_provenance")

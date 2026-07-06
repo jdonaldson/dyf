@@ -40,32 +40,196 @@ from .configs import EmbedderConfig, LabelerConfig, list_configs  # noqa: F401
 # Module-level constants and helpers
 # =============================================================================
 
-_DEFAULT_ACADEMIC_STOPWORDS: frozenset[str] = frozenset({
-    'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
-    'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'been',
-    'be', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would',
-    'could', 'should', 'may', 'might', 'must', 'shall', 'can', 'need',
-    'this', 'that', 'these', 'those', 'it', 'its', 'we', 'our', 'they',
-    'their', 'which', 'who', 'whom', 'what', 'where', 'when', 'why', 'how',
-    'all', 'each', 'every', 'both', 'few', 'more', 'most', 'other', 'some',
-    'such', 'no', 'not', 'only', 'same', 'so', 'than', 'too', 'very',
-    'just', 'also', 'now', 'here', 'there', 'then', 'once', 'if', 'any',
-    'about', 'into', 'through', 'during', 'before', 'after', 'above',
-    'below', 'between', 'under', 'over', 'out', 'up', 'down', 'off',
-    'paper', 'study', 'research', 'results', 'method', 'methods', 'approach',
-    'proposed', 'propose', 'show', 'shows', 'shown', 'using', 'used', 'use',
-    'based', 'problem', 'problems', 'work', 'new', 'novel', 'present',
-    'presented', 'demonstrate', 'demonstrates', 'experimental', 'experiments',
-    'however', 'therefore', 'thus', 'hence', 'moreover', 'furthermore',
-    'first', 'second', 'third', 'one', 'two', 'three', 'many', 'several',
-    'various', 'different', 'important', 'significant', 'provide', 'provides',
-    'consider', 'considers', 'introduce', 'introduces', 'existing', 'recent',
-    'previous', 'current', 'given', 'well', 'known', 'general', 'particular',
-    'specific', 'case', 'cases', 'example', 'examples', 'order', 'number',
-    'large', 'small', 'high', 'low', 'best', 'better', 'good', 'simple',
-    'following', 'related', 'similar', 'compared', 'performance', 'evaluate',
-    'evaluated', 'analysis', 'data', 'set', 'sets', 'model', 'models',
-})
+_DEFAULT_ACADEMIC_STOPWORDS: frozenset[str] = frozenset(
+    {
+        "the",
+        "a",
+        "an",
+        "and",
+        "or",
+        "but",
+        "in",
+        "on",
+        "at",
+        "to",
+        "for",
+        "of",
+        "with",
+        "by",
+        "from",
+        "as",
+        "is",
+        "was",
+        "are",
+        "were",
+        "been",
+        "be",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "could",
+        "should",
+        "may",
+        "might",
+        "must",
+        "shall",
+        "can",
+        "need",
+        "this",
+        "that",
+        "these",
+        "those",
+        "it",
+        "its",
+        "we",
+        "our",
+        "they",
+        "their",
+        "which",
+        "who",
+        "whom",
+        "what",
+        "where",
+        "when",
+        "why",
+        "how",
+        "all",
+        "each",
+        "every",
+        "both",
+        "few",
+        "more",
+        "most",
+        "other",
+        "some",
+        "such",
+        "no",
+        "not",
+        "only",
+        "same",
+        "so",
+        "than",
+        "too",
+        "very",
+        "just",
+        "also",
+        "now",
+        "here",
+        "there",
+        "then",
+        "once",
+        "if",
+        "any",
+        "about",
+        "into",
+        "through",
+        "during",
+        "before",
+        "after",
+        "above",
+        "below",
+        "between",
+        "under",
+        "over",
+        "out",
+        "up",
+        "down",
+        "off",
+        "paper",
+        "study",
+        "research",
+        "results",
+        "method",
+        "methods",
+        "approach",
+        "proposed",
+        "propose",
+        "show",
+        "shows",
+        "shown",
+        "using",
+        "used",
+        "use",
+        "based",
+        "problem",
+        "problems",
+        "work",
+        "new",
+        "novel",
+        "present",
+        "presented",
+        "demonstrate",
+        "demonstrates",
+        "experimental",
+        "experiments",
+        "however",
+        "therefore",
+        "thus",
+        "hence",
+        "moreover",
+        "furthermore",
+        "first",
+        "second",
+        "third",
+        "one",
+        "two",
+        "three",
+        "many",
+        "several",
+        "various",
+        "different",
+        "important",
+        "significant",
+        "provide",
+        "provides",
+        "consider",
+        "considers",
+        "introduce",
+        "introduces",
+        "existing",
+        "recent",
+        "previous",
+        "current",
+        "given",
+        "well",
+        "known",
+        "general",
+        "particular",
+        "specific",
+        "case",
+        "cases",
+        "example",
+        "examples",
+        "order",
+        "number",
+        "large",
+        "small",
+        "high",
+        "low",
+        "best",
+        "better",
+        "good",
+        "simple",
+        "following",
+        "related",
+        "similar",
+        "compared",
+        "performance",
+        "evaluate",
+        "evaluated",
+        "analysis",
+        "data",
+        "set",
+        "sets",
+        "model",
+        "models",
+    }
+)
 
 
 def _tfidf_keywords(
@@ -101,7 +265,7 @@ def _tfidf_keywords(
 
     def _tokenize(text: str) -> list[str]:
         text = text.lower()
-        words = re.findall(r'\b[a-z]+\b', text)
+        words = re.findall(r"\b[a-z]+\b", text)
         return [w for w in words if len(w) >= min_word_len and w not in stops]
 
     bucket_words: list[str] = []
@@ -163,9 +327,11 @@ def _sample_near_centroid(
 # Data Classes
 # =============================================================================
 
+
 @dataclass
 class DensityReport:
     """Report on density classification."""
+
     # Corpus stats
     corpus_size: int
     num_buckets: int
@@ -213,11 +379,13 @@ class DensityReport:
         ]
 
         if self.category_counts:
-            lines.extend([
-                "",
-                "TOP CATEGORIES",
-                "-" * 40,
-            ])
+            lines.extend(
+                [
+                    "",
+                    "TOP CATEGORIES",
+                    "-" * 40,
+                ]
+            )
             for cat, count in self.category_counts[:10]:
                 pct = count / self.corpus_size * 100
                 lines.append(f"  {cat[:30]:<32} {count:>5} ({pct:>5.1f}%)")
@@ -301,12 +469,12 @@ class DensityClassifier:
     @classmethod
     def from_polars(
         cls,
-        df: 'pl.DataFrame',
+        df: "pl.DataFrame",
         embedding_col: str,
         category_col: str | None = None,
         text_col: str | None = None,
-        **kwargs
-    ) -> 'DensityClassifier':
+        **kwargs,
+    ) -> "DensityClassifier":
         """
         Create classifier from a Polars DataFrame.
 
@@ -349,7 +517,7 @@ class DensityClassifier:
 
         return classifier
 
-    def to_polars(self) -> 'pl.DataFrame':
+    def to_polars(self) -> "pl.DataFrame":
         """
         Return source DataFrame with density metrics columns added.
 
@@ -371,13 +539,15 @@ class DensityClassifier:
             raise ValueError("Must call fit() first")
 
         # Create labels DataFrame
-        labels_df = pl.DataFrame({
-            'bucket_id': self._bucket_ids.tolist(),
-            'bucket_size': self._bucket_sizes.tolist(),
-            'centroid_similarity': self._centroid_similarities.tolist(),
-            'isolation_score': self._isolation_scores.tolist(),
-            'stability_score': self._stability_scores.tolist(),
-        })
+        labels_df = pl.DataFrame(
+            {
+                "bucket_id": self._bucket_ids.tolist(),
+                "bucket_size": self._bucket_sizes.tolist(),
+                "centroid_similarity": self._centroid_similarities.tolist(),
+                "isolation_score": self._isolation_scores.tolist(),
+                "stability_score": self._stability_scores.tolist(),
+            }
+        )
 
         # If we have source DataFrame, join to it
         if self._source_df is not None:
@@ -390,12 +560,12 @@ class DensityClassifier:
     @classmethod
     def from_pandas(
         cls,
-        df: 'pd.DataFrame',
+        df: "pd.DataFrame",
         embedding_col: str,
         category_col: str | None = None,
         text_col: str | None = None,
-        **kwargs
-    ) -> 'DensityClassifier':
+        **kwargs,
+    ) -> "DensityClassifier":
         """
         Create classifier from a Pandas DataFrame.
 
@@ -437,7 +607,7 @@ class DensityClassifier:
 
         return classifier
 
-    def to_pandas(self) -> 'pd.DataFrame':
+    def to_pandas(self) -> "pd.DataFrame":
         """
         Return source DataFrame with density metrics columns added.
 
@@ -459,23 +629,22 @@ class DensityClassifier:
             raise ValueError("Must call fit() first")
 
         # Create labels DataFrame
-        labels_df = pd.DataFrame({
-            'bucket_id': self._bucket_ids.tolist(),
-            'bucket_size': self._bucket_sizes.tolist(),
-            'centroid_similarity': self._centroid_similarities.tolist(),
-            'isolation_score': self._isolation_scores.tolist(),
-            'stability_score': self._stability_scores.tolist(),
-        })
+        labels_df = pd.DataFrame(
+            {
+                "bucket_id": self._bucket_ids.tolist(),
+                "bucket_size": self._bucket_sizes.tolist(),
+                "centroid_similarity": self._centroid_similarities.tolist(),
+                "isolation_score": self._isolation_scores.tolist(),
+                "stability_score": self._stability_scores.tolist(),
+            }
+        )
 
         # If we have source DataFrame, join to it
         if self._source_pandas_df is not None:
-            return pd.concat(
-                [self._source_pandas_df.reset_index(drop=True), labels_df],
-                axis=1
-            )
+            return pd.concat([self._source_pandas_df.reset_index(drop=True), labels_df], axis=1)
         else:
             # Add index column for manual joining
-            labels_df['index'] = range(len(self.embeddings))
+            labels_df["index"] = range(len(self.embeddings))
             return labels_df
 
     @classmethod
@@ -490,8 +659,8 @@ class DensityClassifier:
         ngram_range: tuple[int, int] = (1, 2),
         num_bits: int = 12,
         verbose: bool = True,
-        **kwargs
-    ) -> 'DensityClassifier':
+        **kwargs,
+    ) -> "DensityClassifier":
         """
         Create classifier from raw texts using TF-IDF + SVD embeddings.
 
@@ -526,11 +695,7 @@ class DensityClassifier:
 
         # Build TF-IDF matrix
         vectorizer = TfidfVectorizer(
-            max_features=max_features,
-            min_df=min_df,
-            max_df=max_df,
-            ngram_range=ngram_range,
-            stop_words='english'
+            max_features=max_features, min_df=min_df, max_df=max_df, ngram_range=ngram_range, stop_words="english"
         )
         tfidf_matrix = vectorizer.fit_transform(texts)
 
@@ -544,18 +709,14 @@ class DensityClassifier:
         if verbose:
             logger.info(f"Applying SVD ({n_components} components)...")
 
-        svd = TruncatedSVD(n_components=n_components, random_state=kwargs.get('seed', 31))
+        svd = TruncatedSVD(n_components=n_components, random_state=kwargs.get("seed", 31))
         embeddings = svd.fit_transform(tfidf_matrix).astype(np.float32)
 
         if verbose:
             logger.debug(f"  Variance explained: {svd.explained_variance_ratio_.sum():.1%}")
 
         # Create and fit classifier
-        classifier = cls(
-            embedding_dim=n_components,
-            num_bits=num_bits,
-            **kwargs
-        )
+        classifier = cls(embedding_dim=n_components, num_bits=num_bits, **kwargs)
 
         # Store vectorizer and SVD for potential later use
         classifier._vectorizer = vectorizer
@@ -571,8 +732,8 @@ class DensityClassifier:
         categories: list[str] | None = None,
         texts: list[str] | None = None,
         normalize: bool = True,
-        verbose: bool = True
-    ) -> 'DensityClassifier':
+        verbose: bool = True,
+    ) -> "DensityClassifier":
         """
         Fit the density classifier.
 
@@ -703,7 +864,7 @@ class DensityClassifier:
 
         # Step 1d: Re-hash with PCA hyperplanes
         signs = (embeddings @ hp.T) >= 0
-        hashes = (signs @ powers[:len(hp)]).astype(np.uint64)
+        hashes = (signs @ powers[: len(hp)]).astype(np.uint64)
 
         return hashes, hp
 
@@ -875,7 +1036,7 @@ class DensityClassifier:
             raise ValueError("Must call fit() first")
         return self._stability_scores.copy()
 
-    def get_labels(self) -> 'pl.DataFrame':
+    def get_labels(self) -> "pl.DataFrame":
         """
         Get per-record labels as a Polars DataFrame.
 
@@ -900,15 +1061,17 @@ class DensityClassifier:
 
         n = len(self.embeddings)
 
-        return pl.DataFrame({
-            'index': list(range(n)),
-            'bucket_id': self._bucket_ids.tolist(),
-            'bucket_size': self._bucket_sizes.tolist(),
-            'centroid_similarity': self._centroid_similarities.tolist(),
-            'isolation_score': self._isolation_scores.tolist(),
-            'stability_score': self._stability_scores.tolist(),
-            'category': self.categories,
-        })
+        return pl.DataFrame(
+            {
+                "index": list(range(n)),
+                "bucket_id": self._bucket_ids.tolist(),
+                "bucket_size": self._bucket_sizes.tolist(),
+                "centroid_similarity": self._centroid_similarities.tolist(),
+                "isolation_score": self._isolation_scores.tolist(),
+                "stability_score": self._stability_scores.tolist(),
+                "category": self.categories,
+            }
+        )
 
     def label_buckets(
         self,
@@ -917,7 +1080,7 @@ class DensityClassifier:
         samples_per_bucket: int = 5,
         max_text_len: int = 200,
         min_bucket_size: int = 5,
-        verbose: bool = True
+        verbose: bool = True,
     ) -> dict[int, dict]:
         """
         Generate descriptive labels for buckets using a local LLM.
@@ -964,10 +1127,7 @@ Label:"""
 
             try:
                 response = client.chat.completions.create(
-                    model=model,
-                    messages=[{"role": "user", "content": prompt}],
-                    max_tokens=30,
-                    temperature=0.3
+                    model=model, messages=[{"role": "user", "content": prompt}], max_tokens=30, temperature=0.3
                 )
                 return response.choices[0].message.content.strip()
             except Exception as e:
@@ -981,8 +1141,7 @@ Label:"""
 
         # Label buckets
         buckets_to_label = [
-            (bid, indices) for bid, indices in bucket_to_indices.items()
-            if len(indices) >= min_bucket_size
+            (bid, indices) for bid, indices in bucket_to_indices.items() if len(indices) >= min_bucket_size
         ]
 
         if verbose:
@@ -991,14 +1150,13 @@ Label:"""
         results = {}
         for i, (bucket_id, indices) in enumerate(buckets_to_label):
             samples = _sample_near_centroid(
-                indices, self.embeddings, self.texts, samples_per_bucket,
+                indices,
+                self.embeddings,
+                self.texts,
+                samples_per_bucket,
             )
             label = get_label(samples)
-            results[bucket_id] = {
-                'label': label,
-                'size': len(indices),
-                'samples': samples
-            }
+            results[bucket_id] = {"label": label, "size": len(indices), "samples": samples}
             if verbose and (i + 1) % 10 == 0:
                 logger.info(f"  {i + 1}/{len(buckets_to_label)} buckets labeled")
 
@@ -1013,7 +1171,7 @@ Label:"""
         min_bucket_size: int = 5,
         stopwords: set | None = None,
         min_word_len: int = 3,
-        use_tfidf: bool = True
+        use_tfidf: bool = True,
     ) -> dict[int, dict]:
         """
         Generate labels for buckets using keyword extraction (no LLM required).
@@ -1046,7 +1204,7 @@ Label:"""
 
         def _tokenize_local(text: str) -> list[str]:
             text = text.lower()
-            words = re.findall(r'\b[a-z]+\b', text)
+            words = re.findall(r"\b[a-z]+\b", text)
             return [w for w in words if len(w) >= min_word_len and w not in stops]
 
         # Build corpus document frequencies
@@ -1067,15 +1225,16 @@ Label:"""
                 continue
 
             keywords = _tfidf_keywords(
-                self.texts, indices, corpus_freqs, stops,
-                min_word_len, top_k, use_tfidf,
+                self.texts,
+                indices,
+                corpus_freqs,
+                stops,
+                min_word_len,
+                top_k,
+                use_tfidf,
             )
-            label = ' '.join(kw for kw, _ in keywords) if keywords else '[no keywords]'
+            label = " ".join(kw for kw, _ in keywords) if keywords else "[no keywords]"
 
-            results[bucket_id] = {
-                'label': label,
-                'keywords': keywords,
-                'size': len(indices)
-            }
+            results[bucket_id] = {"label": label, "keywords": keywords, "size": len(indices)}
 
         return results

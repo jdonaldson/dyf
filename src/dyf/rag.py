@@ -49,6 +49,7 @@ logger = logging.getLogger(__name__)
 
 try:
     from dyf_rs import BridgeAnalysis, DensityClassifier  # noqa: F401
+
     _HAS_RUST = True
 except ImportError:
     _HAS_RUST = False
@@ -75,6 +76,7 @@ class SuperConnectorResult:
         global_threshold: Threshold used for "high" global centrality
         local_threshold: Threshold used for "high" local centrality
     """
+
     indices: np.ndarray
     global_centrality: np.ndarray
     local_centrality: np.ndarray
@@ -88,9 +90,9 @@ class SuperConnectorResult:
     def summary(self) -> str:
         """Return a summary string of the super connector distribution."""
         n_super = len(self.indices)
-        n_cross = (self.quadrant == 'Cross-Domain').sum()
-        n_specialist = (self.quadrant == 'Domain Specialist').sum()
-        n_minor = (self.quadrant == 'Minor Bridge').sum()
+        n_cross = (self.quadrant == "Cross-Domain").sum()
+        n_specialist = (self.quadrant == "Domain Specialist").sum()
+        n_minor = (self.quadrant == "Minor Bridge").sum()
         return (
             f"Super Connectors: {n_super} | Cross-Domain: {n_cross} | "
             f"Domain Specialists: {n_specialist} | Minor Bridges: {n_minor}"
@@ -112,6 +114,7 @@ class OrthogonalAnchorResult:
         seed_indices: Initial seed indices (e.g., super connectors)
         candidate_source: Source of candidates ('bridges', 'all', or 'custom')
     """
+
     indices: np.ndarray
     seed_indices: np.ndarray
     candidate_source: str
@@ -177,6 +180,7 @@ class BridgeIndex:
         >>> # Batch queries
         >>> results = index.query_batch(query_vecs, k=10)
     """
+
     # Configuration
     n_anchors: int = 1000
     n_query_anchors: int = 10
@@ -197,7 +201,7 @@ class BridgeIndex:
     _bridge_indices: np.ndarray | None = field(default=None, repr=False)
     _fitted: bool = field(default=False, repr=False)
 
-    def fit(self, embeddings: np.ndarray, verbose: bool = True) -> 'BridgeIndex':
+    def fit(self, embeddings: np.ndarray, verbose: bool = True) -> "BridgeIndex":
         """
         Build the bridge index from embeddings.
 
@@ -229,7 +233,7 @@ class BridgeIndex:
             facet_num_bits=self.facet_num_bits,
             dense_percentile=self.dense_percentile,
             min_bucket_size=self.min_bucket_size,
-            seed=self.seed
+            seed=self.seed,
         )
 
         if verbose:
@@ -265,7 +269,7 @@ class BridgeIndex:
             seed_indices=seed_indices,
             candidate_indices=candidate_indices,
             use_bridges=False,  # We already handled bridge detection above
-            seed=self.seed
+            seed=self.seed,
         )
 
         anchor_indices = list(anchor_result.indices)
@@ -300,9 +304,7 @@ class BridgeIndex:
         if verbose:
             logger.info(f"  Precomputing {self.expansion_k}-NN neighborhoods...")
 
-        self._neighborhoods = _precompute_neighborhoods(
-            self._anchor_indices, embeddings, self.expansion_k
-        )
+        self._neighborhoods = _precompute_neighborhoods(self._anchor_indices, embeddings, self.expansion_k)
 
         self._fitted = True
 
@@ -313,11 +315,7 @@ class BridgeIndex:
         return self
 
     def query(
-        self,
-        query: np.ndarray,
-        k: int = 10,
-        n_query_anchors: int | None = None,
-        return_scores: bool = True
+        self, query: np.ndarray, k: int = 10, n_query_anchors: int | None = None, return_scores: bool = True
     ) -> tuple[np.ndarray, np.ndarray | None]:
         """
         Retrieve top-k candidates for a query embedding.
@@ -373,10 +371,7 @@ class BridgeIndex:
             return top_k_indices, None
 
     def query_batch(
-        self,
-        queries: np.ndarray,
-        k: int = 10,
-        n_query_anchors: int | None = None
+        self, queries: np.ndarray, k: int = 10, n_query_anchors: int | None = None
     ) -> list[tuple[np.ndarray, np.ndarray]]:
         """
         Batch query for multiple embeddings.
@@ -416,9 +411,7 @@ class BridgeIndex:
         anchor_bytes = self._anchor_embeddings.nbytes
 
         # Neighborhoods (assume int64 indices)
-        neighborhood_bytes = sum(
-            arr.nbytes for arr in self._neighborhoods.values()
-        )
+        neighborhood_bytes = sum(arr.nbytes for arr in self._neighborhoods.values())
 
         return (anchor_bytes + neighborhood_bytes) / (1024 * 1024)
 
@@ -437,19 +430,14 @@ class BridgeIndex:
 
         return (
             f"BridgeIndex: {n_points:,} points\n"
-            f"  Anchors: {n_anchors:,} ({n_anchors/n_points*100:.1f}%)\n"
+            f"  Anchors: {n_anchors:,} ({n_anchors / n_points * 100:.1f}%)\n"
             f"  Super connectors: {n_super:,}\n"
             f"  Total bridges: {n_bridges:,}\n"
             f"  Avg neighborhood: {avg_neighborhood:.0f}\n"
             f"  Storage: {storage_mb:.1f} MB"
         )
 
-    def evaluate_recall(
-        self,
-        n_queries: int = 100,
-        k: int = 10,
-        seed: int = 42
-    ) -> dict[str, float]:
+    def evaluate_recall(self, n_queries: int = 100, k: int = 10, seed: int = 42) -> dict[str, float]:
         """
         Evaluate recall against brute-force search.
 
@@ -488,7 +476,7 @@ class BridgeIndex:
 
             # Count candidates (proxy via neighborhood expansion)
             anchor_sims = query @ self._anchor_embeddings.T
-            top_anchors = self._anchor_indices[np.argsort(anchor_sims)[-self.n_query_anchors:]]
+            top_anchors = self._anchor_indices[np.argsort(anchor_sims)[-self.n_query_anchors :]]
             candidates = set()
             for anchor in top_anchors:
                 candidates.update(self._neighborhoods[anchor])
@@ -498,11 +486,7 @@ class BridgeIndex:
         avg_candidates = total_candidates / n_queries
         speedup = len(self._embeddings) / avg_candidates if avg_candidates > 0 else 0
 
-        return {
-            'recall': avg_recall,
-            'avg_candidates': avg_candidates,
-            'speedup': speedup
-        }
+        return {"recall": avg_recall, "avg_candidates": avg_candidates, "speedup": speedup}
 
 
 def _compute_local_centrality(
@@ -554,7 +538,7 @@ def _compute_local_centrality(
                 local_idx, _, neighbors = facet_bridge.get_bridge_connections(i)
                 local_centrality[indices[local_idx]] = len(neighbors) + 1
         except TypeError:
-            raise   # dtype/signature errors are bugs, never graceful-degradation
+            raise  # dtype/signature errors are bugs, never graceful-degradation
         except Exception as e:
             logger.debug("Facet bridge analysis failed for bucket: %s", e)
 
@@ -569,7 +553,7 @@ def find_super_connectors(
     global_threshold_percentile: float = 50,
     local_threshold_percentile: float = 50,
     min_bucket_size: int = 20,
-    seed: int = 42
+    seed: int = 42,
 ) -> SuperConnectorResult:
     """
     Find super connectors: points with high centrality in both global and local
@@ -618,8 +602,14 @@ def find_super_connectors(
 
     # Compute local centrality within dense buckets
     local_centrality = _compute_local_centrality(
-        embeddings, bucket_to_indices, dense_bucket_ids,
-        n_points, dim, facet_num_bits, min_bucket_size, seed,
+        embeddings,
+        bucket_to_indices,
+        dense_bucket_ids,
+        n_points,
+        dim,
+        facet_num_bits,
+        min_bucket_size,
+        seed,
     )
 
     # Compute thresholds from non-zero values
@@ -630,17 +620,17 @@ def find_super_connectors(
     local_thresh = np.percentile(local_nonzero, local_threshold_percentile) if len(local_nonzero) > 0 else 1
 
     # Classify into quadrants
-    quadrant = np.full(n_points, 'Regular', dtype=object)
+    quadrant = np.full(n_points, "Regular", dtype=object)
     high_global = global_centrality > global_thresh
     high_local = local_centrality > local_thresh
     is_bridge = (global_centrality > 0) | (local_centrality > 0)
 
-    quadrant[is_bridge & ~high_global & ~high_local] = 'Minor Bridge'
-    quadrant[high_global & ~high_local] = 'Cross-Domain'
-    quadrant[~high_global & high_local] = 'Domain Specialist'
-    quadrant[high_global & high_local] = 'Super Connector'
+    quadrant[is_bridge & ~high_global & ~high_local] = "Minor Bridge"
+    quadrant[high_global & ~high_local] = "Cross-Domain"
+    quadrant[~high_global & high_local] = "Domain Specialist"
+    quadrant[high_global & high_local] = "Super Connector"
 
-    super_indices = np.where(quadrant == 'Super Connector')[0]
+    super_indices = np.where(quadrant == "Super Connector")[0]
 
     return SuperConnectorResult(
         indices=super_indices,
@@ -648,7 +638,7 @@ def find_super_connectors(
         local_centrality=local_centrality,
         quadrant=quadrant,
         global_threshold=float(global_thresh),
-        local_threshold=float(local_thresh)
+        local_threshold=float(local_thresh),
     )
 
 
@@ -659,7 +649,7 @@ def select_orthogonal_anchors(
     candidate_indices: np.ndarray | None = None,
     use_bridges: bool = True,
     global_num_bits: int = 12,
-    seed: int = 42
+    seed: int = 42,
 ) -> OrthogonalAnchorResult:
     """
     Select k maximally spread anchors using greedy farthest-point sampling.
@@ -693,20 +683,20 @@ def select_orthogonal_anchors(
             clf.fit(embeddings)
             bridge_analysis = clf.analyze_bridges(embeddings)
             candidate_indices = np.array(bridge_analysis.bridge_indices)
-            candidate_source = 'bridges'
+            candidate_source = "bridges"
             # Fall back to all points if no bridges found
             if len(candidate_indices) == 0:
                 candidate_indices = np.arange(n_points)
-                candidate_source = 'all'
+                candidate_source = "all"
         else:
             candidate_indices = np.arange(n_points)
-            candidate_source = 'all'
+            candidate_source = "all"
     else:
-        candidate_source = 'custom'
+        candidate_source = "custom"
         # Handle empty custom candidates
         if len(candidate_indices) == 0:
             candidate_indices = np.arange(n_points)
-            candidate_source = 'all'
+            candidate_source = "all"
 
     # Initialize with seeds (if any)
     selected = list(seed_indices) if len(seed_indices) > 0 else []
@@ -745,9 +735,7 @@ def select_orthogonal_anchors(
         min_distances = np.minimum(min_distances, dists)
 
     return OrthogonalAnchorResult(
-        indices=np.array(selected),
-        seed_indices=seed_indices,
-        candidate_source=candidate_source
+        indices=np.array(selected), seed_indices=seed_indices, candidate_source=candidate_source
     )
 
 
@@ -765,6 +753,7 @@ class FacetDiverseResult:
         similarities: Query similarity for each selected item
         buckets_covered: Number of unique buckets in result
     """
+
     indices: np.ndarray
     bucket_ids: np.ndarray
     similarities: np.ndarray
@@ -831,7 +820,7 @@ def diversify_by_facet(
             indices=np.array([], dtype=np.int64),
             bucket_ids=np.array([], dtype=np.int64),
             similarities=np.array([], dtype=np.float32),
-            buckets_covered=0
+            buckets_covered=0,
         )
 
     # Compute similarities for candidates
@@ -864,7 +853,7 @@ def diversify_by_facet(
         indices=np.array(selected_indices, dtype=np.int64),
         bucket_ids=np.array(selected_bucket_ids, dtype=np.int64),
         similarities=np.array(selected_sims, dtype=np.float32),
-        buckets_covered=len(seen_buckets)
+        buckets_covered=len(seen_buckets),
     )
 
 
@@ -911,11 +900,7 @@ def _find_candidate_bridges(
 
         for seed_idx in range(num_stability_seeds):
             seed_offset = seed_idx * 1000
-            clf = DensityClassifier(
-                embedding_dim=dim,
-                num_bits=global_num_bits,
-                seed=seed + seed_offset
-            )
+            clf = DensityClassifier(embedding_dim=dim, num_bits=global_num_bits, seed=seed + seed_offset)
             clf.fit(embeddings)
             bridge_analysis = clf.analyze_bridges(embeddings)
             for bridge_idx in bridge_analysis.bridge_indices:
@@ -1018,7 +1003,9 @@ def get_kmeans_init(
 
     # Find candidate bridges
     candidate_indices = _find_candidate_bridges(
-        embeddings, n_points, dim,
+        embeddings,
+        n_points,
+        dim,
         use_stable_bridges=use_stable_bridges,
         num_stability_seeds=num_stability_seeds,
         stability_threshold=stability_threshold,
@@ -1037,7 +1024,7 @@ def get_kmeans_init(
         k=nlist,
         candidate_indices=candidate_indices,
         use_bridges=False,  # Already handled above
-        seed=seed
+        seed=seed,
     )
 
     # Return anchor embeddings as initial centroids

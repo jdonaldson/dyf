@@ -43,19 +43,14 @@ def cut_tree_to_labels(
         ValueError: If the tree shape is unrecognized, or required kwargs
             for the detected shape are missing.
     """
-    if 'children' in tree:
+    if "children" in tree:
         if embeddings is None:
-            raise ValueError(
-                "DYF tree (has 'children' key) requires embeddings= kwarg"
-            )
+            raise ValueError("DYF tree (has 'children' key) requires embeddings= kwarg")
         return _cut_dyf_tree_to_labels(tree, n_points, n_clusters, embeddings)
-    if 'left' in tree:
+    if "left" in tree:
         if max_depth is None:
-            raise ValueError(
-                "PCA tree (has 'left'/'right' keys) requires max_depth= kwarg"
-            )
+            raise ValueError("PCA tree (has 'left'/'right' keys) requires max_depth= kwarg")
         return _cut_pca_tree_to_labels(tree, max_depth, n_points, n_clusters)
     raise ValueError(
-        f"Unrecognized tree shape: expected 'children' (DYF) or 'left' (PCA) "
-        f"key, got {sorted(tree.keys())}"
+        f"Unrecognized tree shape: expected 'children' (DYF) or 'left' (PCA) key, got {sorted(tree.keys())}"
     )

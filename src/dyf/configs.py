@@ -32,6 +32,7 @@ class EmbedderConfig:
         >>> config = EmbedderConfig.MEDIUM
         >>> embeddings = config.embed(texts)
     """
+
     name: str
     model_id: str
     dim: int
@@ -41,13 +42,13 @@ class EmbedderConfig:
 
     def embed(self, texts: list[str], batch_size: int = 32, verbose: bool = True) -> np.ndarray:
         """Generate embeddings for texts using this config."""
-        if self.provider == 'tfidf':
+        if self.provider == "tfidf":
             return self._embed_tfidf(texts, verbose)
-        elif self.provider == 'bm25':
+        elif self.provider == "bm25":
             return self._embed_bm25(texts, verbose)
-        elif self.provider == 'sentence-transformers':
+        elif self.provider == "sentence-transformers":
             return self._embed_sentence_transformers(texts, batch_size, verbose)
-        elif self.provider == 'openai':
+        elif self.provider == "openai":
             return self._embed_openai(texts, batch_size, verbose)
         else:
             raise ValueError(f"Unknown provider: {self.provider}")
@@ -61,8 +62,7 @@ class EmbedderConfig:
             print(f"Building TF-IDF embeddings ({len(texts):,} texts)...")
 
         vectorizer = TfidfVectorizer(
-            max_features=10000, min_df=2, max_df=0.95,
-            ngram_range=(1, 2), stop_words='english'
+            max_features=10000, min_df=2, max_df=0.95, ngram_range=(1, 2), stop_words="english"
         )
         tfidf = vectorizer.fit_transform(texts)
 
@@ -90,8 +90,7 @@ class EmbedderConfig:
 
         # Get raw term counts
         count_vectorizer = CountVectorizer(
-            max_features=10000, min_df=2, max_df=0.95,
-            ngram_range=(1, 2), stop_words='english'
+            max_features=10000, min_df=2, max_df=0.95, ngram_range=(1, 2), stop_words="english"
         )
         tf_matrix = count_vectorizer.fit_transform(texts)
 
@@ -142,11 +141,7 @@ class EmbedderConfig:
             print(f"Loading {self.model_id}...")
 
         model = SentenceTransformer(self.model_id, trust_remote_code=True)
-        embeddings = model.encode(
-            texts, batch_size=batch_size,
-            show_progress_bar=verbose,
-            convert_to_numpy=True
-        )
+        embeddings = model.encode(texts, batch_size=batch_size, show_progress_bar=verbose, convert_to_numpy=True)
         return embeddings.astype(np.float32)
 
     def _embed_openai(self, texts: list[str], batch_size: int, verbose: bool) -> np.ndarray:
@@ -162,7 +157,7 @@ class EmbedderConfig:
             print(f"Calling OpenAI API ({len(texts):,} texts)...")
 
         for i in range(0, len(texts), batch_size):
-            batch = texts[i:i + batch_size]
+            batch = texts[i : i + batch_size]
             response = client.embeddings.create(model=self.model_id, input=batch)
             batch_embeddings = [e.embedding for e in response.data]
             all_embeddings.extend(batch_embeddings)
@@ -175,32 +170,60 @@ class EmbedderConfig:
 
 # Embedder presets
 EmbedderConfig.TFIDF = EmbedderConfig(
-    name="tfidf", model_id="tfidf+svd", dim=128, size_mb=0,
-    provider="tfidf", description="Built-in TF-IDF + SVD, no download"
+    name="tfidf",
+    model_id="tfidf+svd",
+    dim=128,
+    size_mb=0,
+    provider="tfidf",
+    description="Built-in TF-IDF + SVD, no download",
 )
 EmbedderConfig.BM25 = EmbedderConfig(
-    name="bm25", model_id="bm25+svd", dim=128, size_mb=0,
-    provider="bm25", description="BM25 saturation + SVD, no download"
+    name="bm25",
+    model_id="bm25+svd",
+    dim=128,
+    size_mb=0,
+    provider="bm25",
+    description="BM25 saturation + SVD, no download",
 )
 EmbedderConfig.LOW = EmbedderConfig(
-    name="low", model_id="all-MiniLM-L6-v2", dim=384, size_mb=80,
-    provider="sentence-transformers", description="Fast, good quality"
+    name="low",
+    model_id="all-MiniLM-L6-v2",
+    dim=384,
+    size_mb=80,
+    provider="sentence-transformers",
+    description="Fast, good quality",
 )
 EmbedderConfig.MEDIUM = EmbedderConfig(
-    name="medium", model_id="all-mpnet-base-v2", dim=768, size_mb=420,
-    provider="sentence-transformers", description="Better semantic understanding"
+    name="medium",
+    model_id="all-mpnet-base-v2",
+    dim=768,
+    size_mb=420,
+    provider="sentence-transformers",
+    description="Better semantic understanding",
 )
 EmbedderConfig.MEDIUM_BGE = EmbedderConfig(
-    name="medium-bge", model_id="BAAI/bge-base-en-v1.5", dim=768, size_mb=440,
-    provider="sentence-transformers", description="Strong retrieval performance"
+    name="medium-bge",
+    model_id="BAAI/bge-base-en-v1.5",
+    dim=768,
+    size_mb=440,
+    provider="sentence-transformers",
+    description="Strong retrieval performance",
 )
 EmbedderConfig.HIGH = EmbedderConfig(
-    name="high", model_id="BAAI/bge-large-en-v1.5", dim=1024, size_mb=1300,
-    provider="sentence-transformers", description="Best open-source"
+    name="high",
+    model_id="BAAI/bge-large-en-v1.5",
+    dim=1024,
+    size_mb=1300,
+    provider="sentence-transformers",
+    description="Best open-source",
 )
 EmbedderConfig.OPENAI = EmbedderConfig(
-    name="openai", model_id="text-embedding-3-large", dim=3072, size_mb=0,
-    provider="openai", description="OpenAI API, best overall"
+    name="openai",
+    model_id="text-embedding-3-large",
+    dim=3072,
+    size_mb=0,
+    provider="openai",
+    description="OpenAI API, best overall",
 )
 
 
@@ -221,6 +244,7 @@ class LabelerConfig:
         >>> config = LabelerConfig.MEDIUM
         >>> labels = classifier.label_buckets(**config.as_kwargs())
     """
+
     name: str
     model_id: str
     size_b: float  # billions of parameters
@@ -232,20 +256,17 @@ class LabelerConfig:
 
     def as_kwargs(self, use_mlx: bool = False) -> dict:
         """Get kwargs for label_buckets() method."""
-        if self.provider == 'keywords':
-            return {'_use_keywords': True}
+        if self.provider == "keywords":
+            return {"_use_keywords": True}
 
         model = self.mlx_name if use_mlx else self.ollama_name
         url = "http://localhost:8080/v1" if use_mlx else self.base_url
 
-        return {
-            'base_url': url,
-            'model': model
-        }
+        return {"base_url": url, "model": model}
 
     def install_cmd(self, use_mlx: bool = False) -> str:
         """Get command to install/pull this model."""
-        if self.provider == 'keywords':
+        if self.provider == "keywords":
             return "# No installation needed"
         if use_mlx:
             return f"pip install mlx-lm && python -c \"from mlx_lm import load; load('{self.mlx_name}')\""
@@ -253,7 +274,7 @@ class LabelerConfig:
 
     def serve_cmd(self, use_mlx: bool = False) -> str:
         """Get command to start serving this model."""
-        if self.provider == 'keywords':
+        if self.provider == "keywords":
             return "# No server needed"
         if use_mlx:
             return f"mlx_lm.server --model {self.mlx_name} --port 8080"
@@ -262,38 +283,52 @@ class LabelerConfig:
 
 # Labeler presets
 LabelerConfig.KEYWORDS = LabelerConfig(
-    name="keywords", model_id="tfidf", size_b=0,
-    provider="keywords", description="Built-in TF-IDF keywords, no LLM"
+    name="keywords", model_id="tfidf", size_b=0, provider="keywords", description="Built-in TF-IDF keywords, no LLM"
 )
 LabelerConfig.LOW = LabelerConfig(
-    name="low", model_id="phi3-mini", size_b=3.8,
-    provider="ollama", ollama_name="phi3:mini",
+    name="low",
+    model_id="phi3-mini",
+    size_b=3.8,
+    provider="ollama",
+    ollama_name="phi3:mini",
     mlx_name="mlx-community/Phi-3-mini-4k-instruct-4bit",
-    description="Fast, small footprint"
+    description="Fast, small footprint",
 )
 LabelerConfig.LOW_QWEN = LabelerConfig(
-    name="low-qwen", model_id="qwen2.5-1.5b", size_b=1.5,
-    provider="ollama", ollama_name="qwen2.5:1.5b",
+    name="low-qwen",
+    model_id="qwen2.5-1.5b",
+    size_b=1.5,
+    provider="ollama",
+    ollama_name="qwen2.5:1.5b",
     mlx_name="mlx-community/Qwen2.5-1.5B-Instruct-4bit",
-    description="Smallest, fastest"
+    description="Smallest, fastest",
 )
 LabelerConfig.MEDIUM = LabelerConfig(
-    name="medium", model_id="qwen2.5-7b", size_b=7,
-    provider="ollama", ollama_name="qwen2.5:7b",
+    name="medium",
+    model_id="qwen2.5-7b",
+    size_b=7,
+    provider="ollama",
+    ollama_name="qwen2.5:7b",
     mlx_name="mlx-community/Qwen2.5-7B-Instruct-4bit",
-    description="Good balance of speed/quality"
+    description="Good balance of speed/quality",
 )
 LabelerConfig.MEDIUM_LLAMA = LabelerConfig(
-    name="medium-llama", model_id="llama3.1-8b", size_b=8,
-    provider="ollama", ollama_name="llama3.1:8b",
+    name="medium-llama",
+    model_id="llama3.1-8b",
+    size_b=8,
+    provider="ollama",
+    ollama_name="llama3.1:8b",
     mlx_name="mlx-community/Llama-3.1-8B-Instruct-4bit",
-    description="Strong general purpose"
+    description="Strong general purpose",
 )
 LabelerConfig.HIGH = LabelerConfig(
-    name="high", model_id="qwen2.5-14b", size_b=14,
-    provider="ollama", ollama_name="qwen2.5:14b",
+    name="high",
+    model_id="qwen2.5-14b",
+    size_b=14,
+    provider="ollama",
+    ollama_name="qwen2.5:14b",
     mlx_name="mlx-community/Qwen2.5-14B-Instruct-4bit",
-    description="Best local quality"
+    description="Best local quality",
 )
 
 
@@ -304,9 +339,15 @@ def list_configs():
     print("=" * 70)
     print(f"{'Name':<12} {'Model':<30} {'Dim':>6} {'Size':>8} {'Provider':<20}")
     print("-" * 70)
-    for cfg in [EmbedderConfig.TFIDF, EmbedderConfig.BM25, EmbedderConfig.LOW,
-                EmbedderConfig.MEDIUM, EmbedderConfig.MEDIUM_BGE, EmbedderConfig.HIGH,
-                EmbedderConfig.OPENAI]:
+    for cfg in [
+        EmbedderConfig.TFIDF,
+        EmbedderConfig.BM25,
+        EmbedderConfig.LOW,
+        EmbedderConfig.MEDIUM,
+        EmbedderConfig.MEDIUM_BGE,
+        EmbedderConfig.HIGH,
+        EmbedderConfig.OPENAI,
+    ]:
         size = f"{cfg.size_mb}MB" if cfg.size_mb > 0 else "API/0"
         print(f"{cfg.name:<12} {cfg.model_id:<30} {cfg.dim:>6} {size:>8} {cfg.provider:<20}")
 
@@ -316,7 +357,13 @@ def list_configs():
     print("=" * 70)
     print(f"{'Name':<12} {'Model':<20} {'Size':>6} {'Ollama':<20} {'MLX':<35}")
     print("-" * 70)
-    for cfg in [LabelerConfig.KEYWORDS, LabelerConfig.LOW_QWEN, LabelerConfig.LOW,
-                LabelerConfig.MEDIUM, LabelerConfig.MEDIUM_LLAMA, LabelerConfig.HIGH]:
+    for cfg in [
+        LabelerConfig.KEYWORDS,
+        LabelerConfig.LOW_QWEN,
+        LabelerConfig.LOW,
+        LabelerConfig.MEDIUM,
+        LabelerConfig.MEDIUM_LLAMA,
+        LabelerConfig.HIGH,
+    ]:
         size = f"{cfg.size_b}B" if cfg.size_b > 0 else "-"
         print(f"{cfg.name:<12} {cfg.model_id:<20} {size:>6} {cfg.ollama_name or '-':<20} {cfg.mlx_name or '-':<35}")
