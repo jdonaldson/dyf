@@ -111,14 +111,70 @@ to DYF2 first"). DYF2 is read-write:
 So the write path exists in the kernel. Three things still need establishing before relying on
 it for anything transactional:
 
-1. **Does `remove` reclaim or tombstone?** It `swap_remove`s from the leaf's item list and
-   updates counts/centroid — an index-structure update. Whether the underlying batch space is
-   reclaimed is unverified. Matters for any TTL-style expiry.
+1. **~~Does `remove` reclaim or tombstone?~~ Answered 2026-08-02, and it disqualifies
+   `remove` for any frozen-basis index — see "Eviction: tombstone only" below.**
 2. **Durability on the append path.** `append_items` returns `io::Result`, i.e. file I/O — not
    necessarily a journal with fsync ordering and crash recovery. Fine for a rebuildable index;
    **not** fine for a log of record.
 3. **Concurrency.** `&mut self` on `insert`/`append_items` means single-writer. Compatible with
    one-writer/many-mmap-readers; rules out arbitrary concurrent writers.
+
+### Eviction: tombstone only. `remove` is off-limits. (decided 2026-08-02)
+
+**Invariant: a frozen-basis index must never call `Tree::remove`.** Not a preference —
+`remove` destroys the basis it depends on.
+
+`tree.rs:310` calls `merge_children(parent)` whenever a leaf falls below `min_leaf_size`,
+and `merge_children` (`tree.rs:417`) is not a local repair:
+
+```rust
+let all_items = self.collect_items(parent_idx);  // ALL descendants
+self.nodes[parent_idx].items = Some(all_items);
+self.nodes[parent_idx].hyperplanes = None;       // <- basis destroyed
+self.nodes[parent_idx].children.clear();
+self.nodes[parent_idx].num_bits = 0;
+// Note: old child nodes become orphans in the nodes vec.
+```
+
+One underfull leaf collapses its whole parent subtree — up to 16 siblings at
+`num_bits=4` — and nulls the hyperplanes. They are *gone*, not bypassed: those addresses
+cannot be recovered without a refit. Since address stability is the entire reason to
+freeze (see below), a single expiry can undo it for a large region.
+
+Three further hazards in the same path:
+
+- **Orphan nodes leak.** The comment says `compact()` "would" reclaim them. `compact`
+  exists (`format.rs:525`, exposed on `DyfFile`) but whether it reclaims *tree* nodes as
+  opposed to file space is untested.
+- **Silent no-op removals.** `remove` locates its target via `find_leaf(emb)` and then
+  searches that leaf for the index. After any topology change a point may no longer route
+  to the leaf holding it, and removal returns `false` with no error. Compounds with the
+  merging above.
+- **`swap_remove` reorders survivors**, so a leaf that lost one point serialises to
+  different bytes than a filtered version would — byte-identity dedup breaks more often
+  than the removal count suggests.
+
+**The policy: tombstone in the leaf batch, skip at search, reclaim at scheduled
+compaction** — the shape the incremental-updates design already assumed. Topology
+untouched, hyperplanes intact, addresses stable. Costs retained space and scanning dead
+rows. Two cheap companions: a `remove`-without-merge mode if in-place shrinking is ever
+wanted (the partition tolerates severe imbalance — max leaf grew 947→1545 with no recall
+cost), and **ranking only occupied cells at probe time** so drained leaves do not consume
+probe budget.
+
+Not urgent in practice: tree `insert`/`remove` are not exposed to Python in `dyf_rs`
+0.9.0 (`DyfFile` offers `append_items`, `append_field_layer`, `compact`, `update_tree`
+and no removal), so this is a constraint on whoever builds the write path, not a live bug.
+
+**Scope warning for everything measured below: it is all append-only, and eviction makes
+drift strictly worse.** Under append, old points stay and keep anchoring coverage. Under
+eviction, coverage *decays* — the fit retains cells for regions the data has left while
+the data moves into regions the fit never saw. The "+64% growth costs ~0.01 recall" result
+is an **optimistic bound** and does not transfer to a sliding window. Expect uniform
+eviction to be nearly free (it is subsampling, structurally the `random` control) and
+evict-oldest-under-drift to be the damaging case. Untested; the design that would
+discriminate is a window sliding over a *composition schedule*, with a fixed-mix window as
+the control — sliding over SEC quarters alone would measure that SEC does not drift.
 
 ---
 
@@ -303,8 +359,9 @@ total rebuild time.)
   use the identical harness, which is all the conclusions require, but absolute figures
   like "R@10 = 0.88 at probe 32" are properties of this harness and say nothing about
   dyf's shipped search performance.
-- **Append-only.** Eviction/TTL was not tested and dirties leaves differently — relevant
-  to the `remove`-reclaims-or-tombstones question above.
+- **Append-only.** Eviction/TTL was not tested and dirties leaves differently. See
+  "Eviction: tombstone only" above — the results here are an optimistic bound, because
+  under eviction the fit's coverage decays instead of persisting.
 - The section split is a split by document *type* and is probably an upper bound on
   real-world shift severity.
 - One real file (`haxe/src.dyf`) stores **zero hyperplanes** across 191 internal nodes.
