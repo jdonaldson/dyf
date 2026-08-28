@@ -499,11 +499,47 @@ total-work accounting the two curves had no overlapping range at all. Any compar
 between trees of different granularity must match leaf count first.
 
 Caveats: `min_leaf` is the knob used to match leaf counts, so it differs across arms by
-construction; the cost model assumes flat-IVF centroid scanning, whereas hierarchical
-descent would cost `depth * 2^bits` and barely care about leaf count; derived-bits builds
-cost ~60s vs ~4s (parallel analysis per node), unoptimised. Deriving `num_bits` trades that
-parameter for continued dependence on `min_leaf`, which now sets both the leaf floor and
-the capacity cap.
+construction; derived-bits builds cost ~60s vs ~4s (parallel analysis per node),
+unoptimised. Deriving `num_bits` trades that parameter for continued dependence on
+`min_leaf`, which now sets both the leaf floor and the capacity cap.
+
+#### Confirmed under dyf's real router (`sec_hier_routing.py`)
+
+Everything above ran through `sec_seqlib.ivf_search` — flat IVF, scanning every leaf
+centroid. **dyf does not do that.** `LazyIndex._find_candidate_leaves`
+(`lazy_index.py:2136`) descends from the root, hashes the query against each node's
+hyperplanes, and orders alternative buckets by margin distance —
+`cost of flipping bit i = |projection[i]|` (`lazy_index.py:1590`). It never touches a leaf
+centroid. So the two routers differ in **signal**, not just cost accounting, and the
+flat-IVF numbers are a property of the harness.
+
+Re-run on the same four trees, work = routing dots + members scanned, 800 queries:
+
+| vs `fixed4_origin` | 133 | 271 | 554 | 1129 | 2303 | 4696 dots |
+|---|---|---|---|---|---|---|
+| fixed4 + median cut | +0.0946 | +0.0855 | +0.0617 | +0.0518 | +0.0301 | +0.0196 |
+| derived bits, origin cut | +0.1261 | +0.1107 | +0.0912 | +0.0736 | +0.0361 | +0.0160 |
+| derived bits + median cut | +0.1559 | +0.1280 | +0.0967 | +0.0759 | +0.0432 | +0.0248 |
+
+- **The offset matters more under the real router, as predicted.** The median cut's benefit
+  roughly doubles at mid-to-high budgets (+0.0492 → +0.0617, +0.0310 → +0.0518,
+  +0.0163 → +0.0301, +0.0079 → +0.0196). Mechanism: the margin is measured from the origin,
+  so on an 80/20 bit `|projection|` overstates the cost of flipping that bit and the
+  alternative ordering is miscalibrated. Under flat IVF the offset only decided which
+  points shared a leaf; here it corrupts routing decisions.
+- **The ranking holds.** Derived bits still beats the median cut at every budget except the
+  loosest (at 4,696 dots, +0.0160 vs +0.0196, where all arms have converged).
+- **They are now complementary, not redundant.** Median adds ~+0.030 on top of derived here
+  versus +0.018 under flat IVF, and the gap persists across the whole curve. Best arm is
+  both together at every budget.
+- **Imbalance costs work via size-biased leaf landing.** A query lands in leaf *i* with
+  probability proportional to its size, so a skewed leaf-size distribution means the
+  typical query lands in an oversized leaf. At matched leaf count (~17 points/leaf mean),
+  the first probe scans **133 candidates for `fixed4_origin` vs 32 for `derived_median`** —
+  4× the work from imbalance alone.
+
+Cross-router comparison is not apples-to-apples (the flat table's x-axis omits the ~13k
+centroid dots per query), so treat only the within-router columns as measurements.
 
 ### Scope limits
 
