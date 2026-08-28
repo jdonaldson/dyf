@@ -420,6 +420,91 @@ construction. Same single corpus and embedding model as everything above. Filed 
 the empty-cell metric in "Scope limits" as a second obvious-looking coverage metric that
 measures nothing.
 
+### What a split is doing, and deriving `num_bits` instead of setting it
+
+Measured 2026-08-28. `sec_split_anatomy.py`, `sec_cell_spectra.py`, `sec_derived_bits.py`.
+
+**A node's hyperplanes ARE its top-`num_bits` PCs** — |cos| = 1.000 against PC1–PC4 from
+numpy. So `num_bits` is not a taste parameter, it is the answer to "how many eigenvectors
+do we trust", which is estimable.
+
+**The cut is at the origin, and that is the dominant pathology.** Routing is
+`x @ H.T > 0`, but the PCs are fitted on *centred* data — nothing makes the origin pass
+through the cell. Per-bit `frac>0` on a 20k subset: **0.585 / 0.118 / 0.219 / 0.239**. The
+mean projection sits ~0.8 sd off the cut on PC2–PC4, so those bits are 80/20 slabs. It
+worsens with PC index because sigma shrinks faster than the offset does. Across all cells,
+**25% (depth 1) and 30% (depth 2) of split axes are worse than 80/20**, and effective
+buckets run **7.8–8.6 of 16**. Fit method matters: `fit_raw_pca` 7.82 effective buckets
+(max share 0.340), `fit` **10.26** (0.195), `fit_itq` 8.01 (0.293).
+
+**The splits do separate real modes** — 2-component GMM, Ashman's D, against nulls that
+hold the cell fixed and vary only the direction (random ambient direction; Gaussian with
+the cell's covariance on its own PC1). PC1 is genuinely bimodal in **12/14 depth-1 and
+69/79 depth-2 cells**, mean 3.00 and 2.22 of 4 axes.
+
+⚠ **Null-ladder trap, recorded so nobody re-derives it.** Three nulls, three answers:
+1-D standard normal (D95 ~1.7, too weak — omits that PC1 is *chosen* as max-variance);
+Gaussian with the cell's covariance on its own PC1 (D95 1.6–1.8, the correct
+selection-effect null — PCA does *not* manufacture modes); and a matched-size **random
+corpus subset** (D95 3.5–3.9, **no cell beats it**). The third is the wrong question — it
+asks "is this cell as multimodal as the whole corpus", and the answer is no *by design*
+because depth 1 already separated the section types. Varying the cell contents smuggled in
+a second difference.
+
+**Spectral skew does NOT tell you what a split is doing.** rho(skew, n_bimodal) = −0.064
+(depth 1) / +0.060 (depth 2); rho(top1_share, n_bimodal) = −0.143 / +0.247. Sign-unstable,
+inside noise. The intuition that a dominant PC means the split is shaving derivative
+variation is not supported — the waste is in the offset, not the spectrum.
+
+#### Deriving `num_bits`
+
+`b = clip(min(significant_PCs, capacity_cap), 1, 6)` where significance is **Horn's
+parallel analysis** (shuffle each column independently — kills cross-column correlation,
+preserves every marginal — keep components above the permuted 95th percentile) and
+`capacity_cap = floor(log2(n / (2*min_leaf)))`.
+
+PA validated before use: returns 6 on corpus-scale subsets (var shares
+0.126/0.067/0.051/0.038 vs isotropic 0.0013; observed/shuffled ratios 5.4/4.0/3.5/3.1) and
+exactly **2 on a synthetic 3-cluster control**.
+
+**Capacity binds, not signal.** Signal says ~6 nearly everywhere; what limits a node is how
+many points it has to divide. Bits allocate top-heavy — `bits_hist` over 5,068 internal
+nodes = `[0, 3952, 620, 260, 129, 56, 51]`, i.e. thousands of small deep nodes at 1 bit and
+the large nodes near the root at 5–6. **`mean_bits` (1.40) is a misleading summary** — it
+averages over the numerous deep nodes and reads like a near-binary tree when the root is
+branching 64 ways.
+
+Recall@10 at matched scan cost, **leaf counts matched to within 5%** (13,657 / 12,990 /
+13,408 / 13,445, tuned via `min_leaf` = 15 / 45 / 10 / 12):
+
+| vs `fixed4_origin` | 280 | 487 | 846 | 1470 | 2556 | 4443 candidates |
+|---|---|---|---|---|---|---|
+| fixed4 + median cut | +0.0865 | +0.0662 | +0.0492 | +0.0310 | +0.0163 | +0.0079 |
+| **derived bits, origin cut** | **+0.1256** | +0.0953 | +0.0718 | +0.0490 | +0.0285 | +0.0128 |
+| derived bits + median cut | +0.1436 | +0.1102 | +0.0797 | +0.0512 | +0.0283 | +0.0140 |
+
+**Deriving the bits beats fixing the offset**, and the two are largely redundant (median
+adds +0.018 on top of derived, but +0.087 on top of fixed). The mechanism explains why:
+bit 0 is nearly centred (`frac>0` = 0.585) and the lopsidedness lives in bits 2–4, so
+derived bits mostly *avoids* the bad bits rather than repairing them. Gains concentrate at
+tight budgets and wash out by ~4.4k candidates.
+
+⚠ **Measurement trap that nearly produced a wrong answer.** The first run showed the median
+cut at **+0.25** recall. Artifact: `sec_seqlib.scan_cost()` counts only candidates
+examined, while `ivf_search` compares each query against *every* leaf centroid. The median
+arm built **43,414 leaves (5.3 points/leaf)** vs 13,327, so it reached equal recall with
+8.8× fewer candidates while paying 3.3× more centroid comparisons — its *floor* cost
+(43,414 dots/query) exceeded the baseline's entire budget at 0.9847 recall, and under
+total-work accounting the two curves had no overlapping range at all. Any comparison
+between trees of different granularity must match leaf count first.
+
+Caveats: `min_leaf` is the knob used to match leaf counts, so it differs across arms by
+construction; the cost model assumes flat-IVF centroid scanning, whereas hierarchical
+descent would cost `depth * 2^bits` and barely care about leaf count; derived-bits builds
+cost ~60s vs ~4s (parallel analysis per node), unoptimised. Deriving `num_bits` trades that
+parameter for continued dependence on `min_leaf`, which now sets both the leaf floor and
+the capacity cap.
+
 ### Scope limits
 
 - One corpus, one embedding model (768d), one tree shape (`max_depth=4, min_leaf=16`,
