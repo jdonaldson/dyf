@@ -342,6 +342,84 @@ figure is `build_dyf_tree` only — a full REINDEX also writes ~500MB of Arrow b
 unmeasured here. The conclusion is insensitive to it; the number should not be quoted as
 total rebuild time.)
 
+### Cell volume does not say where the basis is thin — and the eigenvalues are a trap
+
+The coverage result above raises an obvious follow-on: depth-1 JS says *when* to refit, so
+is there a query-free signal for *where* the frozen basis is thin — which cells will serve
+new content badly, i.e. where to go get samples? The candidate is nearly free. Every
+internal node already stores its own PCA spectrum (`eigenvalues` in
+`src/dyf/schema/dyf_index.fbs`, written from `clf.get_eigenvalues()` on that node's own
+points at `src/dyf/dyf_tree.py:113`, read back by `LazyIndex.get_split_eigenvalues()`), and
+ellipsoid log-volume is `0.5 * sum(log lambda_i)`. Large volume with low occupancy should
+mean a thinly-sampled region.
+
+**Verdict: falsified, and the direction is inverted.** Measured 2026-08-28,
+`sec_cell_volume.py`, 5 seeds × the same 4 conditions, 2,000 stream-side queries each,
+probe 32. Target is the quantity that matters — per-cell recall gap (fresh − frozen) for
+stream queries routed into that cell.
+
+**First, two properties of `get_eigenvalues()` that any future reader of that field needs.**
+Measured directly against numpy on synthetic caps before the hypothesis was tested:
+
+- **It is scatter-like, not covariance-like.** `sum(ev)` grows as ~n^0.86 (n=500 → 20.7,
+  n=8000 → 221.5 at fixed spread). So raw log-ev **is occupancy in disguise**:
+  rho(sum log ev_raw, log n) = **+0.958 to +0.987** across all four conditions. It is the
+  only volume-flavoured predictor that clears the significance null *in the hypothesised
+  direction* — and it does so purely as a monotone function of n. (Several others clear it
+  in the anti-predictive direction; see below.) Divide by n before use —
+  and note that the sub-linear exponent means even that does not fully de-confound it
+  (the n-corrected version still reads rho = −0.39 to −0.85 against log n).
+- **It saturates at the diffuse end.** Angular spread 0.02 → 0.8 moves `sum log ev` from
+  2.55 → 17.21, but 0.4 → 0.8 moves it only 16.94 → 17.21 while mean-cos-to-centroid still
+  halves (0.30 → 0.15). Unit-norm data goes isotropic and the top-k eigenvalues hit a
+  ceiling.
+- Only `num_bits` eigenvalues are stored (4 here, of 768). They reproduce the true top-4
+  spectrum faithfully (rho 0.999–1.000), but rho(true top-4, true top-32) is only
+  **+0.33 to +0.57**. The stored shadow is not a usable proxy for a cell's real spectrum.
+
+**Second, the power floor.** Permutation null on |rho| is **0.582 at depth 1** (~12 usable
+cells) and **0.220 at depth 2** (~80 of 234). *No* depth-1 correlation in this probe is
+interpretable, including a +0.321 apparent win for volume in the temporal condition. Note
+the asymmetry with the JS trigger: depth 1 is the *best* level for a distributional
+statistic (it aggregates ~8,700 points per cell into one number) and the *worst* level for
+a correlation across cells (n=16 observations). Same tree level, opposite power.
+
+**Third, the ablation.** Against the two free baselines — occupancy alone (`-log n`) and
+mean-cos-to-centroid, which dyf already computes as `centroid_similarities` →
+`point_margin_map` — the value of volume, `rho(sparsity32) - max(rho(neg_log_n),
+rho(diffuse))`, is **≤ 0 in every condition at depth 2**: −0.016 random, −0.053 temporal,
+−0.040 ticker, −0.206 section. The least n-confounded predictor (`logdet32`) carries the
+least signal, which is the tell that the signal is occupancy throughout.
+
+**Fourth, damage runs the opposite way.** Section condition (the only one that collapses),
+depth 2, cells binned by base occupancy:
+
+| base n quartile | n range | mean recall gap | mean flood (n_stream/n_base) | mean logdet32 |
+|---|---|---|---|---|
+| Q1 (smallest) | 13–114 | +0.0882 | 24.07 | −95.45 |
+| Q2 | 114–354 | +0.0931 | 3.54 | −89.83 |
+| Q3 | 354–1074 | +0.1251 | 2.24 | −92.22 |
+| Q4 (largest) | 1074–6810 | +0.1571 | 0.60 | −94.90 |
+
+rho(log n, gap) = **+0.351**, rho(log n, flood) = **−0.800**, rho(logdet32, gap) = −0.190.
+Thin cells get flooded 24× over and suffer *less*; crowded cells suffer most. This is the
+same inversion as the dirty-fraction trap above — out-of-distribution data piles into a
+corner, and the corner is not where retrieval breaks.
+
+**Why there was nothing to detect.** `logdet32` is flat across those quartiles (−95, −90,
+−92, −95) while occupancy spans 500×. dyf's PCA splits **equalise cell extent and let
+count vary**, so volume is close to constant by construction and carries almost no
+information about this partition. The mechanism that does explain the table is ordinary
+IVF: at a fixed 32-leaf probe budget, a query in a crowded region has its true top-10
+spread across more leaves than the budget covers. That is a *density* failure, not a
+coverage failure — consistent with 32→128 probes recovering most of the mild-condition gap.
+
+Caveats: a cell needed ≥5 stream queries to enter the correlation, so this says "among
+cells that receive traffic", though a zero-traffic cell cannot damage measured recall by
+construction. Same single corpus and embedding model as everything above. Filed alongside
+the empty-cell metric in "Scope limits" as a second obvious-looking coverage metric that
+measures nothing.
+
 ### Scope limits
 
 - One corpus, one embedding model (768d), one tree shape (`max_depth=4, min_leaf=16`,
@@ -373,7 +451,9 @@ total rebuild time.)
   landing in cells that were empty at fit time" is **structurally zero at every depth**.
   The tree is built from base points, so every cell it has contains base members by
   construction. New territory can only surface as an unseen-bucket fallback, never as an
-  empty cell. The obvious metric returns zeros that look like "no drift".
+  empty cell. The obvious metric returns zeros that look like "no drift". Per-cell volume
+  is the second metric of this genre — see "Cell volume does not say where the basis is
+  thin" above.
 
 ### Relation to graft
 
