@@ -591,6 +591,68 @@ text baselines top out at 0.80–0.88 within budget); 100k subsamples, 500 queri
 `cmu_mocap` is raw joint angles unit-normalised to define a cosine task, which is not the
 natural metric for motion.
 
+### Spectral shape by depth and along paths (`sec_depth_spectra.py`)
+
+All descriptors n-matched to 300 (effective rank tracks sample size, so a raw depth
+profile is mostly a size profile). Decisive control is the **parent-subsample null**: each
+child's spectrum against a random same-size draw from *its own parent*, which holds n
+exactly and asks whether the SPLIT changed the shape rather than whether a smaller sample
+did. SEC 768d and CMU MoCap 62d.
+
+**(A) Shape is not uniform with depth, but the discontinuity is only at the root.** SEC
+eff_rank 77.8 (root) → 65.7 (d1) → 68.6 → 69.5 → 69.8; `top1` 0.127 → 0.149 → 0.106 →
+0.101 → 0.094. Below depth 1 the partition is close to **self-similar** — each level sees
+structure of the same shape. MoCap: eff_rank 14.2 → 9.9 → 8.7 → 8.9 → 9.8.
+
+**(B) ⛔ Deeper splits do NOT stop working — prediction falsified.** The expectation from
+the derived-bits failure was that split quality would decay with depth and hand us a
+stopping criterion. It does not. Child-minus-parent-subsample `d_eff_rank`:
+
+| depth | SEC | MoCap |
+|---|---|---|
+| 1 | −11.40 ± 6.16 (ns, 15 pairs) | −4.01 ± 1.18 |
+| 2 | −6.39 ± 1.66 | −3.02 ± 0.45 |
+| 3 | **−15.45 ± 0.79** | −2.59 ± 0.42 |
+| 4 | −13.85 ± 1.39 | −2.81 ± 0.45 |
+
+Splits concentrate structure at *every* depth, most strongly at depth 3–4 on SEC. **This is
+the strongest independent evidence for why derived `num_bits` failed**: at exactly the
+depths where parallel analysis reports few significant components (n ≈ 300–500 in 768d, so
+the shuffled null is inflated), the splits are demonstrably still concentrating structure
+at ~19 sigma. "Not statistically significant" and "not useful for splitting" are different
+properties, and PA measures the wrong one. No stopping criterion exists to be found here.
+
+**(C) Shape is strongly heritable along a path.** Parent→child rho(eff_rank) on SEC:
+**+0.618 (d1→2), +0.645 (d2→3), +0.681 (d3→4)** — coherent and *increasing* with depth.
+MoCap is weaker mid-tree (+0.250, +0.181) then +0.702. So root-to-leaf paths are not
+random walks through shape space; a node's spectrum substantially predicts its child's.
+(Depth 0→1 reads `nan` because there is one root, hence no variance to correlate.)
+
+**Corpus-level shape explains the MoCap divergence.** Global spectrum at matched n=300:
+
+| corpus | eff_rank | top1 | alpha | median-cut speedup |
+|---|---|---|---|---|
+| cmu_mocap 62d | 13.6 | 0.217 | **2.57** | **4.07×** |
+| sec 768d | 76.3 | 0.124 | 0.89 | (n/a) |
+| arxiv 768d | 134.9 | 0.065 | 0.62 | 0.90× |
+| news 384d | 127.2 | 0.047 | 0.51 | 0.83× |
+| tweets 384d | 137.8 | 0.040 | 0.50 | (n/a) |
+| wikipedia 384d | 130.4 | 0.036 | 0.46 | (n/a) |
+
+MoCap is the only corpus with a **dominant principal axis** (alpha 2.57 vs 0.46–0.89;
+eff_rank 13.6 vs 76–138) and the only one where centring the cut pays. Mechanically
+coherent — with one axis carrying the variance, getting that axis's cut right is most of
+the partition — and it succeeds where the anisotropy diagnostic (mean-vector norm) failed.
+
+⚠ **But n=1 in the positive class again**, the same trap already listed in Scope limits for
+the section split. One steep-spectrum corpus, one payoff; "steep spectrum causes the
+benefit" is not separable from "motion capture differs for some other reason". The cheap
+decisive test is a **synthetic sweep with tunable alpha** (0.5 → 3.0), not another
+real corpus.
+
+Caveats: only nodes with n ≥ 300 enter, so depth 4 keeps 47 of many on SEC — survivorship
+toward large nodes; two corpora.
+
 ### Scope limits
 
 - One corpus, one embedding model (768d), one tree shape (`max_depth=4, min_leaf=16`,
