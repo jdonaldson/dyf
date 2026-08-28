@@ -541,6 +541,56 @@ Re-run on the same four trees, work = routing dots + members scanned, 800 querie
 Cross-router comparison is not apples-to-apples (the flat table's x-axis omits the ~13k
 centroid dots per query), so treat only the within-router columns as measurements.
 
+#### ⛔ It does not replicate. Do not build this. (`sec_multicorpus_bits.py`)
+
+Everything above is ONE corpus. Re-run across five corpora spanning 62–768 dims and three
+modalities, hierarchical router, work = routing dots + members scanned, `min_leaf=16` for
+every arm. Metric is the operationally meaningful one — **work reduction at equal recall**,
+since recall deltas are largest at tight budgets corresponding to recall 0.4–0.6 that
+nobody ships.
+
+| corpus | recall | fixed4+median | derived+origin | derived+median |
+|---|---|---|---|---|
+| cmu_mocap 62d | 0.80 | **4.55×** | (starts above) | 1.61× |
+| cmu_mocap 62d | 0.90 | **4.07×** | **0.58×** | 1.44× |
+| wikipedia 384d | 0.80 | never reaches | 0.92× | 0.98× |
+| news 384d | 0.80 | 0.83× | 0.84× | 0.88× |
+| tweets 384d | 0.80 | never reaches | 0.85× | 0.92× |
+| arxiv 768d | 0.80 | 0.90× | 0.94× | 0.87× |
+
+**Every text corpus is ≤1.0× for every intervention.** The SEC result does not generalise.
+The single win is the median cut on motion capture, and there *derived bits actively hurts*
+(0.58×). Neither change is a floor-raiser.
+
+**Why derived bits fails, and it is the useful lesson: parallel analysis answers the wrong
+question.** PA asks "is this principal component statistically real?"; an index needs "is
+this split useful?" A split does not need significance to help — it only needs to divide
+the node somewhat evenly. Deep in the tree n is small relative to d, the shuffled null is
+inflated, few components pass, and the tree goes coarse: at identical `min_leaf` the
+derived arms build **~4,600 leaves vs ~14,600** on every text corpus, so every probe drags
+in a leaf 3× too big. Motion capture confirms it from the other side — at d=62 PA is
+well-powered and *correctly* reports that motion is low-dimensional (~2–3 components), and
+that correct answer still produces a worse index. **Being right about intrinsic
+dimensionality is not the same as building a good tree.**
+
+⚠ **The SEC win was granularity compensation, not bit allocation.** `sec_derived_bits.py`
+binary-searched `min_leaf` per arm to equalise leaf counts, handing the derived arm a finer
+floor (`min_leaf` 10 vs 15). At a shared `min_leaf` the derived arm is 3× coarser and
+loses. So deriving `num_bits` requires retuning `min_leaf` to compensate — **it does not
+reduce the parameter count, which was the entire motivation.**
+
+**The median cut is corpus-specific and not predictable.** Anisotropy does not explain it:
+`arxiv_768` has the *highest* mean-vector norm (0.788 vs mocap's 0.687) and a comparable
+per-PC offset ratio (0.46 vs 0.43), yet gets 0.90× where mocap gets 4.07×. A diagnostic
+that would have told you when to apply the fix was measured and **does not work**, so there
+is no rule for switching it on.
+
+Measurement limits: probes cap at 256, so "never reaches 0.80" means "not within 256
+probes", not "impossible"; only recall 0.80 is comparable across all five corpora (the
+text baselines top out at 0.80–0.88 within budget); 100k subsamples, 500 queries;
+`cmu_mocap` is raw joint angles unit-normalised to define a cosine task, which is not the
+natural metric for motion.
+
 ### Scope limits
 
 - One corpus, one embedding model (768d), one tree shape (`max_depth=4, min_leaf=16`,
