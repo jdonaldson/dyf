@@ -653,6 +653,60 @@ real corpus.
 Caveats: only nodes with n ≥ 300 enter, so depth 4 keeps 47 of many on SEC — survivorship
 toward large nodes; two corpora.
 
+### When children are NOT self-similar to their parent (`sec_nonselfsimilar.py`)
+
+⚠ **Correction to (A) above.** "Close to self-similar" is a statement about the
+*population* of shapes — the mean spectrum at each depth is stable. It is NOT a statement
+about individual splits, which move shape enormously. Both are true, the way a gas can hold
+a constant temperature while every molecule moves.
+
+Each child scored against a null of R=8 independent same-size draws of **its own parent**
+(child and null averaged over the same number of draws, or the child would be the less
+noisy of the two and every z inflated). 347 pairs, SEC.
+
+**Non-self-similarity is the rule, not the exception**: |z_eff_rank| > 2 in **91.9%** of
+children, > 10 in **70.3%**, median −14.07; z_div (whole-spectrum L1) median +43.1. Note
+the null sd is small — 8 draws of n=300 from one parent barely varies — so lean on the raw
+descriptor differences rather than the z magnitudes. **84% of splits concentrate**
+(child tighter than a parent draw), **16% diffuse**.
+
+**The two tails are different mechanisms, and both are the user's original hypothesis
+observed directly.** corr(z_eff_rank, z_top1) = **−0.764**:
+
+| group | z_eff_rank | z_top1 | z_alpha | top1 | eff_rank | share |
+|---|---|---|---|---|---|---|
+| 40 most concentrating | −45.0 | **+24.9** | +22.6 | 0.134 | 59.2 | 0.064 |
+| middle 40 | −14.1 | +4.0 | +8.6 | 0.102 | 68.9 | 0.158 |
+| 40 most diffusing | +19.3 | **−19.3** | −20.1 | 0.087 | 77.0 | 0.197 |
+
+- **Diffusing children lost their parent's dominant axis.** A parent holding two
+  well-separated tight clusters has its spectrum dominated by the *between-cluster*
+  direction — highly peaked, low eff_rank. Splitting removes that axis, so the child's
+  remaining variance spreads over many small directions and the spectrum *flattens* even
+  though the child is semantically **purer** (`sec_top` purity 1.00 vs a mixed parent).
+  "More diffuse spectrum" is not "more heterogeneous content". This is exactly the
+  "split prunes derivative variation along the dominant axis" mechanism, and it is the 16%
+  tail rather than the general case.
+- **Concentrating children isolate near-duplicate boilerplate.** The extreme cases pull a
+  1%-share pocket of `forward_looking` text (dup_frac 0.52–0.57) out of a `risk_factors`
+  parent (dup_frac 0.01) — i.e. dyf separating the standard forward-looking-statement
+  disclaimer embedded inside risk-factor sections. Group means: dup_frac **0.450** for the
+  40 most concentrating vs **0.295** for the 40 most diffusing.
+
+**Non-self-similarity lives in the thin minority buckets — the origin-cut pathology decides
+where it appears.** Mean |z_eff_rank| by the child's share of its parent:
+
+| child share | 0.00–0.05 | 0.05–0.15 | 0.15–0.35 | 0.35–1.00 |
+|---|---|---|---|---|
+| mean \|z_eff_rank\| | **29.4** | 19.9 | 13.2 | **8.2** |
+| mean z_div | 72.8 | 58.1 | 40.1 | 35.5 |
+
+Monotone. This is what the 80/20 origin cut predicts: the majority child is "the parent
+minus a thin tail" and stays parent-like, while the sliver is structurally distinct. Not a
+sample-size artifact — every spectrum is computed at n=300 regardless of child size, and
+children below 300 are excluded (which does mean small-share children only arise from large
+parents).
+
 ### Scope limits
 
 - One corpus, one embedding model (768d), one tree shape (`max_depth=4, min_leaf=16`,
