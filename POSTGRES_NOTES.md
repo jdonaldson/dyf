@@ -591,6 +591,49 @@ text baselines top out at 0.80–0.88 within budget); 100k subsamples, 500 queri
 `cmu_mocap` is raw joint angles unit-normalised to define a cosine task, which is not the
 natural metric for motion.
 
+### ⛔ The eff_rank lever fails. Spectral direction closed. (`sec_adaptive_probe.py`)
+
+`sec_cell_spectra.py`'s one surviving positive was that per-cell effective rank predicts
+retrieval difficulty where occupancy fails (+0.314 raw, **+0.405** partialling log n, vs
+log_n at −0.002, null95 0.186). A correlation with difficulty is not a lever. This spends a
+**fixed total work budget non-uniformly across queries** — more probes where the routed cell
+has high eff_rank — and asks whether recall improves at matched total work. SEC is where the
+correlation is strongest, so this was the cheapest kill for the whole direction.
+
+Rank-based allocation (percentile *u* → `base * (1 + 0.6*(2u−1))` probes), hierarchical
+router, 1,500 queries, compared at interpolated equal total work:
+
+| vs uniform | 443 | 745 | 1253 | 2107 | 3543 | 5958 |
+|---|---|---|---|---|---|---|
+| **eff_rank** | **−0.0241** | −0.0212 | −0.0108 | −0.0098 | −0.0086 | −0.0033 |
+| log_n (negative control) | −0.0300 | −0.0285 | −0.0197 | −0.0190 | −0.0164 | −0.0088 |
+| margin (incumbent signal) | +0.0015 | +0.0010 | +0.0024 | −0.0000 | −0.0029 | +0.0001 |
+| combo (eff_rank + margin) | −0.0110 | −0.0100 | −0.0024 | −0.0043 | −0.0060 | −0.0013 |
+
+**eff_rank is worse than uniform at every budget, and worse than margin** (−0.0256 …
+−0.0034). The negative control behaves correctly — `log_n`, which scored ρ = −0.002 against
+difficulty, is the most harmful arm — so the harness is sane and the ordering is meaningful.
+
+**Why it fails, and it is not a tuning problem.** eff_rank correlates **+0.67 with cell
+size**, so allocating extra probes to high-eff_rank cells means allocating them where leaves
+are *large*, and each extra probe there costs disproportionately more work. At base=4 the
+eff_rank arm spends **432 work for 0.603 recall against uniform's 399 for 0.614** — more
+work, less recall. The signal identifies genuinely hard cells, but they are hard *because*
+their neighbourhoods are spread out, which is exactly what makes them expensive to fix by
+probing. Predicted difficulty and the cost of addressing it are confounded. Since every arm
+converges to uniform as alpha → 0, the best this allocation can do is break even.
+
+**Decision: the spectral-characterisation direction is closed.** Four hypotheses came out of
+it (cell volume, derived `num_bits`, pocket merges, depth stopping criterion) and all were
+falsified; the fifth — eff_rank as an adaptive-probe signal — is falsified here. Do not open
+a sixth without an outcome variable chosen first.
+
+⚠ Incidental, and **not** a claim about shipped behaviour: the margin arm shows no
+measurable benefit at matched work on this corpus (+0.0024 … −0.0029). But this tests
+*margin as a rank-allocation signal*, not dyf's actual `_resolve_nprobe` threshold logic, so
+it is not evidence that `AdaptiveProbeConfig` fails to do its job. Testing that would need
+the real code path.
+
 ### Spectral shape by depth and along paths (`sec_depth_spectra.py`)
 
 All descriptors n-matched to 300 (effective rank tracks sample size, so a raw depth
