@@ -707,6 +707,41 @@ sample-size artifact — every spectrum is computed at n=300 regardless of child
 children below 300 are excluded (which does mean small-share children only arise from large
 parents).
 
+#### Are the pockets fragments of one concept? No. (`sec_shattered_pockets.py`)
+
+A root-to-leaf path is an intersection of halfspaces, so the tree can hold a convex region
+but must **shatter** a concept that is multi-modal in embedding space. If the boilerplate
+pockets were fragments of one such concept carved out under different parents, they would
+be merge candidates. Tested against the LCA-depth-conditional similarity distribution
+(similarity decays with tree distance by design, so "these are similar" is not evidence —
+only "similar *given* how far apart they sit" is). 347 cells, 60,031 pairs.
+
+**Verdict: not shattered fragments, and nothing for the existing merger to catch.**
+
+- **Cross-pair duplicate rate is 0.04–0.20** — the decisive test. Top candidates reach
+  centroid cos 0.993–0.996 yet only 4–20% of A's points have a near-duplicate in B, while
+  *within*-pocket dup_frac is 0.52–0.76. The duplicates live **inside** each pocket, not
+  across them. High cosine, different duplicate sets.
+- **No enrichment.** Pockets are 2.2% of pairs diverging at depth ≤1 and 2.3% of those also
+  above the depth-conditional p95 — **1.04×**. Pockets are not special with respect to being
+  shattered.
+- **All 10 top candidates already exceed the Louvain link threshold**, so
+  `agglomerate.louvain_cluster_leaves` would already reunite them. Zero missed.
+
+**What they actually are: regionalised boilerplate.** Each depth-1 region carries its own
+near-duplicate pocket — context-specific variants of the same legal template. The tree is
+doing the right thing by isolating each region's variant; merging them would collapse a
+real distinction. They are candidates for **dedup/compression, not merging** — which is the
+same lever as the earlier finding that `other` consumes 18.7% of leaves for 8.1% of content.
+
+⚠ **The similarity scale is compressed on this corpus, which breaks cosine thresholds.**
+Mean centroid cos is **0.821 at LCA depth 0** (pairs diverging at the root, i.e. maximally
+distant), p95 0.933; at depth 3 it is 0.982. Everything lives in a narrow cone, so centroid
+cosine barely discriminates and any absolute threshold must be set relative to the corpus
+baseline, not to intuition. Note `agglomerate._run_louvain_on_centroids` documents
+`similarity_threshold` as "only used by the NetworkX fallback" — the default Rust path
+ignores it — but on the fallback path the 0.5 default would filter nothing here.
+
 ### Scope limits
 
 - One corpus, one embedding model (768d), one tree shape (`max_depth=4, min_leaf=16`,
