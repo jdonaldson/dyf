@@ -600,9 +600,13 @@ log-rank) was never evidence of a power law: fitting a slope to anything yields 
 
 | corpus | D2 | scaling window | D_q spread | R² power law | R² exponential | verdict |
 |---|---|---|---|---|---|---|
-| sec 768d | 13.30 | 0.03 dec | 2.05 | **0.997** | 0.854 | power law, multifractal |
-| cmu_mocap 62d | 3.98 | 0.11 dec | 0.78 | 0.406 | **0.657** | exponential, multifractal |
+| sec 768d | 13.30 | 0.03 dec | 2.05 | **0.997** | 0.854 | power-law spectrum |
+| cmu_mocap 62d | 3.98 | 0.11 dec | 0.78 | 0.406 | **0.657** | exponential spectrum |
 | wikipedia 384d | 27.21 | 0.01 dec | 3.23 | 0.963 | 0.939 | power law (marginal) |
+
+(The `D_q spread` column is retained only because the retraction below refers to it — it is
+an estimator artifact, not a multifractality measurement. `D2` and `window` come from a
+detector shown below to be unreliable; treat both as indicative at best.)
 
 - **No spatial self-similarity anywhere.** Scaling windows are 0.01–0.11 decades, i.e. none.
   The local slope of log C(r) drifts smoothly rather than plateauing (SEC: 13.4 → 12.7 →
@@ -614,9 +618,28 @@ log-rank) was never evidence of a power law: fitting a slope to anything yields 
   scale. ⛔ This **falsifies the prediction written into the probe** ("SEC should show a
   scaling window and MoCap should not") — exactly backwards. Motion has the only clean
   spatial plateau (slopes 3.3–4.1 from r=0.36 to 1.02) and the *worst* power-law fit.
-- **All three are multifractal** — D_q decreases monotonically in q (SEC 8.98 → 6.93,
-  wikipedia 21.26 → 18.03, mocap 3.32 → 2.55). One dimension does not describe any of them,
-  consistent with eff_rank ranging 9.1–85.3 across depth-2 cells with ICC 0.466.
+- ⛔ **RETRACTED: the multifractality claim does not survive a null.** D_q does decrease
+  monotonically in q (SEC 8.98 → 6.93, wikipedia 21.26 → 18.03, mocap 3.32 → 2.55) — but
+  **that is required by theory**, since the Rényi spectrum is non-increasing in q for *any*
+  measure, so the direction carries no information. Calibrated against a Gaussian with each
+  corpus's **own covariance** (preserves the power-law spectrum, homogeneous density), the
+  real spread is *smaller* than the null: **0.69× (SEC), 0.70× (mocap), 0.51× (wikipedia)**.
+  Homogeneous data produces MORE of the signature. The spread is an estimator artifact, and
+  the tell was visible before the null — spread/D2 was near-constant (0.196 / 0.154 / 0.119),
+  which is what a multiplicative estimator effect looks like. The original "multifractal"
+  verdict used a hardcoded spread > 0.5 threshold with no null; do not reuse it.
+- ⚠ **The scaling-window detector is biased toward saturation plateaus** and cannot be
+  trusted in general: it returns D2 ≈ 0.28–0.94 on the Gaussian nulls, where the true value
+  is far higher, because the flattest part of any C(r) curve is where it saturates and the
+  scoring function rewards flatness. It happened to pick the right region on real data (SEC
+  13.35 matches the eyeballed small-r slopes of 12.8–13.4), but that is luck, not validation.
+  D_q is unaffected — it is averaged over the valid band rather than through the detector.
+- **What survives is weaker and comes from elsewhere: local dimensionality IS heterogeneous
+  across the map**, but that rests on the per-cell measurements (eff_rank 9.1–85.3 across
+  depth-2 cells, 46.6% of variance explained by the depth-1 parent, rho(eff_rank, dup_frac)
+  = −0.723), each n-matched with its own null. That is "heterogeneous local dimension", not
+  "multifractal" in the scaling sense — and it cannot be upgraded to the latter, because
+  without a scaling window there are no well-defined exponents to form a spectrum from.
 - D2 within SEC cells: 9.67 ± 5.64 (depth 1), 11.89 ± 1.91 (depth 2) vs 13.30 corpus-wide —
   but with 0.03–0.05 decade windows these are not trustworthy numbers.
 
