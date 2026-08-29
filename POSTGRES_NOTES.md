@@ -591,6 +591,55 @@ text baselines top out at 0.80–0.88 within budget); 100k subsamples, 500 queri
 `cmu_mocap` is raw joint angles unit-normalised to define a cosine task, which is not the
 natural metric for motion.
 
+### Is the recovered structure fractal? (`sec_fractal.py`)
+
+Asked as a *scientific* question rather than an engineering one — the earlier "does it
+produce a lever" framing is a different criterion and closing the direction on it did not
+answer this. Three real measurements, because `alpha` (an OLS slope of log-eigenvalue on
+log-rank) was never evidence of a power law: fitting a slope to anything yields a slope.
+
+| corpus | D2 | scaling window | D_q spread | R² power law | R² exponential | verdict |
+|---|---|---|---|---|---|---|
+| sec 768d | 13.30 | 0.03 dec | 2.05 | **0.997** | 0.854 | power law, multifractal |
+| cmu_mocap 62d | 3.98 | 0.11 dec | 0.78 | 0.406 | **0.657** | exponential, multifractal |
+| wikipedia 384d | 27.21 | 0.01 dec | 3.23 | 0.963 | 0.939 | power law (marginal) |
+
+- **No spatial self-similarity anywhere.** Scaling windows are 0.01–0.11 decades, i.e. none.
+  The local slope of log C(r) drifts smoothly rather than plateauing (SEC: 13.4 → 12.7 →
+  11.1 → 9.2 → 7.4 → 5.1 → 2.9). The correlation dimension is **scale-dependent**, so there
+  is no D2 to quote honestly.
+- **But the text spectra ARE power laws.** SEC R² = 0.997 for `lambda_i ~ i^-0.89` against
+  0.854 exponential — a strong, clean scale-free spectrum. Wikipedia 0.963 vs 0.939 is
+  marginal. MoCap is the reverse: **exponential** (0.657 vs 0.406), i.e. a characteristic
+  scale. ⛔ This **falsifies the prediction written into the probe** ("SEC should show a
+  scaling window and MoCap should not") — exactly backwards. Motion has the only clean
+  spatial plateau (slopes 3.3–4.1 from r=0.36 to 1.02) and the *worst* power-law fit.
+- **All three are multifractal** — D_q decreases monotonically in q (SEC 8.98 → 6.93,
+  wikipedia 21.26 → 18.03, mocap 3.32 → 2.55). One dimension does not describe any of them,
+  consistent with eff_rank ranging 9.1–85.3 across depth-2 cells with ICC 0.466.
+- D2 within SEC cells: 9.67 ± 5.64 (depth 1), 11.89 ± 1.91 (depth 2) vs 13.30 corpus-wide —
+  but with 0.03–0.05 decade windows these are not trustworthy numbers.
+
+**⛔ Non-normalised embeddings do not rescue it, and the reason is fundamental.** Unit
+vectors bound distances to [0,2], under one decade even in principle, so raw vectors were
+the obvious fix. Source check: the MiniLM text sets and SEC filings are **already unit-norm
+upstream** (norm sd = 0.000, nothing to recover); Nomic is unnormalised at ratio 1.17–1.27;
+CMU MoCap is genuinely raw at ratio 3.90 (4 of 140,837 rows are all-zero).
+
+| corpus | raw dist range | normed | raw window | normed window |
+|---|---|---|---|---|
+| cmu_mocap 62d | 0.90 dec | 0.75 dec | 0.09 | 0.08 |
+| wikipedia_nomic | 0.16 dec | 0.14 dec | 0.02 | 0.01 |
+| arxiv_nomic | 0.18 dec | 0.17 dec | 0.02 | 0.02 |
+| news_nomic | 0.15 dec | 0.14 dec | 0.02 | 0.01 |
+
+Raw buys 0.01–0.15 decades — nothing. The binding limit is **concentration of measure**, not
+normalisation: distance range falls as intrinsic dimension rises (mocap D2 ≈ 3.9 → 0.90
+decades; Nomic D2 ≈ 23–29 → 0.15–0.18). **Classical fractal analysis is not applicable to
+high-dimensional embeddings** — the dynamic range scaling analysis needs is destroyed by
+dimensionality itself. The spectral power-law result stands, since it does not depend on
+distance range.
+
 ### ⛔ The eff_rank lever fails. Spectral direction closed. (`sec_adaptive_probe.py`)
 
 `sec_cell_spectra.py`'s one surviving positive was that per-cell effective rank predicts
