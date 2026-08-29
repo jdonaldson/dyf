@@ -707,6 +707,39 @@ sample-size artifact — every spectrum is computed at n=300 regardless of child
 children below 300 are excluded (which does mean small-share children only arise from large
 parents).
 
+#### Is non-self-similarity just duplicates? Partly — ~24% of it. (`sec_dedup_ablation.py`)
+
+Near-duplicates collapsed within each leaf at cos > 0.99, a fresh tree built on what
+remains, and the identical child-vs-parent-subsample scoring re-run. Blocking by leaf misses
+cross-leaf duplicate pairs, so the removal rate is a **lower bound** and the ablation
+under-removes — survival is the conservative direction.
+
+**29.1% of this corpus is near-duplicate content** (66,731 of 229,243 points).
+
+| | children | median z | \|z\|>2 % | \|z\|>10 % | mean \|z\| | % concentrating |
+|---|---|---|---|---|---|---|
+| with duplicates | 347 | −14.07 | 91.9 | 70.3 | 18.7 | 84 |
+| deduped | 238 | −8.35 | 90.3 | 52.1 | 13.7 | 74 |
+
+**The phenomenon survives; its magnitude does not fully.** After removing 29% of the corpus
+**90.3% of children are still non-self-similar** (vs 91.9%) — essentially unchanged — while
+median z drops −14.07 → −8.35 and mean |z| 18.7 → 13.7. The concentrating share falls
+84% → 74%, i.e. duplicates were specifically inflating the *concentrating* tail, exactly
+where dup_frac 0.52–0.76 lived.
+
+⚠ **Confound checked and cleared.** Dedup shrinks the corpus, so fewer nodes clear the
+n ≥ 300 floor (238 vs 347 children) and survivors could skew toward larger shares — and |z|
+falls with share. Within matched share bins, retention is **82% / 66% / 75% / 82%** with no
+share pattern, and the share distribution barely moved (median 0.116 → 0.120). The drop is
+dedup, not selection.
+
+So: the extreme concentrating pockets *are* substantially degenerate duplicates, but
+non-self-similarity as a property of dyf splits is real geometry that outlives them.
+
+Incidental and useful: dedup removed **29% of points but only 11% of leaves**
+(13,220 → 11,711), so duplicate mass sits packed *within* existing leaves rather than
+spread across extra ones — points/leaf 17.3 → 13.9.
+
 #### Are the pockets fragments of one concept? No. (`sec_shattered_pockets.py`)
 
 A root-to-leaf path is an intersection of halfspaces, so the tree can hold a convex region
