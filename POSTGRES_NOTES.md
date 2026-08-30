@@ -889,6 +889,14 @@ Work to reach a target recall: at **0.80**, star_inherit 1,398 vs baseline 1,455
 *and* 29% smaller); at **0.90**, baseline 3,390 vs star_inherit 5,149; at **0.95** baseline
 6,433 and star_inherit **cannot get there at all**.
 
+⛔ **SUPERSEDED — the recall penalty below was mostly a METRIC ARTIFACT.** See
+"Distinct-content recall" immediately after this section. `recall@10` against exact kNN over
+the raw corpus asks "did you reproduce the brute-force list", and this corpus puts a mean of
+**2.97 duplicate slots in every true top-10** (83% of queries have at least one). That metric
+therefore *pays for returning redundant copies* — precisely what dedup exists to prevent.
+Under a content-level metric dedup wins at nearly every budget. The numbers below are
+correct as stated but answer the ANN-approximation question, not the retrieval-quality one.
+
 **The verdict is operating-point dependent.** Below ~0.82 recall dedup is a strict win —
 less storage, faster build, *better* recall, because probe budget stops being spent
 re-scanning near-identical vectors. Above it dedup loses, and score-inheritance **caps out**
@@ -901,6 +909,46 @@ The prediction going in — that dedup would improve recall by not wasting budge
 ceiling dominates. Obvious next tweak, untested: **cap cluster size** (collapse clusters up
 to ~8 members, index larger ones in full) to keep most of the storage win while preserving
 ranking inside the big boilerplate clusters that cause the ceiling.
+
+#### Distinct-content recall: dedup actually WINS (`sec_dedup_metric.py`)
+
+The metric above was wrong for the question. `recall@10` against raw exact kNN measures
+"reproduce the brute-force list", and when a corpus holds four near-identical copies of a
+document the true top-10 spends four slots on the **same content**. Measured on this corpus:
+**mean 2.97 duplicate slots per true top-10, 83% of queries affected.** Raw recall@10 pays
+for returning redundant results, so it penalises dedup for doing its job.
+
+Two metrics, same runs, same work axis. `distinct@10` takes ground truth as the top-10
+*clusters* ranked by each cluster's best member, and predictions as the system's candidates
+mapped to clusters, deduplicated in score order, first 10 distinct. **Applied symmetrically**
+— the baseline is also credited only for distinct content, so it too is penalised for
+spending result slots on duplicates.
+
+| delta (dedup − baseline) | 227 | 439 | 850 | 1645 | 3184 | 6162 |
+|---|---|---|---|---|---|---|
+| raw@10 | +0.042 | +0.032 | +0.014 | −0.009 | −0.026 | −0.039 |
+| **distinct@10** | **+0.053** | **+0.055** | **+0.042** | **+0.026** | **+0.010** | −0.006 |
+
+**Dedup wins at every budget except the largest, where it is −0.006 (parity).** Combined with
+29.4% less vector storage and half the build time, dedup on ingest is a clear win — the
+earlier "trade above ~0.82 recall" was the metric, not the system.
+
+**Why the switch fixes it, mechanically.** The failure diagnosed via dose-response was
+within-cluster tie-breaking: members share an inherited score, so top-k selection picks
+arbitrarily among them. Under `distinct@10` only ONE member of a cluster is ever credited, so
+ties inside a cluster become irrelevant by construction. The correction is largest at the
+high-budget end (−0.039 → −0.006), which is where the raw metric's duplicate reward was
+biggest.
+
+⚠ **Read the earlier dose-response table the other way round.** Baseline raw recall was
+*higher* on duplicate-rich queries (0.9517 for 4–8 clusters vs 0.8531 for singletons). That
+is not the baseline handling them well — those queries are easy to *score* on because the
+metric pays for redundant copies. A user would rate that result worse, not better.
+
+**Lesson, and it is the same one as the rest of this arc**: pick the outcome variable to match
+the intent. Five spectral hypotheses died from measuring geometry and hunting for a use; this
+one nearly died from measuring the wrong success criterion for a system whose entire purpose
+is to *not* return something the metric rewarded.
 
 #### Are the pockets fragments of one concept? No. (`sec_shattered_pockets.py`)
 
