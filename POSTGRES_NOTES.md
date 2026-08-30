@@ -855,6 +855,53 @@ Incidental and useful: dedup removed **29% of points but only 11% of leaves**
 (13,220 → 11,711), so duplicate mass sits packed *within* existing leaves rather than
 spread across extra ones — points/leaf 17.3 → 13.9.
 
+#### Dedup on ingest: 29% storage, and a recall TRADE, not a free lunch (`sec_dedup_ingest.py`)
+
+The operational test of the 29.1% duplicate finding. Outcome variables declared before the
+probe was written. Retrieval task unchanged — truth is exact kNN over the **full** corpus —
+with the index storing one representative per cluster plus a representative→members side
+table, expanded at query time. Dedup is tree-free (multi-table random-projection LSH) so it
+genuinely precedes indexing. Cross-check: LSH finds **32.0%** against the 29.1% within-leaf
+estimate, two independent methods agreeing within 3pp.
+
+| | points | leaves | vectors MB | build | cluster max |
+|---|---|---|---|---|---|
+| baseline | 229,243 | 13,327 | 704.2 | 3s | — |
+| dedup_transitive | 155,843 (−32.0%) | 12,408 (−6.9%) | 479.3 (−31.9%) | 2s | **541** |
+| dedup_star | 161,875 (−29.4%) | 11,995 (−10.0%) | 497.8 (−29.3%) | 2s | 143 |
+
+⚠ **Transitive union-find over-merges.** Its 541-member "duplicate" cluster is a chain
+A~B~C~…~Z where A and Z need not be similar, so members inherit a representative score that
+is wrong for them. **Star clustering** — a point joins a representative only if within
+threshold *of that representative*, no transitivity — bounds every member's error and drops
+cluster max to 143. Use star; the 2.6pp less dedup is worth it.
+
+Recall@10 vs full-corpus truth at matched total work, `_inherit` = members take the
+representative's score (expansion is an array lookup, costs no dot products):
+
+| vs baseline | 270 | 503 | 938 | 1749 | 3259 | 6072 |
+|---|---|---|---|---|---|---|
+| transitive_inherit | −0.004 | −0.004 | −0.006 | −0.025 | −0.039 | −0.051 |
+| **star_inherit** | **+0.039** | **+0.026** | **+0.018** | −0.004 | −0.023 | −0.039 |
+| star_rescore | −0.088 | −0.087 | −0.076 | −0.071 | −0.059 | −0.045 |
+
+Work to reach a target recall: at **0.80**, star_inherit 1,398 vs baseline 1,455 (4% cheaper
+*and* 29% smaller); at **0.90**, baseline 3,390 vs star_inherit 5,149; at **0.95** baseline
+6,433 and star_inherit **cannot get there at all**.
+
+**The verdict is operating-point dependent.** Below ~0.82 recall dedup is a strict win —
+less storage, faster build, *better* recall, because probe budget stops being spent
+re-scanning near-identical vectors. Above it dedup loses, and score-inheritance **caps out**
+below 0.95 because members of one cluster cannot be ranked against each other. Re-scoring
+members lifts the ceiling (reaches 0.95 at 12,238 work) but is worse everywhere at matched
+work, since the expansion dots come straight off the probe budget.
+
+The prediction going in — that dedup would improve recall by not wasting budget on duplicates
+— was **half right**: correct at tight budgets, wrong at high recall, where the ranking
+ceiling dominates. Obvious next tweak, untested: **cap cluster size** (collapse clusters up
+to ~8 members, index larger ones in full) to keep most of the storage win while preserving
+ranking inside the big boilerplate clusters that cause the ceiling.
+
 #### Are the pockets fragments of one concept? No. (`sec_shattered_pockets.py`)
 
 A root-to-leaf path is an intersection of halfspaces, so the tree can hold a convex region
