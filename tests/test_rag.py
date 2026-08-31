@@ -76,6 +76,54 @@ class TestSuperConnectors:
         assert len(result.local_centrality) == len(sample_embeddings)
         assert len(result.quadrant) == len(sample_embeddings)
 
+    def test_finds_bridges_on_anisotropic_embeddings(self):
+        """Regression: this returned ZERO on text-like embeddings.
+
+        `analyze_bridges` defines a bridge as centroid_similarity < bridge_threshold, whose
+        default 0.5 is an ABSOLUTE cosine. Real unit-norm text embeddings live in a narrow
+        cone — measured on 4k SEC sections, the MINIMUM centroid similarity was 0.730, so
+        0.0% fell below 0.5 and `indices` came back empty with all-zero centrality. The older
+        tests in this class only assert types and lengths, so they passed throughout.
+
+        Uses deliberately anisotropic data (all vectors in a narrow cone) to reproduce the
+        condition rather than the isotropic gaussians the other fixtures use.
+        """
+        rng = np.random.default_rng(7)
+        dim, n = 64, 1200
+        axis = np.zeros(dim, dtype=np.float32)
+        axis[0] = 1.0
+        # tight cone: perpendicular component small relative to the shared axis, so pairwise
+        # cosine stays high the way it does for real text embeddings
+        centers = axis + 0.04 * rng.standard_normal((6, dim)).astype(np.float32)
+        lab = rng.integers(0, len(centers), n)
+        X = centers[lab] + 0.02 * rng.standard_normal((n, dim)).astype(np.float32)
+        X /= np.linalg.norm(X, axis=1, keepdims=True)
+
+        # The regression condition, asserted as BEHAVIOUR rather than as a fixture property:
+        # the old absolute threshold must find (almost) nothing here...
+        old = find_super_connectors(X, min_bucket_size=10, bridge_percentile=0)
+        # ...while the relative default does find bridges.
+        new = find_super_connectors(X, min_bucket_size=10)
+        assert new.global_centrality.sum() > old.global_centrality.sum(), (
+            "a relative bridge threshold must admit more bridges than an absolute floor"
+        )
+        assert new.global_centrality.sum() > 0, "no global bridges found on anisotropic data"
+        assert new.local_centrality.sum() > 0, "no facet-level bridges found on anisotropic data"
+        assert len(new.indices) > 0, "no super connectors found on anisotropic data"
+
+    def test_bridge_percentile_is_relative_and_monotone(self):
+        """A larger bridge_percentile admits more bridges, on any corpus."""
+        rng = np.random.default_rng(11)
+        dim, n = 48, 900
+        axis = np.zeros(dim, dtype=np.float32)
+        axis[0] = 1.0
+        X = axis + 0.3 * rng.standard_normal((n, dim)).astype(np.float32)
+        X /= np.linalg.norm(X, axis=1, keepdims=True)
+
+        low = find_super_connectors(X, min_bucket_size=10, bridge_percentile=5)
+        high = find_super_connectors(X, min_bucket_size=10, bridge_percentile=40)
+        assert (high.global_centrality > 0).sum() >= (low.global_centrality > 0).sum()
+
     def test_find_super_connectors_quadrants(self, clustered_embeddings):
         """Test that quadrant labels are valid."""
         result = find_super_connectors(clustered_embeddings)

@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+### Fixed
+
+- **`find_super_connectors` returned nothing on text embeddings.** On 8,000 SEC sections it
+  produced `indices=[]` with `global_centrality` and `local_centrality` all zero — a
+  documented feature yielding no output at all. Three compounding causes, all now fixed:
+
+  1. `analyze_bridges` defines a bridge as `centroid_similarity < bridge_threshold`, and its
+     **0.5 default is an absolute cosine**. Unit-norm text embeddings live in a narrow cone:
+     measured on 4k SEC sections the *minimum* centroid similarity was 0.730, so **0.0% fell
+     below 0.5 and zero bridges were found** — at every `num_bits` from 4 to 12. (An
+     isotropic gaussian is the opposite: 92.3% below, flooding 3,693 of 4,000 points.) The
+     global pass now derives its threshold from the corpus's own distribution via a new
+     `bridge_percentile=10` argument.
+  2. `_compute_local_centrality` had the same absolute-threshold call at the facet level.
+  3. Quadrant classification tested `centrality > percentile`, but centrality is a small
+     integer count and its percentile often lands *on* the modal value — on SEC the 50th
+     percentile of nonzero global centrality equalled the maximum (195), so `>` selected
+     nothing even after bridges were being found. Now `>=`.
+
+  After the fix the same 8,000 sections yield **200 super connectors**. Regression tests
+  assert bridges are *found* on anisotropic data; the 77 pre-existing `test_rag.py` tests all
+  passed against the empty result because they check types and lengths only.
+
+  ⚠ `DensityClassifier.analyze_bridges`'s own 0.5 default is unchanged (it lives in dyf-rs),
+  so direct callers still need to pass a corpus-relative `bridge_threshold`.
+
 ### Added
 
 - **`dyf.dedup` — ingest-time near-duplicate detection.** `near_duplicate_clusters()`

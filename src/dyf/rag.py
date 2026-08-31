@@ -498,6 +498,7 @@ def _compute_local_centrality(
     facet_num_bits: int,
     min_bucket_size: int,
     seed: int,
+    bridge_percentile: float = 10,
 ) -> np.ndarray:
     """
     Compute local (facet) bridge centrality within dense buckets.
@@ -532,7 +533,11 @@ def _compute_local_centrality(
         try:
             facet_clf = DensityClassifier(embedding_dim=dim, num_bits=bits, seed=seed)
             facet_clf.fit(ensure_f32(bucket_emb, "embeddings"))
-            facet_bridge = facet_clf.analyze_bridges(bucket_emb)
+            # relative threshold, for the same reason as the global pass: an absolute
+            # cosine cut of 0.5 finds zero bridges in unit-norm text embeddings
+            fcs = np.asarray(facet_clf.get_centroid_similarities(), dtype=np.float64)
+            fthresh = float(np.percentile(fcs, bridge_percentile)) if len(fcs) else 0.5
+            facet_bridge = facet_clf.analyze_bridges(bucket_emb, bridge_threshold=fthresh)
 
             for i in range(len(facet_bridge.bridge_indices)):
                 local_idx, _, neighbors = facet_bridge.get_bridge_connections(i)
@@ -554,6 +559,7 @@ def find_super_connectors(
     local_threshold_percentile: float = 50,
     min_bucket_size: int = 20,
     seed: int = 42,
+    bridge_percentile: float = 10,
 ) -> SuperConnectorResult:
     """
     Find super connectors: points with high centrality in both global and local
@@ -573,6 +579,11 @@ def find_super_connectors(
         local_threshold_percentile: Percentile for "high" local centrality
         min_bucket_size: Minimum bucket size for faceting
         seed: Random seed
+        bridge_percentile: Bridges are the lowest-centroid-similarity points; this is the
+            percentile of *this corpus's* similarity distribution used as the cut. Relative
+            by design — `analyze_bridges`'s absolute 0.5 default returns zero bridges on
+            unit-norm text embeddings (0.0% fall below it) and floods on isotropic data
+            (92.3% below), so an absolute constant cannot serve both.
 
     Returns:
         SuperConnectorResult with indices and centrality data
@@ -583,7 +594,16 @@ def find_super_connectors(
     global_clf = DensityClassifier(embedding_dim=dim, num_bits=global_num_bits, seed=seed)
     global_clf.fit(embeddings)
     global_buckets = global_clf.get_bucket_ids()
-    global_bridge = global_clf.analyze_bridges(embeddings)
+
+    # `analyze_bridges` defines a bridge as centroid_similarity < bridge_threshold, and its
+    # default of 0.5 is an ABSOLUTE cosine. Embedding anisotropy varies enormously, so that
+    # constant does not transfer: measured over 4k-point samples, unit-norm SEC text has
+    # 0.0% of similarities below 0.5 (min 0.730) and returned ZERO bridges, making this whole
+    # function yield an empty `indices` with all-zero centrality; an isotropic gaussian has
+    # 92.3% below it and floods. So derive the threshold from this corpus's own distribution.
+    cs = np.asarray(global_clf.get_centroid_similarities(), dtype=np.float64)
+    bridge_threshold = float(np.percentile(cs, bridge_percentile)) if len(cs) else 0.5
+    global_bridge = global_clf.analyze_bridges(embeddings, bridge_threshold=bridge_threshold)
 
     # Compute global centrality (number of buckets connected)
     global_centrality = np.zeros(n_points, dtype=np.int32)
@@ -610,6 +630,7 @@ def find_super_connectors(
         facet_num_bits,
         min_bucket_size,
         seed,
+        bridge_percentile,
     )
 
     # Compute thresholds from non-zero values
@@ -619,10 +640,14 @@ def find_super_connectors(
     global_thresh = np.percentile(global_nonzero, global_threshold_percentile) if len(global_nonzero) > 0 else 1
     local_thresh = np.percentile(local_nonzero, local_threshold_percentile) if len(local_nonzero) > 0 else 1
 
-    # Classify into quadrants
+    # Classify into quadrants.
+    # `>=`, not `>`: centrality is a small integer count, so its percentile frequently lands
+    # ON the modal value. Measured on 8k SEC points the 50th percentile of nonzero global
+    # centrality equalled the maximum (195), so a strict `>` selected nothing and the
+    # function returned an empty `indices` even once bridges were being found.
+    high_global = global_centrality >= global_thresh
+    high_local = local_centrality >= local_thresh
     quadrant = np.full(n_points, "Regular", dtype=object)
-    high_global = global_centrality > global_thresh
-    high_local = local_centrality > local_thresh
     is_bridge = (global_centrality > 0) | (local_centrality > 0)
 
     quadrant[is_bridge & ~high_global & ~high_local] = "Minor Bridge"

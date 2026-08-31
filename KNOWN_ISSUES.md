@@ -110,6 +110,57 @@ from the shipped one; this audit exercises the real code path.
 
 ---
 
+## 5. Absolute cosine/margin thresholds do not transfer across corpora — PARTLY FIXED
+
+**The pattern**, now seen twice: shipped defaults are **absolute** cosine or margin
+constants, but embedding anisotropy varies enormously between corpora, so a constant that is
+sensible on one is degenerate on another. Both instances were found by auditing, not by tests.
+
+**Instance A — `analyze_bridges` (dyf-rs), and `find_super_connectors` on top of it.**
+A bridge is defined as `centroid_similarity < bridge_threshold`, default **0.5**. Measured on
+4,000-point samples:
+
+| corpus | min centroid_sim | p10 | median | % below 0.5 | bridges flagged |
+|---|---|---|---|---|---|
+| SEC 768d, unit-norm text | **0.730** | 0.828 | 0.874 | **0.0%** | **0** |
+| CMU MoCap 62d | 0.210 | 0.708 | 0.873 | 0.4% | 14 |
+| isotropic gaussian 64d | −0.101 | 0.261 | 0.377 | **92.3%** | **3,693 of 4,000** |
+
+The default therefore flags **nothing or almost everything**, never a useful regime for real
+embeddings. Confirmed at every `num_bits` from 4 to 12 on SEC — zero bridges at all
+granularities, so it was not a bucket-resolution mistake.
+
+**Consequence**: `find_super_connectors` on 8,000 SEC sections returned
+`indices=[]` with `global_centrality` and `local_centrality` **all zero** — a documented
+feature ("10x better coverage efficiency than random anchors") producing nothing at all on
+text embeddings.
+
+**Fixed in `rag.py`** (three compounding causes, all needed):
+1. Global pass now derives the threshold from the corpus's own centroid-similarity
+   distribution via a new `bridge_percentile=10` parameter.
+2. `_compute_local_centrality` did the same thing at the facet level; same fix.
+3. Quadrant classification used `centrality > percentile`, but centrality is a small integer
+   count whose percentile often lands *on* the modal value — on SEC the 50th percentile of
+   nonzero global centrality **equalled the maximum (195)**, so `>` selected nothing even
+   once bridges were being found. Now `>=`.
+
+After the fix, 8,000 SEC sections yield **200 super connectors** and 748 nonzero local
+centralities. Regression tests added that assert bridges are *found* on anisotropic data —
+⚠ the 77 pre-existing `test_rag.py` tests all passed against the empty result, because they
+assert types and array lengths and never that anything was detected.
+
+**Still open**: the `bridge_threshold=0.5` default inside dyf-rs is unchanged, so anyone
+calling `DensityClassifier.analyze_bridges(embeddings)` directly still gets zero bridges on
+text. Fixing that is a dyf-core change.
+
+**Instance B** is `nprobe="auto"` — see issue 4 above. Same root cause, absolute margin
+thresholds, not yet fixed.
+
+**Rule going forward**: a threshold on a similarity, margin, or distance should be expressed
+as a percentile of the observed distribution, not as a constant.
+
+---
+
 ## Source
 
 Discovered 2026-04-07 while wiring `experiments/capability_dyf_router.py` in
