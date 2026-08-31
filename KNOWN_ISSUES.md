@@ -8,6 +8,13 @@ each cost some time to diagnose.
 ## Cleanup queue (opened 2026-08-31)
 
 Ordered by leverage, not by size. Evidence for each is in the numbered issues below.
+Heading this serves: see "Heading" at the top of `CLAUDE.md` — v1 *quality*, i.e. closing the
+gap between the shipped surface (109 exports / 72 callables) and the validated one.
+
+**Standing audits** — re-run when touching the public surface; each caught a real defect:
+`benchmarks/audit_public_api.py` (41 of 72 callables, canary reproduces issue 5),
+`benchmarks/audit_test_assertions.py` (11% of tests assert shape only),
+`benchmarks/audit_absolute_thresholds.py` (constants that do not transfer).
 
 **P0 — incomplete sweep of issue 5, left in the tree by the same commit that documented it**
 

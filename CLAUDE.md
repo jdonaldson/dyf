@@ -1,5 +1,55 @@
 # DYF Project Notes
 
+## Heading (asserted 2026-08-31)
+
+**Destination: dyf's primitives become trustworthy enough that downstream consumers
+(`sec10quant`, `shortorder`) can rely on them. Moving toward v1 *quality*, not more
+capability.**
+
+Score work against that. The test is "can someone depend on this?", not "is this
+interesting?".
+
+**Why this heading, and why now.** A bearing check found the project *drifting* — real
+progress, but effort allocated opportunistically because no destination was stated, which is
+also why "is this good bang for buck?" had no crisp answer. The evidence:
+
+- **109 public exports, 72 callables, 30 modules, 26 test files.** The validated surface is
+  materially smaller than the shipped surface.
+- **Two of the handful of features inspected by hand were silently broken** — both with
+  performance claims in their docstrings (`KNOWN_ISSUES` #4, #5). That is a poor base rate
+  for the ~70 not inspected.
+- **11% of tests assert shape only**; one asserts nothing. `benchmarks/audit_test_assertions.py`
+  measures this.
+- **12+ absolute cosine/margin constants** are measured inert on real corpora. A v1 would
+  freeze those into the API.
+
+Pre-v1 is the only cheap moment to fix any of that (see "Backward Compatibility" in
+`~/Projects/CLAUDE.md` — break freely before v1).
+
+### What this heading implies
+
+- **In scope**: making existing primitives correct, measured, and honestly documented;
+  closing the gap between shipped and validated surface; deleting or relativising knobs that
+  do nothing.
+- **Out of scope until the floor is solid**: new mechanisms in dyf. `SPECTRAL_NOTES.md`
+  records six consecutive falsified hypotheses of that shape; the only thing that shipped
+  from that arc (`dyf.dedup`) started from a *measurement of the data*, not from a mechanism.
+- **The one rule that keeps paying**: pick the outcome variable before building the probe.
+  And measure against a null or an incumbent, never against intuition about what a number
+  should look like.
+
+### Standing audits
+
+Re-run these when touching the public surface; each exists because it caught a real defect:
+
+| command | catches |
+|---|---|
+| `python benchmarks/audit_public_api.py` | exported callables returning empty/all-zero/constant (has a canary that reproduces #5) |
+| `python benchmarks/audit_test_assertions.py` | tests asserting only types and lengths |
+| `python benchmarks/audit_absolute_thresholds.py` | absolute cosine constants that do not transfer across corpora |
+
+Open queue with priorities: `KNOWN_ISSUES.md`.
+
 ## Release Workflow
 
 When adding features or making API changes:
