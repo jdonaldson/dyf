@@ -397,7 +397,7 @@ def main():
 def semantics():
     """What does get_eigenvalues() actually return? Test behaviour, don't assume a formula.
 
-    Backs the two traps in the module docstring and in POSTGRES_NOTES.md. Everything here
+    Backs the two traps in the module docstring and in SPECTRAL_NOTES.md. Everything here
     is unit-normalised, matching real corpora -- so the question is not "does it scale with
     |x|" (meaningless on a sphere) but "does it track ANGULAR SPREAD, and is it a covariance
     or a scatter matrix".
@@ -460,7 +460,7 @@ def semantics():
 def anatomy():
     """Read cell_volume_results.json and ground the three interpretive claims.
 
-    Backs the tables quoted in POSTGRES_NOTES.md: (1) every "volume" predictor is really
+    Backs the tables quoted in SPECTRAL_NOTES.md: (1) every "volume" predictor is really
     occupancy, (2) damage rises with occupancy while flood falls, (3) the stored 4-D
     shadow does not track the real spectrum.
     """
