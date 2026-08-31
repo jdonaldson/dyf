@@ -1,6 +1,6 @@
 # Spectral characterisation of dyf cells — CLOSED
 
-⛔ **This direction is closed. Five hypotheses, five falsified.** Do not open a sixth
+⛔ **This direction is closed. Six hypotheses, six falsified.** Do not open a seventh
 without choosing an outcome variable first.
 
 | hypothesis | verdict |
@@ -10,6 +10,7 @@ without choosing an outcome variable first.
 | boilerplate pockets are shattered concepts → merge them | falsified — cross-pair duplicate rate 0.04–0.20 |
 | split quality decays with depth → stopping criterion | falsified — it does not decay |
 | `eff_rank` as an adaptive-probe signal | falsified — worse than uniform at every budget |
+| pairwise "shared density" (incl. the temporal predecessor) | falsified — loses to raw step distance wherever the task is solvable |
 
 **The one durable methodological lesson**: pick the outcome variable FIRST. Everything found
 by describing geometry and then hunting for a use died. The single result that got anywhere
@@ -681,3 +682,68 @@ baseline, not to intuition. Note `agglomerate._run_louvain_on_centroids` documen
 `similarity_threshold` as "only used by the NetworkX fallback" — the default Rust path
 ignores it — but on the fallback path the 0.5 default would filter nothing here.
 
+
+---
+
+## Pairwise "shared density" — falsified (`sec_shared_density.py`)
+
+Not spectral, but the same genre and it belongs with the other closed attempts. Premise: dyf
+measures density PER POINT (bucket occupancy, centroid similarity, isolation); a *pair* also
+has a shared density — how populated the region between them is. And the partner can be the
+**temporal predecessor** rather than the geometric neighbour, turning per-point density into
+transition density *without* asking the index to be order-aware. That last part genuinely
+sidesteps what closed the sequence arc, since it computes over a permutation-invariant index
+rather than inside it. Worth stating so the idea is not re-killed by the wrong precedent.
+
+**No new machinery needed**: shared density is a density query at the midpoint, which dyf
+already answers. The proposed "layer" is a query pattern, not an index change.
+
+**Test 1 — at MATCHED pair distance, does it discriminate same-motion pairs?** Distance is
+the confound that would make this trivial, so it is held constant within bands. CMU MoCap,
+40k frames, 6,000 pairs:
+
+| distance band | midpoint | segment_min | mid/endpoint | endpoint_mean | distance |
+|---|---|---|---|---|---|
+| 173–221 | 0.509 | 0.503 | 0.509 | 0.450 | 0.505 |
+| 221–273 | 0.463 | 0.462 | 0.463 | 0.513 | 0.478 |
+| 273–307 | 0.504 | 0.504 | 0.504 | 0.480 | 0.533 |
+| 307–353 | 0.474 | 0.474 | 0.474 | 0.488 | 0.473 |
+| 353–655 | 0.528 | 0.527 | 0.528 | 0.534 | 0.533 |
+
+**Nothing.** Every AUC sits at 0.46–0.53. `endpoint_mean` — the per-point density dyf already
+gives — is equally uninformative, so this is not "shared beats per-point", it is "neither
+carries motion type". ⚠ Caveat that weakens the negative: **pooled distance AUC is only
+0.544**, so raw geometry barely predicts motion type in 62-d pose space either. Motion type
+is about dynamics, not static pose, so single-frame features cannot express it and there was
+little for shared density to add to. A different corpus/label pair could still be informative.
+
+**Test 2 — the temporal predecessor, boundary detection at increasing lag.** All 79 trial
+boundaries enumerated (see the bug note below), 20 within-trial controls each:
+
+| lag | boundaries | step(within) | step(bnd) | **AUC step** | AUC −midpoint | AUC −mid/endpoint |
+|---|---|---|---|---|---|---|
+| 1 | 79 | 3.9 | 147.1 | **0.990** | 0.773 | 0.769 |
+| 5 | 395 | 14.9 | 143.0 | **0.946** | 0.766 | 0.758 |
+| 20 | 1580 | 48.0 | 138.7 | **0.792** | 0.740 | 0.777 |
+| 60 | 4740 | 99.9 | 130.7 | 0.574 | 0.479 | 0.471 |
+| 150 | 11713 | 147.8 | 140.5 | 0.487 | 0.574 | **0.580** |
+
+**Raw step distance dominates at every lag where the task is solvable.** Shared density only
+edges ahead at lag 150 (0.580 vs 0.487) — exactly where step distance has collapsed to chance
+and both signals are weak. Not a win worth building on.
+
+⚠ **Two bugs in the first version of test 2, both instructive:**
+
+1. **Random sampling found 3 boundaries in 4,000 adjacent pairs** (there are only 79 in
+   140,837 frames) and cheerfully reported AUC 0.988 on n=3. Rare-event labels must be
+   enumerated, not sampled.
+2. **Shared density is scale-degenerate.** At lag 1 the step is 3.8 while the density radius
+   is 34.4, so the midpoint lies inside *both* endpoints' neighbourhoods by construction and
+   `mid/endpoint` is exactly **1.000**. The measure cannot say anything unless the step is
+   comparable to the density scale — which is why the lag sweep exists, and a caution for any
+   future pairwise-density measure: check the ratio of separation to kernel width first.
+
+**Not ruled out**: bridge detection. A pair with dense endpoints and an empty midpoint is
+*definitionally* a bridge, and dyf already ships `BridgeAnalysis` / `find_super_connectors`
+as a baseline to beat. That is the one framing where shared density has an existing target
+and a real incumbent, and it was not tested here.
