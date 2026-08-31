@@ -16,6 +16,31 @@ Motivation, measured on a 229,243-section SEC 10-Q corpus
   queries affected), so it pays for returning redundant copies. Scored on distinct content
   instead, dedup wins at every budget tested but the largest, where it reaches parity.
 
+**Measure your corpus before enabling this.** The duplicate rate is wildly corpus-dependent
+and the win tracks it closely (`benchmarks/sequence_arc/sec_dedup_corpora.py`, weighed
+`.dyf` files, cosine > 0.99):
+
+===================  ==========  ============
+corpus               dup rate    file saving
+===================  ==========  ============
+CMU MoCap 62d            88.3%         77.1%
+SEC 10-Q 768d            29.4%         25.6%
+news MiniLM 384d          1.0%         -3.1%
+tweets MiniLM 384d        0.1%         -3.1%
+arxiv MiniLM 384d         0.0%         -3.3%
+wikipedia MiniLM 384d     0.0%         -3.9%
+===================  ==========  ============
+
+Curated document collections have almost no near-duplicates; templated corpora (SEC
+boilerplate) and temporally oversampled ones (adjacent motion-capture frames) have many.
+Where duplicates exist, **file saving is reliably ~0.87x the duplicate rate** -- the shortfall
+is tree overhead, since every node stores a dim-length centroid and leaf count falls more
+slowly than point count. Where they do not, :func:`dedup_for_index` omits its bookkeeping
+fields so the cost is zero rather than the -3% seen when they were added unconditionally.
+
+:func:`near_duplicate_clusters` is itself the cheap diagnostic: ~1s per 100k points, so
+measure first and enable accordingly rather than by default.
+
 Only numpy is used, so this stays importable on the core dependency set.
 
 Cosine similarity is the comparison; embeddings are unit-normalised internally, so callers
@@ -260,6 +285,13 @@ def dedup_for_index(
                 out_fields[name] = values[reps]
             else:
                 out_fields[name] = [values[i] for i in reps]
+    # When nothing was collapsed, the bookkeeping fields are pure overhead: orig_index is
+    # the identity and every dup_members entry is empty. Measured on four curated text
+    # corpora with ~0% duplicates, adding them anyway made the .dyf 3-4% LARGER. Skip them.
+    if result.n_removed == 0:
+        logger.info("dedup: no duplicates found, omitting %r/%r fields", origin_field, member_field)
+        return np.ascontiguousarray(E[reps]), out_fields, result
+
     if origin_field:
         out_fields[origin_field] = reps.astype(np.int64)
     if member_field:

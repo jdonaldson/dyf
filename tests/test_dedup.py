@@ -256,6 +256,18 @@ class TestDedupForIndex:
         _, sfr, _ = dedup_for_index(X, sf, member_field=None, origin_field=None)
         assert set(sfr) == {"label", "num"}
 
+    def test_no_duplicates_means_no_bookkeeping_overhead(self):
+        """Adding orig_index/dup_members when nothing collapsed made files 3-4% LARGER."""
+        from dyf.dedup import dedup_for_index
+
+        rng = np.random.default_rng(2)
+        X = rng.standard_normal((120, 16)).astype(np.float32)
+        X /= np.linalg.norm(X, axis=1, keepdims=True)
+        Xr, sfr, r = dedup_for_index(X, {"label": [str(i) for i in range(120)]})
+        assert r.n_removed == 0
+        assert set(sfr) == {"label"}, "bookkeeping fields must be omitted when nothing deduped"
+        assert len(Xr) == len(X)
+
     def test_works_with_no_stored_fields(self):
         from dyf.dedup import dedup_for_index
 

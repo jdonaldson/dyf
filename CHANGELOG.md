@@ -10,11 +10,24 @@
   with `.mask()` (which points to index), `.members()` (representative → the points it
   stands for), and `.member_field()` (a `stored_fields`-ready encoding of the mapping).
 
-  Measured on a 229,243-section SEC 10-Q corpus (`benchmarks/sequence_arc/sec_dedup_*.py`):
-  **29.4% of that corpus is near-duplicate content**, and indexing representatives only
-  shrinks the weighed `.dyf` from **418.5 MB to 311.3 MB (25.6%, 107 MB saved)**. The dedup
-  pass costs ~2.5s. Note the file saving is smaller than the point saving because every tree
-  node stores a dim-length centroid and leaf count falls only ~10%.
+  **Measure your corpus before enabling this — the duplicate rate spans 0% to 88%** across
+  six corpora (`benchmarks/sequence_arc/sec_dedup_corpora.py`, weighed `.dyf` files):
+
+  | corpus | dup rate | file saving |
+  |---|---|---|
+  | CMU MoCap 62d (adjacent frames) | 88.3% | 77.1% |
+  | SEC 10-Q 768d (legal boilerplate) | 29.4% | 25.6% |
+  | news 384d | 1.0% | ~0% |
+  | tweets 384d | 0.1% | ~0% |
+  | arxiv 384d | 0.0% | ~0% |
+  | wikipedia 384d | 0.0% | ~0% |
+
+  Curated document collections have almost no near-duplicates; templated corpora and
+  temporally oversampled ones have many. Where duplicates exist, **file saving is reliably
+  ~0.87× the duplicate rate** — the shortfall is tree overhead, since every node stores a
+  dim-length centroid and leaf count falls more slowly than point count.
+  `near_duplicate_clusters` is itself the diagnostic at ~1s per 100k points, so measure
+  first rather than enabling by default.
 
   Retrieval quality *improves* when scored on distinct content: measured against the top-10
   distinct clusters, the deduped index wins at every work budget tested but the largest,

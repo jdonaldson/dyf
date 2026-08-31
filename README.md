@@ -116,10 +116,20 @@ from dyf import decode_members
 also_matched = decode_members(result_fields["dup_members"][0])
 ```
 
-On a 229k-section SEC 10-Q corpus, 29.4% of points were near-duplicates and the `.dyf`
-shrank **418.5 MB → 311.3 MB (25.6%)**. Retrieval quality improves when scored on distinct
-content, because the probe budget stops re-scanning near-identical vectors. No file-format
-change: the mapping is an ordinary utf8 stored field.
+**Measure before enabling — the duplicate rate is wildly corpus-dependent:**
+
+| corpus | dup rate | `.dyf` saving |
+|---|---|---|
+| CMU MoCap (adjacent frames) | 88.3% | **77.1%** |
+| SEC 10-Q (legal boilerplate) | 29.4% | **25.6%** |
+| news / tweets / arxiv / wikipedia | 0.0–1.0% | ~0% |
+
+Curated document collections have almost no near-duplicates; templated or temporally
+oversampled corpora have many. Where duplicates exist, file saving is reliably **~0.87× the
+duplicate rate**. `near_duplicate_clusters` is itself the cheap diagnostic (~1s per 100k
+points), so measure first. Retrieval quality also improves when scored on distinct content,
+because the probe budget stops re-scanning near-identical vectors. No file-format change:
+the mapping is an ordinary utf8 stored field.
 
 ### Adaptive Probing
 
