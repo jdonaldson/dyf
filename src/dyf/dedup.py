@@ -32,7 +32,7 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["DedupResult", "decode_members", "near_duplicate_clusters"]
+__all__ = ["DedupResult", "decode_members", "dedup_for_index", "near_duplicate_clusters"]
 
 
 @dataclass
@@ -202,3 +202,67 @@ def near_duplicate_clusters(
         threshold,
     )
     return DedupResult(assigned, reps, threshold, n)
+
+
+def dedup_for_index(
+    embeddings,
+    stored_fields=None,
+    threshold: float = 0.99,
+    member_field: str = "dup_members",
+    origin_field: str = "orig_index",
+    **kwargs,
+):
+    """Dedup an ingest batch: subset embeddings AND stored fields to representatives.
+
+    The piece every ingest path needs. Subsetting embeddings alone would silently
+    de-align every parallel stored-field list, so this does both together and adds the
+    fields that make the written index self-describing:
+
+    * ``origin_field`` -- each row's index in the ORIGINAL pre-dedup input.
+    * ``member_field`` -- the other original indices that row stands for.
+
+    Both refer to the pre-dedup input, not to rows of the written file, because the whole
+    point is to let a caller map back to data that is no longer stored. ``item_index`` in
+    the file still refers to rows of the deduped array, and since the stored fields are
+    subset in lockstep, row-to-field alignment stays correct.
+
+    Args:
+        embeddings: (n, dim) array-like.
+        stored_fields: Optional mapping of field name to a length-n sequence, subset in
+            lockstep with the embeddings.
+        threshold: Cosine duplicate threshold, passed to
+            :func:`near_duplicate_clusters`.
+        member_field: Stored-field name for the member lists. Pass ``None`` to omit.
+        origin_field: Stored-field name for each row's original index. Pass ``None`` to
+            omit.
+        **kwargs: Forwarded to :func:`near_duplicate_clusters` (``n_tables``, ``n_bits``,
+            ``seed``, ``max_bucket``).
+
+    Returns:
+        ``(embeddings_reps, stored_fields_reps, result)``. Feed the first two straight to
+        `write_lazy_index`; ``result`` is a :class:`DedupResult` for reporting.
+
+    Raises:
+        ValueError: If a stored field's length does not match ``len(embeddings)``.
+    """
+    E = np.asarray(embeddings)
+    result = near_duplicate_clusters(E, threshold=threshold, **kwargs)
+    reps = result.representatives
+
+    out_fields: dict = {}
+    if stored_fields:
+        for name, values in stored_fields.items():
+            if len(values) != len(E):
+                raise ValueError(
+                    f"stored field {name!r} has length {len(values)}, expected {len(E)} to match embeddings"
+                )
+            if isinstance(values, np.ndarray):
+                out_fields[name] = values[reps]
+            else:
+                out_fields[name] = [values[i] for i in reps]
+    if origin_field:
+        out_fields[origin_field] = reps.astype(np.int64)
+    if member_field:
+        out_fields[member_field] = result.member_field()
+
+    return np.ascontiguousarray(E[reps]), out_fields, result

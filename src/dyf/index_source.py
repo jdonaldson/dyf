@@ -281,8 +281,17 @@ def index_source(
     num_bits: int = 4,
     min_leaf_size: int = 5,
     seed: int = 42,
+    dedup: float | None = None,
 ) -> None:
-    """Index source code into a .dyf file."""
+    """Index source code into a .dyf file.
+
+    Args:
+        dedup: If set, cosine threshold for ingest-time near-duplicate collapsing (0.99 is
+            a good default). One representative per duplicate cluster is indexed and the
+            mapping is stored as ``orig_index`` / ``dup_members`` fields. Source trees
+            repeat themselves heavily — vendored copies, generated files, boilerplate
+            headers — so this can shrink the index substantially. ``None`` disables it.
+    """
     logger.info("Indexing source code")
     logger.info(f"  Source: {source_dir}")
     logger.info(f"  Output: {output}")
@@ -319,6 +328,28 @@ def index_source(
     norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
     embeddings = embeddings / np.where(norms > 0, norms, 1)
 
+    # Stored fields, kept parallel with `embeddings` so dedup can subset both in lockstep
+    stored_fields = {
+        "title": [c["title"] for c in all_chunks],
+        "file": [c["file"] for c in all_chunks],
+        "kind": [c["kind"] for c in all_chunks],
+        "line": [str(c["line"]) for c in all_chunks],
+        "language": [c["language"] for c in all_chunks],
+    }
+
+    # Optional ingest-time dedup — must happen BEFORE the tree is built, so the tree is
+    # fitted on distinct content rather than on repeated copies.
+    n_original = len(embeddings)
+    if dedup is not None:
+        from .dedup import dedup_for_index
+
+        t0 = time.time()
+        embeddings, stored_fields, dd = dedup_for_index(embeddings, stored_fields, threshold=dedup, seed=seed)
+        logger.info(
+            f"Dedup at cosine > {dedup}: {n_original} -> {len(embeddings)} chunks "
+            f"({dd.removed_fraction:.1%} removed) in {time.time() - t0:.1f}s"
+        )
+
     # Build DYF tree
     logger.info("Building DYF tree...")
     t0 = time.time()
@@ -335,11 +366,6 @@ def index_source(
     # Write .dyf
     logger.info("Writing .dyf...")
     t0 = time.time()
-    titles = [c["title"] for c in all_chunks]
-    files = [c["file"] for c in all_chunks]
-    kinds = [c["kind"] for c in all_chunks]
-    line_nums = [str(c["line"]) for c in all_chunks]
-    languages = [c["language"] for c in all_chunks]
 
     write_lazy_index(
         tree,
@@ -359,17 +385,14 @@ def index_source(
             "min_leaf_size": min_leaf_size,
             "seed": seed,
         },
-        stored_fields={
-            "title": titles,
-            "file": files,
-            "kind": kinds,
-            "line": line_nums,
-            "language": languages,
-        },
+        stored_fields=stored_fields,
     )
     size_mb = output.stat().st_size / (1024 * 1024)
     logger.info(f"  Written {output.name} ({size_mb:.1f} MB) in {time.time() - t0:.1f}s")
-    logger.info(f"Done. {len(all_chunks)} chunks indexed.")
+    if dedup is not None and len(embeddings) != n_original:
+        logger.info(f"Done. {len(embeddings)} of {n_original} chunks indexed (deduped).")
+    else:
+        logger.info(f"Done. {len(all_chunks)} chunks indexed.")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -424,6 +447,16 @@ def main(argv: list[str] | None = None) -> int:
         default=42,
         help="Random seed (default: 42)",
     )
+    parser.add_argument(
+        "--dedup",
+        type=float,
+        nargs="?",
+        const=0.99,
+        default=None,
+        metavar="COSINE",
+        help="Collapse near-duplicate chunks before indexing (default threshold 0.99 when "
+        "the flag is given with no value; omit the flag to disable)",
+    )
 
     args = parser.parse_args(argv)
 
@@ -445,5 +478,6 @@ def main(argv: list[str] | None = None) -> int:
         num_bits=args.num_bits,
         min_leaf_size=args.min_leaf_size,
         seed=args.seed,
+        dedup=args.dedup,
     )
     return 0

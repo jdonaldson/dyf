@@ -89,6 +89,7 @@ from .cut import cut_tree_to_labels
 from .dedup import (
     DedupResult,
     decode_members,
+    dedup_for_index,
     near_duplicate_clusters,
 )
 
@@ -307,6 +308,7 @@ __all__ = [
     # Ingest-time near-duplicate detection
     "DedupResult",
     "decode_members",
+    "dedup_for_index",
     "near_duplicate_clusters",
     # PCA tree
     "build_pca_tree",

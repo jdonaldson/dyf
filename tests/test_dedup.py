@@ -196,6 +196,97 @@ def test_end_to_end_dedup_then_index_roundtrip():
             os.unlink(path)
 
 
+class TestDedupForIndex:
+    """`dedup_for_index` must keep embeddings and stored fields aligned.
+
+    Subsetting embeddings without subsetting the parallel field lists is the failure that
+    would silently mislabel every row of a written index, so it is tested directly.
+    """
+
+    def _fixture(self):
+        X = _clustered(n_clusters=10, per=3, dim=16, jitter=0.001, seed=21)
+        labels = [f"pt{i}" for i in range(len(X))]
+        nums = np.arange(len(X), dtype=np.int64)
+        return X, {"label": labels, "num": nums}
+
+    def test_embeddings_and_fields_stay_aligned(self):
+        from dyf.dedup import dedup_for_index
+
+        X, sf = self._fixture()
+        Xr, sfr, r = dedup_for_index(X, sf)
+        assert len(Xr) == len(r.representatives)
+        for name in ("label", "num"):
+            assert len(sfr[name]) == len(Xr), f"{name} de-aligned from embeddings"
+        # each surviving row's fields are the ORIGINAL row's fields
+        for row, orig in enumerate(sfr["orig_index"]):
+            assert sfr["label"][row] == f"pt{orig}"
+            assert sfr["num"][row] == orig
+            assert np.allclose(Xr[row], X[orig])
+
+    def test_list_and_ndarray_fields_both_work(self):
+        from dyf.dedup import dedup_for_index
+
+        X, sf = self._fixture()
+        _, sfr, _ = dedup_for_index(X, sf)
+        assert isinstance(sfr["num"], np.ndarray)
+        assert isinstance(sfr["label"], list)
+
+    def test_added_fields_reconstruct_the_original_set(self):
+        from dyf.dedup import dedup_for_index
+
+        X, sf = self._fixture()
+        _, sfr, _ = dedup_for_index(X, sf)
+        recovered = []
+        for orig, enc in zip(sfr["orig_index"], sfr["dup_members"]):
+            recovered.append(int(orig))
+            recovered.extend(decode_members(enc).tolist())
+        assert np.array_equal(np.sort(np.array(recovered)), np.arange(len(X)))
+
+    def test_length_mismatch_is_rejected(self):
+        from dyf.dedup import dedup_for_index
+
+        X, _ = self._fixture()
+        with pytest.raises(ValueError, match="length"):
+            dedup_for_index(X, {"bad": ["only", "three", "items"]})
+
+    def test_added_fields_can_be_suppressed(self):
+        from dyf.dedup import dedup_for_index
+
+        X, sf = self._fixture()
+        _, sfr, _ = dedup_for_index(X, sf, member_field=None, origin_field=None)
+        assert set(sfr) == {"label", "num"}
+
+    def test_works_with_no_stored_fields(self):
+        from dyf.dedup import dedup_for_index
+
+        X, _ = self._fixture()
+        Xr, sfr, r = dedup_for_index(X)
+        assert len(Xr) == len(r.representatives)
+        assert set(sfr) == {"orig_index", "dup_members"}
+
+    def test_output_is_writable_as_an_index(self):
+        import os
+        import tempfile
+
+        pytest.importorskip("dyf_rs")
+        from dyf.dedup import dedup_for_index
+        from dyf.dyf_tree import build_dyf_tree
+        from dyf.lazy_index import LazyIndex, write_lazy_index
+
+        X, sf = self._fixture()
+        Xr, sfr, _ = dedup_for_index(X, sf)
+        tree = build_dyf_tree(Xr, max_depth=3, num_bits=3, min_leaf_size=2, seed=42)
+        with tempfile.NamedTemporaryFile(suffix=".dyf", delete=False) as f:
+            path = f.name
+        try:
+            write_lazy_index(tree, Xr, path, stored_fields=sfr)
+            idx = LazyIndex(path)
+            assert {"label", "num", "orig_index", "dup_members"} <= set(idx.stored_field_names)
+        finally:
+            if os.path.exists(path):
+                os.unlink(path)
+
+
 def test_full_recovery_of_original_point_set():
     """Representatives plus decoded members must cover every original point exactly once."""
     X = _clustered(n_clusters=18, per=5, jitter=0.002, seed=13)
