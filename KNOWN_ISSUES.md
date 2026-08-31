@@ -65,6 +65,51 @@ resilient to either return type at no cost.
 
 ---
 
+## 4. `nprobe="auto"` adaptive probing is a no-op — OPEN
+
+**Symptom**: `AdaptiveProbeConfig`'s defaults are miscalibrated, so
+`nprobe="auto"` resolves to `max_probes` for nearly every query. It behaves as a
+fixed `nprobe≈5` while presenting as adaptive.
+
+**Measured** (`benchmarks/sequence_arc/sec_adaptive_audit.py`, 100k×768 SEC
+subset, 400 queries, through the real `LazyIndex.search`):
+
+- Routing margin distribution: median **0.0083**, p10 0.0014, p90 **0.0254** —
+  entirely *below* the default `margin_hi=0.1`. **0.0% of queries reach
+  `margin_hi`**, so the "confident query → fewer probes" branch never fires.
+  57.0% sit at/below `margin_lo=0.01` and get `max_probes`.
+- Resolved nprobe distribution: `{2: 2, 3: 3, 4: 54, 5: 341}` — 85% of queries
+  get exactly `max_probes=5`.
+- Against a fixed-nprobe sweep on the same index, auto lands **ON** the frontier:
+  recall 0.5280 at 172 candidates vs an interpolated 0.5258 (**+0.0022**). It is
+  indistinguishable from `nprobe=5` (0.5305 @ 176).
+- Identical on both `backend="python"` and `backend="rust"` — the kernels agree,
+  so this is the shared logic, not a backend divergence.
+
+**Root cause**: the thresholds are **absolute** margins, but `|projection|` scales
+with embedding norm and hyperplane normalisation, so no single constant transfers
+across corpora. Compounding it, the default range `min_probes=1 … max_probes=5`
+spans recall 0.31–0.53 on this corpus, where `nprobe=128` is needed for 0.92 — so
+even perfectly calibrated allocation could only move a regime nobody ships.
+
+**Fix not applied** — needs a design decision, two parts:
+1. Make thresholds *relative*: compute margin quantiles at build time, store them
+   in index metadata, and interpolate on the quantile rather than a raw margin.
+2. Widen the probe range, or express it as a multiplier on a caller-supplied base
+   nprobe rather than absolute 1–5.
+
+**Meanwhile**: `nprobe="auto"` is safe but pointless; pass an explicit int. Also
+note `LazyIndex.search`'s `nprobe` parameter is annotated `int` while the
+docstring and `_resolve_nprobe` both accept `"auto"` and `AdaptiveProbeConfig` —
+the annotation is stale and type-checkers flag correct calls.
+
+Discovered 2026-08-31 while auditing whether adaptive probing earns its
+complexity. An earlier probe (`sec_adaptive_probe.py`) tested margin as a *rank
+allocation* signal and also found ~0 effect, but that is a different mechanism
+from the shipped one; this audit exercises the real code path.
+
+---
+
 ## Source
 
 Discovered 2026-04-07 while wiring `experiments/capability_dyf_router.py` in
