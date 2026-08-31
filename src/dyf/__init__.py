@@ -85,6 +85,13 @@ from .configs import (
 # Unified tree-cutting dispatcher (routes to the right impl per tree shape)
 from .cut import cut_tree_to_labels
 
+# Ingest-time near-duplicate detection
+from .dedup import (
+    DedupResult,
+    decode_members,
+    near_duplicate_clusters,
+)
+
 # Dense in-memory multiprobe search (Rust-backed, dyf-rs >= 0.8.0)
 from .dense_search import DenseSearchIndex, flatten_tree
 
@@ -297,6 +304,10 @@ __all__ = [
     "deduplicate_chunks",
     "doc_spread",
     "neighbor_coherence",
+    # Ingest-time near-duplicate detection
+    "DedupResult",
+    "decode_members",
+    "near_duplicate_clusters",
     # PCA tree
     "build_pca_tree",
     "extract_boundary_persistence",

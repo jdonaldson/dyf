@@ -1,5 +1,47 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **`dyf.dedup` — ingest-time near-duplicate detection.** `near_duplicate_clusters()`
+  groups points at cosine > 0.99 using multi-table random-projection LSH, so you can index
+  one representative per duplicate cluster instead of every copy. Returns a `DedupResult`
+  with `.mask()` (which points to index), `.members()` (representative → the points it
+  stands for), and `.member_field()` (a `stored_fields`-ready encoding of the mapping).
+
+  Measured on a 229,243-section SEC 10-Q corpus (`benchmarks/sequence_arc/sec_dedup_*.py`):
+  **29.4% of that corpus is near-duplicate content**, and indexing representatives only
+  shrinks the weighed `.dyf` from **418.5 MB to 311.3 MB (25.6%, 107 MB saved)**. The dedup
+  pass costs ~2.5s. Note the file saving is smaller than the point saving because every tree
+  node stores a dim-length centroid and leaf count falls only ~10%.
+
+  Retrieval quality *improves* when scored on distinct content: measured against the top-10
+  distinct clusters, the deduped index wins at every work budget tested but the largest,
+  where it reaches parity. Scored against raw brute-force `recall@10` it appears to lose —
+  but that metric puts a mean of 2.97 duplicate slots in every true top-10 (83% of queries
+  affected), so it pays for returning redundant copies, which is what dedup exists to
+  prevent.
+
+  **No file-format change.** The representative → members mapping travels as an ordinary
+  utf8 stored field, so `.dyf` schema, the generated flatbuffers, and the Rust reader are
+  all untouched. `search()` already returns stored fields in `result.fields`.
+
+  Clustering is *star*, not transitive: a point joins a representative only if it is within
+  threshold of *that representative*. Transitive union-find was measured to chain a
+  541-member "duplicate" cluster containing genuinely dissimilar documents, and cost 5pp of
+  recall where star clustering gained 2.6pp.
+
+  ```python
+  from dyf import near_duplicate_clusters, build_dyf_tree, write_lazy_index
+
+  result = near_duplicate_clusters(embeddings)          # cosine > 0.99
+  reps = embeddings[result.mask()]
+  tree = build_dyf_tree(reps, max_depth=4, num_bits=4)
+  write_lazy_index(tree, reps, "index.dyf",
+                   stored_fields={"dup_members": result.member_field()})
+  ```
+
 ## 0.12.1
 
 ### Fixed

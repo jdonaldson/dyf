@@ -95,6 +95,32 @@ indices, scores = idx.search(query, k=10, nprobe=256)
 I, S = idx.search(query_batch, k=10, nprobe=256)    # batched -> (nq, k)
 ```
 
+### Shrink the Index: Dedup on Ingest
+
+Real corpora repeat themselves. Index one representative per near-duplicate cluster and
+carry the mapping as a stored field:
+
+```python
+from dyf import near_duplicate_clusters, build_dyf_tree, write_lazy_index
+
+result = near_duplicate_clusters(embeddings)        # cosine > 0.99, ~2.5s / 229k points
+print(f"{result.n_removed:,} duplicates ({result.removed_fraction:.1%})")
+
+reps = embeddings[result.mask()]
+tree = build_dyf_tree(reps, max_depth=4, num_bits=4)
+write_lazy_index(tree, reps, "index.dyf",
+                 stored_fields={"dup_members": result.member_field()})
+
+# at query time, expand a hit back to the points it stands for
+from dyf import decode_members
+also_matched = decode_members(result_fields["dup_members"][0])
+```
+
+On a 229k-section SEC 10-Q corpus, 29.4% of points were near-duplicates and the `.dyf`
+shrank **418.5 MB → 311.3 MB (25.6%)**. Retrieval quality improves when scored on distinct
+content, because the probe budget stops re-scanning near-identical vectors. No file-format
+change: the mapping is an ordinary utf8 stored field.
+
 ### Adaptive Probing
 
 Queries near decision boundaries automatically probe more leaves:
