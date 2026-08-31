@@ -5,6 +5,65 @@ each cost some time to diagnose.
 
 ---
 
+## Cleanup queue (opened 2026-08-31)
+
+Ordered by leverage, not by size. Evidence for each is in the numbered issues below.
+
+**P0 — incomplete sweep of issue 5, left in the tree by the same commit that documented it**
+
+- [x] `find_super_connectors` global + facet passes — relative threshold (issue 5)
+- [x] `_precompute_neighborhoods` (`BridgeIndex.fit`) — now relative
+- [x] `select_orthogonal_anchors` — now relative, and the silent fallback logs a warning
+- [x] `_find_candidate_bridges` (both single-seed and stability-seed paths) — now relative
+- [x] Factored into one `_relative_bridge_threshold()` helper; all six call sites route
+      through it, and `percentile=0` reproduces the old absolute floor for comparison
+- [x] Verified: `select_orthogonal_anchors(use_bridges=True)` now reports
+      `candidate_source='bridges'` instead of falling back to `'all'`
+- [ ] ⚠ **but the outcome is unchanged on SEC** — the selected anchors are still identical
+      to `use_bridges=False` (60 of 60 overlap). Plausible reason: bridges are by definition
+      the points furthest from their bucket centroid, i.e. the extremes that a
+      max-orthogonality greedy selects anyway, so the candidate restriction is close to a
+      no-op for this selector. Worth deciding whether `use_bridges` earns its existence.
+- [ ] `select_orthogonal_anchors(k=12)` returned **60** anchors — unexplained, unrelated to
+      the threshold work, noticed while verifying
+
+**P1 — shipped features that do not work**
+
+- [ ] `nprobe="auto"` is a no-op (issue 4). Needs margin quantiles stored at build time
+      *and* a probe range wider than 1–5
+- [ ] `analyze_bridges`'s own `bridge_threshold=0.5` default — cross-repo, `dyf-core/dyf-rs`
+- [ ] `connection_threshold=0.3` in the same function — also absolute, never audited
+
+**P2 — sweep the rest of the pattern (see the rule at the end of issue 5)**
+
+- [ ] `ontology.py` — 0.55, 0.45, `diversity_gap_threshold=0.02` (five sites)
+- [ ] `concept_graph.py` (0.2, 0.4), `catalog.py` (0.5), `splits.py` (0.10),
+      `cluster_tree.py` (`straddle_threshold=0.15`)
+- [ ] `agglomerate.louvain_cluster_leaves(similarity_threshold=0.5)` — measured inert on
+      SEC (cell-pair cosine baseline is 0.821, so it filters nothing) and documented as
+      NetworkX-fallback-only, so lowest urgency of the class
+- [ ] Eight `analyze_bridges` calls in `demo/` — not shipped, cosmetic
+
+**P3 — the test gap that let issue 5 ship (highest leverage item here)**
+
+- [ ] All 77 pre-existing `test_rag.py` tests passed against an empty result: they assert
+      types and array lengths, never that anything was *detected*. Sweep for other tests
+      with that shape. This is the generator of the whole bug class — it would have caught
+      issue 5 and would catch P2 without hand-auditing each constant.
+
+**P4 — hygiene**
+
+- [ ] `LazyIndex.search`'s `nprobe` annotated `int` while accepting `"auto"` and
+      `AdaptiveProbeConfig`; type-checkers flag correct calls
+- [ ] ~8 pre-existing pyright `Optional` errors in `rag.py`
+- [ ] Consider splitting `DEDUP_NOTES.md` out of `SPECTRAL_NOTES.md`, whose CLOSED banner
+      undersells the arc's one positive result
+- [ ] Query-time dedup expansion in `LazyIndex.search` — deliberately NOT built, since
+      expansion is a no-op for distinct-content retrieval. Revisit only if a
+      "give me every matching id" use case appears
+
+---
+
 ## 1. Editable-install metadata staleness vs. version constraints — FIXED
 
 **Symptom**: After bumping `pyproject.toml` from 0.6.2 → 0.8.0, an existing
