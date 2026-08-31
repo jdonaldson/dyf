@@ -76,6 +76,14 @@ class TestSuperConnectors:
         assert len(result.local_centrality) == len(sample_embeddings)
         assert len(result.quadrant) == len(sample_embeddings)
 
+        # BEHAVIOUR, not just shape. Every assertion above holds of an empty, all-zero
+        # result, which is exactly what this function returned on text embeddings while
+        # this test passed (KNOWN_ISSUES #5). Detected by
+        # `benchmarks/audit_test_assertions.py`, which flags tests whose assertions are all
+        # type/length checks.
+        assert result.global_centrality.sum() > 0, "found no bridges at all"
+        assert (result.quadrant != "Regular").any(), "every point classified as Regular"
+
     def test_finds_bridges_on_anisotropic_embeddings(self):
         """Regression: this returned ZERO on text-like embeddings.
 

@@ -46,10 +46,46 @@ Ordered by leverage, not by size. Evidence for each is in the numbered issues be
 
 **P3 — the test gap that let issue 5 ship (highest leverage item here)**
 
-- [ ] All 77 pre-existing `test_rag.py` tests passed against an empty result: they assert
-      types and array lengths, never that anything was *detected*. Sweep for other tests
-      with that shape. This is the generator of the whole bug class — it would have caught
-      issue 5 and would catch P2 without hand-auditing each constant.
+- [x] Built `benchmarks/audit_test_assertions.py` — AST scan classifying every assertion in
+      every `test_*` function as *shape* (isinstance / len / .shape / .dtype / hasattr) or
+      *value* (anything constraining content). Flags tests whose assertions are all shape.
+      Validated by construction: it flags `test_find_super_connectors_basic`, the exact test
+      that passed while issue 5 shipped.
+- [x] **Result: 64 of 594 tests (11%) assert shape only; 1 asserts nothing at all**
+      (`test_catalog.py:347 test_alternatives_from_different_parents`). 17 of the 64 guard
+      functions that detect or select, where an empty result would pass.
+- [x] Strengthened `test_find_super_connectors_basic` with the two assertions that would
+      have caught issue 5: `global_centrality.sum() > 0` and `(quadrant != "Regular").any()`
+- [x] ⚠ Two false-positive classes fixed in the scanner first, or it would have cried wolf
+      on 26 tests: `with pytest.raises(...)` (the context manager *is* the assertion) and
+      `np.testing.assert_*` calls (function calls, not `ast.Assert` nodes). 26 → 1 after.
+- [ ] Add behavioural assertions to the remaining 16 flagged detector/selector tests
+- [ ] Consider running the audit in CI as a non-blocking report, so the count cannot grow
+
+**P2 findings — severity downgraded, measured (`benchmarks/audit_absolute_thresholds.py`)**
+
+The `ontology.py` constants are **inert, not destructive** — a materially different problem
+from issue 5. Fraction of kNN pairs clearing each threshold:
+
+| corpus | median kNN sim | ≥0.35 | ≥0.45 | ≥0.55 |
+|---|---|---|---|---|
+| SEC 768d text | 0.855 | 100% | 100% | 100% |
+| CMU MoCap 62d | 0.935 | 100% | 100% | 99% |
+| isotropic gaussian | 0.310 | 18% | 1% | 0% |
+
+They admit ~everything on both real corpora, so the parameter does not discriminate — but
+"admit everything" degrades to "use all neighbours", a benign default, and the builders all
+produce sensible output (SEC: 275 chains, 522 taxonomy roots, 2,378 main nodes). Contrast
+issue 5, where the same class of constant produced an *empty* result. So P2 is a
+**misleading-knob** problem — users think they are tuning something inert — not a bug.
+`build_rog_ontology` adapts its cut via `threshold_decay` + `target_coverage` and is
+structurally immune; it is the model the others should follow.
+
+⚠ The first version of that probe read `.nodes` / `.chains` off `DAGTaxonomy` and
+`UnifiedOntologyResult` — neither attribute exists — and so reported 0 for three functions
+that work fine. Caught before it was written up. Reading a nonexistent attribute and
+reporting the default is how a probe manufactures a false positive; it is the same mistake
+as the `super_connector_indices` typo earlier in this session.
 
 **P4 — hygiene**
 
