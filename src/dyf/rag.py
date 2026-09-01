@@ -128,6 +128,38 @@ class OrthogonalAnchorResult:
 DEFAULT_BRIDGE_PERCENTILE = 10.0
 
 
+def _derive_num_bits(n_points: int, min_bucket_size: int, cap: int = 12) -> int:
+    """Bucket resolution scaled to corpus size, so dense buckets can actually exist.
+
+    Faceting only runs inside buckets that clear ``min_bucket_size``. A *fixed* bit count
+    fixes the bucket count at ``2**bits`` regardless of ``n``, so below some corpus size no
+    bucket ever qualifies and the dense-bucket gate closes completely. Measured with the old
+    ``global_num_bits=12`` default (4096 buckets, ``min_bucket_size=20``):
+
+    =========  =======  ==============  =============  ================
+    data       n        largest bucket  dense buckets  super connectors
+    =========  =======  ==============  =============  ================
+    isotropic      500               2              0                 0
+    isotropic   30,000              20              0                 0
+    clustered    2,000              18              0                 0
+    clustered    8,000             113            112                50
+    =========  =======  ==============  =============  ================
+
+    So the feature was silently inert below ~8k points, and on isotropic data at every size
+    tested. Targeting a mean occupancy of ``2 * min_bucket_size`` puts the upper quartile of
+    buckets clear of the gate at any ``n``; the cap preserves the previous behaviour on large
+    corpora, where 12 bits was already in the right regime.
+
+    This is the same failure as an absolute cosine threshold (see
+    :func:`_relative_bridge_threshold`) with *corpus size* as the axis that does not
+    transfer rather than anisotropy.
+    """
+    if n_points <= 0:
+        return 2
+    target_buckets = max(n_points / max(2 * min_bucket_size, 1), 4.0)
+    return int(np.clip(int(np.log2(target_buckets)), 2, cap))
+
+
 def _relative_bridge_threshold(clf, percentile: float = DEFAULT_BRIDGE_PERCENTILE) -> float:
     """Bridge cut as a percentile of *this* corpus's centroid-similarity distribution.
 
@@ -198,7 +230,8 @@ class BridgeIndex:
         n_anchors: Number of anchor points to use
         n_query_anchors: Number of anchors to retrieve per query
         expansion_k: Size of neighborhood to expand from each anchor
-        global_num_bits: LSH bits for global bucketing (default 12)
+        global_num_bits: LSH bits for global bucketing (default None = derive from
+            corpus size; a fixed value closes the dense-bucket gate on small corpora)
         seed: Random seed for reproducibility
 
     Example:
@@ -216,8 +249,8 @@ class BridgeIndex:
     n_anchors: int = 1000
     n_query_anchors: int = 10
     expansion_k: int = 200
-    global_num_bits: int = 12
-    facet_num_bits: int = 10
+    global_num_bits: int | None = None
+    facet_num_bits: int | None = None
     dense_percentile: float = 75
     min_bucket_size: int = 20
     include_sparse_points: int = 0  # Number of sparse region points to add
@@ -252,8 +285,18 @@ class BridgeIndex:
         self._embeddings = embeddings
         n_points, dim = embeddings.shape
 
+        # Resolve bucket resolution against the corpus we were actually handed, and record
+        # it, so `global_num_bits` reads back as the value that was used rather than None.
+        if self.global_num_bits is None:
+            self.global_num_bits = _derive_num_bits(n_points, self.min_bucket_size)
+        if self.facet_num_bits is None:
+            self.facet_num_bits = max(2, self.global_num_bits - 2)
+
         if verbose:
-            logger.info(f"Building BridgeIndex: {n_points:,} points, dim={dim}")
+            logger.info(
+                f"Building BridgeIndex: {n_points:,} points, dim={dim}, "
+                f"num_bits={self.global_num_bits}/{self.facet_num_bits}"
+            )
 
         # Step 1: Find super connectors
         if verbose:
@@ -581,8 +624,8 @@ def _compute_local_centrality(
 
 def find_super_connectors(
     embeddings: np.ndarray,
-    global_num_bits: int = 12,
-    facet_num_bits: int = 10,
+    global_num_bits: int | None = None,
+    facet_num_bits: int | None = None,
     dense_percentile: float = 75,
     global_threshold_percentile: float = 50,
     local_threshold_percentile: float = 50,
@@ -601,8 +644,12 @@ def find_super_connectors(
 
     Args:
         embeddings: Normalized embeddings (n_points, dim)
-        global_num_bits: LSH bits for global bucketing
-        facet_num_bits: LSH bits for facet bucketing
+        global_num_bits: LSH bits for global bucketing. ``None`` (default) derives it from
+            the corpus size via :func:`_derive_num_bits`, which is required for the
+            dense-bucket gate to open at all below ~8k points — the previous fixed default
+            of 12 returned zero super connectors on every smaller corpus.
+        facet_num_bits: LSH bits for facet bucketing within a dense bucket. ``None``
+            (default) uses two bits below the global resolution.
         dense_percentile: Percentile threshold for dense buckets
         global_threshold_percentile: Percentile for "high" global centrality
         local_threshold_percentile: Percentile for "high" local centrality
@@ -618,6 +665,11 @@ def find_super_connectors(
         SuperConnectorResult with indices and centrality data
     """
     n_points, dim = embeddings.shape
+
+    if global_num_bits is None:
+        global_num_bits = _derive_num_bits(n_points, min_bucket_size)
+    if facet_num_bits is None:
+        facet_num_bits = max(2, global_num_bits - 2)
 
     # Global DYF and bridge analysis
     global_clf = DensityClassifier(embedding_dim=dim, num_bits=global_num_bits, seed=seed)
