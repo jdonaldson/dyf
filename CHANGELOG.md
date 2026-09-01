@@ -2,7 +2,32 @@
 
 ## Unreleased
 
+### Changed
+
+- **`find_super_connectors` and `BridgeIndex` now derive their bucket resolution from the
+  corpus size.** `global_num_bits` and `facet_num_bits` default to `None` instead of 12 and
+  10; pass integers to pin them. Behaviour on large corpora is unchanged (the derivation caps
+  at 12), but see below for why the old fixed defaults were broken on small ones.
+
 ### Fixed
+
+- **`find_super_connectors` was inert below ~8,000 points.** Local centrality is only computed
+  inside buckets clearing `min_bucket_size`, but `global_num_bits=12` fixes 4,096 buckets
+  regardless of `n` — so on smaller corpora no bucket ever qualified, local centrality was all
+  zero, no point could be `high_global AND high_local`, and `indices` was always empty.
+  Measured with the old defaults: **0 super connectors at n = 500 / 2,000 / 8,000 / 30,000 on
+  isotropic data, and at 500 / 2,000 on clustered data.** The previous fix (below) was verified
+  on an 8k SEC corpus that is clustered enough to sit just inside the working regime, which is
+  why this survived it.
+
+  New `_derive_num_bits(n, min_bucket_size)` targets a mean bucket occupancy of
+  `2 * min_bucket_size`, capped at 12 bits. `BridgeIndex` carried the same two hardcoded
+  constants and now defers identically, recording the resolved values on the instance so
+  `index.global_num_bits` reads back as the value used.
+
+  Generalises the rule from the bridge-threshold fix: **a default that fixes an absolute
+  *resolution* fails across corpus size exactly as an absolute *similarity* fails across
+  anisotropy.** Any constant implying a partition count must be derived from `n`.
 
 - **`find_super_connectors` returned nothing on text embeddings.** On 8,000 SEC sections it
   produced `indices=[]` with `global_centrality` and `local_centrality` all zero — a
@@ -80,6 +105,20 @@
   write_lazy_index(tree, reps, "index.dyf",
                    stored_fields={"dup_members": result.member_field()})
   ```
+
+### Testing
+
+- **Behavioural assertions added to the 16 tests that asserted shape only for a function
+  whose job is to detect or select.** `benchmarks/audit_test_assertions.py` reports
+  **49 of 595 shape-only (8%), down from 64 of 594 (11%)**, and its ranked list of
+  detector/selector tests dropped from 16 to 1.
+
+  Two of the sixteen were hiding real defects rather than merely under-asserting — the
+  `BridgeIndex` super-connector bug above, and `CatalogSpace._detect_gap` never firing
+  (`KNOWN_ISSUES` #7, open). Also fixed three weak-assertion classes the scanner does not
+  detect: vacuous comparisons (`assert n_components >= 0`), `if result.x:` guards that let a
+  degenerate result skip rather than fail, and one test whose correct answer *is* an empty
+  result but which never said so.
 
 ## 0.12.1
 

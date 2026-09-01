@@ -12,9 +12,15 @@ Heading this serves: see "Heading" at the top of `CLAUDE.md` — v1 *quality*, i
 gap between the shipped surface (109 exports / 72 callables) and the validated one.
 
 **Standing audits** — re-run when touching the public surface; each caught a real defect:
-`benchmarks/audit_public_api.py` (41 of 72 callables, canary reproduces issue 5),
-`benchmarks/audit_test_assertions.py` (11% of tests assert shape only),
+`benchmarks/audit_public_api.py` (41 of 72 callables, 41 OK, canary reproduces issue 5),
+`benchmarks/audit_test_assertions.py` (8% of tests assert shape only, down from 11%),
 `benchmarks/audit_absolute_thresholds.py` (constants that do not transfer).
+
+⚠ **The audits are necessary but not sufficient.** Issues 6 and 7 were both found by asking
+"what does this *test* actually assert?" and then measuring the payload — not by any audit.
+`audit_public_api.py` passed `find_super_connectors` throughout, because its 400-point real
+fixture happens to sit just inside the working regime. `benchmarks/probe_*.py` hold those
+one-off measurements.
 
 **P0 — incomplete sweep of issue 5, left in the tree by the same commit that documented it**
 
@@ -36,6 +42,12 @@ gap between the shipped surface (109 exports / 72 callables) and the validated o
 
 **P1 — shipped features that do not work**
 
+- [x] `find_super_connectors` / `BridgeIndex` returned nothing below ~8k points because
+      `global_num_bits=12` fixes the bucket count regardless of `n` (issue 6). Now derived
+      from corpus size
+- [ ] `CatalogSpace._detect_gap` never fires — `gap_score` was exactly 0.0 across 16 runs
+      (issue 7). Needs a real hierarchical corpus (GUDID) before redesigning; the test now
+      pins the current behaviour so a fix is loud
 - [ ] `nprobe="auto"` is a no-op (issue 4). Needs margin quantiles stored at build time
       *and* a probe range wider than 1–5
 - [ ] `analyze_bridges`'s own `bridge_threshold=0.5` default — cross-repo, `dyf-core/dyf-rs`
@@ -66,7 +78,22 @@ gap between the shipped surface (109 exports / 72 callables) and the validated o
 - [x] ⚠ Two false-positive classes fixed in the scanner first, or it would have cried wolf
       on 26 tests: `with pytest.raises(...)` (the context manager *is* the assertion) and
       `np.testing.assert_*` calls (function calls, not `ast.Assert` nodes). 26 → 1 after.
-- [ ] Add behavioural assertions to the remaining 16 flagged detector/selector tests
+- [x] Added behavioural assertions to the 16 flagged detector/selector tests.
+      **64 → 49 shape-only (11% → 8%); the ranked detector list went 16 → 1.** Two of the
+      16 turned out to be hiding real defects rather than merely under-asserting, which is
+      the argument for having done this by hand: issue 6 (`BridgeIndex` super connectors
+      always empty) and issue 7 (`_detect_gap` never fires).
+- [x] Three further weak-assertion classes the scanner does **not** flag, found by reading
+      the tests it did flag. Worth teaching it these:
+      1. **vacuous comparisons** — `assert result.n_components >= 0`, satisfied by an empty
+         result (`test_mine_dag_chains_returns_chains`)
+      2. **guarded blocks** — `if taxonomy.children:` / `if result.chains:` wraps the real
+         assertions, so a degenerate result *skips* rather than fails. Fixed by asserting
+         the guard condition before the block in four tests.
+      3. **asserting the negative by accident** — `test_mine_dag_chains_basic` runs on
+         isotropic noise where 0 chains is the *correct* answer; it now says so explicitly
+         instead of leaving an empty result indistinguishable from a broken one.
+- [ ] Teach `audit_test_assertions.py` the three classes above
 - [ ] Consider running the audit in CI as a non-blocking report, so the count cannot grow
 
 **P2 findings — severity downgraded, measured (`benchmarks/audit_absolute_thresholds.py`)**
@@ -260,6 +287,97 @@ thresholds, not yet fixed.
 
 **Rule going forward**: a threshold on a similarity, margin, or distance should be expressed
 as a percentile of the observed distribution, not as a constant.
+
+---
+
+## 6. Fixed bucket resolution made `find_super_connectors` inert below ~8k points — FIXED
+
+**Instance C of issue 5, with corpus SIZE as the axis that does not transfer** rather than
+anisotropy. Found by probing what the *tests* were actually asserting, not by the audits.
+
+`find_super_connectors` computes local centrality only inside buckets that clear the dense
+gate, `count > max(percentile(counts, dense_percentile), min_bucket_size)`. The default
+`global_num_bits=12` fixes 4096 buckets **regardless of n**, so below roughly
+`min_bucket_size * 2**bits` points no bucket ever qualifies. No dense buckets → local
+centrality all zero → no point can be `high_global AND high_local` → `indices` always empty.
+
+Measured (`benchmarks/probe_superconnector_scale.py`), old default 12 bits / `min_bucket_size=20`:
+
+| data | n | largest bucket | dense buckets | super connectors |
+|---|---|---|---|---|
+| isotropic | 500 | 2 | 0 | **0** |
+| isotropic | 2,000 | 5 | 0 | **0** |
+| isotropic | 8,000 | 11 | 0 | **0** |
+| isotropic | 30,000 | 20 | 0 | **0** |
+| clustered | 500 | 4 | 0 | **0** |
+| clustered | 2,000 | 18 | 0 | **0** |
+| clustered | 8,000 | 113 | 112 | 50 |
+| clustered | 30,000 | 965 | 314 | 219 |
+
+So it was inert below ~8k points, and on isotropic data at **every size tested**. This is why
+the issue-5 fix looked complete: the 8k SEC corpus it was verified on is clustered enough to
+squeak past the gate, and 229k SEC is comfortably past it.
+
+**Fixed in `rag.py`**: `global_num_bits` and `facet_num_bits` now default to `None`, resolved
+by a new `_derive_num_bits(n, min_bucket_size)` that targets a mean occupancy of
+`2 * min_bucket_size` and caps at 12 — so large corpora keep their previous behaviour while
+small ones stop being silently inert. `BridgeIndex` carried the same two hardcoded constants
+and now defers the same way, recording the resolved values on the instance. Regression test
+`test_bridge_index_derives_num_bits_from_corpus_size` asserts both the new behaviour and that
+the old fixed 12/10 still produces zero on the same fixture.
+
+**Rule, generalising issue 5**: a default that fixes an absolute *resolution* fails across
+corpus size exactly as an absolute *similarity* fails across anisotropy. Any constant that
+implies a count of partitions must be derived from `n`.
+
+⚠ Also fixed a **false positive in `audit_public_api.py`** found while confirming this: its
+`CONSTANT` rule ("single distinct value → no discrimination") is correct for a score array and
+wrong for an index array, where a one-element selection is a legitimate result. It reported
+`find_super_connectors` as CONSTANT when `indices` was `[175]` — one genuine super connector,
+with all four quadrant classes populated and 40 nonzero centralities. Selection fields are now
+listed in `SELECTION_FIELDS` and judged only on emptiness. The canary still has teeth.
+
+---
+
+## 7. `CatalogSpace._detect_gap` never fires — OPEN
+
+`match_single().gap_detected` was **False and `gap_score` exactly 0.0 in all 16 runs** of a
+fixture engineered to contain a gap, plus its control (`benchmarks/probe_catalog_gap.py`,
+8 seeds × 2 conditions). The detector requires **five absolute constants simultaneously**:
+
+```
+parent_entropy < 0.5  and  child_entropy > 0.7  and  entropy_increase > 0.3
+                      and  similarity_drop > 0.1  and  child_sim < 0.8
+```
+
+Measured on the engineered hierarchy (`benchmarks/probe_catalog_gap_conditions.py`), per-depth
+best similarity is **0.962 / 0.885 / 0.247** — a 0.64 collapse into depth 3, versus 0.02 for a
+control whose commodities sit near their parents. So the gap is large and the two conditions
+that speak to it (`similarity_drop > 0.1`, `child_sim < 0.8`) both pass. It is blocked by the
+entropy terms:
+
+| pair | p_ent<0.5 | c_ent>0.7 | inc>0.3 | drop>0.1 | c_sim<0.8 |
+|---|---|---|---|---|---|
+| 1→2 | Y (0.00) | n (0.51) | Y (0.51) | n (0.08) | n (0.88) |
+| 2→3 | **n (0.5051)** | n (0.66) | n (0.15) | Y (0.64) | Y (0.25) |
+
+The decisive one misses by **0.005** — `parent_entropy` is 0.5051 against a required `< 0.5`.
+And the requirement is close to backwards: when a child depth is uniformly *bad* (random
+commodities), the best match is poor but entropy stays moderate (0.66), so demanding
+`child_entropy > 0.7` rejects the clearest gaps. A conjunction of five absolute thresholds is
+issue 5's bug class at its most extreme — each term multiplies the chance of never firing.
+
+**Not fixed, deliberately.** The similarity drop alone separates the two conditions perfectly
+here (0.64 vs 0.02), but redesigning the detector against **one engineered fixture** is the
+mistake `SPECTRAL_NOTES.md` documents six times over. It needs a real hierarchical corpus as
+ground truth — the GUDID energy-devices set (34k records with a real GMDN hierarchy) is the
+obvious candidate, since a gap there is checkable by hand.
+
+**Meanwhile** `test_gap_detected_with_engineered_data` asserts the *current* behaviour
+(`gap_detected is False`, `gap_score == 0.0`) with a message telling whoever fixes it to
+update the test. Previously it asserted only `isinstance(result.gap_detected, bool)`, with a
+comment conceding it could not guarantee detection fired — so a feature that never fires at
+all passed a test named for it firing.
 
 ---
 
