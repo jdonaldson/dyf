@@ -151,6 +151,26 @@ PAYLOAD_FIELDS = {
     "anchors",
 }
 
+#: Payload fields that are a SELECTION (which items) rather than a SCORE (how much per item).
+#: For these, only EMPTY is degenerate: an index array of length 1 has a single distinct value
+#: by definition, so the CONSTANT rule misfires on it. Measured false positive —
+#: `find_super_connectors` on the 400-point SEC fixture returns `indices=[175]` with all four
+#: quadrant classes populated and 40 nonzero centralities, and was reported CONSTANT.
+#: `labels` / `point_labels` / `scores` stay under the CONSTANT rule, where a single distinct
+#: value genuinely means no discrimination (one cluster, or a flat score).
+SELECTION_FIELDS = {
+    "indices",
+    "index",
+    "selected",
+    "roots",
+    "leaves",
+    "nodes",
+    "main_nodes",
+    "bridge_indices",
+    "representatives",
+    "anchors",
+}
+
 
 def classify(out) -> str:
     """EMPTY / ALLZERO / CONSTANT / OK for an arbitrary return value.
@@ -169,8 +189,11 @@ def classify(out) -> str:
         payload = {
             k: v for k, v in members.items() if k in PAYLOAD_FIELDS and isinstance(v, (np.ndarray, list, tuple, dict))
         }
-        for v in payload.values():
+        for name, v in payload.items():
             k = classify(v)
+            if name in SELECTION_FIELDS and k in ("ALLZERO", "CONSTANT"):
+                # a selection is only degenerate when it selects nothing
+                k = "OK"
             if k != "OK":
                 return k
         if payload:
