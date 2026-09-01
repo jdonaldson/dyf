@@ -18,8 +18,9 @@ also why "is this good bang for buck?" had no crisp answer. The evidence:
 - **Two of the handful of features inspected by hand were silently broken** — both with
   performance claims in their docstrings (`KNOWN_ISSUES` #4, #5). That is a poor base rate
   for the ~70 not inspected.
-- **11% of tests assert shape only**; one asserts nothing. `benchmarks/audit_test_assertions.py`
-  measures this.
+- **Tests that pass on a degenerate result**: measured 5% shape-only, plus vacuous,
+  fully-guarded and no-assert categories — all now closed.
+  `benchmarks/audit_test_assertions.py` measures this and carries a `--selftest`.
 - **12+ absolute cosine/margin constants** are measured inert on real corpora. A v1 would
   freeze those into the API.
 

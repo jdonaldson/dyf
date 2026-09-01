@@ -108,10 +108,24 @@
 
 ### Testing
 
-- **Behavioural assertions added to the 16 tests that asserted shape only for a function
-  whose job is to detect or select.** `benchmarks/audit_test_assertions.py` reports
-  **49 of 595 shape-only (8%), down from 64 of 594 (11%)**, and its ranked list of
-  detector/selector tests dropped from 16 to 1.
+- **Behavioural assertions added to every test that could pass on a degenerate result.**
+  `benchmarks/audit_test_assertions.py` now reports **28 of 596 shape-only (5%), and zero
+  in each of the other weak categories**; its ranked list of detector/selector tests is
+  empty. 35 tests were strengthened in total.
+
+  The scanner itself grew three checks it previously lacked — vacuous comparisons
+  (`assert n >= 0`, `assert len(x) <= k`), fully-guarded tests (`if result.x:` wrapping
+  every assertion, so an empty result skips rather than fails), and empty-only tests — and
+  lost a false-positive class of its own, in which equality against a non-literal and bare
+  truthiness checks read as shape. ⚠ **Percentages reported before that correction were
+  inflated**: measured over the same tree, the old classifier flagged 50 and the new one
+  flags 53, with only 34 in common.
+
+  Two tests turned out to be **dead rather than weak** — their assertions had never
+  executed. `test_rog_layers_decrease_threshold` guarded its only assertion behind
+  `if len(result.layers) > 1:` while `build_rog_ontology` returns exactly one layer on that
+  fixture; `test_alternatives_from_different_parents` ended in `pass  # no crash` inside two
+  nested conditionals, the only test in the suite asserting nothing at all.
 
   Two of the sixteen were hiding real defects rather than merely under-asserting — the
   `BridgeIndex` super-connector bug above, and `CatalogSpace._detect_gap` never firing

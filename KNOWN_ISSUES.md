@@ -13,7 +13,8 @@ gap between the shipped surface (109 exports / 72 callables) and the validated o
 
 **Standing audits** — re-run when touching the public surface; each caught a real defect:
 `benchmarks/audit_public_api.py` (41 of 72 callables, 41 OK, canary reproduces issue 5),
-`benchmarks/audit_test_assertions.py` (8% of tests assert shape only, down from 11%),
+`benchmarks/audit_test_assertions.py` (5% shape-only; vacuous / guarded / no-assert all zero;
+`--selftest` validates the classifier on 34 hand-labelled cases),
 `benchmarks/audit_absolute_thresholds.py` (constants that do not transfer).
 
 ⚠ **The audits are necessary but not sufficient.** Issues 6 and 7 were both found by asking
@@ -70,7 +71,9 @@ one-off measurements.
       *value* (anything constraining content). Flags tests whose assertions are all shape.
       Validated by construction: it flags `test_find_super_connectors_basic`, the exact test
       that passed while issue 5 shipped.
-- [x] **Result: 64 of 594 tests (11%) assert shape only; 1 asserts nothing at all**
+- [x] **Result as first measured: 64 of 594 tests (11%) assert shape only; 1 asserts
+      nothing at all.** ⚠ That 11% is now known to be inflated — see the scanner
+      false-positive correction above; the real figure was ~5%.
       (`test_catalog.py:347 test_alternatives_from_different_parents`). 17 of the 64 guard
       functions that detect or select, where an empty result would pass.
 - [x] Strengthened `test_find_super_connectors_basic` with the two assertions that would
@@ -79,7 +82,8 @@ one-off measurements.
       on 26 tests: `with pytest.raises(...)` (the context manager *is* the assertion) and
       `np.testing.assert_*` calls (function calls, not `ast.Assert` nodes). 26 → 1 after.
 - [x] Added behavioural assertions to the 16 flagged detector/selector tests.
-      **64 → 49 shape-only (11% → 8%); the ranked detector list went 16 → 1.** Two of the
+      **the ranked detector list went 16 → 1** (the shape-only percentages quoted at the
+      time were measured with the pre-fix classifier and were inflated). Two of the
       16 turned out to be hiding real defects rather than merely under-asserting, which is
       the argument for having done this by hand: issue 6 (`BridgeIndex` super connectors
       always empty) and issue 7 (`_detect_gap` never fires).
@@ -93,8 +97,27 @@ one-off measurements.
       3. **asserting the negative by accident** — `test_mine_dag_chains_basic` runs on
          isotropic noise where 0 chains is the *correct* answer; it now says so explicitly
          instead of leaving an empty result indistinguishable from a broken one.
-- [ ] Teach `audit_test_assertions.py` the three classes above
-- [ ] Consider running the audit in CI as a non-blocking report, so the count cannot grow
+- [x] Taught `audit_test_assertions.py` all three classes, and **corrected a
+      false-positive class of its own**: equality against a non-literal
+      (`r.labels[z] == z`, `spreads["A"].bucket_distribution == {0: 2, 1: 1}`) read as
+      shape, as did a bare truthiness check (`assert taxonomy.children`), which is
+      precisely the emptiness assertion this audit exists to prompt. Measured against the
+      previous version over the same tree: **50 flagged before, 53 after, only 34 in
+      common — 16 false positives and 19 misses.** ⚠ **Every count this scanner reported
+      before that fix was inflated**, including the 11% and 8% figures previously written
+      here. Corrected: **5% shape-only, and zero in every other weak category.**
+- [x] Added `--selftest`: 34 hand-labelled cases, each a real line from `tests/`. Writing
+      them caught two gaps in the new rules before they reached the report — a classifier
+      announcing "N problems" is worth nothing until shown to separate the cases it claims
+      to, the same lesson as `audit_public_api.py`'s canary.
+- [x] Closed all 19 newly-found tests. Two were **dead, not weak** — their assertions had
+      never executed: `test_rog_layers_decrease_threshold` (ROG returns one layer on its
+      fixture, so `if len(layers) > 1:` never opened) and
+      `test_alternatives_from_different_parents` (ended in `pass  # no crash` inside two
+      nested `if`s — the only test in the suite asserting nothing, while named for a
+      property it never checked; measured 15/15 alternatives from a different parent, so
+      the name is assertable as written).
+- [ ] Consider running the audits in CI as a non-blocking report, so the counts cannot grow
 
 **P2 findings — severity downgraded, measured (`benchmarks/audit_absolute_thresholds.py`)**
 
