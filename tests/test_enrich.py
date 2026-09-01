@@ -167,6 +167,10 @@ class TestComputeTFIDFKeywords:
         kw = _compute_tfidf_keywords(titles, labels, n_clusters=2, top_k=5)
         # Cluster 1 has no items, should return empty
         assert kw[1] == []
+        # ...but cluster 0 must still be populated, or `kw[1] == []` would also pass for a
+        # function that returns nothing at all for every cluster.
+        assert kw[0], "cluster 0 has items but produced no keywords"
+        assert all(isinstance(w, str) and w for w, _ in kw[0])
 
 
 class TestFindNearestCluster:

@@ -335,10 +335,23 @@ class TestGapDetection:
         query /= np.linalg.norm(query)
 
         result = space.match_single("gapped", query)
-        # We can't guarantee gap detection fires with random data,
-        # but the structure is there. Test the mechanism runs without error.
         assert isinstance(result.gap_detected, bool)
         assert isinstance(result.gap_score, float)
+
+        # The engineered gap IS present and large: measured per-depth best similarity on
+        # this fixture is 0.962 / 0.885 / 0.247, i.e. a 0.64 collapse into depth 3, versus
+        # 0.02 for a control whose commodities sit near their parents.
+        assert len([n for n in node_ids if n.startswith("K")]) == 30, "fixture no longer builds 30 depth-3 commodities"
+
+        # ...and `_detect_gap` does NOT fire on it. See KNOWN_ISSUES #6: the detector is a
+        # conjunction of five absolute constants, and here the decisive one misses by
+        # 0.005 (parent_entropy 0.5051 vs the required < 0.5) while the 0.64 similarity
+        # drop it should be detecting is ignored. Asserting the CURRENT behaviour so the
+        # fix flips this test loudly instead of silently.
+        assert result.gap_detected is False, (
+            "gap detection now fires — good; update this test and close KNOWN_ISSUES #6"
+        )
+        assert result.gap_score == 0.0
 
 
 class TestDiverseAlternatives:

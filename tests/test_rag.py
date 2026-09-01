@@ -234,6 +234,40 @@ class TestBridgeIndex:
 
         sc = index.get_super_connectors()
         assert isinstance(sc, SuperConnectorResult)
+        # Behavioural: something must actually be detected. With the old fixed
+        # global_num_bits=12 default, 4096 buckets over 500 points meant no bucket ever
+        # cleared min_bucket_size=20, so local centrality was all zero, no point could be
+        # high_global AND high_local, and `indices` was always empty while this test passed.
+        assert len(sc.indices) > 0, "no super connectors found — dense-bucket gate closed?"
+        assert np.asarray(sc.local_centrality).sum() > 0, "local centrality all zero"
+        assert np.asarray(sc.global_centrality).sum() > 0, "global centrality all zero"
+        assert (np.asarray(sc.quadrant) == "Super Connector").sum() == len(sc.indices)
+
+    def test_bridge_index_derives_num_bits_from_corpus_size(self, sample_embeddings):
+        """Bucket resolution must scale with n, or the dense-bucket gate never opens.
+
+        Regression test: a fixed bit count fixes the bucket count at 2**bits regardless of
+        corpus size, so below ~8k points no bucket reaches min_bucket_size and the feature
+        is silently inert. Same failure shape as an absolute cosine threshold, with corpus
+        size rather than anisotropy as the axis that does not transfer.
+        """
+        index = BridgeIndex(n_anchors=50)
+        assert index.global_num_bits is None, "default must defer to the corpus"
+        index.fit(sample_embeddings, verbose=False)
+
+        # Resolved and recorded, and small enough that buckets can fill
+        assert index.global_num_bits is not None
+        assert 2 <= index.global_num_bits <= 12
+        assert 2**index.global_num_bits < len(sample_embeddings), (
+            "more buckets than points — no bucket can reach min_bucket_size"
+        )
+        assert index.facet_num_bits is not None
+        assert index.facet_num_bits < index.global_num_bits
+
+        # And the old default really is the broken one, on this very fixture
+        broken = find_super_connectors(sample_embeddings, global_num_bits=12, facet_num_bits=10)
+        assert len(broken.indices) == 0
+        assert np.asarray(broken.local_centrality).sum() == 0
 
     def test_bridge_index_summary(self, sample_embeddings):
         """Test summary generation."""
@@ -401,6 +435,10 @@ class TestKmeansInit:
         assert isinstance(init, np.ndarray)
         assert init.shape == (20, sample_embeddings.shape[1])
         assert init.dtype == np.float32
+        # Behavioural: 20 *distinct*, non-degenerate centroids. Padding to the requested
+        # count with zeros or duplicates would satisfy the shape assertions above.
+        assert len(np.unique(init, axis=0)) == 20, "duplicate centroids returned"
+        assert np.all(np.abs(init).sum(axis=1) > 0), "all-zero centroid row"
 
     def test_get_kmeans_init_normalized(self, sample_embeddings):
         """Test that initial centroids are normalized."""
@@ -440,6 +478,14 @@ class TestKmeansInit:
 
         assert len(kmeans.labels_) == len(clustered_embeddings)
         assert kmeans.cluster_centers_.shape == (10, clustered_embeddings.shape[1])
+        # Behavioural: the init has to be usable, not merely well-shaped. A degenerate init
+        # (duplicate or zero rows) collapses clusters, which the shape assertions miss.
+        assert len(np.unique(kmeans.labels_)) >= 5, "init collapsed the clustering"
+        assert np.isfinite(kmeans.inertia_) and kmeans.inertia_ > 0
+        # Should beat a random init on this deliberately clustered fixture
+        random_km = KMeans(n_clusters=10, init="random", n_init=1, max_iter=10, random_state=0)
+        random_km.fit(clustered_embeddings)
+        assert kmeans.inertia_ <= random_km.inertia_ * 1.5
 
     def test_get_kmeans_init_large_nlist(self, sample_embeddings):
         """Test with nlist larger than available bridges."""
@@ -467,6 +513,10 @@ class TestNeighborDiversity:
         assert isinstance(diversity, np.ndarray)
         assert len(diversity) == len(sample_embeddings)
         assert diversity.dtype == np.float64 or diversity.dtype == np.float32
+        # Behavioural: a per-point score must actually vary per point. An all-zeros or
+        # all-constant array passes every assertion above.
+        assert diversity.std() > 0, "diversity is constant across all points"
+        assert np.isfinite(diversity).all()
 
     def test_compute_neighbor_diversity_range(self, sample_embeddings):
         """Test that diversity values are in valid range."""
@@ -496,6 +546,12 @@ class TestNeighborDiversity:
         diversity = compute_neighbor_diversity(sample_embeddings, k=k, neighbors=neighbors)
 
         assert len(diversity) == len(sample_embeddings)
+        # Behavioural: the point of the `neighbors=` argument is to skip recomputing the
+        # same kNN, so it must agree with the internally-computed version. Asserting only
+        # the length would pass even if the argument were silently ignored.
+        internal = compute_neighbor_diversity(sample_embeddings, k=k)
+        assert diversity.std() > 0
+        np.testing.assert_allclose(diversity, internal, atol=1e-5)
 
 
 class TestDAGMining:
@@ -507,19 +563,31 @@ class TestDAGMining:
         assert isinstance(result.chains, list)
         assert isinstance(result.diversity, np.ndarray)
         assert len(result.diversity) == len(sample_embeddings)
+        # Behavioural: the diversity payload must be real even where no chain is found.
+        assert result.diversity.std() > 0
+        assert np.isfinite(result.diversity).all()
+        # And assert the negative deliberately rather than by accident: this fixture is
+        # isotropic noise, which has no hierarchy to mine, so finding no chain is the
+        # CORRECT answer here. The clustered fixture below is what proves mining works.
+        assert result.chains == [], "isotropic noise should yield no DAG chains"
 
     def test_mine_dag_chains_returns_chains(self, clustered_embeddings):
         """Test that chains are found in clustered data."""
         result = mine_dag_chains(clustered_embeddings, min_chain_length=3, verbose=False)
 
-        # Should find some structure
-        assert result.n_components >= 0
-        assert len(result.parent_child_edges) >= 0
+        # `>= 0` was vacuous — an empty result satisfied it. Assert structure is FOUND.
+        assert len(result.chains) > 0, "no chains mined from deliberately clustered data"
+        assert len(result.parent_child_edges) > 0
+        assert result.n_components >= 1
+        # Every chain must respect the min_chain_length it was asked for
+        assert all(len(c) >= 3 for c in result.chains)
 
     def test_dag_chain_structure(self, clustered_embeddings):
         """Test DAGChain dataclass."""
         result = mine_dag_chains(clustered_embeddings, min_chain_length=3, verbose=False)
 
+        # No `if` guard: an empty result must fail this test, not skip it silently.
+        assert result.chains, "no chains to inspect"
         if result.chains:
             chain = result.chains[0]
             assert isinstance(chain, DAGChain)
@@ -617,6 +685,14 @@ class TestDAGTaxonomy:
         assert taxonomy.n_nodes == len(clustered_embeddings)
         assert isinstance(taxonomy.diversity, np.ndarray)
         assert len(taxonomy.diversity) == len(clustered_embeddings)
+        # Behavioural: a taxonomy with no edges is not a taxonomy. `n_nodes` is just the
+        # input length, so it is satisfied by a completely empty DAG.
+        n_edges = sum(len(v) for v in taxonomy.children.values())
+        assert n_edges > 0, "taxonomy has no edges"
+        assert taxonomy.children and taxonomy.parents
+        assert taxonomy.roots, "no roots"
+        assert taxonomy.leaves, "no leaves"
+        assert taxonomy.diversity.std() > 0
 
     def test_taxonomy_structure(self, clustered_embeddings):
         """Test taxonomy has expected structure."""
@@ -698,6 +774,9 @@ class TestDAGTaxonomy:
         """Test finding common ancestors."""
         taxonomy = build_dag_taxonomy(clustered_embeddings, verbose=False)
 
+        # No silent skip: if the guard cannot open, the fixture is degenerate and this test
+        # was never exercising get_common_ancestors at all.
+        assert len(taxonomy.parents) >= 2, "fixture produced <2 nodes with parents"
         if len(taxonomy.parents) >= 2:
             nodes = list(taxonomy.parents.keys())[:2]
             common = taxonomy.get_common_ancestors(nodes[0], nodes[1], max_depth=5)
@@ -787,6 +866,7 @@ class TestDAGTaxonomy:
         """Test path from node to itself."""
         taxonomy = build_dag_taxonomy(clustered_embeddings, verbose=False)
 
+        assert taxonomy.children, "fixture produced no nodes with children"
         if taxonomy.children:
             node = list(taxonomy.children.keys())[0]
             path = taxonomy.get_path(node, node)
@@ -849,6 +929,10 @@ class TestUnifiedOntology:
         assert isinstance(result, UnifiedOntologyResult)
         assert isinstance(result.ontology, DAGTaxonomy)
         assert result.ontology.n_nodes == len(clustered_embeddings)
+        # Behavioural: nodes must be assigned and the ontology must have edges. `n_nodes`
+        # only echoes the input length.
+        assert len(np.asarray(result.main_nodes)) > 0, "no main nodes assigned"
+        assert sum(len(v) for v in result.ontology.children.values()) > 0, "no edges"
 
     def test_unified_ontology_coverage(self, clustered_embeddings):
         """Test that unified ontology has better coverage than single threshold."""
@@ -959,6 +1043,11 @@ class TestROG:
         assert isinstance(result, ROGResult)
         assert isinstance(result.ontology, DAGTaxonomy)
         assert result.ontology.n_nodes == len(clustered_embeddings)
+        # Behavioural: at least one layer, real edges, and non-zero coverage. `n_nodes`
+        # echoes the input length and is satisfied by an empty ontology.
+        assert len(result.layers) >= 1, "no ROG layers produced"
+        assert sum(len(v) for v in result.ontology.children.values()) > 0, "no edges"
+        assert result.total_coverage > 0
 
     def test_rog_has_layers(self, clustered_embeddings):
         """Test that ROG produces layers."""

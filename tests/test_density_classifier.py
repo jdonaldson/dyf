@@ -166,6 +166,11 @@ class TestDensityClassifier:
         all_ids = classifier.get_bucket_ids()
 
         assert single_id == all_ids[0]
+        # Behavioural: agreement on index 0 alone would also hold if both paths returned a
+        # constant. Check several indices, and that the buckets actually discriminate.
+        for i in (1, 7, 42, len(sample_embeddings) - 1):
+            assert classifier.get_bucket_id(i) == all_ids[i]
+        assert len(set(all_ids)) > 1, "all points in one bucket — no discrimination"
 
 
 @pytest.mark.skipif(not check_rust_available(), reason="Rust extension not available")

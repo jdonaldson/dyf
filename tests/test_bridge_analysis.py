@@ -139,9 +139,19 @@ class TestBridgeAnalysis:
 
         # get_bridge_connections requires a bridge_idx argument
         bridge_indices = ba.bridge_indices
-        if len(bridge_indices) > 0:
-            connections = ba.get_bridge_connections(bridge_indices[0])
-            assert isinstance(connections, (list, tuple))
+        # No silent skip: if no bridge exists the fixture is degenerate and this test never
+        # exercised the method. (Isotropic embeddings fall well below the 0.5 default, so
+        # bridges are expected here — see KNOWN_ISSUES #5 for why that default is corpus-
+        # dependent.)
+        assert len(bridge_indices) > 0, "no bridges found — fixture degenerate"
+
+        connections = ba.get_bridge_connections(0)
+        assert isinstance(connections, (list, tuple))
+        # Behavioural: the payload must describe the bridge it was asked about
+        point_idx, _sim, neighbors = connections
+        assert 0 <= point_idx < len(sample_embeddings)
+        assert point_idx in list(bridge_indices)
+        assert all(0 <= n < ba.n_buckets for n in neighbors)
 
     def test_clustered_data_analysis(self, clustered_embeddings):
         """Test that clustered data can be analyzed for bridges."""
