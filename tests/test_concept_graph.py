@@ -35,6 +35,10 @@ class TestSlugify:
     def test_truncation(self):
         long = "a" * 100
         assert len(slugify(long)) <= 50
+        # `<= 50` alone is satisfied by the empty string — assert it truncates rather than
+        # discards, and that the content that survives is the right content.
+        assert slugify(long) == "a" * len(slugify(long))
+        assert len(slugify(long)) > 0, "truncation returned nothing"
 
     def test_multiple_spaces(self):
         assert slugify("foo   bar") == "foo-bar"

@@ -163,6 +163,10 @@ class TestOrthogonalAnchors:
         assert isinstance(result, OrthogonalAnchorResult)
         assert isinstance(result.indices, np.ndarray)
         assert len(result.indices) <= 50
+        # `<= 50` is an upper bound an EMPTY result satisfies. Assert selection happened.
+        assert len(result.indices) > 0, "selected no anchors"
+        assert len(set(result.indices.tolist())) == len(result.indices), "duplicate anchors"
+        assert result.indices.max() < len(sample_embeddings)
 
     def test_select_orthogonal_anchors_with_seeds(self, sample_embeddings):
         """Test selection with explicit seeds."""
@@ -226,6 +230,9 @@ class TestBridgeIndex:
         anchors = index.get_anchors()
         assert isinstance(anchors, np.ndarray)
         assert len(anchors) <= 50
+        # An empty array also satisfies `<= 50`.
+        assert len(anchors) > 0, "index fitted but exposes no anchors"
+        assert len(set(anchors.tolist())) == len(anchors), "duplicate anchors"
 
     def test_bridge_index_get_super_connectors(self, sample_embeddings):
         """Test super connector retrieval."""
@@ -726,6 +733,9 @@ class TestDAGTaxonomy:
         taxonomy = build_dag_taxonomy(clustered_embeddings, verbose=False)
 
         # Pick a node that has children
+        # Assert the guard rather than skipping on it: a degenerate
+        # result must FAIL this test, not quietly pass it.
+        assert taxonomy.children, "taxonomy produced no parent->child edges"
         if taxonomy.children:
             node = list(taxonomy.children.keys())[0]
             children = taxonomy.get_children(node)
@@ -735,6 +745,9 @@ class TestDAGTaxonomy:
                 assert 0 <= c < taxonomy.n_nodes
 
         # Pick a node that has parents
+        # Assert the guard rather than skipping on it: a degenerate
+        # result must FAIL this test, not quietly pass it.
+        assert taxonomy.parents, "taxonomy produced no child->parent edges"
         if taxonomy.parents:
             node = list(taxonomy.parents.keys())[0]
             parents = taxonomy.get_parents(node)
@@ -746,6 +759,9 @@ class TestDAGTaxonomy:
         """Test getting ancestors."""
         taxonomy = build_dag_taxonomy(clustered_embeddings, verbose=False)
 
+        # Assert the guard rather than skipping on it: a degenerate
+        # result must FAIL this test, not quietly pass it.
+        assert taxonomy.parents, "taxonomy produced no child->parent edges"
         if taxonomy.parents:
             # Pick a node with parents
             node = list(taxonomy.parents.keys())[0]
@@ -760,6 +776,9 @@ class TestDAGTaxonomy:
         """Test getting descendants."""
         taxonomy = build_dag_taxonomy(clustered_embeddings, verbose=False)
 
+        # Assert the guard rather than skipping on it: a degenerate
+        # result must FAIL this test, not quietly pass it.
+        assert taxonomy.children, "taxonomy produced no parent->child edges"
         if taxonomy.children:
             # Pick a node with children
             node = list(taxonomy.children.keys())[0]
@@ -791,6 +810,9 @@ class TestDAGTaxonomy:
         """Test finding LCAs."""
         taxonomy = build_dag_taxonomy(clustered_embeddings, verbose=False)
 
+        # Assert the guard rather than skipping on it: a degenerate
+        # result must FAIL this test, not quietly pass it.
+        assert len(taxonomy.parents) >= 2, "fewer than 2 nodes have parents"
         if len(taxonomy.parents) >= 2:
             nodes = list(taxonomy.parents.keys())[:2]
             lcas = taxonomy.get_lowest_common_ancestors(nodes[0], nodes[1], max_depth=5)
@@ -851,6 +873,9 @@ class TestDAGTaxonomy:
         """Test finding a path between nodes."""
         taxonomy = build_dag_taxonomy(clustered_embeddings, verbose=False)
 
+        # Assert the guard rather than skipping on it: a degenerate
+        # result must FAIL this test, not quietly pass it.
+        assert taxonomy.children, "taxonomy produced no parent->child edges"
         if taxonomy.children:
             # Find a node with children and its child
             parent = list(taxonomy.children.keys())[0]
@@ -877,6 +902,9 @@ class TestDAGTaxonomy:
         """Test finding all paths between nodes."""
         taxonomy = build_dag_taxonomy(clustered_embeddings, verbose=False)
 
+        # Assert the guard rather than skipping on it: a degenerate
+        # result must FAIL this test, not quietly pass it.
+        assert taxonomy.children, "taxonomy produced no parent->child edges"
         if taxonomy.children:
             parent = list(taxonomy.children.keys())[0]
             child = taxonomy.get_children(parent)[0]
@@ -994,8 +1022,10 @@ class TestUnifiedOntology:
         """Test that bridge edges are counted."""
         result = build_unified_ontology(clustered_embeddings, verbose=False)
 
-        # Bridge edges should be non-negative
-        assert result.bridge_edges >= 0
+        # `>= 0` is vacuous — a count cannot be negative. Bridge edges are the whole point
+        # of knitting the outlier layer onto the main one, so assert some were made.
+        assert result.bridge_edges > 0, "outlier layer was never bridged to the main one"
+        assert len(np.asarray(result.outlier_nodes)) > 0, "no outliers to bridge"
 
         # If there are outlier nodes, there might be bridge edges
         if len(result.outlier_nodes) > 0:
@@ -1070,13 +1100,29 @@ class TestROG:
         # Should achieve close to target coverage
         assert result.total_coverage >= 0.80  # Allow some slack
 
-    def test_rog_layers_decrease_threshold(self, clustered_embeddings):
-        """Test that layers have decreasing thresholds."""
+    def test_rog_layers_decrease_threshold(self, sample_embeddings):
+        """Test that layers have decreasing thresholds.
+
+        Uses `sample_embeddings`, not `clustered_embeddings`: on the clustered fixture ROG
+        covers 543 of 550 points in ONE pass and the loop exits on its `len(remaining) > 10`
+        floor, so it returns a single layer and there is no pair of thresholds to compare.
+        That is correct behaviour, but it left this test's only assertion behind a
+        `if len(result.layers) > 1:` guard that never opened — the test had never run its own
+        body. Isotropic embeddings are hard to cover, so ROG recurses to 4 layers.
+        """
+        result = build_rog_ontology(sample_embeddings, verbose=False)
+
+        assert len(result.layers) > 1, "fixture no longer forces recursion; test is inert again"
+        thresholds = [layer.similarity_threshold for layer in result.layers]
+        assert thresholds == sorted(thresholds, reverse=True), f"not monotone: {thresholds}"
+        assert thresholds[0] > thresholds[-1], "thresholds never actually decreased"
+
+    def test_rog_single_layer_when_coverage_met(self, clustered_embeddings):
+        """The complement: well-clustered data is covered in one pass, so ROG stops."""
         result = build_rog_ontology(clustered_embeddings, verbose=False)
 
-        if len(result.layers) > 1:
-            for i in range(len(result.layers) - 1):
-                assert result.layers[i].similarity_threshold >= result.layers[i + 1].similarity_threshold
+        assert len(result.layers) == 1
+        assert result.total_coverage >= 0.95
 
     def test_rog_summary(self, clustered_embeddings):
         """Test summary method."""

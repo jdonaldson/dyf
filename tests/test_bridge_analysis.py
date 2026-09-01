@@ -124,6 +124,10 @@ class TestBridgeAnalysis:
         bucket_ids = ba.bucket_ids
         unique_buckets = list(set(bucket_ids))
 
+        # Assert the guard rather than skipping on it: a single-bucket result must fail
+        # this test, not quietly pass it.
+        assert len(unique_buckets) >= 2, f"only {len(unique_buckets)} bucket(s); nothing to bridge"
+
         if len(unique_buckets) >= 2:
             b1, b2 = unique_buckets[0], unique_buckets[1]
             bridges = ba.bridges_between(b1, b2)

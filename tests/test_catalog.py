@@ -371,17 +371,23 @@ class TestDiverseAlternatives:
 
         result = space.match_single("test", query, top_k=5)
 
-        if result.alternatives:
-            # Alternatives should not share the primary's parent
-            primary_id = result.node_id
-            primary_parents = graph.get_parents(primary_id)
+        # This test previously ended in `pass  # structure verified, no crash` inside two
+        # nested `if`s — the only test in the suite that asserted nothing at all, while
+        # being named for a property it never checked. Measured over 5 seeds
+        # (`benchmarks/probe_catalog_alternatives.py`): 15 of 15 alternatives came from a
+        # different parent, 0 from the same one. So diversification is strict here and the
+        # name is assertable as written.
+        assert result.alternatives, "no alternatives returned"
 
-            for alt_id, _alt_name, _alt_sim in result.alternatives:
-                alt_parents = graph.get_parents(alt_id)
-                # At least some alternatives should be from different parents
-                # (can't guarantee ALL are, but the mechanism should work)
-                if alt_parents and primary_parents:
-                    pass  # structure verified, no crash
+        primary_parents = set(graph.get_parents(result.node_id))
+        assert primary_parents, "primary has no parent; the test cannot discriminate"
+
+        for alt_id, _alt_name, _alt_sim in result.alternatives:
+            alt_parents = set(graph.get_parents(alt_id))
+            assert alt_parents, f"alternative {alt_id} has no parent"
+            assert not (alt_parents & primary_parents), (
+                f"alternative {alt_id} shares a parent with primary {result.node_id}"
+            )
 
 
 # ── Phase 2: Multi-catalog tests ─────────────────────────────────────────

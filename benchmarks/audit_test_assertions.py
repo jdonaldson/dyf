@@ -142,6 +142,18 @@ def _classify_compare(n: ast.Compare) -> str | None:
 def classify_assert(node: ast.Assert) -> str:
     """'value' if any sub-expression constrains content, 'vacuous' if it only appears to,
     else 'shape'."""
+    # A bare truthiness assertion IS a content check: `assert taxonomy.children` says the
+    # container is non-empty, which is exactly what a degenerate result fails. Likewise
+    # `assert not (a & b)` claims an intersection is empty. Both were being scored as shape,
+    # which under-credited the very fix this audit exists to prompt.
+    bare = node.test
+    if isinstance(bare, ast.UnaryOp) and isinstance(bare.op, ast.Not):
+        return "value"
+    if isinstance(bare, (ast.Name, ast.Subscript)):
+        return "value"
+    if isinstance(bare, ast.Attribute) and bare.attr not in SHAPE_ATTRS:
+        return "value"
+
     verdict = "shape"
     for n in ast.walk(node.test):
         if isinstance(n, ast.Call):
@@ -290,6 +302,12 @@ SELFTEST_ASSERTS = [
     ("assert np.all(d >= 0)", "value"),
     ("assert diversity.std() > 0", "value"),
     ("assert result.meta_clusters == {0}", "value"),
+    # bare truthiness is an emptiness check, which is the whole point of this audit
+    ("assert taxonomy.children", "value"),
+    ("assert result.alternatives", "value"),
+    ("assert not (alt_parents & primary_parents)", "value"),
+    ("assert kw[0]", "value"),
+    ("assert x.shape", "shape"),
 ]
 
 SELFTEST_FUNCS = [

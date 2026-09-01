@@ -41,11 +41,17 @@ def test_star_property_every_member_near_its_representative():
     thresh = 0.99
     r = near_duplicate_clusters(X, threshold=thresh, n_tables=6)
     Xn = X / np.linalg.norm(X, axis=1, keepdims=True)
+    checked = 0
     for rep, grp in r.members().items():
         sims = Xn[grp] @ Xn[rep]
         others = sims[grp != rep]
         if len(others):
+            checked += 1
             assert others.min() > thresh, f"member of {rep} only reached cos {others.min():.4f}"
+    # The star property is only tested where a cluster actually has more than one member.
+    # Without this, a run that produced nothing but singletons would pass having checked
+    # nothing at all — the guard would simply never open.
+    assert checked > 0, "no multi-member clusters formed; the star property went untested"
 
 
 def test_mask_and_representatives_agree():
