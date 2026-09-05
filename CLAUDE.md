@@ -1,13 +1,28 @@
 # DYF Project Notes
 
-## Heading (asserted 2026-08-31)
+## Heading (asserted 2026-08-31, consumers amended 2026-09-05)
 
-**Destination: dyf's primitives become trustworthy enough that downstream consumers
-(`sec10quant`, `shortorder`) can rely on them. Moving toward v1 *quality*, not more
-capability.**
+**Destination: dyf's primitives become trustworthy enough that downstream consumers can
+rely on them. Moving toward v1 *quality*, not more capability.**
 
 Score work against that. The test is "can someone depend on this?", not "is this
 interesting?".
+
+**Consumers (amended 2026-09-05).** `sec10quant` and `shortorder` via the Python API —
+and **agents, as a first-class consumer, via both the CLI and the Python API.** Agents
+are a target, not a side effect of having shipped a CLI.
+
+This widens *which surface* the heading covers, not what counts as done on it. Before the
+amendment the dependency surface was the exported Python API, which is why the three
+standing audits look only there — and why a CLI that printed nothing at all survived
+(`AGENT_LEGIBILITY_TODO.md`). The CLI and the module-to-module contracts are now in
+scope. The bar is unchanged: can someone depend on it?
+
+⚠ **The risk this amendment carries.** A bearing check found this project drifting
+because no destination was stated, and "add a consumer class mid-flight" is structurally
+the same move that produced the drift. The guard: agent work earns its place only where
+it makes an *existing* surface dependable. Parseable output, loud failure, honest
+docs — yes. New mechanisms to serve agents — no, same as before.
 
 **Why this heading, and why now.** A bearing check found the project *drifting* — real
 progress, but effort allocated opportunistically because no destination was stated, which is
@@ -32,6 +47,11 @@ Pre-v1 is the only cheap moment to fix any of that (see "Backward Compatibility"
 - **In scope**: making existing primitives correct, measured, and honestly documented;
   closing the gap between shipped and validated surface; deleting or relativising knobs that
   do nothing.
+- **In scope as of 2026-09-05**: giving the CLI and the Python API a contract an agent can
+  rely on — machine-readable output, meaningful exit codes, errors that say what to do,
+  and a cheap way to ask what an artifact contains before paying to open it. This is the
+  same "can someone depend on this?" test applied to a consumer that cannot squint at a
+  blank terminal and guess.
 - **Out of scope until the floor is solid**: new mechanisms in dyf. `SPECTRAL_NOTES.md`
   records six consecutive falsified hypotheses of that shape; the only thing that shipped
   from that arc (`dyf.dedup`) started from a *measurement of the data*, not from a mechanism.

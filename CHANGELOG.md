@@ -2,6 +2,38 @@
 
 ## Unreleased
 
+### Added
+
+- **`dyf info <file.dyf>` — describe an index without loading it.** Reports item count,
+  dimensionality, leaf/node counts, build params, stored field names, domain, enrichment
+  level and provenance stages. Backed entirely by existing `LazyIndex` properties, so it
+  stays cheap: **0.09 s wall clock on a 479 MB / 229,243-item index**, including
+  interpreter startup. Previously the only way to learn what a `.dyf` contained was to
+  write Python.
+
+  `--json` emits a `{"schema_version": 0, ...}` envelope. **The schema is unstable before
+  v1** — that is what the version stamp is for. Callers get something parseable now while
+  the project stays free to change the shape.
+
+### Fixed
+
+- **The CLI produced no output at all.** `__init__.py` installs a `NullHandler` on the
+  package logger — correct for a library — but nothing configured logging for CLI use, so
+  every subcommand reporting through `logger` was silently swallowed. `dyf concepts list`
+  printed **0 bytes on a graph with 100+ nodes**; `dyf concepts check` printed 0 bytes and
+  exited 1. Affected `concepts` (19 logger calls), `index-source` (17), `index-images`
+  (21), `index-video` (21), and most of `enrich` (102 across submodules, mixed with 25
+  surviving `print` calls, so it appeared to work while its progress reporting was gone).
+
+  Fixed with `_configure_cli_logging()` in `cli.py`, scoped to the `dyf` logger. Not
+  `basicConfig`, which configures the *root* logger and turned on INFO for every
+  dependency — httpx dumped every HuggingFace request during `concepts build`.
+
+- **CLI results now go to stdout, problems to stderr.** `logging.StreamHandler` defaults
+  to stderr, but for these subcommands `logger.info` carries the answer, not a
+  diagnostic — so `dyf info f.dyf > out.txt` would have written an empty file. Handlers
+  are now split at `WARNING`.
+
 ### Changed
 
 - **`find_super_connectors` and `BridgeIndex` now derive their bucket resolution from the

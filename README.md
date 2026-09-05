@@ -95,6 +95,23 @@ indices, scores = idx.search(query, k=10, nprobe=256)
 I, S = idx.search(query_batch, k=10, nprobe=256)    # batched -> (nq, k)
 ```
 
+### Inspect an Index
+
+`dyf info` describes a `.dyf` file without loading its data — item count, dimensionality,
+build params, stored fields, and how far the enrichment pipeline has been run:
+
+```bash
+dyf info index.dyf
+dyf info index.dyf --json    # machine-readable
+```
+
+It is backed by `LazyIndex`'s lazy-open path, so it stays cheap regardless of file size —
+**0.09s on a 479 MB, 229k-item index.** Useful for deciding what to do with an artifact
+before paying to open it.
+
+> The `--json` payload carries `"schema_version": 0` and is **unstable before v1**; the
+> field is there so callers can detect a change rather than be surprised by one.
+
 ### Shrink the Index: Dedup on Ingest
 
 Real corpora repeat themselves. Index one representative per near-duplicate cluster and
