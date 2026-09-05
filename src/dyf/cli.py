@@ -16,10 +16,52 @@ Usage:
     dyf tour f.dyf           # Launch browser viewer with tour
 """
 
+import logging
 import sys
 
 
+def _configure_cli_logging() -> None:
+    """Give the package logger a console handler when running as a CLI.
+
+    `__init__.py` installs a NullHandler on the `dyf` logger — correct for a library,
+    since it suppresses Python's handler of last resort. But nothing else in the
+    package configures logging, so as a CLI every subcommand that reports through
+    `logger` emitted nothing at all: `dyf concepts list` printed 0 bytes on a graph
+    with 100+ nodes. See AGENT_LEGIBILITY_TODO.md P0.
+
+    Scoped to the `dyf` logger rather than `basicConfig`, which configures the *root*
+    logger and would turn on INFO for every third-party library too (httpx dumping
+    every HuggingFace request during `concepts build` is the case that caught this).
+
+    Results go to **stdout**, problems to **stderr**. `logging.StreamHandler()` defaults
+    to stderr, but for these subcommands `logger.info` carries the actual answer — the
+    node list, the file summary — not a diagnostic. Left on stderr,
+    `dyf concepts list > out.txt` writes an empty file, which breaks any caller that
+    redirects or pipes. Splitting at WARNING keeps both audiences correct.
+    """
+    pkg_logger = logging.getLogger("dyf")
+    if any(not isinstance(h, logging.NullHandler) for h in pkg_logger.handlers):
+        return  # already configured — don't double up
+
+    fmt = logging.Formatter("%(message)s")
+
+    out = logging.StreamHandler(sys.stdout)
+    out.setFormatter(fmt)
+    out.setLevel(logging.INFO)
+    out.addFilter(lambda record: record.levelno < logging.WARNING)
+
+    err = logging.StreamHandler(sys.stderr)
+    err.setFormatter(fmt)
+    err.setLevel(logging.WARNING)
+
+    pkg_logger.addHandler(out)
+    pkg_logger.addHandler(err)
+    pkg_logger.setLevel(logging.INFO)
+
+
 def main():
+    _configure_cli_logging()
+
     if len(sys.argv) > 1:
         cmd = sys.argv[1]
         if cmd == "concepts":
