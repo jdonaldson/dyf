@@ -68,6 +68,13 @@ Re-run these when touching the public surface; each exists because it caught a r
 | `python benchmarks/audit_public_api.py` | exported callables returning empty/all-zero/constant (has a canary that reproduces #5) |
 | `python benchmarks/audit_test_assertions.py` | tests asserting only types and lengths |
 | `python benchmarks/audit_absolute_thresholds.py` | absolute cosine constants that do not transfer across corpora |
+| `python benchmarks/audit_cli_surface.py` | subcommands that exit 0 saying nothing, or fail with a traceback instead of a message (has a `--selftest` and a live mute canary) |
+
+⚠ The first three inspect the **exported Python API only**. That is why a CLI printing
+zero bytes passed all three; `cli.py` is not in the public surface. The fourth exists to
+cover it, and deliberately does **not** test `--help` — argparse prints help itself
+without touching the logger, so every subcommand answers `--help` with rc 0 even when its
+real execution path is mute. It runs real invocations instead.
 
 Open queue with priorities: `KNOWN_ISSUES.md`.
 

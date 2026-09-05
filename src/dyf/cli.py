@@ -60,41 +60,77 @@ def _configure_cli_logging() -> None:
     pkg_logger.setLevel(logging.INFO)
 
 
+# Which pyproject extra supplies each subcommand's optional dependencies. Used to turn a
+# ModuleNotFoundError into a line the caller can act on.
+COMMAND_EXTRAS = {
+    "info": "lazy",
+    "concepts": "concepts",
+    "index-source": "source",
+    "index-images": "vision",
+    "index-video": "video",
+    "enrich": "enrich",
+    "tour": "viz",
+}
+
+
+def _dispatch(cmd: str, argv: list[str]) -> int | None:
+    """Route to a subcommand, returning its exit code.
+
+    Returns None if `cmd` is not a known subcommand, so the caller can print usage.
+    Lets ImportError propagate: `main` turns it into an actionable message.
+    """
+    if cmd == "info":
+        from .info import main as info_main
+
+        return info_main(argv)
+    if cmd == "concepts":
+        from .concept_graph import main as concepts_main
+
+        return concepts_main(argv)
+    if cmd == "index-source":
+        from .index_source import main as index_main
+
+        return index_main(argv)
+    if cmd == "enrich":
+        from .enrich import main as enrich_main
+
+        enrich_main(argv)
+        return 0
+    if cmd == "index-images":
+        from .index_images import main as index_images_main
+
+        return index_images_main(argv)
+    if cmd == "index-video":
+        from .index_video import main as index_video_main
+
+        return index_video_main(argv)
+    if cmd == "tour":
+        from .tour import main as tour_main
+
+        tour_main(argv)
+        return 0
+    return None
+
+
 def main():
     _configure_cli_logging()
 
     if len(sys.argv) > 1:
         cmd = sys.argv[1]
-        if cmd == "info":
-            from .info import main as info_main
-
-            sys.exit(info_main(sys.argv[2:]))
-        elif cmd == "concepts":
-            from .concept_graph import main as concepts_main
-
-            sys.exit(concepts_main(sys.argv[2:]))
-        elif cmd == "index-source":
-            from .index_source import main as index_main
-
-            sys.exit(index_main(sys.argv[2:]))
-        elif cmd == "enrich":
-            from .enrich import main as enrich_main
-
-            enrich_main(sys.argv[2:])
-            sys.exit(0)
-        elif cmd == "index-images":
-            from .index_images import main as index_images_main
-
-            sys.exit(index_images_main(sys.argv[2:]))
-        elif cmd == "index-video":
-            from .index_video import main as index_video_main
-
-            sys.exit(index_video_main(sys.argv[2:]))
-        elif cmd == "tour":
-            from .tour import main as tour_main
-
-            tour_main(sys.argv[2:])
-            sys.exit(0)
+        try:
+            code = _dispatch(cmd, sys.argv[2:])
+        except ImportError as exc:
+            # Optional dependencies are the most common way these commands fail, and a
+            # ModuleNotFoundError traceback tells the caller nothing about the fix.
+            # Modules that already raise a helpful ImportError keep their own wording.
+            logger = logging.getLogger("dyf")
+            logger.error("%s", exc)
+            extra = COMMAND_EXTRAS.get(cmd)
+            if extra and f"dyf[{extra}]" not in str(exc):
+                logger.error("`dyf %s` needs: pip install 'dyf[%s]'", cmd, extra)
+            sys.exit(3)
+        if code is not None:
+            sys.exit(code)
 
     print("Usage: dyf <command>")
     print()

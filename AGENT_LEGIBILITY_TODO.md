@@ -172,15 +172,38 @@ is a place an agent will confidently report the wrong thing.
       reporting item count and estimated work is how that rule gets encoded rather than
       remembered.
 
-- [ ] **CLI smoke audit — the missing fourth audit.** Run every subcommand end-to-end on
-      a tiny fixture and assert non-empty output plus a sane exit code. This single check
-      catches the P0 logging bug, would have caught `enrich reannotate`, and covers the
-      surface users actually touch. Highest-leverage item remaining in this file.
+- [x] **CLI smoke audit — the missing fourth audit.**
+      *(done 2026-09-05, `benchmarks/audit_cli_surface.py`, now in the CLAUDE.md table.)*
+      Runs a real invocation of every subcommand and classifies the result as
+      OK / MUTE / TRACEBACK / CLEAN-FAIL / SKIP. `--selftest` checks the classifier
+      against 9 hand-labelled cases plus a live canary that is deliberately mute — the
+      lesson from `audit_test_assertions.py`, whose scanner had a 32% false-positive rate
+      and had inflated every number it ever reported.
 
-      **Started**: `tests/test_info.py` is the first test of the CLI surface in the repo
-      — its absence is precisely why a CLI printing nothing survived three standing
-      audits, since all three look only at the exported Python API. Generalise its
-      `_run()` subprocess helper across the other six subcommands.
+      ⚠ **Design finding: it must not test `--help`.** argparse prints help itself,
+      writing to stdout without ever touching the logger, so **all 7 subcommands returned
+      rc 0 with output for `--help` while 3 crashed on a real invocation**. A help-only
+      smoke test would have been blind to the precise bug that motivated it.
+
+      First run: **5 OK, 3 TRACEBACK, 1 CLEAN-FAIL, 1 SKIP — and 0 MUTE**, confirming the
+      P0 fix holds across the whole surface, not just where it was spot-checked. After
+      the ImportError fix below: **5 OK, 4 CLEAN-FAIL, 1 SKIP, 0 MUTE, 0 TRACEBACK**,
+      audit exits 0.
+
+- [x] **Optional dependencies fail as tracebacks, not as messages.**
+      *(done 2026-09-05.)* Fixed once at the CLI boundary rather than at five call sites:
+      `main()` catches `ImportError` around dispatch, prints the exception plus
+      `pip install 'dyf[<extra>]'` from a `COMMAND_EXTRAS` map, and exits 3. Modules that
+      already raise a good message keep their own wording — `index-source` said
+      `Install it with: pip install "dyf[source]"` all along, buried under a traceback
+      nobody caught. Measured before: `index-source`, `index-images` and `enrich project`
+      all raised bare tracebacks; `index-video` was the one command already failing
+      cleanly, so the in-repo example to copy existed.
+      - [ ] Still open: `enrich audio` needs `kokoro` + `soundfile`, declared in **no**
+        extra, so there is no `dyf[...]` to name. Either add the extra or drop the path.
+      - [ ] Still open: `index-source` also needs a live Ollama server and only finds out
+        mid-run (`index_source.py:247-272`). A missing *service* is not an ImportError,
+        so the boundary fix does not cover it.
 - [ ] **`concepts query` with no match must say so.** It currently falls through to
       semantic search and can return zero lines at rc 0.
 - [ ] **Audit exit codes across subcommands.** `check` returning rc 1 for STALE is

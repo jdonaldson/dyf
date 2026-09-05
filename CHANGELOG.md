@@ -4,6 +4,14 @@
 
 ### Added
 
+- **`benchmarks/audit_cli_surface.py` — a fourth standing audit, covering the CLI.** The
+  other three inspect the exported Python API, which is why a CLI printing zero bytes
+  passed all of them. Runs a real invocation of every subcommand and classifies it
+  OK / MUTE / TRACEBACK / CLEAN-FAIL / SKIP; `--selftest` validates the classifier against
+  9 hand-labelled cases plus a live mute canary. It deliberately does **not** test
+  `--help`: argparse prints help without touching the logger, so all 7 subcommands
+  answered `--help` with rc 0 while 3 crashed on real use.
+
 - **`dyf info <file.dyf>` — describe an index without loading it.** Reports item count,
   dimensionality, leaf/node counts, build params, stored field names, domain, enrichment
   level and provenance stages. Backed entirely by existing `LazyIndex` properties, so it
@@ -28,6 +36,13 @@
   Fixed with `_configure_cli_logging()` in `cli.py`, scoped to the `dyf` logger. Not
   `basicConfig`, which configures the *root* logger and turned on INFO for every
   dependency — httpx dumped every HuggingFace request during `concepts build`.
+
+- **Missing optional dependencies now produce an actionable message, not a traceback.**
+  `main()` catches `ImportError` around dispatch and reports
+  `pip install 'dyf[<extra>]'`, exiting 3. Before: `dyf index-images` died with a bare
+  `ModuleNotFoundError: No module named 'PIL'`, and `dyf index-source` raised a perfectly
+  good `Install it with: pip install "dyf[source]"` that was buried under a traceback
+  because nothing caught it. Modules with their own message keep it.
 
 - **CLI results now go to stdout, problems to stderr.** `logging.StreamHandler` defaults
   to stderr, but for these subcommands `logger.info` carries the answer, not a
