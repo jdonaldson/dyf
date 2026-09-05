@@ -39,16 +39,25 @@ ENRICHMENT_LEVELS = {
     3: "viz-ready (edge_pairs / tour_narration)",
 }
 
-# Metadata keys that are structural rather than descriptive. They are reported as
-# presence/shape instead of dumped verbatim: several hold large JSON blobs (dendrograms,
-# edge lists, narration) that would bury the summary this command exists to give.
+# Metadata keys that are structural rather than descriptive — dendrograms, edge lists,
+# narration text, base64 audio. Reported as presence and size instead of dumped verbatim.
+#
+# `tour_audio` is the reason the size cap below exists rather than this list alone: it
+# holds base64-encoded WAV for every narrated cluster and runs to megabytes, so a
+# describe command that inlined it would be neither cheap nor readable. A denylist is
+# always one key behind whatever the pipeline adds next, so the cap is the real guard and
+# this list is just for legible naming.
 _BULK_METADATA_KEYS = {
     "stored_fields",
     "louvain_dendrogram",
     "edge_pairs",
     "edge_paths_2d",
     "tour_narration",
+    "tour_audio",
 }
+
+# Any metadata value longer than this is summarized rather than inlined, whatever its key.
+_MAX_INLINE_VALUE_CHARS = 512
 
 
 def collect_info(path: str) -> dict[str, Any]:
@@ -96,11 +105,21 @@ def collect_info(path: str) -> dict[str, Any]:
         info["provenance"] = provenance
 
         info["metadata_keys"] = sorted(meta)
-        info["metadata"] = {
-            k: v
-            for k, v in sorted(meta.items())
-            if k not in _BULK_METADATA_KEYS and not k.startswith("_provenance_level_")
-        }
+
+        # Descriptive metadata is inlined; bulk payloads are reported as a size so the
+        # summary stays small enough to hand to a caller verbatim.
+        descriptive: dict[str, Any] = {}
+        bulk: dict[str, int] = {}
+        for key, value in sorted(meta.items()):
+            if key.startswith("_provenance_level_"):
+                continue
+            text = value if isinstance(value, str) else str(value)
+            if key in _BULK_METADATA_KEYS or len(text) > _MAX_INLINE_VALUE_CHARS:
+                bulk[key] = len(text)
+            else:
+                descriptive[key] = value
+        info["metadata"] = descriptive
+        info["bulk_metadata_bytes"] = bulk
 
     return info
 

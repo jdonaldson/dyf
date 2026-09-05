@@ -89,6 +89,42 @@ class TestCollectInfo:
         # Payload must stay small enough to hand to a caller verbatim.
         assert len(json.dumps(info, default=str)) < 8_000
 
+    def test_bulk_metadata_is_summarized_not_inlined(self, tmp_path):
+        """A describe command must not inline megabytes of base64 audio.
+
+        The original fixture carried no bulk metadata, so the size assertion above
+        passed vacuously while `tour_audio` — the largest payload the pipeline writes —
+        was absent from the exclusion list entirely. This builds the case that failed.
+        """
+        pytest.importorskip("dyf_rs")
+        from dyf.dyf_tree import build_dyf_tree
+        from dyf.info import collect_info
+        from dyf.lazy_index import write_lazy_index
+
+        rng = np.random.default_rng(3)
+        X = np.ascontiguousarray(rng.standard_normal((32, 8)).astype(np.float32))
+        tree = build_dyf_tree(X, max_depth=2, num_bits=2, min_leaf_size=2, seed=42)
+        path = str(tmp_path / "with-audio.dyf")
+
+        fake_audio = "A" * 200_000  # stands in for base64 WAV
+        write_lazy_index(
+            tree,
+            X,
+            path,
+            metadata={"domain": "d", "tour_audio": fake_audio, "some_future_blob": "B" * 50_000},
+        )
+
+        info = collect_info(path)
+        payload = json.dumps(info, default=str)
+
+        assert fake_audio not in payload, "tour_audio was inlined into the summary"
+        assert len(payload) < 8_000, f"summary ballooned to {len(payload)} bytes"
+        # It should still be *reported*, just as a size rather than a value.
+        assert info["bulk_metadata_bytes"]["tour_audio"] == len(fake_audio)
+        assert "tour_audio" in info["metadata_keys"]
+        # And the cap must catch a key nobody thought to list.
+        assert "some_future_blob" in info["bulk_metadata_bytes"]
+
 
 class TestCliContract:
     def test_human_output_is_not_empty(self, dyf_path):
