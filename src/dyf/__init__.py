@@ -87,6 +87,7 @@ from .cut import cut_tree_to_labels
 
 # Ingest-time near-duplicate detection
 from .dedup import (
+    DedupForIndexResult,
     DedupResult,
     decode_members,
     dedup_for_index,
@@ -312,6 +313,7 @@ __all__ = [
     "doc_spread",
     "neighbor_coherence",
     # Ingest-time near-duplicate detection
+    "DedupForIndexResult",
     "DedupResult",
     "decode_members",
     "dedup_for_index",

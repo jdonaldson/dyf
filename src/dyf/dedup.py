@@ -57,7 +57,13 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["DedupResult", "decode_members", "dedup_for_index", "near_duplicate_clusters"]
+__all__ = [
+    "DedupForIndexResult",
+    "DedupResult",
+    "decode_members",
+    "dedup_for_index",
+    "near_duplicate_clusters",
+]
 
 
 @dataclass
@@ -229,6 +235,62 @@ def near_duplicate_clusters(
     return DedupResult(assigned, reps, threshold, n)
 
 
+@dataclass
+class DedupForIndexResult:
+    """Result of :func:`dedup_for_index` — deduped inputs ready for ``write_lazy_index``.
+
+    Replaces a 3-tuple that was half-typed: its third element was already a
+    :class:`DedupResult` while the first two stayed positional, in the same module whose
+    sibling :func:`near_duplicate_clusters` returned a clean object.
+
+    ``bookkeeping_added`` is the fact the tuple could not express. When nothing collapses,
+    ``origin_field`` and ``member_field`` are deliberately omitted — they would be the
+    identity map and a list of empties, and measured on four curated corpora adding them
+    made the ``.dyf`` 3-4% *larger*. A caller previously had to probe ``stored_fields``
+    for the key to find out whether that happened.
+
+    Composes :class:`DedupResult` rather than extending it: ``near_duplicate_clusters``
+    has no embeddings or fields to report, and optional attributes that are meaningless
+    on half the call sites are the shape this whole pass is removing.
+
+    Unpacks as the original ``(embeddings, stored_fields, result)`` tuple.
+    """
+
+    embeddings: np.ndarray
+    stored_fields: dict
+    dedup: DedupResult
+    bookkeeping_added: bool
+
+    def _as_tuple(self):
+        return (self.embeddings, self.stored_fields, self.dedup)
+
+    def __iter__(self):
+        """Backward-compatible unpacking of the original 3-tuple."""
+        return iter(self._as_tuple())
+
+    def __getitem__(self, key):
+        """Backward-compatible positional access. Prefer the named attributes."""
+        return self._as_tuple()[key]
+
+    @property
+    def n_removed(self) -> int:
+        """Points eliminated. Delegates to :attr:`dedup`."""
+        return self.dedup.n_removed
+
+    @property
+    def removed_fraction(self) -> float:
+        """Fraction of the input eliminated. Delegates to :attr:`dedup`."""
+        return self.dedup.removed_fraction
+
+    def summary(self) -> str:
+        if self.n_removed == 0:
+            return f"No duplicates in {self.dedup.n_points:,} points; bookkeeping fields omitted."
+        return (
+            f"{self.n_removed:,} of {self.dedup.n_points:,} points collapsed "
+            f"({self.removed_fraction:.1%}) at cosine > {self.dedup.threshold}."
+        )
+
+
 def dedup_for_index(
     embeddings,
     stored_fields=None,
@@ -236,7 +298,7 @@ def dedup_for_index(
     member_field: str = "dup_members",
     origin_field: str = "orig_index",
     **kwargs,
-):
+) -> DedupForIndexResult:
     """Dedup an ingest batch: subset embeddings AND stored fields to representatives.
 
     The piece every ingest path needs. Subsetting embeddings alone would silently
@@ -264,8 +326,10 @@ def dedup_for_index(
             ``seed``, ``max_bucket``).
 
     Returns:
-        ``(embeddings_reps, stored_fields_reps, result)``. Feed the first two straight to
-        `write_lazy_index`; ``result`` is a :class:`DedupResult` for reporting.
+        :class:`DedupForIndexResult`. Feed ``.embeddings`` and ``.stored_fields`` straight
+        to `write_lazy_index`; ``.dedup`` is the :class:`DedupResult` for reporting, and
+        ``.bookkeeping_added`` says whether the origin/member fields were written. Unpacks
+        as the original ``(embeddings, stored_fields, result)`` tuple.
 
     Raises:
         ValueError: If a stored field's length does not match ``len(embeddings)``.
@@ -290,11 +354,21 @@ def dedup_for_index(
     # corpora with ~0% duplicates, adding them anyway made the .dyf 3-4% LARGER. Skip them.
     if result.n_removed == 0:
         logger.info("dedup: no duplicates found, omitting %r/%r fields", origin_field, member_field)
-        return np.ascontiguousarray(E[reps]), out_fields, result
+        return DedupForIndexResult(
+            embeddings=np.ascontiguousarray(E[reps]),
+            stored_fields=out_fields,
+            dedup=result,
+            bookkeeping_added=False,
+        )
 
     if origin_field:
         out_fields[origin_field] = reps.astype(np.int64)
     if member_field:
         out_fields[member_field] = result.member_field()
 
-    return np.ascontiguousarray(E[reps]), out_fields, result
+    return DedupForIndexResult(
+        embeddings=np.ascontiguousarray(E[reps]),
+        stored_fields=out_fields,
+        dedup=result,
+        bookkeeping_added=bool(origin_field or member_field),
+    )

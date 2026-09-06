@@ -344,11 +344,14 @@ def index_source(
         from .dedup import dedup_for_index
 
         t0 = time.time()
-        embeddings, stored_fields, dd = dedup_for_index(embeddings, stored_fields, threshold=dedup, seed=seed)
+        dd = dedup_for_index(embeddings, stored_fields, threshold=dedup, seed=seed)
+        embeddings, stored_fields = dd.embeddings, dd.stored_fields
         logger.info(
             f"Dedup at cosine > {dedup}: {n_original} -> {len(embeddings)} chunks "
             f"({dd.removed_fraction:.1%} removed) in {time.time() - t0:.1f}s"
         )
+        if not dd.bookkeeping_added:
+            logger.info("  No duplicates: omitted the orig_index/dup_members fields.")
 
     # Build DYF tree
     logger.info("Building DYF tree...")

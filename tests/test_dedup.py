@@ -215,6 +215,55 @@ class TestDedupForIndex:
         nums = np.arange(len(X), dtype=np.int64)
         return X, {"label": labels, "num": nums}
 
+    def test_returns_a_named_result_that_still_unpacks(self):
+        """The 3-tuple was half-typed — element 3 was already a DedupResult."""
+        from dyf.dedup import DedupForIndexResult, DedupResult, dedup_for_index
+
+        X, sf = self._fixture()
+        result = dedup_for_index(X, sf)
+
+        assert isinstance(result, DedupForIndexResult)
+        assert isinstance(result.dedup, DedupResult)
+
+        # Existing positional callers must be unaffected.
+        Xr, sfr, r = result
+        assert Xr is result.embeddings
+        assert sfr is result.stored_fields
+        assert r is result.dedup
+        assert result[0] is result.embeddings
+
+    def test_bookkeeping_added_reports_the_conditional_field_write(self):
+        """Whether the origin/member fields were written was previously undiscoverable.
+
+        `dedup_for_index` omits them when nothing collapses — they would be an identity
+        map and a list of empties, and adding them measured 3-4% LARGER files on curated
+        corpora. A caller had to probe `stored_fields` for the key to find out.
+        """
+        from dyf.dedup import dedup_for_index
+
+        X, sf = self._fixture()
+        collapsed = dedup_for_index(X, sf)
+        assert collapsed.n_removed > 0, "fixture must actually contain duplicates"
+        assert collapsed.bookkeeping_added is True
+        assert "orig_index" in collapsed.stored_fields
+
+        rng = np.random.default_rng(3)
+        Y = rng.standard_normal((200, 32)).astype(np.float32)
+        Y /= np.linalg.norm(Y, axis=1, keepdims=True)
+        distinct = dedup_for_index(np.ascontiguousarray(Y), {"label": [f"p{i}" for i in range(len(Y))]})
+        assert distinct.n_removed == 0
+        assert distinct.bookkeeping_added is False
+        assert "orig_index" not in distinct.stored_fields
+        assert "dup_members" not in distinct.stored_fields
+
+    def test_delegates_the_common_dedup_stats(self):
+        from dyf.dedup import dedup_for_index
+
+        X, sf = self._fixture()
+        result = dedup_for_index(X, sf)
+        assert result.n_removed == result.dedup.n_removed
+        assert result.removed_fraction == result.dedup.removed_fraction
+
     def test_embeddings_and_fields_stay_aligned(self):
         from dyf.dedup import dedup_for_index
 

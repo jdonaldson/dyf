@@ -43,6 +43,33 @@
 
 ### Changed
 
+- **Named result types for the tuples whose positions could be silently swapped.** An
+  audit of all 109 exports found several multi-value returns where a positional mistake
+  would type-check clean. Each also hid a conditional the tuple could not express. All
+  three still unpack as their original tuples, so no caller changes.
+
+  - **`embed_with_diagnostics` → `AxisDiagnosticsResult`.** Its 4-tuple had two elements
+    of the *same type* (`list[AxisDiagnostic]`) differing only by meaning — before vs
+    after restructuring. The early-exit path returned the before-diagnostics in **both**
+    slots, so a caller could not distinguish "re-embedding ran and changed nothing" from
+    "re-embedding never happened". New `.restructured` says which. The existing test had
+    been asserting `before is after` — inferring it from *object identity*.
+  - **`agglomerate_tree_leaves` / `louvain_cluster_leaves` → `LeafGroupingResult`.** Two
+    identical unnamed 5-tuples, documented as "Same tuple as `agglomerate_tree_leaves`" —
+    sameness asserted in prose, now enforced by a shared type. Both returned
+    `(None, {}, [], None, tree)` for "fewer than two leaves"; `.ok` and `.n_groups`
+    replace decoding four sentinels.
+  - **`dedup_for_index` → `DedupForIndexResult`.** Was half-typed: element 3 was already
+    a `DedupResult` while the first two stayed positional. New `.bookkeeping_added`
+    reports whether the `orig_index`/`dup_members` fields were written — they are omitted
+    when nothing collapses, and a caller previously had to probe `stored_fields` for the
+    key to find out. Composes `DedupResult` rather than extending it, since
+    `near_duplicate_clusters` has no embeddings to report.
+
+  `LeafGroupingResult` and `DedupForIndexResult` deliberately define **no `__len__`**: the
+  only candidate meanings are the unpacking arity or a count, and `SearchResult` had just
+  demonstrated how a hard-coded arity becomes a plausible wrong number.
+
 - **`DenseSearchIndex.search` now returns a `SearchResult`, like `LazyIndex.search`.** It
   previously returned a bare `(indices, scores)` tuple — a shape a caller cannot
   introspect or extend, and which forced you to already know the arity. The two index
