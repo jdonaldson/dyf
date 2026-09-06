@@ -360,11 +360,25 @@ is a place an agent will confidently report the wrong thing.
       Cleanly typed already, for contrast: `catalog.py` and `ontology.py`. The untyped
       ones are `agglomerate.py`, `splits.py`, `categorical.py`.
 
-- [ ] **Hidden requirements must be declarable before they fail.** `index-source` needs a
-      live Ollama server at `localhost:11434` and only discovers this by raising mid-run
-      (`index_source.py:247-272`, `raise_for_status`, no fallback). Agents need a
-      preflight — a `--check` or a fast fail with the reason — not a stack trace after
-      the embedding pass has started.
+- [x] **Hidden requirements must be declarable before they fail.**
+      *(done 2026-09-05, `check_embedding_service`, 9 tests.)* `index-source` needed a
+      live Ollama server and discovered it only after parsing the **entire source tree**,
+      reporting it as a **69-line `requests.ConnectionError` traceback that never
+      mentioned Ollama by name** — measured, the worst error message in the package. A
+      missing *service* is not an `ImportError`, so `cli.main`'s dependency handler could
+      not cover it.
+
+      Preflight now runs before any parsing, costs one HTTP round trip, and also checks
+      the model is actually pulled. `embed_batch` wraps mid-run failures too, reporting
+      how far it got, since a server can die partway through.
+
+      ```
+      before: 69 lines of traceback, after the expensive half of the run
+      after:  rc=3, three lines, before any work
+              cannot reach the embedding service at http://... (ConnectionError).
+                Start it with: ollama serve
+                Or point elsewhere with: --ollama-url
+      ```
 
 - [ ] **Cost preview before expensive work.** dyf's whole domain is corpora where the
       embedding pass is the expensive step, and `~/Projects/CLAUDE.md`'s *Sanity Check
@@ -428,22 +442,22 @@ is a place an agent will confidently report the wrong thing.
       ⚠ This changed behaviour a test had pinned (`test_load_missing_file`). Broken
       deliberately per the pre-v1 rule, with the reason recorded in the test.
 
-- [ ] **Make the remaining error messages actionable.** `concepts` is done; `index-*` and
-      `info` still have paths that say only what went wrong, not what to do.
+- [x] **Make the remaining error messages actionable.** *(done 2026-09-05 for `index-*`;
+      `concepts` and `info` were already done.)* Also fixed two things the sweep exposed:
 
-- [ ] **Optional dependencies fail as tracebacks, not as messages.** One generator, five
-      instances — worth one fix at the CLI boundary rather than five patches:
+      - **`sys.exit(1)` from inside library functions** — all three `index_*` modules did
+        it. `SystemExit` derives from `BaseException`, so it bypasses normal handling and
+        kills the interpreter of anyone who imported them. Same defect as `_audio.py`'s,
+        which went to dyfviz. They now raise `IngestError` subclasses.
+      - **Every failure exited 1**, so a caller could not tell a wrong path from an empty
+        corpus from a dead service. Now 0/1/2/3 matching `concepts`, defined once in
+        `_ingest_errors.py` with the code carried *on the exception class* — so a new
+        failure type cannot forget to pick one.
 
-      | site | today |
-      | --- | --- |
-      | `concepts build` | raw `ModuleNotFoundError: sentence_transformers` (`configs.py:138`), no guidance |
-      | `index-source` | *has* a good `ImportError: tree-sitter-language-pack is required for source indexing.` — buried under a full traceback |
-      | `index-source` | also needs a live Ollama server; `raise_for_status`, no fallback (`index_source.py:247-272`) |
-      | `enrich audio` | needs `kokoro` + `soundfile`, declared in **no** pyproject extra |
-      | `tests/test_dedup.py` | **fails** rather than skips when `[lazy]`/`flatbuffers` is absent, unlike the 70 tests that skip cleanly |
-
-      Fix: catch `ImportError` in `cli.main()`, print `<message> — pip install 'dyf[<extra>]'`,
-      exit non-zero. An agent can act on that line; it cannot act on a traceback.
+      Messages moved from `logger.warning("Error: ...")` (wrong level, redundant prefix)
+      to `logger.error()`, and empty results now say what was searched for. `index-images`
+      also distinguishes "no files matched" from "files matched but none could be
+      decoded", which had been the same message.
 
 ## P2 — make the package self-describing
 
