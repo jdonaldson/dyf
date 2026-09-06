@@ -420,12 +420,6 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../reference/cut_dyf_tree_to_labels.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">cut_dyf_tree_to_labels</span></a>
-  </div>
-</li>
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
   <a href="../reference/refine_clusters.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">refine_clusters</span></a>
   </div>
@@ -1084,7 +1078,6 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 <h1>boundary_persistence_scores</h1>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>boundary_persistence_scores(tree, margin_pct<span class="op">=</span><span class="fl">0.1</span>, max_depth<span class="op">=</span><span class="va">None</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Compute depth-weighted boundary persistence bridge scores.</p>
-<p>Convenience wrapper that calls extract_boundary_persistence and returns a single score array. Each boundary depth contributes (max_depth - depth) to the score, so boundaries at coarse (shallow) levels count more.</p>
 <section id="parameters" class="level2 doc-section doc-section-parameters">
 <h2 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters">Parameters</h2>
 <table class="caption-top table">
@@ -1106,7 +1099,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 <tr class="odd">
 <td>tree</td>
 <td></td>
-<td>PCA tree dict from build_pca_tree().</td>
+<td>DYF tree dict from build_dyf_tree().</td>
 <td><em>required</em></td>
 </tr>
 <tr class="even">

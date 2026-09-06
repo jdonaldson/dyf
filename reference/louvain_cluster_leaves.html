@@ -420,12 +420,6 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../reference/cut_dyf_tree_to_labels.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">cut_dyf_tree_to_labels</span></a>
-  </div>
-</li>
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
   <a href="../reference/refine_clusters.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">refine_clusters</span></a>
   </div>
@@ -1153,9 +1147,9 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 <h2 class="doc-section doc-section-returns anchored" data-anchor-id="returns">Returns</h2>
 <table class="caption-top table">
 <colgroup>
-<col style="width: 9%">
-<col style="width: 9%">
-<col style="width: 81%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 83%">
 </colgroup>
 <thead>
 <tr class="header">
@@ -1168,22 +1162,17 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 <tr class="odd">
 <td></td>
 <td></td>
-<td>Same tuple as <code>agglomerate_tree_leaves</code>:</td>
+<td>The same :class:<code>LeafGroupingResult</code> as :func:<code>agglomerate_tree_leaves</code> — which</td>
 </tr>
 <tr class="even">
 <td></td>
 <td></td>
-<td><code>(point_labels, lsh_names, lsh_label_data, item_leaf_map,          | |        |        | tree_structure)</code>.</td>
+<td>is now enforced by the shared type rather than asserted in prose. Check <code>.ok</code></td>
 </tr>
 <tr class="odd">
 <td></td>
 <td></td>
-<td>Returns <code>(None, {}, [], None, tree)</code> when the tree has fewer than</td>
-</tr>
-<tr class="even">
-<td></td>
-<td></td>
-<td>two leaves.</td>
+<td>for the fewer-than-two-leaves case.</td>
 </tr>
 </tbody>
 </table>

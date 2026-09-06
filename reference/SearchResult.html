@@ -420,12 +420,6 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../reference/cut_dyf_tree_to_labels.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">cut_dyf_tree_to_labels</span></a>
-  </div>
-</li>
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
   <a href="../reference/refine_clusters.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">refine_clusters</span></a>
   </div>
@@ -1080,6 +1074,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 <h1>SearchResult</h1>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>SearchResult(indices, scores, fields<span class="op">=</span><span class="bu">dict</span>(), routing<span class="op">=</span><span class="va">None</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Search result with indices, scores, and optional stored fields.</p>
+<p>The standard return type of every retrieval entry point — <code>LazyIndex.search</code>, <code>LazyIndex.search_ivf</code>, <code>DenseSearchIndex.search</code> and <code>BridgeIndex.query</code> — so the same calling code works against any index.</p>
 
 
 </section>

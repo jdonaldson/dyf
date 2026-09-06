@@ -420,12 +420,6 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../reference/cut_dyf_tree_to_labels.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">cut_dyf_tree_to_labels</span></a>
-  </div>
-</li>
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
   <a href="../reference/refine_clusters.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">refine_clusters</span></a>
   </div>
@@ -1149,42 +1143,47 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 <tr class="odd">
 <td></td>
 <td></td>
-<td>Tuple of <code>(point_labels, lsh_names, lsh_label_data,                                                           | |        |        | item_leaf_map, tree_structure)</code> ready for <code>multi_level_data</code>.</td>
+<td>class:<code>LeafGroupingResult</code>, ready for <code>multi_level_data</code>. Unpacks as the</td>
 </tr>
 <tr class="even">
+<td></td>
+<td></td>
+<td>original 5-tuple <code>(point_labels, names, label_data, item_leaf_map, tree)</code>.</td>
+</tr>
+<tr class="odd">
 <td></td>
 <td></td>
 <td>* <code>point_labels</code> – int32 array (N,) of bucket ids (0-based).</td>
 </tr>
-<tr class="odd">
-<td></td>
-<td></td>
-<td>* <code>lsh_names</code> – <code>{cid: "Bucket &lt;cid&gt;"}</code> placeholder names.</td>
-</tr>
 <tr class="even">
 <td></td>
 <td></td>
-<td>* <code>lsh_label_data</code> – list of dicts with centroid x/y/z, size, cid.</td>
+<td>* <code>names</code> – <code>{cid: "Bucket &lt;cid&gt;"}</code> placeholder names.</td>
 </tr>
 <tr class="odd">
+<td></td>
+<td></td>
+<td>* <code>label_data</code> – list of dicts with centroid x/y/z, size, cid.</td>
+</tr>
+<tr class="even">
 <td></td>
 <td></td>
 <td>* <code>item_leaf_map</code> – int32 array (N,) mapping each item to its tree leaf <code>node_id</code> (before agglomeration).</td>
 </tr>
+<tr class="odd">
+<td></td>
+<td></td>
+<td>* <code>tree</code> – raw tree node list from <code>idx.get_tree_structure()</code>.</td>
+</tr>
 <tr class="even">
 <td></td>
 <td></td>
-<td>* <code>tree_structure</code> – raw tree node list from <code>idx.get_tree_structure()</code>.</td>
+<td>When the tree has fewer than two leaves, <code>.ok</code> is False and the array fields</td>
 </tr>
 <tr class="odd">
 <td></td>
 <td></td>
-<td>Returns <code>(None, {}, [], None, tree)</code> when the tree has fewer than</td>
-</tr>
-<tr class="even">
-<td></td>
-<td></td>
-<td>two leaves.</td>
+<td>are None — check <code>.ok</code> rather than testing <code>point_labels is None</code>.</td>
 </tr>
 </tbody>
 </table>

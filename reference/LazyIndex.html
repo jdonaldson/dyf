@@ -420,12 +420,6 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../reference/cut_dyf_tree_to_labels.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">cut_dyf_tree_to_labels</span></a>
-  </div>
-</li>
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
   <a href="../reference/refine_clusters.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">refine_clusters</span></a>
   </div>
@@ -1136,7 +1130,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 </tr>
 <tr class="even">
 <td><a href="#dyf.LazyIndex.tree_summary">tree_summary</a></td>
-<td>Return tree stats without touching Arrow data.</td>
+<td>Tree stats without touching Arrow data. See :class:<code>TreeSummary</code>.</td>
 </tr>
 </tbody>
 </table>
@@ -1517,16 +1511,16 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 </section>
 <section id="dyf.LazyIndex.search" class="level3">
 <h3 class="anchored" data-anchor-id="dyf.LazyIndex.search">search</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>LazyIndex.search(query, k<span class="op">=</span><span class="dv">10</span>, nprobe<span class="op">=</span><span class="dv">3</span>, return_routing<span class="op">=</span><span class="va">False</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>LazyIndex.search(query, k<span class="op">=</span><span class="dv">10</span>, nprobe<span class="op">=</span><span class="dv">3</span>, return_routing<span class="op">=</span><span class="va">False</span>, backend<span class="op">=</span><span class="st">'rust'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Search the index for nearest neighbors.</p>
 <section id="parameters-3" class="level4 doc-section doc-section-parameters">
 <h4 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters-3">Parameters</h4>
 <table class="caption-top table">
 <colgroup>
-<col style="width: 6%">
-<col style="width: 3%">
-<col style="width: 85%">
 <col style="width: 4%">
+<col style="width: 2%">
+<col style="width: 91%">
+<col style="width: 3%">
 </colgroup>
 <thead>
 <tr class="header">
@@ -1560,6 +1554,12 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 <td></td>
 <td>If True, populate result.routing with diagnostics.</td>
 <td><code>False</code></td>
+</tr>
+<tr class="odd">
+<td>backend</td>
+<td></td>
+<td>“rust” (default) or “python”. The rust backend uses the Rust kernel (dyf_rs.DyfSearcher) — much faster, same result shape, and now handles fixed/adaptive nprobe and return_routing. It falls back to the python path only for PQ-compressed or overflow indexes (the non-load-bearing tail). Pass backend=“python” to force the reference path (e.g.&nbsp;for parity testing).</td>
+<td><code>'rust'</code></td>
 </tr>
 </tbody>
 </table>

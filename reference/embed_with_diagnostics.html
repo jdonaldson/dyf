@@ -420,12 +420,6 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../reference/cut_dyf_tree_to_labels.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">cut_dyf_tree_to_labels</span></a>
-  </div>
-</li>
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
   <a href="../reference/refine_clusters.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">refine_clusters</span></a>
   </div>
@@ -1103,7 +1097,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 </section>
 <section id="returns" class="level2 doc-section doc-section-returns">
 <h2 class="doc-section doc-section-returns anchored" data-anchor-id="returns">Returns</h2>
-<p>embeddings : (n, d) float32 Final embeddings (original if no axes promoted, re-embedded otherwise). before_diags : list[AxisDiagnostic] Diagnostics from the first pass. after_diags : list[AxisDiagnostic] Diagnostics from the second pass (same as before if no re-embedding). texts : list[str] Final text strings (original or structured).</p>
+<p>AxisDiagnosticsResult With <code>.embeddings</code>, <code>.before</code>, <code>.after</code>, <code>.texts</code> and <code>.restructured</code>. Unpacks as the original 4-tuple. Check <code>.restructured</code> rather than comparing <code>before</code> and <code>after</code>: on the early-exit path they are the same object.</p>
 
 
 </section>

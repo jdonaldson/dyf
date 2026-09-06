@@ -420,12 +420,6 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../reference/cut_dyf_tree_to_labels.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">cut_dyf_tree_to_labels</span></a>
-  </div>
-</li>
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
   <a href="../reference/refine_clusters.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">refine_clusters</span></a>
   </div>
@@ -1125,22 +1119,22 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 </tr>
 <tr class="odd">
 <td>children</td>
-<td><a href="`typing.Dict`">Dict</a>[<a href="`int`">int</a>, <a href="`typing.List`">List</a>[<a href="`typing.Tuple`">Tuple</a>[<a href="`int`">int</a>, <a href="`float`">float</a>, <a href="`float`">float</a>]]]</td>
+<td><a href="`dict`">dict</a>[<a href="`int`">int</a>, <a href="`list`">list</a>[<a href="`tuple`">tuple</a>[<a href="`int`">int</a>, <a href="`float`">float</a>, <a href="`float`">float</a>]]]</td>
 <td>Dict mapping node → list of (child, similarity, gap)</td>
 </tr>
 <tr class="even">
 <td>parents</td>
-<td><a href="`typing.Dict`">Dict</a>[<a href="`int`">int</a>, <a href="`typing.List`">List</a>[<a href="`typing.Tuple`">Tuple</a>[<a href="`int`">int</a>, <a href="`float`">float</a>, <a href="`float`">float</a>]]]</td>
+<td><a href="`dict`">dict</a>[<a href="`int`">int</a>, <a href="`list`">list</a>[<a href="`tuple`">tuple</a>[<a href="`int`">int</a>, <a href="`float`">float</a>, <a href="`float`">float</a>]]]</td>
 <td>Dict mapping node → list of (parent, similarity, gap)</td>
 </tr>
 <tr class="odd">
 <td>roots</td>
-<td><a href="`typing.List`">List</a>[<a href="`int`">int</a>]</td>
+<td><a href="`list`">list</a>[<a href="`int`">int</a>]</td>
 <td>Nodes with no parents (most general concepts)</td>
 </tr>
 <tr class="even">
 <td>leaves</td>
-<td><a href="`typing.List`">List</a>[<a href="`int`">int</a>]</td>
+<td><a href="`list`">list</a>[<a href="`int`">int</a>]</td>
 <td>Nodes with no children (most specific concepts)</td>
 </tr>
 </tbody>
@@ -1278,7 +1272,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 <tbody>
 <tr class="odd">
 <td></td>
-<td><a href="`typing.List`">List</a>[<a href="`typing.List`">List</a>[<a href="`int`">int</a>]]</td>
+<td><a href="`list`">list</a>[<a href="`list`">list</a>[<a href="`int`">int</a>]]</td>
 <td>List of paths, where each path is a list of node indices</td>
 </tr>
 </tbody>
@@ -1438,7 +1432,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 <tbody>
 <tr class="odd">
 <td></td>
-<td><a href="`typing.List`">List</a>[<a href="`typing.Tuple`">Tuple</a>[<a href="`int`">int</a>, <a href="`int`">int</a>]]</td>
+<td><a href="`list`">list</a>[<a href="`tuple`">tuple</a>[<a href="`int`">int</a>, <a href="`int`">int</a>]]</td>
 <td>List of (node_idx, parent_count) tuples, sorted by count descending</td>
 </tr>
 </tbody>
@@ -1535,7 +1529,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 <tbody>
 <tr class="odd">
 <td></td>
-<td><a href="`typing.List`">List</a>[<a href="`typing.Tuple`">Tuple</a>[<a href="`int`">int</a>, <a href="`int`">int</a>, <a href="`int`">int</a>, <a href="`int`">int</a>]]</td>
+<td><a href="`list`">list</a>[<a href="`tuple`">tuple</a>[<a href="`int`">int</a>, <a href="`int`">int</a>, <a href="`int`">int</a>, <a href="`int`">int</a>]]</td>
 <td>List of (top, left, right, bottom) tuples</td>
 </tr>
 </tbody>
@@ -1581,7 +1575,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 <tbody>
 <tr class="odd">
 <td></td>
-<td><a href="`typing.List`">List</a>[<a href="`typing.Tuple`">Tuple</a>[<a href="`int`">int</a>, <a href="`int`">int</a>]]</td>
+<td><a href="`list`">list</a>[<a href="`tuple`">tuple</a>[<a href="`int`">int</a>, <a href="`int`">int</a>]]</td>
 <td>List of (node_idx, child_count) tuples, sorted by count descending</td>
 </tr>
 </tbody>
@@ -1639,7 +1633,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 <tbody>
 <tr class="odd">
 <td></td>
-<td><a href="`typing.List`">List</a>[<a href="`int`">int</a>]</td>
+<td><a href="`list`">list</a>[<a href="`int`">int</a>]</td>
 <td>List of LCA indices (may be multiple in a lattice)</td>
 </tr>
 </tbody>
@@ -1746,7 +1740,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 <tbody>
 <tr class="odd">
 <td></td>
-<td><a href="`typing.Optional`">Optional</a>[<a href="`typing.List`">List</a>[<a href="`int`">int</a>]]</td>
+<td><a href="`list`">list</a>[<a href="`int`">int</a>] | None</td>
 <td>List of node indices from start to end, or None if no path</td>
 </tr>
 </tbody>

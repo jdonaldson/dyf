@@ -420,12 +420,6 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../reference/cut_dyf_tree_to_labels.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">cut_dyf_tree_to_labels</span></a>
-  </div>
-</li>
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
   <a href="../reference/refine_clusters.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">refine_clusters</span></a>
   </div>
@@ -1090,7 +1084,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 <span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    metadata<span class="op">=</span><span class="va">None</span>,</span>
 <span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    build_params<span class="op">=</span><span class="va">None</span>,</span>
 <span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    stored_fields<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    format_version<span class="op">=</span><span class="dv">1</span>,</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    format_version<span class="op">=</span><span class="dv">3</span>,</span>
 <span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>    embedding_dim<span class="op">=</span><span class="va">None</span>,</span>
 <span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Write a DYF lazy index file (FlatBuffers tree + Arrow IPC leaf data).</p>
@@ -1157,8 +1151,8 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 <tr class="odd">
 <td>format_version</td>
 <td><a href="`int`">int</a></td>
-<td>1 (DYF1, header-based) or 2 (DYF2, footer-based, append-friendly). Default: 1.</td>
-<td><code>1</code></td>
+<td>3 (DYF3, header-based, chunkable — readable by python, the browser viewer, and dyf-rs &gt;= 0.10), 2 (DYF2, footer-based, append-friendly, rust read-write), or 1 (DYF1, legacy header-based). Default: 3.</td>
+<td><code>3</code></td>
 </tr>
 <tr class="even">
 <td>embedding_dim</td>

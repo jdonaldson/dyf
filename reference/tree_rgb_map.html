@@ -420,12 +420,6 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../reference/cut_dyf_tree_to_labels.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">cut_dyf_tree_to_labels</span></a>
-  </div>
-</li>
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
   <a href="../reference/refine_clusters.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">refine_clusters</span></a>
   </div>
@@ -1087,12 +1081,6 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 <section id="parameters" class="level2 doc-section doc-section-parameters">
 <h2 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters">Parameters</h2>
 <table class="caption-top table">
-<colgroup>
-<col style="width: 17%">
-<col style="width: 8%">
-<col style="width: 59%">
-<col style="width: 13%">
-</colgroup>
 <thead>
 <tr class="header">
 <th>Name</th>
@@ -1104,19 +1092,19 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 <tbody>
 <tr class="odd">
 <td>labels</td>
-<td></td>
+<td><a href="`list`">list</a>[<a href="`int`">int</a>] | <a href="`numpy`">np</a>.<a href="`numpy.ndarray`">ndarray</a></td>
 <td>per-item cluster/bucket labels (array-like of ints)</td>
 <td><em>required</em></td>
 </tr>
 <tr class="even">
 <td>tree_structure</td>
-<td></td>
+<td><a href="`list`">list</a>[<a href="`dict`">dict</a>]</td>
 <td>list of node dicts from idx.get_tree_structure()</td>
 <td><em>required</em></td>
 </tr>
 <tr class="odd">
 <td>item_leaf_map</td>
-<td></td>
+<td><a href="`numpy`">np</a>.<a href="`numpy.ndarray`">ndarray</a></td>
 <td>array of length N mapping item index → leaf node_id</td>
 <td><em>required</em></td>
 </tr>

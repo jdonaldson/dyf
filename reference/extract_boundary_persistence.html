@@ -420,12 +420,6 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../reference/cut_dyf_tree_to_labels.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">cut_dyf_tree_to_labels</span></a>
-  </div>
-</li>
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
   <a href="../reference/refine_clusters.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">refine_clusters</span></a>
   </div>
@@ -1084,16 +1078,15 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 <h1>extract_boundary_persistence</h1>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>extract_boundary_persistence(tree, margin_pct<span class="op">=</span><span class="fl">0.1</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Identify points that persist as boundary across multiple tree depths.</p>
-<p>Walks the built tree once, reading existing point_margin_map at each internal node. At each depth, points with margin below the margin_pct percentile threshold are tagged as boundary at that depth.</p>
-<p>Points that are boundary at multiple depths have high boundary persistence — they straddle concepts at several levels of the hierarchy and are semantically polysemous bridge points.</p>
+<p>Same concept as pca_tree.extract_boundary_persistence but for k-ary DYF trees. At each depth, points with centroid similarity below the margin_pct percentile threshold are tagged as boundary.</p>
 <section id="parameters" class="level2 doc-section doc-section-parameters">
 <h2 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters">Parameters</h2>
 <table class="caption-top table">
 <colgroup>
-<col style="width: 8%">
-<col style="width: 5%">
-<col style="width: 77%">
-<col style="width: 8%">
+<col style="width: 17%">
+<col style="width: 11%">
+<col style="width: 54%">
+<col style="width: 17%">
 </colgroup>
 <thead>
 <tr class="header">
@@ -1107,13 +1100,13 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 <tr class="odd">
 <td>tree</td>
 <td></td>
-<td>PCA tree dict from build_pca_tree().</td>
+<td>DYF tree dict from build_dyf_tree().</td>
 <td><em>required</em></td>
 </tr>
 <tr class="even">
 <td>margin_pct</td>
 <td></td>
-<td>Percentile threshold (0-1). Points with margin below this percentile at a given depth are boundary.</td>
+<td>Percentile threshold (0-1).</td>
 <td><code>0.1</code></td>
 </tr>
 </tbody>
@@ -1123,9 +1116,9 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 <h2 class="doc-section doc-section-returns anchored" data-anchor-id="returns">Returns</h2>
 <table class="caption-top table">
 <colgroup>
-<col style="width: 2%">
-<col style="width: 2%">
-<col style="width: 94%">
+<col style="width: 6%">
+<col style="width: 6%">
+<col style="width: 87%">
 </colgroup>
 <thead>
 <tr class="header">
@@ -1138,7 +1131,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 <tr class="odd">
 <td></td>
 <td></td>
-<td>dict with: boundary_depths: dict[int, list[int]] — point_idx -&gt; list of depths where the point is boundary boundary_count: np.ndarray shape (n,) — number of boundary depths per point thresholds: dict[int, float] — margin threshold per depth</td>
+<td>dict with: boundary_depths: dict[int, list[int]] boundary_count: np.ndarray shape (n,) thresholds: dict[int, float]</td>
 </tr>
 </tbody>
 </table>

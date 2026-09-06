@@ -420,12 +420,6 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../reference/cut_dyf_tree_to_labels.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">cut_dyf_tree_to_labels</span></a>
-  </div>
-</li>
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
   <a href="../reference/refine_clusters.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">refine_clusters</span></a>
   </div>
@@ -1223,13 +1217,13 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 </tr>
 <tr class="even">
 <td>categories</td>
-<td><a href="`typing.Optional`">Optional</a>[<a href="`typing.List`">List</a>[<a href="`str`">str</a>]]</td>
+<td><a href="`list`">list</a>[<a href="`str`">str</a>] | None</td>
 <td>Optional list of category labels</td>
 <td><code>None</code></td>
 </tr>
 <tr class="odd">
 <td>texts</td>
-<td><a href="`typing.Optional`">Optional</a>[<a href="`typing.List`">List</a>[<a href="`str`">str</a>]]</td>
+<td><a href="`list`">list</a>[<a href="`str`">str</a>] | None</td>
 <td>Optional list of text content</td>
 <td><code>None</code></td>
 </tr>
@@ -1304,13 +1298,13 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 </tr>
 <tr class="odd">
 <td>category_col</td>
-<td><a href="`typing.Optional`">Optional</a>[<a href="`str`">str</a>]</td>
+<td><a href="`str`">str</a> | None</td>
 <td>Optional column name for category labels</td>
 <td><code>None</code></td>
 </tr>
 <tr class="even">
 <td>text_col</td>
-<td><a href="`typing.Optional`">Optional</a>[<a href="`str`">str</a>]</td>
+<td><a href="`str`">str</a> | None</td>
 <td>Optional column name for text content (enables labeling)</td>
 <td><code>None</code></td>
 </tr>
@@ -1389,13 +1383,13 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 </tr>
 <tr class="odd">
 <td>category_col</td>
-<td><a href="`typing.Optional`">Optional</a>[<a href="`str`">str</a>]</td>
+<td><a href="`str`">str</a> | None</td>
 <td>Optional column name for category labels</td>
 <td><code>None</code></td>
 </tr>
 <tr class="even">
 <td>text_col</td>
-<td><a href="`typing.Optional`">Optional</a>[<a href="`str`">str</a>]</td>
+<td><a href="`str`">str</a> | None</td>
 <td>Optional column name for text content (enables labeling)</td>
 <td><code>None</code></td>
 </tr>
@@ -1468,13 +1462,13 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 <tbody>
 <tr class="odd">
 <td>texts</td>
-<td><a href="`typing.List`">List</a>[<a href="`str`">str</a>]</td>
+<td><a href="`list`">list</a>[<a href="`str`">str</a>]</td>
 <td>List of text documents</td>
 <td><em>required</em></td>
 </tr>
 <tr class="even">
 <td>categories</td>
-<td><a href="`typing.Optional`">Optional</a>[<a href="`typing.List`">List</a>[<a href="`str`">str</a>]]</td>
+<td><a href="`list`">list</a>[<a href="`str`">str</a>] | None</td>
 <td>Optional category labels</td>
 <td><code>None</code></td>
 </tr>
@@ -1504,7 +1498,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 </tr>
 <tr class="odd">
 <td>ngram_range</td>
-<td><a href="`typing.Tuple`">Tuple</a>[<a href="`int`">int</a>, <a href="`int`">int</a>]</td>
+<td><a href="`tuple`">tuple</a>[<a href="`int`">int</a>, <a href="`int`">int</a>]</td>
 <td>N-gram range (default unigrams + bigrams)</td>
 <td><code>(1, 2)</code></td>
 </tr>
@@ -1687,7 +1681,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 <tbody>
 <tr class="odd">
 <td></td>
-<td><a href="`typing.Dict`">Dict</a>[<a href="`int`">int</a>, <a href="`typing.Dict`">Dict</a>]</td>
+<td><a href="`dict`">dict</a>[<a href="`int`">int</a>, <a href="`dict`">dict</a>]</td>
 <td>Dict mapping bucket_id -&gt; {‘label’: str, ‘size’: int, ‘samples’: List[str]}</td>
 </tr>
 </tbody>
@@ -1741,7 +1735,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 </tr>
 <tr class="odd">
 <td>stopwords</td>
-<td><a href="`typing.Optional`">Optional</a>[<a href="`set`">set</a>]</td>
+<td><a href="`set`">set</a> | None</td>
 <td>Set of words to exclude (uses default if None)</td>
 <td><code>None</code></td>
 </tr>
@@ -1773,7 +1767,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 <tbody>
 <tr class="odd">
 <td></td>
-<td><a href="`typing.Dict`">Dict</a>[<a href="`int`">int</a>, <a href="`typing.Dict`">Dict</a>]</td>
+<td><a href="`dict`">dict</a>[<a href="`int`">int</a>, <a href="`dict`">dict</a>]</td>
 <td>Dict mapping bucket_id -&gt; {‘label’: str, ‘keywords’: List[Tuple[str, float]], ‘size’: int}</td>
 </tr>
 </tbody>
