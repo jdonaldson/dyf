@@ -1,5 +1,65 @@
 # Changelog
 
+## 0.14.0 — 2026-09-06
+
+Isolation scoring was **97.8% of `fit()`**. It is a pure diagnostic — nothing in the
+bucket or tree path reads it — so it is now off by default and, when asked for, computed
+through BLAS instead of a Python loop.
+
+Requires `dyf-rs>=0.11.0`.
+
+### Faster
+
+Measured on clustered corpora, this machine:
+
+| | before | after | |
+|---|---|---|---|
+| `fit` n=60,000 d=384 | 1.644 s | **0.046 s** | 36x |
+| `fit` n=200,000 d=768 | 12.702 s | **0.270 s** | 47x |
+| isolation itself, n=200k d=768 | 12.422 s | **0.239 s** | 52x |
+| `DensityClassifierFull` isolation, n=20k d=384 | 1.92 s | **0.23 s** | 8.5x |
+
+The Python classifier's `_compute_isolation_scores` looped over items and re-evaluated
+`self.embeddings[sample_indices]` *inside* the loop — a fancy-index copy of the whole
+sample rebuilt once per item — then sorted all 1000 similarities to read two positions.
+It is now one matrix product per row chunk plus two partitions.
+
+Scores are unchanged; `tests/test_classifier_isolation.py` pins the new path to a
+transcription of the original algorithm across even and odd sample sizes and across the
+chunk boundary.
+
+### Absent diagnostics are now absent
+
+Skipping a diagnostic used to fill a placeholder: zeros for isolation, **1.0** for
+stability. 1.0 is the maximum stability score, so a computation that never ran was
+reported as a perfect result, formatted identically to a measured one.
+
+- `DensityReport.mean_isolation_score` and `.mean_stability_score` are now `float | None`
+- `report()` prints `not computed` rather than a number
+- `DensityClassifierFull.get_stability_scores()` returns `None` when unmeasured
+- the `stability_score` DataFrame column is null rather than a column of 1.0
+- new `has_isolation_scores()` / `has_stability_scores()` on the Rust classifier
+- new `compute_isolation(embeddings)` for the opt-in path
+
+`skip_isolation` and `num_stability_seeds` are also independent gates now. They used to
+be folded together, so asking for 3 stability seeds silently produced nothing when an
+unrelated flag was set.
+
+### Breaking (pre-v1)
+
+- `skip_isolation` defaults to `True`; call `compute_isolation(embeddings)` for scores
+- the two report means are `Optional[float]` — code formatting them with `:.4f` must
+  handle `None`
+- `get_stability_scores()` may return `None`
+
+### Known, not fixed
+
+The Rust stability metric compares raw bucket *labels* across independently generated
+hyperplane sets, so it reads ~0.0 on data with 40 well-separated clusters. Measured:
+label agreement across seeds 0.0000, co-membership agreement 0.4489, same seed twice
+1.0000 — the structure is stable and the metric cannot see it. The Python twin perturbs
+hyperplanes by 0.01 rather than regenerating them, which keeps labels comparable.
+
 ## 0.13.1 — 2026-09-06
 
 Fixes the top-level CLI contract that 0.13.0 shipped broken. 0.13.0's premise was that an

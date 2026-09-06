@@ -105,22 +105,60 @@ class TestDensityClassifier:
         # Most values should be in valid range (allow small floating point errors)
         assert sum(-1.1 <= s <= 1.1 for s in sims) == len(sims)
 
-    def test_get_isolation_scores(self, sample_embeddings):
-        """Test isolation score retrieval."""
+    def test_isolation_scores_are_absent_by_default(self, sample_embeddings):
+        """Isolation is ~98% of fit and a pure diagnostic, so it is off by default.
+
+        Absent means *empty*, not a vector of zeros: a placeholder cannot be told apart
+        from a measurement by any caller.
+        """
         classifier = DensityClassifier(embedding_dim=64, num_bits=8)
         classifier.fit(sample_embeddings)
 
-        scores = classifier.get_isolation_scores()
+        assert not classifier.has_isolation_scores()
+        assert len(classifier.get_isolation_scores()) == 0
+        assert classifier.report().mean_isolation_score is None
+
+    def test_get_isolation_scores_after_computing_them(self, sample_embeddings):
+        """Test isolation score retrieval on the opt-in path."""
+        classifier = DensityClassifier(embedding_dim=64, num_bits=8)
+        classifier.fit(sample_embeddings)
+
+        scores = classifier.compute_isolation(sample_embeddings)
         assert len(scores) == 500
+        assert classifier.has_isolation_scores()
+        assert len(classifier.get_isolation_scores()) == 500
+        assert classifier.report().mean_isolation_score is not None
+
+    def test_get_isolation_scores_eagerly(self, sample_embeddings):
+        """skip_isolation=False still computes during fit, as before."""
+        classifier = DensityClassifier(embedding_dim=64, num_bits=8, skip_isolation=False)
+        classifier.fit(sample_embeddings)
+
+        assert classifier.has_isolation_scores()
+        assert len(classifier.get_isolation_scores()) == 500
 
     def test_get_stability_scores(self, sample_embeddings):
-        """Test stability score retrieval."""
+        """Test stability score retrieval.
+
+        num_stability_seeds is gated independently of skip_isolation: asking for seeds
+        must produce scores regardless of whether isolation is switched on.
+        """
         classifier = DensityClassifier(embedding_dim=64, num_bits=8, num_stability_seeds=3)
         classifier.fit(sample_embeddings)
 
+        assert classifier.has_stability_scores()
         scores = classifier.get_stability_scores()
         assert len(scores) == 500
         assert all(0.0 <= s <= 1.0 for s in scores)
+
+    def test_stability_absent_without_enough_seeds(self, sample_embeddings):
+        """Fewer than 2 seeds cannot measure stability — report absence, not 1.0."""
+        classifier = DensityClassifier(embedding_dim=64, num_bits=8, num_stability_seeds=1)
+        classifier.fit(sample_embeddings)
+
+        assert not classifier.has_stability_scores()
+        assert len(classifier.get_stability_scores()) == 0
+        assert classifier.report().mean_stability_score is None
 
     def test_clustered_data_has_larger_buckets(self, clustered_embeddings, sample_embeddings):
         """Test that clustered data produces larger buckets than random data."""
