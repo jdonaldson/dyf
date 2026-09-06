@@ -1,4 +1,8 @@
-"""Dense in-memory multiprobe search backed by the Rust kernel (dyf-rs >= 0.8.0).
+"""Dense in-memory multiprobe search backed by the Rust kernel.
+
+The required `dyf-rs` version is declared once in `pyproject.toml` and checked at import
+by `dyf/__init__.py`. It is not restated here — this line used to say `>= 0.8.0` while the
+requirement was `>= 0.10.0`, one of four disagreeing copies of the same number.
 
 Builds a dyf tree over a dense embedding corpus and routes queries through it with a
 batched, rayon-parallel Rust kernel (``dyf_rs.dense_search_batch``). The kernel is a

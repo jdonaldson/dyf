@@ -261,8 +261,10 @@ The key insight: items that appear as outliers globally often share structure at
 
 ## Performance
 
-Search runs on a Rust multiprobe kernel (`dyf-rs >= 0.8.0`, PyO3) — the default path for
-both `LazyIndex.search` and `DenseSearchIndex`. Results are **bit-identical** to the
+Search runs on a Rust multiprobe kernel (`dyf-rs`, PyO3) — the default path for
+both `LazyIndex.search` and `DenseSearchIndex`. The required version is declared in
+`pyproject.toml` and checked at import; it is not repeated here, because the copy in this
+sentence said `>= 0.8.0` while the requirement was `>= 0.10.0`. Results are **bit-identical** to the
 pure-Python reference (`backend="python"`); the kernel handles fixed *and* adaptive
 `nprobe` and `return_routing`. MSMARCO MiniLM-L6 (384d), Apple Silicon, batched unless
 noted:

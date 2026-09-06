@@ -77,22 +77,57 @@ except ImportError:
     DensityReport = None
     BridgeAnalysis = None
 
-# Warn if dyf-rs is installed but below the documented floor.
-# The pyproject constraint (dyf-rs>=0.7.0) can be silently bypassed
-# by stale editable-install metadata.
+
+# Warn if the installed dyf-rs is below what this package requires. An editable install
+# can silently keep a stale wheel — KNOWN_ISSUES #1 was exactly that, a venv running
+# dyf-rs 0.5.0 against a newer constraint.
+#
+# The floor is READ FROM THE PYPROJECT REQUIREMENT, not hard-coded. It used to be a literal
+# `(0, 7, 0)` and drifted: pyproject moved to >=0.10.0 while this stayed at 0.7.0, so the
+# guard against stale installs sat *below* the requirement and could not fire — a venv
+# running 0.7.0 against a >=0.10.0 constraint passed it silently (found 2026-09-05).
+# A hard-coded copy of a number that lives somewhere else is a number that will drift.
+def _dyf_rs_floor() -> tuple[int, ...] | None:
+    """Minimum dyf-rs version, parsed from this package's own declared requirement.
+
+    Note this reads the *installed distribution's* metadata, which is what makes it
+    self-consistent — and also means a stale editable install reports a stale floor.
+    That is the correct failure direction: the remedy in both cases is
+    `uv pip install -e .`, which the warning names.
+    """
+    try:
+        import re as _re
+        from importlib.metadata import requires as _requires
+
+        for _req in _requires("dyf") or []:
+            # Requirement strings have no space before the specifier: "dyf-rs>=0.7.0".
+            name_match = _re.match(r"^\s*([A-Za-z0-9._-]+)", _req)
+            if not name_match:
+                continue
+            if name_match.group(1).strip().lower().replace("_", "-") != "dyf-rs":
+                continue
+            version_match = _re.search(r">=\s*([0-9]+(?:\.[0-9]+)*)", _req)
+            if version_match:
+                return tuple(int(x) for x in version_match.group(1).split(".")[:3])
+    except Exception:  # noqa: BLE001 — a version check must never break the import
+        pass
+    return None
+
+
 if _HAS_RUST:
     import warnings as _warnings
 
-    _DYF_RS_FLOOR = (0, 7, 0)
+    _DYF_RS_FLOOR = _dyf_rs_floor()
     _rs_ver_str = getattr(__import__("dyf_rs"), "__version__", None)
-    if _rs_ver_str:
+    if _rs_ver_str and _DYF_RS_FLOOR:
         try:
             _rs_ver = tuple(int(x) for x in _rs_ver_str.split(".")[:3])
             if _rs_ver < _DYF_RS_FLOOR:
                 _warnings.warn(
-                    f"dyf-rs {_rs_ver_str} is below the documented floor "
-                    f"{'.'.join(str(x) for x in _DYF_RS_FLOOR)}. "
-                    f"Run `uv pip install -e .` to refresh editable-install metadata.",
+                    f"dyf-rs {_rs_ver_str} is below the required "
+                    f"{'.'.join(str(x) for x in _DYF_RS_FLOOR)} (from dyf's own dependency "
+                    f"declaration). Run `uv pip install -e .` to refresh editable-install "
+                    f"metadata.",
                     RuntimeWarning,
                     stacklevel=2,
                 )
@@ -133,7 +168,7 @@ from .dedup import (
     near_duplicate_clusters,
 )
 
-# Dense in-memory multiprobe search (Rust-backed, dyf-rs >= 0.8.0)
+# Dense in-memory multiprobe search (Rust-backed; see pyproject for the dyf-rs floor)
 from .dense_search import DenseSearchIndex, flatten_tree
 
 # DYF tree (recursive k-ary LSH splits) and boundary persistence.
