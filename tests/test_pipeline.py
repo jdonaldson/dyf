@@ -1,8 +1,11 @@
 """Tests for dyf.pipeline — DAG pipeline runner."""
 
+import json
 import pickle
 
-from dyf.pipeline import Pipeline, Stage
+import pytest
+
+from dyf.pipeline import Pipeline, Stage, _dyf_provenance_value
 from dyf.provenance import create_provenance, provenance_to_dict
 
 # ---------------------------------------------------------------------------
@@ -178,3 +181,59 @@ class TestExplain:
         assert "a" in text
         assert "b" in text
         assert "missing" in text
+
+
+# ---------------------------------------------------------------------------
+# .dyf provenance
+#
+# This branch had no coverage at all. The tests above write `_provenance` into .pkl
+# fixtures by hand, so none of them exercised the .dyf path — which read a key nothing
+# writes, leaving every .dyf stage permanently "stale (no provenance)".
+# ---------------------------------------------------------------------------
+
+
+class TestDyfProvenance:
+    def test_prefers_the_highest_enrichment_level(self):
+        meta = {
+            "_provenance_level_1": "one",
+            "_provenance_level_3": "three",
+            "_provenance_level_2": "two",
+            "domain": "irrelevant",
+        }
+        assert _dyf_provenance_value(meta) == "three"
+
+    def test_plain_key_wins_when_present(self):
+        meta = {"_provenance": "direct", "_provenance_level_2": "two"}
+        assert _dyf_provenance_value(meta) == "direct"
+
+    def test_returns_none_when_no_provenance(self):
+        assert _dyf_provenance_value({"domain": "x"}) is None
+
+    def test_ignores_a_malformed_level_suffix(self):
+        assert _dyf_provenance_value({"_provenance_level_abc": "junk"}) is None
+
+    def test_reads_provenance_from_a_real_dyf_file(self, tmp_path):
+        """End-to-end: the shape dyfviz actually writes must read back as fresh."""
+        pytest.importorskip("flatbuffers")
+        pytest.importorskip("dyf_rs")
+        import numpy as np
+
+        from dyf.dyf_tree import build_dyf_tree
+        from dyf.lazy_index import write_lazy_index
+
+        rng = np.random.default_rng(0)
+        X = np.ascontiguousarray(rng.standard_normal((32, 8)).astype(np.float32))
+        tree = build_dyf_tree(X, max_depth=2, num_bits=2, min_leaf_size=2, seed=42)
+
+        params = {"k": 1}
+        prov = provenance_to_dict(
+            create_provenance(artifact_type="dyf", n_items=32, source_paths=["upstream"], params=params)
+        )
+        path = tmp_path / "enriched.dyf"
+        write_lazy_index(tree, X, str(path), metadata={"_provenance_level_1": json.dumps(prov)})
+
+        assert Pipeline._read_provenance(str(path)) is not None
+
+        p = Pipeline()
+        p.add(Stage(name="e", inputs=[], output=str(path), build_fn=lambda: None, params=params))
+        assert p._stage_status("e") == "fresh"

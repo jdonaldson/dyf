@@ -129,13 +129,30 @@ CI locks in the surface that is already clean and touches none of the above.
       build mode with no embeddings (loses semantic neighbors, keeps the index), a
       lighter embedder, or ship the tool separately from the research package.
 
-- [ ] **Fix the provenance key mismatch.** `pipeline.py:164` reads metadata key
-      `"_provenance"`; the enrich stages only ever write `_provenance_level_1/2/3`
-      (`_project.py:190`, `_cluster.py:432`, `_viz.py:176`). The pipeline runner cannot
-      read the provenance its own package writes and reports every `.dyf` as
-      `"stale (no provenance)"`. The ingest modules stamp none at all. This is the
-      mechanism behind the *DAG-Oriented Task Flow* section's "is a cached intermediate
-      still valid?" — currently it always answers no.
+- [x] **Fix the provenance key mismatch.** *(done 2026-09-05, `_dyf_provenance_value`,
+      5 tests.)* `pipeline.py` read `_provenance`; the enrichment stages only ever wrote
+      `_provenance_level_1/2/3`. Verified on a real artifact before the fix: a
+      dyfviz-shaped `.dyf` read back as `None` and its stage status was
+      `'stale (no provenance)'`; after, `FOUND` and `'fresh'`. So every `.dyf` stage
+      rebuilt unconditionally and the caching this module exists for never engaged.
+
+      Now reads `_provenance`, falling back to the **highest** `_provenance_level_N` —
+      the most recent stage to touch the file, so its params hash is the right one to
+      compare. Reading a key dyfviz writes is the same format convention
+      `detect_enrichment_level` already uses, so this reduces inconsistency rather than
+      adding coupling.
+
+      ⚠ **The `.dyf` branch had no test coverage at all.** Every existing pipeline test
+      hand-writes `_provenance` into a `.pkl` fixture, so the suite passed while the path
+      that matters for real artifacts was broken — the degenerate-fixture pattern again,
+      third instance today. Added 5 tests including one end-to-end on a real `.dyf`.
+
+      - [ ] Still open, and now sharper after the split: **nothing in dyf writes
+        provenance at all.** The ingest modules (`index_source`, `index_images`,
+        `index_video`) stamp `build_params` but no provenance, and `Pipeline` never
+        stamps after running a stage — it assumes `build_fn` did. So `provenance.py`
+        exports 7 public symbols with no in-package producer. Either the ingest path
+        should stamp, or the module should say plainly that stamping is the caller's job.
 
 ## P1 — give both surfaces a contract
 

@@ -55,6 +55,19 @@
   `basicConfig`, which configures the *root* logger and turned on INFO for every
   dependency — httpx dumped every HuggingFace request during `concepts build`.
 
+- **`Pipeline` could never see provenance on a `.dyf`, so every `.dyf` stage rebuilt.**
+  `_read_provenance` looked for a `_provenance` metadata key; the enrichment stages only
+  ever write `_provenance_level_1/2/3`. Verified on a real artifact: a file carrying
+  `_provenance_level_1` read back as `None` with stage status `stale (no provenance)`;
+  it now reads `fresh`. The rebuild-skipping the module exists for had never engaged for
+  this artifact type.
+
+  Now reads `_provenance`, falling back to the highest `_provenance_level_N` — the most
+  recent stage to touch the file, so its params hash is the right one to compare against.
+
+  The `.dyf` branch had **no test coverage**: every existing pipeline test hand-writes
+  `_provenance` into a `.pkl` fixture. Added 5 tests, one end-to-end on a real `.dyf`.
+
 - **Missing optional dependencies now produce an actionable message, not a traceback.**
   `main()` catches `ImportError` around dispatch and reports
   `pip install 'dyf[<extra>]'`, exiting 3. Before: `dyf index-images` died with a bare
