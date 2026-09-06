@@ -130,14 +130,22 @@ with LazyIndex("index.dyf") as idx:
 Build hierarchical structure from embeddings for multi-resolution analysis:
 
 ```python
-from dyf import build_pca_tree, cut_tree_to_labels
+from dyf import build_dyf_tree, cut_tree_to_labels
 
-# Build a PCA-based binary tree
-tree = build_pca_tree(embeddings, max_depth=8)
+# Build a k-ary DYF tree (num_bits=3 gives up to 8 children per node)
+tree = build_dyf_tree(embeddings, max_depth=4, num_bits=3)
 
-# Cut to get cluster labels
-labels = cut_tree_to_labels(tree, max_depth=8, n_points=len(embeddings), n_clusters=25)
+# Cut to get cluster labels — embeddings are needed for leaf centroids
+labels = cut_tree_to_labels(tree, n_points=len(embeddings), n_clusters=25, embeddings=embeddings)
 ```
+
+::: {.callout-note}
+`build_pca_tree` was removed in 0.13. It built a binary PC1-bisection tree that nothing
+in the pipeline consumed — `write_lazy_index`, `LazyIndex` and the Rust kernel all work
+on the k-ary DYF tree. `extract_boundary_persistence` and `boundary_persistence_scores`
+now resolve to the DYF variants; previously the top-level names were the PCA ones, so
+passing a `build_dyf_tree` result raised `KeyError: 'left'`.
+:::
 
 ## Bridge-Aware Retrieval (RAG)
 

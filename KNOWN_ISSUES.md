@@ -203,6 +203,29 @@ detected shape is missing. The old per-module functions are now private
 (`_cut_pca_tree_to_labels`, `_cut_dyf_tree_to_labels`). All callsites
 (tests + demos) migrated.
 
+**Superseded 2026-09-05 — the root cause is gone.** The dispatcher treated the
+symptom: two tree shapes existed, so something had to route between them. Auditing
+the class rather than the instance turned up **the same bug in two functions nobody
+had swept**: `dyf.extract_boundary_persistence` and `dyf.boundary_persistence_scores`
+resolved to the *PCA* variants, so the most natural call —
+
+```python
+from dyf import build_dyf_tree, extract_boundary_persistence
+extract_boundary_persistence(build_dyf_tree(embeddings, max_depth=3))
+```
+
+— died with the identical `KeyError: 'left'` this issue is about.
+
+`pca_tree` was then removed entirely: nothing in the package produced a PCA tree
+(`write_lazy_index`, `LazyIndex` and the Rust kernel all work on the k-ary DYF tree),
+and `dyf_tree` offered a strict superset of its public functions. With one tree shape
+there is nothing to dispatch on; `cut.py` keeps only a shape check so a wrong dict
+still gets a named error instead of a `KeyError` from deep inside the cut.
+
+⚠ The boundary-persistence tests had **all** been written against the PCA variants, so
+the DYF ones — which now own the top-level names — had no coverage at all. Ported to
+`tests/test_dyf_tree_boundaries.py` (15 tests) *before* deleting, rather than after.
+
 ---
 
 ## 3. dyf-py 0.8.0 source assumes dyf-rs >= 0.6.0 unconditionally — FIXED

@@ -82,7 +82,7 @@ from .configs import (
     list_configs,
 )
 
-# Unified tree-cutting dispatcher (routes to the right impl per tree shape)
+# Tree cutting. Was a dispatcher over two tree shapes until pca_tree was dropped.
 from .cut import cut_tree_to_labels
 
 # Ingest-time near-duplicate detection
@@ -97,22 +97,19 @@ from .dedup import (
 # Dense in-memory multiprobe search (Rust-backed, dyf-rs >= 0.8.0)
 from .dense_search import DenseSearchIndex, flatten_tree
 
-# DYF tree (recursive k-ary LSH splits)
+# DYF tree (recursive k-ary LSH splits) and boundary persistence.
+#
+# The two boundary-persistence names resolved to the `pca_tree` variants until
+# 2026-09-05, so the natural call — build with `build_dyf_tree`, analyse with the
+# top-level `extract_boundary_persistence` — died with a bare `KeyError: 'left'`.
+# `pca_tree` is gone; these work on the tree this package actually produces.
 from .dyf_tree import (
+    boundary_persistence_scores,
     build_dyf_tree,
+    extract_boundary_persistence,
     refine_clusters,
     refine_dyf_tree,
 )
-
-# PCA tree
-from .pca_tree import (
-    boundary_persistence_scores,
-    build_pca_tree,
-    extract_boundary_persistence,
-)
-
-# Also available: dyf_tree.extract_boundary_persistence,
-#                 dyf_tree.boundary_persistence_scores
 
 # Lazy index (FlatBuffers + Arrow IPC)
 try:
@@ -319,7 +316,6 @@ __all__ = [
     "dedup_for_index",
     "near_duplicate_clusters",
     # PCA tree
-    "build_pca_tree",
     "extract_boundary_persistence",
     "boundary_persistence_scores",
     # DYF tree

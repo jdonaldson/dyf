@@ -4,6 +4,32 @@
 
 ### Removed
 
+- **`build_pca_tree` and the `dyf.pca_tree` module.** It built a binary PC1-bisection
+  tree that **nothing in the package consumed** — `write_lazy_index`, `LazyIndex`, the
+  Rust kernel and every `index-*` path work on the k-ary DYF tree — while `dyf_tree`
+  offered a strict superset of its public functions.
+
+  **This fixes a live footgun.** `dyf.extract_boundary_persistence` and
+  `dyf.boundary_persistence_scores` resolved to the *PCA* variants, so the most natural
+  call died with a bare `KeyError: 'left'`:
+
+  ```python
+  from dyf import build_dyf_tree, extract_boundary_persistence
+  extract_boundary_persistence(build_dyf_tree(embeddings, max_depth=3))  # KeyError
+  ```
+
+  That is the same failure as `KNOWN_ISSUES` #2, which had been fixed for the `cut_*`
+  pair with a dispatcher but never swept across the class. Both names now resolve to the
+  DYF variants and work on the tree this package actually produces.
+
+  `cut_tree_to_labels` no longer dispatches — with one tree shape there is nothing to
+  route — but keeps a shape check so a wrong dict still gets a named `ValueError`. Its
+  `max_depth` argument is now ignored and accepted only for compatibility.
+
+  ⚠ Every boundary-persistence test had been written against the PCA variants, so the
+  DYF ones had **no coverage**. Ported to `tests/test_dyf_tree_boundaries.py` (15 tests)
+  before the deletion, not after.
+
 - **`dyf enrich` and `dyf tour` moved to the new `dyfviz` package.** dyf is now a library
   about indexing and search; UMAP projection, Louvain clustering, LLM labelling,
   narration, Kokoro TTS and the browser viewer live downstream in
