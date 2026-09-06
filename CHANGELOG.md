@@ -1,6 +1,14 @@
 # Changelog
 
-## Unreleased
+## 0.13.0 — 2026-09-05
+
+Pre-v1, so the breaking changes below land in a minor bump. Two themes: **agents became a
+first-class consumer** (a CLI that produced no output at all, exit codes that meant
+nothing, no way to discover the API), and **return shapes were reconciled** while that is
+still cheap.
+
+The enrichment pipeline and browser tour moved out to
+[dyfviz](https://github.com/jdonaldson/dyfviz).
 
 ### Removed
 
