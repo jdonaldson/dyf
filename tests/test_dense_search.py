@@ -71,7 +71,16 @@ class TestBackwardCompatibleUnpacking:
         result = index.search(corpus[0], k=5, nprobe=16)
         assert np.array_equal(result[0], result.indices)
         assert np.array_equal(result[1], result.scores)
-        assert len(result) == 2
+
+    def test_len_is_the_hit_count_not_the_unpacking_arity(self, index, corpus):
+        """CHANGED 2026-09-05: `__len__` returned a hard-coded 2.
+
+        `len(result)` reported 2 on a k=10 search — a plausible wrong number, the kind
+        that gets cited downstream without being questioned. Safe to change because
+        unpacking goes through `__iter__`, never `__len__`, which the tests above cover.
+        """
+        assert len(index.search(corpus[0], k=5, nprobe=16)) == 5
+        assert len(index.search(corpus[0], k=10, nprobe=64)) == 10
 
 
 class TestSearchBehaviour:

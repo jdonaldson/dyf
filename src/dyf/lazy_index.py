@@ -89,7 +89,12 @@ def detect_dyf_version(path: str) -> int:
 
 @dataclass
 class SearchResult:
-    """Search result with indices, scores, and optional stored fields."""
+    """Search result with indices, scores, and optional stored fields.
+
+    The standard return type of every retrieval entry point — `LazyIndex.search`,
+    `LazyIndex.search_ivf`, `DenseSearchIndex.search` and `BridgeIndex.query` — so the
+    same calling code works against any index.
+    """
 
     indices: np.ndarray  # (k,) uint32
     scores: np.ndarray  # (k,) float32
@@ -102,12 +107,25 @@ class SearchResult:
         yield self.scores
 
     def __getitem__(self, key):
+        """`r["title"]` gets a stored field; `r[0]`/`r[1]` are indices/scores.
+
+        The positional form exists only so tuple-style access keeps working. Prefer
+        `.indices` / `.scores` — they say which one you meant.
+        """
         if isinstance(key, str):
             return self.fields[key]
         return (self.indices, self.scores)[key]
 
     def __len__(self):
-        return 2
+        """Number of hits — NOT the unpacking arity.
+
+        This returned a hard-coded 2 until 2026-09-05, so `len(result)` reported 2 on a
+        `k=10` search: a plausible-looking wrong number, of exactly the kind that gets
+        cited downstream without being questioned. Safe to change because tuple unpacking
+        goes through `__iter__`, never `__len__` — verified — so
+        `indices, scores = idx.search(...)` is unaffected.
+        """
+        return len(self.indices)
 
 
 @dataclass

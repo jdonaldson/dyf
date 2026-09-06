@@ -44,6 +44,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from ._arrays import ensure_f32
+from .lazy_index import SearchResult
 
 logger = logging.getLogger(__name__)
 
@@ -390,18 +391,23 @@ class BridgeIndex:
 
     def query(
         self, query: np.ndarray, k: int = 10, n_query_anchors: int | None = None, return_scores: bool = True
-    ) -> tuple[np.ndarray, np.ndarray | None]:
+    ) -> SearchResult:
         """
         Retrieve top-k candidates for a query embedding.
+
+        Returns the same :class:`SearchResult` as `LazyIndex.search` and
+        `DenseSearchIndex.search`, so every retriever in the package answers with one
+        shape. It unpacks as a 2-tuple, so `indices, scores = index.query(...)` keeps
+        working.
 
         Args:
             query: (d,) query embedding vector
             k: Number of results to return
             n_query_anchors: Override default number of anchors to probe
-            return_scores: Whether to return similarity scores
+            return_scores: Whether to compute similarity scores (`scores` is None if not)
 
         Returns:
-            (indices, scores) where indices are the top-k candidate indices
+            SearchResult whose `indices` are the top-k candidate indices
             and scores are their cosine similarities (or None if return_scores=False)
         """
         if not self._fitted:
@@ -438,15 +444,10 @@ class BridgeIndex:
         top_k_local = np.argsort(candidate_sims)[-k:][::-1]
         top_k_indices = candidates[top_k_local]
 
-        if return_scores:
-            top_k_scores = candidate_sims[top_k_local]
-            return top_k_indices, top_k_scores
-        else:
-            return top_k_indices, None
+        top_k_scores = candidate_sims[top_k_local] if return_scores else None
+        return SearchResult(indices=top_k_indices, scores=top_k_scores)
 
-    def query_batch(
-        self, queries: np.ndarray, k: int = 10, n_query_anchors: int | None = None
-    ) -> list[tuple[np.ndarray, np.ndarray]]:
+    def query_batch(self, queries: np.ndarray, k: int = 10, n_query_anchors: int | None = None) -> list[SearchResult]:
         """
         Batch query for multiple embeddings.
 
@@ -456,13 +457,9 @@ class BridgeIndex:
             n_query_anchors: Override default number of anchors to probe
 
         Returns:
-            List of (indices, scores) tuples, one per query
+            List of SearchResult, one per query. Each unpacks as (indices, scores).
         """
-        results = []
-        for query in queries:
-            indices, scores = self.query(query, k=k, n_query_anchors=n_query_anchors)
-            results.append((indices, scores))
-        return results
+        return [self.query(query, k=k, n_query_anchors=n_query_anchors) for query in queries]
 
     def get_anchors(self) -> np.ndarray:
         """Return the anchor point indices."""
