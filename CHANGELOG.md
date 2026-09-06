@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.13.1 — 2026-09-06
+
+Fixes the top-level CLI contract that 0.13.0 shipped broken. 0.13.0's premise was that an
+agent can rely on `dyf`'s exit codes; `dyf --help` — the first thing any caller runs —
+exited 1.
+
+`main()` routed four different situations into one usage dump with one exit code, because
+`_dispatch` returns `None` for anything it does not recognise and the fallthrough could
+not tell them apart. They are now distinct:
+
+| invocation | before | after |
+|---|---|---|
+| `dyf --help`, `-h`, `help` | rc 1, stdout | **rc 0**, stdout |
+| `dyf` (no command) | rc 1, stdout | **rc 2**, stderr |
+| `dyf <unknown>` | rc 1, stdout, silent about the typo | **rc 2**, stderr, names the word |
+| `dyf enrich` / `dyf tour` | rc 4 | rc 4 (unchanged) |
+
+Usage now goes to stderr when it is an *error* and stdout when it is the *answer*, so
+`dyf --help > cheatsheet.txt` is no longer empty. The two usage-error codes reuse
+`EXIT_BAD_REQUEST` from the existing ingest contract rather than adding a parallel
+numbering. `dyf --help` also now points at `dyf <command> --help`.
+
+### Why it shipped
+
+`tests/` had no CLI tests at all, and `benchmarks/audit_cli_surface.py` documents a
+deliberate decision not to test `--help`. That decision is correct *for subcommands* —
+argparse answers help itself without touching the logger, so a help smoke test cannot
+distinguish a working command from a mute one, which was the bug that audit was built for.
+It was over-generalised to "do not test `--help`", and the top level has no argparse
+behind it.
+
+Both holes are closed: `tests/test_cli_toplevel.py` (20 tests; 10 of them fail against
+0.13.0) and `check_top_level_contract()` in the audit, which now fails the run. The audit's
+`check_dispatch_matches_help()` also no longer scrapes `print()` calls out of the source —
+it renders the real usage text, and reports a problem if it parses no commands at all,
+since the scraping version would have silently passed once the text was refactored.
+
 ## 0.13.0 — 2026-09-05
 
 Pre-v1, so the breaking changes below land in a minor bump. Two themes: **agents became a

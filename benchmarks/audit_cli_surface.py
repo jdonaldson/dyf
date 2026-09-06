@@ -6,12 +6,25 @@ The fourth standing audit. The other three inspect the exported Python API —
 all three passed cleanly while `dyf concepts list` printed **zero bytes** on a graph with
 100+ nodes. `cli.py` is not in the public API, so nothing looked at it.
 
-**Why this audit does not test `--help`.** It would not have caught the bug. argparse
-prints help itself, writing straight to stdout without ever touching the logger, so every
-subcommand answers `--help` with rc 0 even when its real execution path is mute. Measured
-during this audit's construction: all 7 subcommands returned rc 0 and non-empty output
-for `--help`, while 3 of them raised an unhandled traceback on a real invocation. A
-help-only smoke test is blind to the failure it appears to check for.
+**Why this audit does not test `--help` on subcommands.** It would not have caught the
+bug. argparse prints help itself, writing straight to stdout without ever touching the
+logger, so every subcommand answers `--help` with rc 0 even when its real execution path
+is mute. Measured during this audit's construction: all 7 subcommands returned rc 0 and
+non-empty output for `--help`, while 3 of them raised an unhandled traceback on a real
+invocation. A help-only smoke test is blind to the failure it appears to check for.
+
+⚠ **That reasoning holds only where argparse is doing the parsing, and it was
+over-generalised into "do not test --help" — which cost a release.** The *top level* has
+no argparse: `main()` hand-rolls its usage text, and in 0.13.0 it routed `--help`, `-h`,
+an unknown command and no command at all into one usage dump with one exit code (1). So
+`dyf --help` — the first thing any caller runs — exited 1 on the release whose stated
+premise was that agents can trust these exit codes. Caught by installing the published
+wheel and running it, not by any check in the repo.
+
+`check_top_level_contract()` below now covers that layer, and `tests/test_cli_toplevel.py`
+covers it in CI. The transferable lesson: an exemption earns its scope from the mechanism
+that justifies it. "argparse handles help" justifies skipping *argparse* commands, and
+nothing more.
 
 So each case here runs a **real invocation** and classifies what came back:
 
@@ -193,7 +206,17 @@ def check_dispatch_matches_help() -> list[str]:
 
     A command listed in the usage text but missing from the dispatch chain silently
     falls through to the usage message — it looks like a typo rather than a bug.
+
+    Reads the **rendered** usage text rather than scraping `print(...)` calls out of the
+    source. The scraping version silently stopped working the moment the usage text was
+    refactored from a run of `print()` calls into a list — it then found zero advertised
+    commands and would have reported every command as unadvertised. Rendering the real
+    thing has no such coupling to how the text happens to be emitted.
     """
+    import io
+
+    from dyf.cli import _print_usage
+
     cli_src = Path(REPO, "src", "dyf", "cli.py").read_text()
 
     dispatched = set()
@@ -202,20 +225,83 @@ def check_dispatch_matches_help() -> list[str]:
         if stripped.startswith(("if cmd ==", "elif cmd ==")):
             dispatched.add(stripped.split('"')[1])
 
+    buf = io.StringIO()
+    _print_usage(buf)
     advertised = set()
-    for line in cli_src.splitlines():
-        stripped = line.strip()
-        if stripped.startswith('print("  ') and len(stripped) > 10:
-            token = stripped[len('print("  ') :].split()[0]
-            if token and not token.startswith('"'):
+    for line in buf.getvalue().splitlines():
+        # Command rows are indented two spaces under "Commands:"; prose lines are not.
+        if line.startswith("  ") and not line.startswith("   "):
+            token = line.strip().split()[0] if line.strip() else ""
+            if token:
                 advertised.add(token)
 
     problems = []
+    if not advertised:
+        problems.append("parsed no commands out of the usage text — this check is broken")
     for cmd in sorted(advertised - dispatched):
         problems.append(f"advertised in help but not dispatched: {cmd}")
     for cmd in sorted(dispatched - advertised):
         problems.append(f"dispatched but not advertised in help: {cmd}")
     return problems
+
+
+def check_top_level_contract() -> list[str]:
+    """The four top-level argv cases, which have no argparse behind them.
+
+    `main()` hand-rolls this layer, so the reasoning that lets this audit skip `--help`
+    for subcommands does not reach it. In 0.13.0 all four cases below shared one usage
+    dump and one exit code, so `dyf --help` exited 1.
+
+    Asserted here as a *contract*, not as "whatever it does today":
+
+        dyf --help        rc 0, usage on stdout   (a question that was answered)
+        dyf              rc 2, usage on stderr    (a usage error, not an answer)
+        dyf <unknown>     rc 2, names the word     (distinguishable from the above)
+        dyf enrich        rc 4, names dyfviz       (moved, not mistyped)
+    """
+    problems: list[str] = []
+
+    def run(*args):
+        return subprocess.run(
+            [sys.executable, "-m", "dyf.cli", *args],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+
+    for flag in ("-h", "--help", "help"):
+        r = run(flag)
+        if r.returncode != 0:
+            problems.append(f"`dyf {flag}` exited {r.returncode}, expected 0")
+        if "Usage: dyf" not in r.stdout:
+            problems.append(f"`dyf {flag}` did not put usage on stdout")
+
+    r = run()
+    if r.returncode != EXPECTED_USAGE_RC:
+        problems.append(f"bare `dyf` exited {r.returncode}, expected {EXPECTED_USAGE_RC}")
+    if "Usage: dyf" not in r.stderr:
+        problems.append("bare `dyf` did not put usage on stderr")
+
+    r = run("frobnicate")
+    if r.returncode != EXPECTED_USAGE_RC:
+        problems.append(f"`dyf frobnicate` exited {r.returncode}, expected {EXPECTED_USAGE_RC}")
+    if "frobnicate" not in r.stderr:
+        problems.append("an unknown command is not named in the error")
+
+    r = run("enrich")
+    if r.returncode != EXPECTED_MOVED_RC:
+        problems.append(f"`dyf enrich` exited {r.returncode}, expected {EXPECTED_MOVED_RC}")
+    if "dyfviz" not in r.stderr:
+        problems.append("the moved-command redirect does not name dyfviz")
+
+    return problems
+
+
+#: A malformed request. Mirrors `dyf._ingest_errors.EXIT_BAD_REQUEST`, restated rather
+#: than imported so the audit fails loudly if the contract is quietly renumbered.
+EXPECTED_USAGE_RC = 2
+#: A command that moved to dyfviz — deliberately distinct from "unknown".
+EXPECTED_MOVED_RC = 4
 
 
 # ---------------------------------------------------------------------------
@@ -280,6 +366,7 @@ def main() -> int:
 
     results = [run_case(name, argv) for name, argv in build_cases(fx)]
     dispatch_problems = check_dispatch_matches_help()
+    top_level_problems = check_top_level_contract()
 
     if args.as_json:
         print(
@@ -287,6 +374,7 @@ def main() -> int:
                 {
                     "results": [r.__dict__ for r in results],
                     "dispatch_problems": dispatch_problems,
+                    "top_level_problems": top_level_problems,
                 },
                 indent=2,
             )
@@ -305,15 +393,26 @@ def main() -> int:
         else:
             print("  consistent")
 
+        print("\nTop-level contract (--help / no command / unknown / moved)")
+        if top_level_problems:
+            for problem in top_level_problems:
+                print(f"  {problem}")
+        else:
+            print("  holds")
+
         counts: dict[str, int] = {}
         for r in results:
             counts[r.verdict] = counts.get(r.verdict, 0) + 1
         print("\n" + "  ".join(f"{k}={v}" for k, v in sorted(counts.items())))
 
     failing = [r for r in results if r.verdict in FAILING_VERDICTS]
-    if failing or dispatch_problems:
+    if failing or dispatch_problems or top_level_problems:
         if not args.as_json:
-            print(f"\n{len(failing)} command(s) mute or crashing; {len(dispatch_problems)} dispatch problem(s)")
+            print(
+                f"\n{len(failing)} command(s) mute or crashing; "
+                f"{len(dispatch_problems)} dispatch problem(s); "
+                f"{len(top_level_problems)} top-level contract problem(s)"
+            )
         return 1
     return 0
 

@@ -19,6 +19,11 @@ downstream in `dyfviz`, split out 2026-09-05: `dyfviz enrich all f.dyf`, `dyfviz
 import logging
 import sys
 
+# A missing or unknown top-level command is a malformed request, which the ingest
+# exit-code contract already numbers. Reused here so the whole CLI speaks one language
+# rather than growing a second, parallel set of codes.
+from ._ingest_errors import EXIT_BAD_REQUEST
+
 
 def _configure_cli_logging() -> None:
     """Give the package logger a console handler when running as a CLI.
@@ -112,11 +117,50 @@ def _dispatch(cmd: str, argv: list[str]) -> int | None:
     return None
 
 
+HELP_FLAGS = {"-h", "--help", "help"}
+
+
+def _print_usage(stream) -> None:
+    lines = [
+        "Usage: dyf <command>",
+        "",
+        "Commands:",
+        "  info          Describe a .dyf file (items, fields, enrichment level; --json)",
+        "  api           Map of the public Python API, grouped with entry points (--json)",
+        "  concepts      Build and query concept graphs from markdown files",
+        "  index-source  Index source code into a .dyf file (Python, JS, TS, Rust, Go, Java, C, C++, OCaml)",
+        "  index-images  Index images into a .dyf file (vision embeddings + thumbnails)",
+        "  index-video   Index video keyframes into a .dyf file (scene detection + vision)",
+        "",
+        "Run `dyf <command> --help` for a command's own options.",
+        "Enrichment and the browser tour moved to dyfviz: dyfviz enrich | dyfviz tour",
+    ]
+    print("\n".join(lines), file=stream)
+
+
 def main():
     _configure_cli_logging()
 
     if len(sys.argv) > 1:
         cmd = sys.argv[1]
+
+        # Asking for help is a successful request, so it exits 0 and answers on stdout.
+        # Every other path through this block is a usage *error* and exits 2.
+        #
+        # These four cases — `--help`, an unknown command, a moved command, and no
+        # command at all — used to share one usage dump and one exit code (1), because
+        # `_dispatch` returns None for anything it does not recognise and the fallthrough
+        # could not tell those apart. A caller that ran `dyf --help` got rc 1; a caller
+        # that typoed a command got rc 1 with nothing saying which word was wrong.
+        #
+        # `benchmarks/audit_cli_surface.py` documents why it skips `--help` for
+        # subcommands: argparse answers those itself without touching the logger, so a
+        # help smoke test is blind to a mute execution path. True — but that reasoning
+        # only holds where argparse is doing the parsing. Up here there is none, and
+        # generalising it to "do not test --help" is what let this ship in 0.13.0.
+        if cmd in HELP_FLAGS:
+            _print_usage(sys.stdout)
+            sys.exit(0)
 
         if cmd in MOVED_COMMANDS:
             logger = logging.getLogger("dyf")
@@ -140,18 +184,18 @@ def main():
         if code is not None:
             sys.exit(code)
 
-    print("Usage: dyf <command>")
-    print()
-    print("Commands:")
-    print("  info          Describe a .dyf file (items, fields, enrichment level; --json)")
-    print("  api           Map of the public Python API, grouped with entry points (--json)")
-    print("  concepts      Build and query concept graphs from markdown files")
-    print("  index-source  Index source code into a .dyf file (Python, JS, TS, Rust, Go, Java, C, C++, OCaml)")
-    print("  index-images  Index images into a .dyf file (vision embeddings + thumbnails)")
-    print("  index-video   Index video keyframes into a .dyf file (scene detection + vision)")
-    print()
-    print("Enrichment and the browser tour moved to dyfviz: dyfviz enrich | dyfviz tour")
-    sys.exit(1)
+        # `_dispatch` returned None: `cmd` is not a subcommand. Name the offending word
+        # rather than dumping usage and leaving the caller to diff it against what they
+        # typed.
+        logger = logging.getLogger("dyf")
+        logger.error("unknown command: %s", cmd)
+        _print_usage(sys.stderr)
+        sys.exit(EXIT_BAD_REQUEST)
+
+    # No command at all. Usage goes to stderr because stdout is reserved for answers,
+    # and this is an error, not an answer.
+    _print_usage(sys.stderr)
+    sys.exit(EXIT_BAD_REQUEST)
 
 
 if __name__ == "__main__":
