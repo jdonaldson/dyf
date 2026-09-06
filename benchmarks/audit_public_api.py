@@ -251,15 +251,15 @@ def make_bundle(X):
     # candidate_indices[argsort(-sims)], so a length-N sims indexes a length-40 array and
     # raises IndexError. Another fixture bug that looked like a library bug.
     sims = (X[cand] @ X[0]).astype(np.float32)
-    from dyf import build_pca_tree
 
     return {
         "X": X,
         "n": n,
+        # One tree shape now. This bundle used to carry a second, binary `pca_tree`
+        # because the top-level boundary-persistence functions resolved to the PCA
+        # variants and raised `KeyError: 'left'` on a k-ary tree. `pca_tree` was removed
+        # in favour of that mismatch not existing — see KNOWN_ISSUES #2.
         "tree": tree,
-        # boundary-persistence functions want a BINARY pca tree (keys 'left'/'right'),
-        # not a k-ary dyf tree — passing the latter raised KeyError: 'left'
-        "pca_tree": build_pca_tree(X, max_depth=4, min_leaf_size=5),
         "labels": labels,
         "buckets": buckets,
         "doc_ids": np.arange(n) // 4,
@@ -279,8 +279,8 @@ REGISTRY: dict = {
     "refine_dyf_tree": lambda f: dict(tree=f["tree"], embeddings=f["X"]),
     "merge_to_max_k": lambda f: dict(point_labels=f["labels"], embeddings=f["X"], max_k=3),
     "flatten_tree": lambda f: dict(tree=f["tree"]),
-    "extract_boundary_persistence": lambda f: dict(tree=f["pca_tree"]),
-    "boundary_persistence_scores": lambda f: dict(tree=f["pca_tree"]),
+    "extract_boundary_persistence": lambda f: dict(tree=f["tree"]),
+    "boundary_persistence_scores": lambda f: dict(tree=f["tree"]),
     "neighbor_coherence": lambda f: dict(embeddings=f["X"], knn_indices=f["knn"]),
     "chunk_redundancy": lambda f: dict(bucket_ids=f["buckets"], doc_ids=f["doc_ids"]),
     "deduplicate_chunks": lambda f: dict(bucket_ids=f["buckets"], doc_ids=f["doc_ids"]),
