@@ -24,9 +24,10 @@ the gap between the shipped surface and the validated one. (Export counts are de
 not quoted here; they go stale. `dyf.overview()` computes the current one.)
 
 **Standing audits** — re-run when touching the public surface; each caught a real defect:
-`benchmarks/audit_public_api.py` (41 of 72 callables, 41 OK, canary reproduces issue 5),
-`benchmarks/audit_test_assertions.py` (5% shape-only; vacuous / guarded / no-assert all zero;
-`--selftest` validates the classifier on 34 hand-labelled cases),
+`benchmarks/audit_public_api.py` (auto-calls what it can; canary reproduces issue 5 — the
+callables it *cannot* reach without a fixture are where this class of defect hides),
+`benchmarks/audit_test_assertions.py` (shape-only / vacuous / guarded / no-assert;
+`--selftest` validates the classifier on hand-labelled cases),
 `benchmarks/audit_absolute_thresholds.py` (constants that do not transfer).
 
 ⚠ **The audits are necessary but not sufficient.** Issues 6 and 7 were both found by asking
@@ -83,11 +84,15 @@ one-off measurements.
       *value* (anything constraining content). Flags tests whose assertions are all shape.
       Validated by construction: it flags `test_find_super_connectors_basic`, the exact test
       that passed while issue 5 shipped.
-- [x] **Result as first measured: 64 of 594 tests (11%) assert shape only; 1 asserts
-      nothing at all.** ⚠ That 11% is now known to be inflated — see the scanner
-      false-positive correction above; the real figure was ~5%.
-      (`test_catalog.py:347 test_alternatives_from_different_parents`). 17 of the 64 guard
-      functions that detect or select, where an empty result would pass.
+- [x] **Result: ~5% of tests assert shape only; 1 asserted nothing at all**
+      (`test_catalog.py:347 test_alternatives_from_different_parents`), and a subset of
+      those guarded functions that detect or select, where an empty result would pass.
+
+      ⚠ **First reported as "64 of 594 (11%)" — that was wrong**, from a scanner with a
+      32% false-positive rate (see the correction above). The retracted numbers used to be
+      written out here *above* their own retraction, so the wrong figure read first and was
+      the one a skimmer carried away. Removed rather than struck through: a retracted
+      number left legible is a number that gets re-cited.
 - [x] Strengthened `test_find_super_connectors_basic` with the two assertions that would
       have caught issue 5: `global_centrality.sum() > 0` and `(quadrant != "Regular").any()`
 - [x] ⚠ Two false-positive classes fixed in the scanner first, or it would have cried wolf

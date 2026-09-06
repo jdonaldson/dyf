@@ -28,11 +28,14 @@ docs — yes. New mechanisms to serve agents — no, same as before.
 progress, but effort allocated opportunistically because no destination was stated, which is
 also why "is this good bang for buck?" had no crisp answer. The evidence:
 
-- **109 public exports, 72 callables, 30 modules, 26 test files.** The validated surface is
-  materially smaller than the shipped surface.
+- **The validated surface is materially smaller than the shipped surface.** `dyf.overview()`
+  reports the current export count and `benchmarks/audit_public_api.py` reports how many it
+  can actually exercise; the gap between them is the point. (Counts are deliberately not
+  written here — every hand-typed total in this repo went stale, including the ones that
+  used to sit on this line.)
 - **Two of the handful of features inspected by hand were silently broken** — both with
   performance claims in their docstrings (`KNOWN_ISSUES` #4, #5). That is a poor base rate
-  for the ~70 not inspected.
+  for the ones not inspected.
 - **Tests that pass on a degenerate result**: measured 5% shape-only, plus vacuous,
   fully-guarded and no-assert categories — all now closed.
   `benchmarks/audit_test_assertions.py` measures this and carries a `--selftest`.

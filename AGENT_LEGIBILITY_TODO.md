@@ -293,7 +293,7 @@ is a place an agent will confidently report the wrong thing.
         Not moved — that would break `from dyf.lazy_index import SearchResult` for anyone
         doing it, for no functional gain today.
 
-- [ ] **Remaining return-shape work, from the full audit of all 109 exports (2026-09-05).**
+- [ ] **Remaining return-shape work, from the full audit of every export (2026-09-05).**
       Ranked by "would freezing this into v1 be a mistake?". The retrieval API is done;
       these are not.
 

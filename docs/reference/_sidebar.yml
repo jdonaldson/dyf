@@ -6,7 +6,6 @@ website:
       - reference/DensityClassifierFull.qmd
       section: Core
     - contents:
-      - reference/build_pca_tree.qmd
       - reference/cut_tree_to_labels.qmd
       - reference/extract_boundary_persistence.qmd
       - reference/boundary_persistence_scores.qmd
