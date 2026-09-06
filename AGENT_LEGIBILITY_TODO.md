@@ -270,18 +270,33 @@ is a place an agent will confidently report the wrong thing.
       Ranked by "would freezing this into v1 be a mistake?". The retrieval API is done;
       these are not.
 
-      1. **`embed_with_diagnostics` returns a 4-tuple** (`categorical.py:782`) whose 2nd
-         and 3rd elements are *the same type* (`list[AxisDiagnostic]`) and differ only by
-         semantics — before/after weighting. Swapping them is silent and type-checks
-         clean. One return site (`:837`) already passes the same object for both.
-      2. **`agglomerate_tree_leaves` (`agglomerate.py:477`) and `louvain_cluster_leaves`
-         (`:553`) return identical unnamed 5-tuples**, documented as interchangeable — a
-         de-facto struct with no name. Both return a degenerate
-         `(None, {}, [], None, tree)` on the too-few-leaves path, an in-band `None`
-         sentinel where the rest of the API raises `ValueError`.
-      3. **`dedup_for_index` (`dedup.py:232`) is half-tuple, half-object** — element 3 is
-         already a `DedupResult` while the other two stay positional, in the same module
-         where `near_duplicate_clusters` returns a clean `DedupResult`.
+      1. [x] **`embed_with_diagnostics` → `AxisDiagnosticsResult`** *(done 2026-09-05.)*
+         The 4-tuple's 2nd and 3rd elements were the same type and differed only by
+         meaning; the early-exit path returned the same object for both, so "after" was
+         a lie. `.restructured` now says whether a second pass ran. The existing test had
+         been inferring it from **object identity** (`before is after`).
+      2. [x] **`agglomerate_tree_leaves` / `louvain_cluster_leaves` → `LeafGroupingResult`**
+         *(done 2026-09-05.)* Two identical unnamed 5-tuples whose sameness was asserted
+         in prose ("Same tuple as…") and is now a shared type. `.ok` / `.n_groups`
+         replace decoding `(None, {}, [], None, tree)`. dyfviz's exact call site — a
+         5-way unpack plus an `is not None` sentinel check — verified unchanged.
+      3. [x] **`dedup_for_index` → `DedupForIndexResult`** *(done 2026-09-05.)* Element 3
+         was already a `DedupResult` while the first two stayed positional.
+         `.bookkeeping_added` reports whether the `orig_index`/`dup_members` fields were
+         written — omitted when nothing collapses (they measured 3-4% *larger* files),
+         and previously discoverable only by probing `stored_fields` for the key.
+
+      **The pattern all three shared, worth carrying forward:** none was merely missing
+      field names. Each encoded a *conditional or degenerate case as a pattern of sentinel
+      values spread across positions* — same-object-in-two-slots, four `None`s, an absent
+      dict key — so the fact underneath was unsayable. Naming the type is what makes the
+      fact expressible; that is the actual win, not the labels.
+
+      **And a rule that came out of it:** `LeafGroupingResult` and `DedupForIndexResult`
+      define **no `__len__`**. The candidate meanings were the unpacking arity or a count,
+      and `SearchResult` had just shown how a hard-coded arity becomes a plausible wrong
+      number. When a container's `len()` could plausibly mean two things, don't define it.
+
       4. **Missing-item contract differs between adjacent methods**:
          `LazyIndex.get_item_vector` (`:1925`) raises `KeyError`;
          `LazyIndex.get_stored_fields` (`:1962`) fills `None` for the same condition.
