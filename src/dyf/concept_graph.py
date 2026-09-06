@@ -32,11 +32,14 @@ Usage as library:
 from __future__ import annotations
 
 import argparse
+import contextlib
 import glob as glob_mod
+import io
 import json
 import logging
 import os
 import re
+import sys
 import time
 from dataclasses import asdict, dataclass, field, fields
 from difflib import SequenceMatcher
@@ -551,6 +554,12 @@ def main(argv: list[str] | None = None) -> int:
     query_p.add_argument("--semantic", action="store_true", help="Force embedding-based search")
     query_p.add_argument("--top-k", type=int, default=5)
     query_p.add_argument("--config", help="Path to config JSON")
+    query_p.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Emit JSON (schema_version 0 — unstable before v1)",
+    )
 
     # check
     check_p = sub.add_parser("check", help="Check if graph needs rebuilding")
@@ -560,6 +569,12 @@ def main(argv: list[str] | None = None) -> int:
     list_p = sub.add_parser("list", help="List all concept nodes")
     list_p.add_argument("--verbose", "-v", action="store_true", help="Show neighbors")
     list_p.add_argument("--config", help="Path to config JSON")
+    list_p.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Emit JSON (schema_version 0 — unstable before v1)",
+    )
 
     args = parser.parse_args(argv)
 
@@ -583,9 +598,9 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_check(config)
     elif args.command == "query":
         query_text = " ".join(args.text)
-        return _cmd_query(config, query_text, args.semantic, args.top_k)
+        return _cmd_query(config, query_text, args.semantic, args.top_k, as_json=args.as_json)
     elif args.command == "list":
-        return _cmd_list(config, args.verbose)
+        return _cmd_list(config, args.verbose, as_json=args.as_json)
 
     return 1
 
@@ -690,11 +705,132 @@ def _cmd_check(config: ConceptGraphConfig) -> int:
         return 0
 
 
+SCHEMA_VERSION = 0
+
+
+def _node_payload(node_id: str, node: ConceptNode, score: float | None = None) -> dict:
+    """One node as JSON. Shared by query and list so their shapes stay identical."""
+    payload = {
+        "id": node_id,
+        "header": node.header,
+        "source": node.source,
+        "line": node.line,
+    }
+    if score is not None:
+        payload["score"] = round(float(score), 4)
+    return payload
+
+
+def _query_json(
+    config: ConceptGraphConfig,
+    graph: dict[str, ConceptNode],
+    graph_path: str,
+    query_text: str,
+    force_semantic: bool,
+    top_k: int,
+    header_only: bool,
+) -> int:
+    """`concepts query --json`. Returns the same exit codes as the human path.
+
+    Schema version 0 — unstable before v1, same contract as `dyf info --json`. The
+    version field exists so a caller can detect a change rather than be surprised by one.
+
+    Stdout is captured while the work runs and replayed to stderr, so that only JSON
+    reaches stdout. This is enforced at the boundary rather than by fixing call sites:
+    `configs.py` alone has 21 bare `print()` calls (`Loading all-MiniLM-L6-v2...`), and
+    sentence-transformers and tqdm print too — none of which this module controls. One
+    stray line makes the whole payload unparseable, which is a worse failure than the
+    silence it replaced.
+    """
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        payload, code = _build_query_payload(config, graph, graph_path, query_text, force_semantic, top_k, header_only)
+    noise = buffer.getvalue()
+    if noise:
+        print(noise, end="", file=sys.stderr)
+    print(json.dumps(payload, indent=2, default=str))
+    return code
+
+
+def _build_query_payload(
+    config: ConceptGraphConfig,
+    graph: dict[str, ConceptNode],
+    graph_path: str,
+    query_text: str,
+    force_semantic: bool,
+    top_k: int,
+    header_only: bool,
+) -> tuple[dict, int]:
+    """Compute the query payload and exit code. Never writes to stdout itself."""
+    payload: dict = {
+        "schema_version": SCHEMA_VERSION,
+        "query": query_text,
+        "graph": {"path": graph_path, "has_embeddings": not header_only, "nodes": len(graph)},
+    }
+
+    def done(code: int) -> tuple[dict, int]:
+        return payload, code
+
+    if force_semantic and header_only:
+        payload["error"] = "semantic search unavailable: this graph was built without embeddings"
+        payload["remedy"] = "pip install 'dyf[concepts]' && dyf concepts build"
+        payload["match"] = None
+        payload["results"] = []
+        return done(1)
+
+    if not force_semantic:
+        node_id, score = fuzzy_match(query_text, graph)
+        if node_id:
+            node = graph[node_id]
+            payload["mode"] = "fuzzy"
+            payload["match"] = _node_payload(node_id, node, score)
+            payload["neighbors"] = [
+                {
+                    "id": n.get("id"),
+                    "header": n.get("header"),
+                    "source": n.get("source"),
+                    "line": n.get("line"),
+                    "similarity": n.get("similarity"),
+                }
+                for n in node.neighbors
+            ]
+            return done(0)
+
+        if header_only:
+            payload["mode"] = "fuzzy"
+            payload["match"] = None
+            payload["results"] = []
+            payload["note"] = "no header match; this graph has no embeddings to fall back on"
+            payload["remedy"] = "pip install 'dyf[concepts]' && dyf concepts build"
+            return done(1)
+
+    try:
+        results = semantic_search(
+            query_text,
+            graph,
+            embeddings_cache_path=config.expand_path("embeddings_cache_path"),
+            embedder_name=config.embedder,
+            top_k=top_k,
+        )
+    except ImportError as exc:
+        payload["error"] = f"semantic search unavailable: {exc}"
+        payload["remedy"] = "pip install 'dyf[concepts]'"
+        payload["match"] = None
+        payload["results"] = []
+        return done(3)
+
+    payload["mode"] = "semantic"
+    payload["match"] = None
+    payload["results"] = [_node_payload(nid, graph[nid], sim) for nid, sim in results]
+    return done(0 if results else 1)
+
+
 def _cmd_query(
     config: ConceptGraphConfig,
     query_text: str,
     force_semantic: bool,
     top_k: int,
+    as_json: bool = False,
 ) -> int:
     """Query the concept graph."""
     graph_path = config.expand_path("output_path")
@@ -705,6 +841,9 @@ def _cmd_query(
     t0 = time.time()
     graph = load_graph(graph_path)
     header_only = load_graph_meta(graph_path).get("has_embeddings") is False
+
+    if as_json:
+        return _query_json(config, graph, graph_path, query_text, force_semantic, top_k, header_only)
 
     if force_semantic and header_only:
         logger.error("This graph was built without embeddings, so semantic search is unavailable.")
@@ -777,7 +916,7 @@ def _cmd_query(
     return 0
 
 
-def _cmd_list(config: ConceptGraphConfig, verbose: bool) -> int:
+def _cmd_list(config: ConceptGraphConfig, verbose: bool, as_json: bool = False) -> int:
     """List all nodes in the graph."""
     graph_path = config.expand_path("output_path")
     if not os.path.exists(graph_path):
@@ -785,6 +924,27 @@ def _cmd_list(config: ConceptGraphConfig, verbose: bool) -> int:
         return 1
 
     graph = load_graph(graph_path)
+
+    if as_json:
+        header_only = load_graph_meta(graph_path).get("has_embeddings") is False
+        payload = {
+            "schema_version": SCHEMA_VERSION,
+            "graph": {"path": graph_path, "has_embeddings": not header_only, "nodes": len(graph)},
+            "nodes": [
+                {
+                    **_node_payload(node_id, node),
+                    "neighbors": [
+                        {"id": n.get("id"), "header": n.get("header"), "similarity": n.get("similarity")}
+                        for n in node.neighbors
+                    ]
+                    if verbose
+                    else len(node.neighbors),
+                }
+                for node_id, node in graph.items()
+            ],
+        }
+        print(json.dumps(payload, indent=2, default=str))
+        return 0
     for node_id, node in graph.items():
         logger.info("  %s  [%s]", node_id, node.header)
         logger.debug("    %s:%d", node.source, node.line)

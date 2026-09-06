@@ -358,6 +358,90 @@ class TestMarkdownChunk:
 
 
 # ---------------------------------------------------------------------------
+# JSON output
+#
+# The contract an agent depends on: stdout is parseable JSON, and the exit code means
+# the same thing as it does on the human path.
+# ---------------------------------------------------------------------------
+
+
+class TestJsonOutput:
+    def _graph(self, tmp_path):
+        path = str(tmp_path / "graph.json")
+        save_graph(
+            {
+                "notes/alpha": ConceptNode(
+                    header="Alpha",
+                    source="a.md",
+                    line=1,
+                    neighbors=[{"id": "notes/beta", "header": "Beta", "similarity": 0.7, "source": "a.md", "line": 9}],
+                ),
+                "notes/beta": ConceptNode(header="Beta", source="a.md", line=9),
+            },
+            path,
+            has_embeddings=True,
+        )
+        return path
+
+    def _config(self, tmp_path):
+        return ConceptGraphConfig(
+            output_path=self._graph(tmp_path),
+            embeddings_cache_path=str(tmp_path / "emb.npz"),
+        )
+
+    def test_query_json_is_parseable_and_versioned(self, tmp_path, capsys):
+        import dyf.concept_graph as cg
+
+        rc = cg._cmd_query(self._config(tmp_path), "Alpha", False, 5, as_json=True)
+        payload = json.loads(capsys.readouterr().out)
+        assert rc == 0
+        assert payload["schema_version"] == 0
+        assert payload["match"]["header"] == "Alpha"
+        assert payload["match"]["id"] == "notes/alpha"
+
+    def test_query_json_includes_neighbors_with_scores(self, tmp_path, capsys):
+        import dyf.concept_graph as cg
+
+        cg._cmd_query(self._config(tmp_path), "Alpha", False, 5, as_json=True)
+        payload = json.loads(capsys.readouterr().out)
+        assert payload["neighbors"][0]["header"] == "Beta"
+        assert payload["neighbors"][0]["similarity"] == 0.7
+
+    def test_list_json_reports_every_node(self, tmp_path, capsys):
+        import dyf.concept_graph as cg
+
+        rc = cg._cmd_list(self._config(tmp_path), verbose=False, as_json=True)
+        payload = json.loads(capsys.readouterr().out)
+        assert rc == 0
+        assert {n["id"] for n in payload["nodes"]} == {"notes/alpha", "notes/beta"}
+        # Non-verbose reports a neighbor *count*, so the payload stays small.
+        assert payload["nodes"][0]["neighbors"] == 1
+
+    def test_list_json_verbose_expands_neighbors(self, tmp_path, capsys):
+        import dyf.concept_graph as cg
+
+        cg._cmd_list(self._config(tmp_path), verbose=True, as_json=True)
+        payload = json.loads(capsys.readouterr().out)
+        alpha = next(n for n in payload["nodes"] if n["id"] == "notes/alpha")
+        assert alpha["neighbors"][0]["header"] == "Beta"
+
+    def test_header_only_graph_reports_it_and_exits_1(self, tmp_path, capsys):
+        """A caller must be able to tell 'nothing matched' from 'this graph cannot match'."""
+        import dyf.concept_graph as cg
+
+        path = str(tmp_path / "hdr.json")
+        save_graph(build_header_only_graph([]), path, has_embeddings=False)
+        config = ConceptGraphConfig(output_path=path, embeddings_cache_path=str(tmp_path / "emb.npz"))
+
+        rc = cg._cmd_query(config, "anything at all", False, 5, as_json=True)
+        payload = json.loads(capsys.readouterr().out)
+        assert rc == 1
+        assert payload["match"] is None
+        assert payload["graph"]["has_embeddings"] is False
+        assert "remedy" in payload, "must say how to fix it, not just that it failed"
+
+
+# ---------------------------------------------------------------------------
 # Config loading
 #
 # The worst original behaviour was not the traceback on malformed JSON — it was that an
