@@ -380,12 +380,28 @@ is a place an agent will confidently report the wrong thing.
                 Or point elsewhere with: --ollama-url
       ```
 
-- [ ] **Cost preview before expensive work.** dyf's whole domain is corpora where the
-      embedding pass is the expensive step, and `~/Projects/CLAUDE.md`'s *Sanity Check
-      Before Deep Work* rule is the human version of this judgment ("don't re-embed 2.7M
-      records when a regex gets 95%"). An agent has no way to apply it. A `--dry-run`
-      reporting item count and estimated work is how that rule gets encoded rather than
-      remembered.
+- [x] **Cost preview before expensive work.** *(done 2026-09-05, `_preview.py`,
+      `--dry-run` on all three `index-*`, 13 tests.)* Reports file/chunk counts, embedding
+      batches, and service reachability; `--json` for a `schema_version: 0` payload. This
+      is the *Sanity Check Before Deep Work* rule made into something the tool affords
+      rather than something a caller must remember.
+
+      Two rules the implementation holds itself to, both tested:
+
+      - **A dry run stays cheap.** For `index-video` the *counting itself* is expensive —
+        scene detection is a full decode — so it reports the scene count as **unknown**
+        rather than doing the work the flag exists to avoid. Asserted by previewing a file
+        that is not a valid video: it succeeds, which is only possible if nothing decoded.
+      - **No invented time estimates.** Counts are exact and never multiplied by a
+        throughput number, because none is measured. A plausible fabricated duration would
+        be *believed* — the same failure mode as a hard-coded `len()` returning 2. A test
+        greps for `eta` / `estimated time` / `minutes`.
+
+      It also degrades rather than refusing: with neither tree-sitter nor Ollama present it
+      still reports the file count and surfaces **both** blockers as notes instead of dying
+      on the first. Visible in the CLI audit — both dry-runs are OK where the real runs
+      CLEAN-FAIL.
+
 
 - [x] **CLI smoke audit — the missing fourth audit.**
       *(done 2026-09-05, `benchmarks/audit_cli_surface.py`, now in the CLAUDE.md table.)*
