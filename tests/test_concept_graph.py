@@ -4,9 +4,12 @@ import json
 import os
 import time
 
+import pytest
+
 from dyf.concept_graph import (
     ConceptGraphConfig,
     ConceptNode,
+    ConfigError,
     MarkdownChunk,
     build_header_only_graph,
     check_staleness,
@@ -284,8 +287,16 @@ class TestConceptGraphConfig:
         assert len(config.sources) > 0
 
     def test_load_missing_file(self, tmp_path):
-        config = ConceptGraphConfig.load(str(tmp_path / "missing.json"))
-        assert config.top_k == 5  # defaults
+        """CHANGED 2026-09-05: an explicitly requested config that is missing now raises.
+
+        This previously returned defaults silently. That is a worse outcome than an
+        error: the caller passes --config, believes their output_path is in effect, and
+        the tool writes to ~/.dyf/ instead without saying anything. Pre-v1, so broken
+        deliberately rather than preserved. The no-config-at-all case still falls back —
+        see TestConfigLoading.test_default_path_missing_is_fine.
+        """
+        with pytest.raises(ConfigError):
+            ConceptGraphConfig.load(str(tmp_path / "missing.json"))
 
     def test_load_from_file(self, tmp_path):
         cfg_path = tmp_path / "config.json"
@@ -344,6 +355,54 @@ class TestMarkdownChunk:
             metadata={"project": "foo"},
         )
         assert chunk.metadata["project"] == "foo"
+
+
+# ---------------------------------------------------------------------------
+# Config loading
+#
+# The worst original behaviour was not the traceback on malformed JSON — it was that an
+# explicitly requested config file that did not exist fell back to defaults in silence,
+# so the tool wrote somewhere other than where the caller asked and said nothing.
+# ---------------------------------------------------------------------------
+
+
+class TestConfigLoading:
+    def test_explicit_missing_file_is_an_error(self, tmp_path):
+        with pytest.raises(ConfigError, match="not found"):
+            ConceptGraphConfig.load(str(tmp_path / "absent.json"))
+
+    def test_default_path_missing_is_fine(self, tmp_path, monkeypatch):
+        """Having no config file at all is the normal case, not an error."""
+        monkeypatch.setenv("HOME", str(tmp_path))
+        config = ConceptGraphConfig.load(None)
+        assert config.top_k == 5
+
+    def test_malformed_json_names_the_file(self, tmp_path):
+        path = tmp_path / "bad.json"
+        path.write_text("this is not json")
+        with pytest.raises(ConfigError, match="not valid JSON"):
+            ConceptGraphConfig.load(str(path))
+
+    def test_unknown_setting_is_rejected_and_lists_valid_ones(self, tmp_path):
+        path = tmp_path / "cfg.json"
+        path.write_text(json.dumps({"top_k": 3, "nonsense": 1}))
+        with pytest.raises(ConfigError) as exc:
+            ConceptGraphConfig.load(str(path))
+        assert "nonsense" in str(exc.value)
+        assert "top_k" in str(exc.value), "should name the valid settings"
+
+    def test_non_object_json_is_rejected(self, tmp_path):
+        path = tmp_path / "arr.json"
+        path.write_text("[1, 2, 3]")
+        with pytest.raises(ConfigError, match="JSON object"):
+            ConceptGraphConfig.load(str(path))
+
+    def test_valid_config_loads(self, tmp_path):
+        path = tmp_path / "cfg.json"
+        path.write_text(json.dumps({"top_k": 9, "similarity_threshold": 0.5}))
+        config = ConceptGraphConfig.load(str(path))
+        assert config.top_k == 9
+        assert config.similarity_threshold == 0.5
 
 
 # ---------------------------------------------------------------------------

@@ -14,6 +14,15 @@ Usage as CLI (via `dyf concepts`):
     dyf concepts check              # check if graph is stale
     dyf concepts list               # list all nodes
 
+Exit codes — these are a contract, not incidental. A caller that cannot tell "no such
+concept" from "the tool is broken" will report the wrong thing:
+
+    0  success; for `check`, the graph is current
+    1  a normal negative answer: nothing matched, or `check` found the graph stale
+       (grep's convention — a query finding nothing is not an error)
+    2  the request itself was wrong: bad or missing --config
+    3  a dependency is missing; the message names the extra to install
+
 Usage as library:
     >>> from dyf.concept_graph import chunk_markdown, build_concept_graph
     >>> chunks = chunk_markdown(text, "myfile.md")
@@ -29,7 +38,7 @@ import logging
 import os
 import re
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from difflib import SequenceMatcher
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -38,6 +47,14 @@ logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     import numpy as np
+
+
+class ConfigError(Exception):
+    """A config file was requested but cannot be used.
+
+    Carries a message meant to be shown to the caller verbatim — it should name the file
+    and say what to do about it, not just what went wrong.
+    """
 
 
 # ---------------------------------------------------------------------------
@@ -88,15 +105,47 @@ class ConceptGraphConfig:
 
     @classmethod
     def load(cls, path: str | None = None) -> ConceptGraphConfig:
-        """Load config from JSON file, falling back to defaults."""
+        """Load config from JSON file, falling back to defaults.
+
+        A config the caller *asked for* is treated differently from the default one:
+
+        * ``path=None`` — look in ``~/.config/dyf/concept_graph.json`` and silently use
+          defaults if it is not there. Having no config file is the normal case.
+        * an explicit ``path`` — missing, malformed or containing unknown keys is an
+          error. Falling back to defaults there is the worst outcome: the caller believes
+          their settings are in effect, the tool writes somewhere else, and nothing says
+          so. That silence was the original behaviour.
+
+        Raises:
+            ConfigError: with a message naming the file and the problem.
+        """
+        explicit = path is not None
         if path is None:
-            path = os.path.expanduser("~/.config/dyf/concept_graph.json")
+            path = "~/.config/dyf/concept_graph.json"
         path = os.path.expanduser(path)
-        if os.path.exists(path):
+
+        if not os.path.exists(path):
+            if explicit:
+                raise ConfigError(f"config file not found: {path}")
+            return cls()
+
+        try:
             with open(path) as f:
                 data = json.load(f)
-            return cls(**data)
-        return cls()
+        except json.JSONDecodeError as exc:
+            raise ConfigError(f"{path} is not valid JSON: {exc}") from exc
+        except OSError as exc:
+            raise ConfigError(f"could not read {path}: {exc}") from exc
+
+        if not isinstance(data, dict):
+            raise ConfigError(f"{path} must contain a JSON object, got {type(data).__name__}")
+
+        known = {f.name for f in fields(cls)}
+        unknown = sorted(set(data) - known)
+        if unknown:
+            raise ConfigError(f"{path} has unknown setting(s): {', '.join(unknown)}. Valid: {', '.join(sorted(known))}")
+
+        return cls(**data)
 
     def expand_sources(self) -> list[Path]:
         """Expand glob patterns and tilde in source paths."""
@@ -518,7 +567,11 @@ def main(argv: list[str] | None = None) -> int:
         parser.print_help()
         return 1
 
-    config = ConceptGraphConfig.load(getattr(args, "config", None))
+    try:
+        config = ConceptGraphConfig.load(getattr(args, "config", None))
+    except ConfigError as exc:
+        logger.error("%s", exc)
+        return 2
 
     if args.command == "build":
         return _cmd_build(
@@ -688,17 +741,34 @@ def _cmd_query(
         logger.debug("   (matched '%s' score=%.2f, %.1fms)", node_id, score, elapsed * 1000)
         return 0
 
-    # Fall back to semantic
+    # No header match. Exit 1 when nothing is found, following grep: a caller — human or
+    # agent — needs to distinguish "no such concept" from "the tool worked".
     logger.info('No header match for "%s" (best=%.2f)', query_text, score)
+
+    if header_only:
+        logger.warning("  This graph has no embeddings, so there is no semantic fallback.")
+        logger.warning("  For fuzzy-to-semantic search: pip install 'dyf[concepts]' && dyf concepts build")
+        return 1
+
     logger.info("Falling back to semantic search...")
-    results = semantic_search(
-        query_text,
-        graph,
-        embeddings_cache_path=config.expand_path("embeddings_cache_path"),
-        embedder_name=config.embedder,
-        top_k=top_k,
-    )
+    try:
+        results = semantic_search(
+            query_text,
+            graph,
+            embeddings_cache_path=config.expand_path("embeddings_cache_path"),
+            embedder_name=config.embedder,
+            top_k=top_k,
+        )
+    except ImportError as exc:
+        logger.error("  Semantic fallback unavailable (%s)", exc)
+        logger.error("  Install with: pip install 'dyf[concepts]'")
+        return 3
+
     elapsed = time.time() - t0
+    if not results:
+        logger.info("  No semantic matches either.")
+        return 1
+
     for node_id, sim_score in results:
         node = graph[node_id]
         logger.info("   %0.3f  %s", sim_score, node.header)
