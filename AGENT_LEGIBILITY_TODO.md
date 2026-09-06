@@ -68,7 +68,17 @@ CI locks in the surface that is already clean and touches none of the above.
 
 ---
 
-## P0 — the CLI produces no output at all
+## P0 — CLOSED 2026-09-05: the CLI was mute, unreachable, and unbuildable
+
+All six items done. What this section was, on the morning of 2026-09-05: the CLI printed
+**zero bytes** from every subcommand; the `dyf` binary existed only inside this project's
+`.venv` while `~/.claude/CLAUDE.md` told every agent to run it; the concept graph was six
+months stale and could not be rebuilt without a multi-GB torch stack; and `Pipeline`
+reported every `.dyf` artifact as stale forever.
+
+Kept in full rather than deleted — each entry records what was measured, and three of
+them describe bugs introduced *by an earlier fix in the same session*, which is the more
+useful lesson.
 
 - [x] **Add a log handler in `cli.py:main()`.** *(done 2026-09-05, `_configure_cli_logging`)*
       Scoped to the `dyf` logger, **not** `basicConfig` — the first attempt used
@@ -99,9 +109,32 @@ CI locks in the surface that is already clean and touches none of the above.
       Experiments* rule in `~/Projects/CLAUDE.md`: `index-video` on a long file now
       prints nothing until it exits.
 
-- [ ] **Make `dyf` reachable.** It exists only at `.venv/bin/dyf`. `~/.claude/CLAUDE.md`
-      instructs every agent, every session, to run `dyf concepts check` before editing
-      CLAUDE.md sections or memory — those agents get `command not found`.
+- [x] **Make `dyf` reachable.** *(done 2026-09-05.)*
+      `uv tool install --editable '~/Projects/dyf[lazy]'` → `~/.local/bin/dyf`, which is
+      already on PATH and already how `harlequin` and `mflux` are installed here.
+      Editable, so it tracks the working tree rather than freezing a copy. `[lazy]` only:
+      that is what `dyf info` needs (flatbuffers + pyarrow), and it deliberately omits
+      `[concepts]` so the global tool stays free of the multi-GB torch stack. Verified
+      from `$HOME`: `dyf info` reads a 229k-item index, `dyf concepts check` and
+      `query` both work.
+
+      **Why the global tool still answers `concepts query` with neighbors** despite having
+      no model: neighbors are computed at build time and saved into the graph, and
+      `fuzzy_match` is pure `SequenceMatcher`. Read is dependency-free; only *write* needs
+      the model. That asymmetry is what makes the whole arrangement work.
+
+- [x] **Decide how a global tool gets its dependencies.** *(done 2026-09-05 — answered by
+      the two items above, not by a packaging change.)* The tool does not need them for
+      the common path: header-only build plus precomputed neighbors means `list`, `check`
+      and `query <header>` all work with zero optional deps. The heavy stack is needed
+      only to *rebuild* neighbors, which is a project-venv job.
+
+      ⚠ That arrangement created a data-loss path, caught only by installing the tool and
+      testing it: a global `build` silently replaced the full graph with a header-only
+      one, **destroying 710 edges**. Now refused unless `--no-embeddings` is passed. The
+      general shape is worth remembering — *the same command name resolving to two
+      installs with different capabilities* is a hazard, and the fix is to make the
+      lesser one refuse to clobber the greater one's output.
 
 - [x] **Rebuild the concept graph.** *(done 2026-09-05 — 76 nodes → **142 nodes, 710
       edges**; `check` now returns `OK - graph is current`, rc 0.)* It had been built
@@ -111,23 +144,14 @@ CI locks in the surface that is already clean and touches none of the above.
       even after the CLI could speak. Required installing the `[concepts]` extra first
       (below).
 
-- [ ] **`concepts build` crashes on a missing optional dep.** Found the moment the
-      handler fix made the CLI audible: `check` says ``STALE - run `dyf concepts build` ``,
-      and `build` then dies with a bare
-      `ModuleNotFoundError: No module named 'sentence_transformers'`
-      (`configs.py:138`). The advice the tool gives is advice it cannot itself follow.
-      Catch the import and say `pip install 'dyf[concepts]'`. This is the P1
-      *actionable error messages* item, hit on the very first command after P0.
-
-- [ ] **Decide how a global tool gets its dependencies.** `~/.claude/CLAUDE.md` tells
-      every agent in every session to run `dyf concepts`, but the graph lives at
-      `~/.dyf/` while the only `dyf` binary lives in this project's `.venv`, and building
-      requires the `[concepts]` extra — which pulls **torch + transformers, multi-GB**,
-      absent here today. Note the asymmetry: `fuzzy_match` (`concept_graph.py:294`) is
-      pure `SequenceMatcher` and needs nothing, so *querying by header is free* — but you
-      cannot obtain a graph at all without the expensive path. Options: a header-only
-      build mode with no embeddings (loses semantic neighbors, keeps the index), a
-      lighter embedder, or ship the tool separately from the research package.
+- [x] **`concepts build` crashed on a missing optional dep.**
+      *(done 2026-09-05 — `build_header_only_graph`, automatic fallback, 7 tests.)*
+      Found the moment the handler fix made the CLI audible: `check` said
+      ``STALE - run `dyf concepts build` `` and `build` then died with a bare
+      `ModuleNotFoundError: No module named 'sentence_transformers'` (`configs.py:138`) —
+      the advice the tool gave was advice it could not itself follow, on the very first
+      command after P0. Now degrades to a header-only graph with a loud warning, and
+      `--semantic` refuses with a rebuild instruction instead of crashing.
 
 - [x] **Fix the provenance key mismatch.** *(done 2026-09-05, `_dyf_provenance_value`,
       5 tests.)* `pipeline.py` read `_provenance`; the enrichment stages only ever wrote
