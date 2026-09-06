@@ -26,6 +26,7 @@ from pathlib import Path
 import numpy as np
 import requests
 
+from ._ingest_common import add_common_index_args, finalize_index
 from ._ingest_errors import (
     BadIngestRequest,
     EmbeddingServiceError,
@@ -33,8 +34,6 @@ from ._ingest_errors import (
     IngestError,
 )
 from ._preview import IngestPreview, batches_for
-from .dyf_tree import build_dyf_tree
-from .lazy_index import write_lazy_index
 
 logger = logging.getLogger(__name__)
 
@@ -454,11 +453,7 @@ def index_source(
     embeddings = embed_batch(texts, ollama_url=ollama_url, model=model)
     logger.info(f"  {embeddings.shape} in {time.time() - t0:.1f}s")
 
-    # Normalize
-    norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
-    embeddings = embeddings / np.where(norms > 0, norms, 1)
-
-    # Stored fields, kept parallel with `embeddings` so dedup can subset both in lockstep
+    # Stored fields, kept parallel with `embeddings` so dedup can subset both in lockstep.
     stored_fields = {
         "title": [c["title"] for c in all_chunks],
         "file": [c["file"] for c in all_chunks],
@@ -467,65 +462,25 @@ def index_source(
         "language": [c["language"] for c in all_chunks],
     }
 
-    # Optional ingest-time dedup — must happen BEFORE the tree is built, so the tree is
-    # fitted on distinct content rather than on repeated copies.
-    n_original = len(embeddings)
-    if dedup is not None:
-        from .dedup import dedup_for_index
-
-        t0 = time.time()
-        dd = dedup_for_index(embeddings, stored_fields, threshold=dedup, seed=seed)
-        embeddings, stored_fields = dd.embeddings, dd.stored_fields
-        logger.info(
-            f"Dedup at cosine > {dedup}: {n_original} -> {len(embeddings)} chunks "
-            f"({dd.removed_fraction:.1%} removed) in {time.time() - t0:.1f}s"
-        )
-        if not dd.bookkeeping_added:
-            logger.info("  No duplicates: omitted the orig_index/dup_members fields.")
-
-    # Build DYF tree
-    logger.info("Building DYF tree...")
-    t0 = time.time()
-    tree = build_dyf_tree(
+    # Dedup, normalize, build and write — shared with index-images and index-video. Dedup
+    # happens before the tree is built, so the tree is fitted on distinct content rather
+    # than on repeated copies.
+    finalize_index(
         embeddings,
-        max_depth=max_depth,
-        num_bits=num_bits,
-        min_leaf_size=min_leaf_size,
-        seed=seed,
-        fit_method="itq",
-    )
-    logger.info(f"  Tree built in {time.time() - t0:.1f}s")
-
-    # Write .dyf
-    logger.info("Writing .dyf...")
-    t0 = time.time()
-
-    write_lazy_index(
-        tree,
-        embeddings,
-        str(output),
-        compression="none",
-        quantization="float16",
+        output,
+        stored_fields=stored_fields,
         metadata={
             "embedding_model": model,
             "domain": "source code",
             "chunk_method": "tree_sitter",
             "languages": langs_str,
         },
-        build_params={
-            "max_depth": max_depth,
-            "num_bits": num_bits,
-            "min_leaf_size": min_leaf_size,
-            "seed": seed,
-        },
-        stored_fields=stored_fields,
+        max_depth=max_depth,
+        num_bits=num_bits,
+        min_leaf_size=min_leaf_size,
+        seed=seed,
+        dedup=dedup,
     )
-    size_mb = output.stat().st_size / (1024 * 1024)
-    logger.info(f"  Written {output.name} ({size_mb:.1f} MB) in {time.time() - t0:.1f}s")
-    if dedup is not None and len(embeddings) != n_original:
-        logger.info(f"Done. {len(embeddings)} of {n_original} chunks indexed (deduped).")
-    else:
-        logger.info(f"Done. {len(all_chunks)} chunks indexed.")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -539,67 +494,11 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         help="Directory containing source files",
     )
-    parser.add_argument(
-        "-o",
-        "--output",
-        type=Path,
-        default=None,
-        help="Output .dyf file path (default: <dirname>.dyf)",
-    )
-    parser.add_argument(
-        "--model",
-        default=DEFAULT_MODEL,
-        help=f"Ollama embedding model (default: {DEFAULT_MODEL})",
-    )
+    add_common_index_args(parser, default_model=DEFAULT_MODEL)
     parser.add_argument(
         "--ollama-url",
         default=DEFAULT_OLLAMA_URL,
         help=f"Ollama API URL (default: {DEFAULT_OLLAMA_URL})",
-    )
-    parser.add_argument(
-        "--max-depth",
-        type=int,
-        default=4,
-        help="DYF tree max depth (default: 4)",
-    )
-    parser.add_argument(
-        "--num-bits",
-        type=int,
-        default=4,
-        help="LSH bits per level (default: 4)",
-    )
-    parser.add_argument(
-        "--min-leaf-size",
-        type=int,
-        default=5,
-        help="Minimum leaf size (default: 5)",
-    )
-    parser.add_argument(
-        "--seed",
-        type=int,
-        default=42,
-        help="Random seed (default: 42)",
-    )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Report what would be indexed and stop. Embeds nothing, writes nothing.",
-    )
-    parser.add_argument(
-        "--json",
-        action="store_true",
-        dest="as_json",
-        help="With --dry-run, emit JSON (schema_version 0 — unstable before v1)",
-    )
-    parser.add_argument(
-        "--dedup",
-        type=float,
-        nargs="?",
-        const=0.99,
-        default=None,
-        metavar="COSINE",
-        help="Collapse near-duplicate chunks before indexing (default threshold 0.99 when "
-        "the flag is given with no value; omit the flag to disable)",
     )
 
     args = parser.parse_args(argv)

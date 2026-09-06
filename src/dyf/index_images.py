@@ -32,10 +32,9 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+from ._ingest_common import add_common_index_args, finalize_index
 from ._ingest_errors import BadIngestRequest, EmptyIngestError, IngestError
 from ._preview import IngestPreview, batches_for
-from .dyf_tree import build_dyf_tree
-from .lazy_index import write_lazy_index
 
 DEFAULT_MODEL = "nomic-ai/nomic-embed-vision-v1.5"
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tiff", ".tif"}
@@ -180,8 +179,17 @@ def index_images(
     min_leaf_size: int = 5,
     seed: int = 42,
     batch_size: int = 16,
+    dedup: float | None = None,
 ) -> None:
-    """Index images into a .dyf file."""
+    """Index images into a .dyf file.
+
+    Args:
+        dedup: Cosine threshold for collapsing near-duplicates before indexing. Reached
+            images for the first time in 0.13 — it had existed only in `index_source`
+            because the shared tail was copy-pasted rather than shared. Burst shots and
+            re-saved crops are exactly what it is for; measure with
+            `near_duplicate_clusters` first, since rates vary enormously by corpus.
+    """
     from PIL import Image
 
     logger.info("Indexing images")
@@ -247,44 +255,9 @@ def index_images(
     embeddings = embed_images(images, processor, vision_model, device, batch_size)
     logger.info(f"  {embeddings.shape} in {time.time() - t0:.1f}s")
 
-    # Normalize
-    norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
-    embeddings = embeddings / np.where(norms > 0, norms, 1)
-
-    # Build DYF tree
-    logger.info("Building DYF tree...")
-    t0 = time.time()
-    tree = build_dyf_tree(
+    finalize_index(
         embeddings,
-        max_depth=max_depth,
-        num_bits=num_bits,
-        min_leaf_size=min_leaf_size,
-        seed=seed,
-        fit_method="itq",
-    )
-    logger.info(f"  Tree built in {time.time() - t0:.1f}s")
-
-    # Write .dyf
-    logger.info("Writing .dyf...")
-    t0 = time.time()
-    write_lazy_index(
-        tree,
-        embeddings,
-        str(output),
-        compression="none",
-        quantization="float16",
-        metadata={
-            "embedding_model": model,
-            "domain": "images",
-            "thumbnail_size": "128x128",
-            "thumbnail_format": "webp",
-        },
-        build_params={
-            "max_depth": max_depth,
-            "num_bits": num_bits,
-            "min_leaf_size": min_leaf_size,
-            "seed": seed,
-        },
+        output,
         stored_fields={
             "title": titles,
             "thumbnail": thumbnails,
@@ -292,10 +265,18 @@ def index_images(
             "width": widths,
             "height": heights,
         },
+        metadata={
+            "embedding_model": model,
+            "domain": "images",
+            "thumbnail_size": "128x128",
+            "thumbnail_format": "webp",
+        },
+        max_depth=max_depth,
+        num_bits=num_bits,
+        min_leaf_size=min_leaf_size,
+        seed=seed,
+        dedup=dedup,
     )
-    size_mb = output.stat().st_size / (1024 * 1024)
-    logger.info(f"  Written {output.name} ({size_mb:.1f} MB) in {time.time() - t0:.1f}s")
-    logger.info(f"Done. {len(images)} images indexed.")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -309,58 +290,12 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         help="Directory containing images",
     )
-    parser.add_argument(
-        "-o",
-        "--output",
-        type=Path,
-        default=None,
-        help="Output .dyf file path (default: <dirname>.dyf)",
-    )
-    parser.add_argument(
-        "--model",
-        default=DEFAULT_MODEL,
-        help=f"HuggingFace vision model (default: {DEFAULT_MODEL})",
-    )
-    parser.add_argument(
-        "--max-depth",
-        type=int,
-        default=4,
-        help="DYF tree max depth (default: 4)",
-    )
-    parser.add_argument(
-        "--num-bits",
-        type=int,
-        default=4,
-        help="LSH bits per level (default: 4)",
-    )
-    parser.add_argument(
-        "--min-leaf-size",
-        type=int,
-        default=5,
-        help="Minimum leaf size (default: 5)",
-    )
-    parser.add_argument(
-        "--seed",
-        type=int,
-        default=42,
-        help="Random seed (default: 42)",
-    )
+    add_common_index_args(parser, default_model=DEFAULT_MODEL)
     parser.add_argument(
         "--batch-size",
         type=int,
         default=16,
         help="Embedding batch size (default: 16)",
-    )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Report what would be indexed and stop. Loads no model, writes nothing.",
-    )
-    parser.add_argument(
-        "--json",
-        action="store_true",
-        dest="as_json",
-        help="With --dry-run, emit JSON (schema_version 0 — unstable before v1)",
     )
 
     args = parser.parse_args(argv)
@@ -392,6 +327,7 @@ def main(argv: list[str] | None = None) -> int:
             min_leaf_size=args.min_leaf_size,
             seed=args.seed,
             batch_size=args.batch_size,
+            dedup=args.dedup,
         )
     except IngestError as exc:
         for line in str(exc).splitlines():
