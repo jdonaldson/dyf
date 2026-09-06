@@ -5,8 +5,8 @@ BridgeIndex(
     n_anchors=1000,
     n_query_anchors=10,
     expansion_k=200,
-    global_num_bits=12,
-    facet_num_bits=10,
+    global_num_bits=None,
+    facet_num_bits=None,
     dense_percentile=75,
     min_bucket_size=20,
     include_sparse_points=0,
@@ -33,13 +33,13 @@ occur at semantic boundaries and provide better coverage.
 
 ## Attributes {.doc-section .doc-section-attributes}
 
-| Name            | Type         | Description                                     |
-|-----------------|--------------|-------------------------------------------------|
-| n_anchors       | [int](`int`) | Number of anchor points to use                  |
-| n_query_anchors | [int](`int`) | Number of anchors to retrieve per query         |
-| expansion_k     | [int](`int`) | Size of neighborhood to expand from each anchor |
-| global_num_bits | [int](`int`) | LSH bits for global bucketing (default 12)      |
-| seed            | [int](`int`) | Random seed for reproducibility                 |
+| Name            | Type                 | Description                                                                                                                         |
+|-----------------|----------------------|-------------------------------------------------------------------------------------------------------------------------------------|
+| n_anchors       | [int](`int`)         | Number of anchor points to use                                                                                                      |
+| n_query_anchors | [int](`int`)         | Number of anchors to retrieve per query                                                                                             |
+| expansion_k     | [int](`int`)         | Size of neighborhood to expand from each anchor                                                                                     |
+| global_num_bits | [int](`int`) \| None | LSH bits for global bucketing (default None = derive from corpus size; a fixed value closes the dense-bucket gate on small corpora) |
+| seed            | [int](`int`)         | Random seed for reproducibility                                                                                                     |
 
 ## Example {.doc-section .doc-section-example}
 
@@ -82,9 +82,9 @@ Evaluate recall against brute-force search.
 
 #### Returns {.doc-section .doc-section-returns}
 
-| Name   | Type                                                    | Description                                             |
-|--------|---------------------------------------------------------|---------------------------------------------------------|
-|        | [Dict](`typing.Dict`)\[[str](`str`), [float](`float`)\] | Dict with 'recall', 'avg_candidates', 'speedup' metrics |
+| Name   | Type                                             | Description                                             |
+|--------|--------------------------------------------------|---------------------------------------------------------|
+|        | [dict](`dict`)\[[str](`str`), [float](`float`)\] | Dict with 'recall', 'avg_candidates', 'speedup' metrics |
 
 ### fit { #dyf.BridgeIndex.fit }
 
@@ -131,21 +131,26 @@ BridgeIndex.query(query, k=10, n_query_anchors=None, return_scores=True)
 
 Retrieve top-k candidates for a query embedding.
 
+Returns the same :class:`SearchResult` as `LazyIndex.search` and
+`DenseSearchIndex.search`, so every retriever in the package answers with one
+shape. It unpacks as a 2-tuple, so `indices, scores = index.query(...)` keeps
+working.
+
 #### Parameters {.doc-section .doc-section-parameters}
 
-| Name            | Type                                          | Description                                 | Default    |
-|-----------------|-----------------------------------------------|---------------------------------------------|------------|
-| query           | [np](`numpy`).[ndarray](`numpy.ndarray`)      | (d,) query embedding vector                 | _required_ |
-| k               | [int](`int`)                                  | Number of results to return                 | `10`       |
-| n_query_anchors | [Optional](`typing.Optional`)\[[int](`int`)\] | Override default number of anchors to probe | `None`     |
-| return_scores   | [bool](`bool`)                                | Whether to return similarity scores         | `True`     |
+| Name            | Type                                     | Description                                                    | Default    |
+|-----------------|------------------------------------------|----------------------------------------------------------------|------------|
+| query           | [np](`numpy`).[ndarray](`numpy.ndarray`) | (d,) query embedding vector                                    | _required_ |
+| k               | [int](`int`)                             | Number of results to return                                    | `10`       |
+| n_query_anchors | [int](`int`) \| None                     | Override default number of anchors to probe                    | `None`     |
+| return_scores   | [bool](`bool`)                           | Whether to compute similarity scores (`scores` is None if not) | `True`     |
 
 #### Returns {.doc-section .doc-section-returns}
 
-| Name   | Type                                                                      | Description                                                               |
-|--------|---------------------------------------------------------------------------|---------------------------------------------------------------------------|
-|        | [np](`numpy`).[ndarray](`numpy.ndarray`)                                  | (indices, scores) where indices are the top-k candidate indices           |
-|        | [Optional](`typing.Optional`)\[[np](`numpy`).[ndarray](`numpy.ndarray`)\] | and scores are their cosine similarities (or None if return_scores=False) |
+| Name   | Type                                          | Description                                                               |
+|--------|-----------------------------------------------|---------------------------------------------------------------------------|
+|        | [SearchResult](`dyf.lazy_index.SearchResult`) | SearchResult whose `indices` are the top-k candidate indices              |
+|        | [SearchResult](`dyf.lazy_index.SearchResult`) | and scores are their cosine similarities (or None if return_scores=False) |
 
 ### query_batch { #dyf.BridgeIndex.query_batch }
 
@@ -157,17 +162,17 @@ Batch query for multiple embeddings.
 
 #### Parameters {.doc-section .doc-section-parameters}
 
-| Name            | Type                                          | Description                                 | Default    |
-|-----------------|-----------------------------------------------|---------------------------------------------|------------|
-| queries         | [np](`numpy`).[ndarray](`numpy.ndarray`)      | (n_queries, d) array of query embeddings    | _required_ |
-| k               | [int](`int`)                                  | Number of results per query                 | `10`       |
-| n_query_anchors | [Optional](`typing.Optional`)\[[int](`int`)\] | Override default number of anchors to probe | `None`     |
+| Name            | Type                                     | Description                                 | Default    |
+|-----------------|------------------------------------------|---------------------------------------------|------------|
+| queries         | [np](`numpy`).[ndarray](`numpy.ndarray`) | (n_queries, d) array of query embeddings    | _required_ |
+| k               | [int](`int`)                             | Number of results per query                 | `10`       |
+| n_query_anchors | [int](`int`) \| None                     | Override default number of anchors to probe | `None`     |
 
 #### Returns {.doc-section .doc-section-returns}
 
-| Name   | Type                                                                                                                                   | Description                                     |
-|--------|----------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------|
-|        | [List](`typing.List`)\[[Tuple](`typing.Tuple`)\[[np](`numpy`).[ndarray](`numpy.ndarray`), [np](`numpy`).[ndarray](`numpy.ndarray`)\]\] | List of (indices, scores) tuples, one per query |
+| Name   | Type                                                            | Description                                                             |
+|--------|-----------------------------------------------------------------|-------------------------------------------------------------------------|
+|        | [list](`list`)\[[SearchResult](`dyf.lazy_index.SearchResult`)\] | List of SearchResult, one per query. Each unpacks as (indices, scores). |
 
 ### summary { #dyf.BridgeIndex.summary }
 

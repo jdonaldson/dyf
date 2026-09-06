@@ -30,10 +30,8 @@ threshold, then runs Louvain to discover communities.
 
 ## Returns {.doc-section .doc-section-returns}
 
-| Name   | Type   | Description                                                         |
-|--------|--------|---------------------------------------------------------------------|
-|        |        | Same tuple as ``agglomerate_tree_leaves``:                          |
-|        |        | ``(point_labels, lsh_names, lsh_label_data, item_leaf_map,          |
-|        |        | tree_structure)``.                                                  |
-|        |        | Returns ``(None, {}, [], None, tree)`` when the tree has fewer than |
-|        |        | two leaves.                                                         |
+| Name   | Type   | Description                                                                     |
+|--------|--------|---------------------------------------------------------------------------------|
+|        |        | The same :class:`LeafGroupingResult` as :func:`agglomerate_tree_leaves` — which |
+|        |        | is now enforced by the shared type rather than asserted in prose. Check ``.ok`` |
+|        |        | for the fewer-than-two-leaves case.                                             |

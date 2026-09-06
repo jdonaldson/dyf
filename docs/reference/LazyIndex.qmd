@@ -25,7 +25,7 @@ print(idx.tree_summary)
 | [is_pq](#dyf.LazyIndex.is_pq) | True if this index uses Product Quantization. |
 | [quantization](#dyf.LazyIndex.quantization) | Read quantization string from BuildParams. |
 | [stored_field_names](#dyf.LazyIndex.stored_field_names) | List of stored field names (empty if no stored fields). |
-| [tree_summary](#dyf.LazyIndex.tree_summary) | Return tree stats without touching Arrow data. |
+| [tree_summary](#dyf.LazyIndex.tree_summary) | Tree stats without touching Arrow data. See :class:`TreeSummary`. |
 
 ## Methods
 
@@ -201,19 +201,20 @@ Export tree hierarchy for visualization (FlatBuffers only, no Arrow).
 ### search { #dyf.LazyIndex.search }
 
 ```python
-LazyIndex.search(query, k=10, nprobe=3, return_routing=False)
+LazyIndex.search(query, k=10, nprobe=3, return_routing=False, backend='rust')
 ```
 
 Search the index for nearest neighbors.
 
 #### Parameters {.doc-section .doc-section-parameters}
 
-| Name           | Type   | Description                                                                                                                                                                                                             | Default    |
-|----------------|--------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------|
-| query          |        | (dim,) query vector.                                                                                                                                                                                                    | _required_ |
-| k              |        | Number of results to return.                                                                                                                                                                                            | `10`       |
-| nprobe         |        | Number of leaf probes. Accepts: - int: fixed probe count (1 = single path, >1 = multi-probe) - "auto": adaptive probing with default AdaptiveProbeConfig - AdaptiveProbeConfig: adaptive probing with custom thresholds | `3`        |
-| return_routing |        | If True, populate result.routing with diagnostics.                                                                                                                                                                      | `False`    |
+| Name           | Type   | Description                                                                                                                                                                                                                                                                                                                                                                | Default    |
+|----------------|--------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------|
+| query          |        | (dim,) query vector.                                                                                                                                                                                                                                                                                                                                                       | _required_ |
+| k              |        | Number of results to return.                                                                                                                                                                                                                                                                                                                                               | `10`       |
+| nprobe         |        | Number of leaf probes. Accepts: - int: fixed probe count (1 = single path, >1 = multi-probe) - "auto": adaptive probing with default AdaptiveProbeConfig - AdaptiveProbeConfig: adaptive probing with custom thresholds                                                                                                                                                    | `3`        |
+| return_routing |        | If True, populate result.routing with diagnostics.                                                                                                                                                                                                                                                                                                                         | `False`    |
+| backend        |        | "rust" (default) or "python". The rust backend uses the Rust kernel (dyf_rs.DyfSearcher) — much faster, same result shape, and now handles fixed/adaptive nprobe and return_routing. It falls back to the python path only for PQ-compressed or overflow indexes (the non-load-bearing tail). Pass backend="python" to force the reference path (e.g. for parity testing). | `'rust'`   |
 
 #### Returns {.doc-section .doc-section-returns}
 

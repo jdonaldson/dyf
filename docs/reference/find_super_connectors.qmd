@@ -3,13 +3,14 @@
 ```python
 find_super_connectors(
     embeddings,
-    global_num_bits=12,
-    facet_num_bits=10,
+    global_num_bits=None,
+    facet_num_bits=None,
     dense_percentile=75,
     global_threshold_percentile=50,
     local_threshold_percentile=50,
     min_bucket_size=20,
     seed=42,
+    bridge_percentile=10,
 )
 ```
 
@@ -23,16 +24,17 @@ Super connectors are ideal RAG anchor points because they:
 
 ## Parameters {.doc-section .doc-section-parameters}
 
-| Name                        | Type                                     | Description                             | Default    |
-|-----------------------------|------------------------------------------|-----------------------------------------|------------|
-| embeddings                  | [np](`numpy`).[ndarray](`numpy.ndarray`) | Normalized embeddings (n_points, dim)   | _required_ |
-| global_num_bits             | [int](`int`)                             | LSH bits for global bucketing           | `12`       |
-| facet_num_bits              | [int](`int`)                             | LSH bits for facet bucketing            | `10`       |
-| dense_percentile            | [float](`float`)                         | Percentile threshold for dense buckets  | `75`       |
-| global_threshold_percentile | [float](`float`)                         | Percentile for "high" global centrality | `50`       |
-| local_threshold_percentile  | [float](`float`)                         | Percentile for "high" local centrality  | `50`       |
-| min_bucket_size             | [int](`int`)                             | Minimum bucket size for faceting        | `20`       |
-| seed                        | [int](`int`)                             | Random seed                             | `42`       |
+| Name                        | Type                                     | Description                                                                                                                                                                                                                                                                                                                                                       | Default    |
+|-----------------------------|------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------|
+| embeddings                  | [np](`numpy`).[ndarray](`numpy.ndarray`) | Normalized embeddings (n_points, dim)                                                                                                                                                                                                                                                                                                                             | _required_ |
+| global_num_bits             | [int](`int`) \| None                     | LSH bits for global bucketing. ``None`` (default) derives it from the corpus size via :func:`_derive_num_bits`, which is required for the dense-bucket gate to open at all below ~8k points — the previous fixed default of 12 returned zero super connectors on every smaller corpus.                                                                            | `None`     |
+| facet_num_bits              | [int](`int`) \| None                     | LSH bits for facet bucketing within a dense bucket. ``None`` (default) uses two bits below the global resolution.                                                                                                                                                                                                                                                 | `None`     |
+| dense_percentile            | [float](`float`)                         | Percentile threshold for dense buckets                                                                                                                                                                                                                                                                                                                            | `75`       |
+| global_threshold_percentile | [float](`float`)                         | Percentile for "high" global centrality                                                                                                                                                                                                                                                                                                                           | `50`       |
+| local_threshold_percentile  | [float](`float`)                         | Percentile for "high" local centrality                                                                                                                                                                                                                                                                                                                            | `50`       |
+| min_bucket_size             | [int](`int`)                             | Minimum bucket size for faceting                                                                                                                                                                                                                                                                                                                                  | `20`       |
+| seed                        | [int](`int`)                             | Random seed                                                                                                                                                                                                                                                                                                                                                       | `42`       |
+| bridge_percentile           | [float](`float`)                         | Bridges are the lowest-centroid-similarity points; this is the percentile of *this corpus's* similarity distribution used as the cut. Relative by design — `analyze_bridges`'s absolute 0.5 default returns zero bridges on unit-norm text embeddings (0.0% fall below it) and floods on isotropic data (92.3% below), so an absolute constant cannot serve both. | `10`       |
 
 ## Returns {.doc-section .doc-section-returns}
 

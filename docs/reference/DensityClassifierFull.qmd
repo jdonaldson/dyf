@@ -62,13 +62,13 @@ Fit the density classifier.
 
 #### Parameters {.doc-section .doc-section-parameters}
 
-| Name       | Type                                                                   | Description                        | Default    |
-|------------|------------------------------------------------------------------------|------------------------------------|------------|
-| embeddings | [np](`numpy`).[ndarray](`numpy.ndarray`)                               | (n, d) array of embedding vectors  | _required_ |
-| categories | [Optional](`typing.Optional`)\[[List](`typing.List`)\[[str](`str`)\]\] | Optional list of category labels   | `None`     |
-| texts      | [Optional](`typing.Optional`)\[[List](`typing.List`)\[[str](`str`)\]\] | Optional list of text content      | `None`     |
-| normalize  | [bool](`bool`)                                                         | Whether to L2-normalize embeddings | `True`     |
-| verbose    | [bool](`bool`)                                                         | Print progress                     | `True`     |
+| Name       | Type                                     | Description                        | Default    |
+|------------|------------------------------------------|------------------------------------|------------|
+| embeddings | [np](`numpy`).[ndarray](`numpy.ndarray`) | (n, d) array of embedding vectors  | _required_ |
+| categories | [list](`list`)\[[str](`str`)\] \| None   | Optional list of category labels   | `None`     |
+| texts      | [list](`list`)\[[str](`str`)\] \| None   | Optional list of text content      | `None`     |
+| normalize  | [bool](`bool`)                           | Whether to L2-normalize embeddings | `True`     |
+| verbose    | [bool](`bool`)                           | Print progress                     | `True`     |
 
 #### Returns {.doc-section .doc-section-returns}
 
@@ -96,8 +96,8 @@ Create classifier from a Pandas DataFrame.
 |---------------|------------------------------------------------|-----------------------------------------------------------|------------|
 | df            | [pd](`pandas`).[DataFrame](`pandas.DataFrame`) | Pandas DataFrame with embeddings                          | _required_ |
 | embedding_col | [str](`str`)                                   | Column name containing embedding vectors (list of floats) | _required_ |
-| category_col  | [Optional](`typing.Optional`)\[[str](`str`)\]  | Optional column name for category labels                  | `None`     |
-| text_col      | [Optional](`typing.Optional`)\[[str](`str`)\]  | Optional column name for text content (enables labeling)  | `None`     |
+| category_col  | [str](`str`) \| None                           | Optional column name for category labels                  | `None`     |
+| text_col      | [str](`str`) \| None                           | Optional column name for text content (enables labeling)  | `None`     |
 | **kwargs      |                                                | Additional args passed to __init__ (num_bits, seed, etc.) | `{}`       |
 
 #### Returns {.doc-section .doc-section-returns}
@@ -136,8 +136,8 @@ Create classifier from a Polars DataFrame.
 |---------------|------------------------------------------------|-----------------------------------------------------------|------------|
 | df            | [pl](`polars`).[DataFrame](`polars.DataFrame`) | Polars DataFrame with embeddings                          | _required_ |
 | embedding_col | [str](`str`)                                   | Column name containing embedding vectors (list of floats) | _required_ |
-| category_col  | [Optional](`typing.Optional`)\[[str](`str`)\]  | Optional column name for category labels                  | `None`     |
-| text_col      | [Optional](`typing.Optional`)\[[str](`str`)\]  | Optional column name for text content (enables labeling)  | `None`     |
+| category_col  | [str](`str`) \| None                           | Optional column name for category labels                  | `None`     |
+| text_col      | [str](`str`) \| None                           | Optional column name for text content (enables labeling)  | `None`     |
 | **kwargs      |                                                | Additional args passed to __init__ (num_bits, seed, etc.) | `{}`       |
 
 #### Returns {.doc-section .doc-section-returns}
@@ -180,18 +180,18 @@ and TruncatedSVD to create dense embeddings from text.
 
 #### Parameters {.doc-section .doc-section-parameters}
 
-| Name          | Type                                                                   | Description                               | Default    |
-|---------------|------------------------------------------------------------------------|-------------------------------------------|------------|
-| texts         | [List](`typing.List`)\[[str](`str`)\]                                  | List of text documents                    | _required_ |
-| categories    | [Optional](`typing.Optional`)\[[List](`typing.List`)\[[str](`str`)\]\] | Optional category labels                  | `None`     |
-| embedding_dim | [int](`int`)                                                           | SVD output dimensions (default 128)       | `128`      |
-| max_features  | [int](`int`)                                                           | Max vocabulary size for TF-IDF            | `10000`    |
-| min_df        | [int](`int`)                                                           | Min document frequency for terms          | `2`        |
-| max_df        | [float](`float`)                                                       | Max document frequency for terms          | `0.95`     |
-| ngram_range   | [Tuple](`typing.Tuple`)\[[int](`int`), [int](`int`)\]                  | N-gram range (default unigrams + bigrams) | `(1, 2)`   |
-| num_bits      | [int](`int`)                                                           | Bits for PCA LSH                          | `12`       |
-| verbose       | [bool](`bool`)                                                         | Print progress                            | `True`     |
-| **kwargs      |                                                                        | Additional args passed to __init__        | `{}`       |
+| Name          | Type                                           | Description                               | Default    |
+|---------------|------------------------------------------------|-------------------------------------------|------------|
+| texts         | [list](`list`)\[[str](`str`)\]                 | List of text documents                    | _required_ |
+| categories    | [list](`list`)\[[str](`str`)\] \| None         | Optional category labels                  | `None`     |
+| embedding_dim | [int](`int`)                                   | SVD output dimensions (default 128)       | `128`      |
+| max_features  | [int](`int`)                                   | Max vocabulary size for TF-IDF            | `10000`    |
+| min_df        | [int](`int`)                                   | Min document frequency for terms          | `2`        |
+| max_df        | [float](`float`)                               | Max document frequency for terms          | `0.95`     |
+| ngram_range   | [tuple](`tuple`)\[[int](`int`), [int](`int`)\] | N-gram range (default unigrams + bigrams) | `(1, 2)`   |
+| num_bits      | [int](`int`)                                   | Bits for PCA LSH                          | `12`       |
+| verbose       | [bool](`bool`)                                 | Print progress                            | `True`     |
+| **kwargs      |                                                | Additional args passed to __init__        | `{}`       |
 
 #### Returns {.doc-section .doc-section-returns}
 
@@ -299,9 +299,9 @@ Uses OpenAI-compatible API (works with Ollama or MLX server).
 
 #### Returns {.doc-section .doc-section-returns}
 
-| Name   | Type                                                         | Description                                                                 |
-|--------|--------------------------------------------------------------|-----------------------------------------------------------------------------|
-|        | [Dict](`typing.Dict`)\[[int](`int`), [Dict](`typing.Dict`)\] | Dict mapping bucket_id -> {'label': str, 'size': int, 'samples': List[str]} |
+| Name   | Type                                           | Description                                                                 |
+|--------|------------------------------------------------|-----------------------------------------------------------------------------|
+|        | [dict](`dict`)\[[int](`int`), [dict](`dict`)\] | Dict mapping bucket_id -> {'label': str, 'size': int, 'samples': List[str]} |
 
 #### Example {.doc-section .doc-section-example}
 
@@ -330,19 +330,19 @@ Extracts top keywords from bucket texts using TF-IDF or frequency analysis.
 
 #### Parameters {.doc-section .doc-section-parameters}
 
-| Name            | Type                                          | Description                                      | Default   |
-|-----------------|-----------------------------------------------|--------------------------------------------------|-----------|
-| top_k           | [int](`int`)                                  | Number of top keywords to include in label       | `3`       |
-| min_bucket_size | [int](`int`)                                  | Only label buckets with at least this many items | `5`       |
-| stopwords       | [Optional](`typing.Optional`)\[[set](`set`)\] | Set of words to exclude (uses default if None)   | `None`    |
-| min_word_len    | [int](`int`)                                  | Minimum word length to consider                  | `3`       |
-| use_tfidf       | [bool](`bool`)                                | Use TF-IDF weighting (vs simple frequency)       | `True`    |
+| Name            | Type                 | Description                                      | Default   |
+|-----------------|----------------------|--------------------------------------------------|-----------|
+| top_k           | [int](`int`)         | Number of top keywords to include in label       | `3`       |
+| min_bucket_size | [int](`int`)         | Only label buckets with at least this many items | `5`       |
+| stopwords       | [set](`set`) \| None | Set of words to exclude (uses default if None)   | `None`    |
+| min_word_len    | [int](`int`)         | Minimum word length to consider                  | `3`       |
+| use_tfidf       | [bool](`bool`)       | Use TF-IDF weighting (vs simple frequency)       | `True`    |
 
 #### Returns {.doc-section .doc-section-returns}
 
-| Name   | Type                                                         | Description                                                                                |
-|--------|--------------------------------------------------------------|--------------------------------------------------------------------------------------------|
-|        | [Dict](`typing.Dict`)\[[int](`int`), [Dict](`typing.Dict`)\] | Dict mapping bucket_id -> {'label': str, 'keywords': List[Tuple[str, float]], 'size': int} |
+| Name   | Type                                           | Description                                                                                |
+|--------|------------------------------------------------|--------------------------------------------------------------------------------------------|
+|        | [dict](`dict`)\[[int](`int`), [dict](`dict`)\] | Dict mapping bucket_id -> {'label': str, 'keywords': List[Tuple[str, float]], 'size': int} |
 
 #### Example {.doc-section .doc-section-example}
 

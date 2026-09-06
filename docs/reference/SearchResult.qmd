@@ -5,3 +5,7 @@ SearchResult(indices, scores, fields=dict(), routing=None)
 ```
 
 Search result with indices, scores, and optional stored fields.
+
+The standard return type of every retrieval entry point — `LazyIndex.search`,
+`LazyIndex.search_ivf`, `DenseSearchIndex.search` and `BridgeIndex.query` — so the
+same calling code works against any index.

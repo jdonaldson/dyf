@@ -40,11 +40,7 @@ prefix : str
 
 ## Returns {.doc-section .doc-section-returns}
 
-embeddings : (n, d) float32
-    Final embeddings (original if no axes promoted, re-embedded otherwise).
-before_diags : list[AxisDiagnostic]
-    Diagnostics from the first pass.
-after_diags : list[AxisDiagnostic]
-    Diagnostics from the second pass (same as before if no re-embedding).
-texts : list[str]
-    Final text strings (original or structured).
+AxisDiagnosticsResult
+    With ``.embeddings``, ``.before``, ``.after``, ``.texts`` and ``.restructured``.
+    Unpacks as the original 4-tuple. Check ``.restructured`` rather than comparing
+    ``before`` and ``after``: on the early-exit path they are the same object.

@@ -6,23 +6,19 @@ extract_boundary_persistence(tree, margin_pct=0.1)
 
 Identify points that persist as boundary across multiple tree depths.
 
-Walks the built tree once, reading existing point_margin_map at each
-internal node.  At each depth, points with margin below the margin_pct
-percentile threshold are tagged as boundary at that depth.
-
-Points that are boundary at multiple depths have high boundary
-persistence — they straddle concepts at several levels of the hierarchy
-and are semantically polysemous bridge points.
+Same concept as pca_tree.extract_boundary_persistence but for k-ary DYF
+trees.  At each depth, points with centroid similarity below the
+margin_pct percentile threshold are tagged as boundary.
 
 ## Parameters {.doc-section .doc-section-parameters}
 
-| Name       | Type   | Description                                                                                                  | Default    |
-|------------|--------|--------------------------------------------------------------------------------------------------------------|------------|
-| tree       |        | PCA tree dict from build_pca_tree().                                                                         | _required_ |
-| margin_pct |        | Percentile threshold (0-1).  Points with margin below         this percentile at a given depth are boundary. | `0.1`      |
+| Name       | Type   | Description                          | Default    |
+|------------|--------|--------------------------------------|------------|
+| tree       |        | DYF tree dict from build_dyf_tree(). | _required_ |
+| margin_pct |        | Percentile threshold (0-1).          | `0.1`      |
 
 ## Returns {.doc-section .doc-section-returns}
 
-| Name   | Type   | Description                                                                                                                                                                                                                                                                       |
-|--------|--------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-|        |        | dict with: boundary_depths: dict[int, list[int]] — point_idx -> list of                  depths where the point is boundary boundary_count: np.ndarray shape (n,) — number of boundary                 depths per point thresholds: dict[int, float] — margin threshold per depth |
+| Name   | Type   | Description                                                                                                         |
+|--------|--------|---------------------------------------------------------------------------------------------------------------------|
+|        |        | dict with: boundary_depths: dict[int, list[int]] boundary_count: np.ndarray shape (n,) thresholds: dict[int, float] |

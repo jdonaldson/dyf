@@ -79,7 +79,6 @@ quartodoc:
         - boundary_persistence_scores
         - build_dyf_tree
         - refine_dyf_tree
-        - cut_dyf_tree_to_labels
         - refine_clusters
 
     - title: Retrieval (RAG)

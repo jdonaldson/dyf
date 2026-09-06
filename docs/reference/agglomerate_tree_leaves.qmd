@@ -24,12 +24,12 @@ nearest bucket centroid to clean up impure leaves and bad merges.
 
 | Name   | Type   | Description                                                                                                    |
 |--------|--------|----------------------------------------------------------------------------------------------------------------|
-|        |        | Tuple of ``(point_labels, lsh_names, lsh_label_data,                                                           |
-|        |        | item_leaf_map, tree_structure)`` ready for ``multi_level_data``.                                               |
+|        |        | class:`LeafGroupingResult`, ready for ``multi_level_data``. Unpacks as the                                     |
+|        |        | original 5-tuple ``(point_labels, names, label_data, item_leaf_map, tree)``.                                   |
 |        |        | *  ``point_labels`` – int32 array (N,) of bucket ids (0-based).                                                |
-|        |        | *  ``lsh_names`` – ``{cid: "Bucket <cid>"}`` placeholder names.                                                |
-|        |        | *  ``lsh_label_data`` – list of dicts with centroid x/y/z, size, cid.                                          |
+|        |        | *  ``names`` – ``{cid: "Bucket <cid>"}`` placeholder names.                                                    |
+|        |        | *  ``label_data`` – list of dicts with centroid x/y/z, size, cid.                                              |
 |        |        | *  ``item_leaf_map`` – int32 array (N,) mapping each item to its tree leaf ``node_id`` (before agglomeration). |
-|        |        | *  ``tree_structure`` – raw tree node list from ``idx.get_tree_structure()``.                                  |
-|        |        | Returns ``(None, {}, [], None, tree)`` when the tree has fewer than                                            |
-|        |        | two leaves.                                                                                                    |
+|        |        | *  ``tree`` – raw tree node list from ``idx.get_tree_structure()``.                                            |
+|        |        | When the tree has fewer than two leaves, ``.ok`` is False and the array fields                                 |
+|        |        | are None — check ``.ok`` rather than testing ``point_labels is None``.                                         |

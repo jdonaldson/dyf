@@ -1,22 +1,36 @@
 # cut_tree_to_labels { #dyf.cut_tree_to_labels }
 
 ```python
-cut_tree_to_labels(tree, max_depth, n_points, n_clusters)
+cut_tree_to_labels(
+    tree,
+    n_points,
+    n_clusters,
+    *,
+    max_depth=None,
+    embeddings=None,
+)
 ```
 
-Cut PCA tree at n_clusters and return point labels array.
+Cut a DYF tree into flat cluster labels.
 
 ## Parameters {.doc-section .doc-section-parameters}
 
-| Name       | Type   | Description                          | Default    |
-|------------|--------|--------------------------------------|------------|
-| tree       |        | PCA tree dict from build_pca_tree(). | _required_ |
-| max_depth  |        | Depth used when building the tree.   | _required_ |
-| n_points   |        | Total number of points.              | _required_ |
-| n_clusters |        | Desired number of clusters.          | _required_ |
+| Name       | Type   | Description                                                                                                                | Default    |
+|------------|--------|----------------------------------------------------------------------------------------------------------------------------|------------|
+| tree       |        | Tree dict from ``build_dyf_tree``.                                                                                         | _required_ |
+| n_points   |        | Total number of points.                                                                                                    | _required_ |
+| n_clusters |        | Desired number of clusters.                                                                                                | _required_ |
+| max_depth  |        | Unused. Accepted so callers written against the two-tree dispatcher keep working; it was only ever required for PCA trees. | `None`     |
+| embeddings |        | (n, d) array — required, used for leaf centroids.                                                                          | `None`     |
 
 ## Returns {.doc-section .doc-section-returns}
 
 | Name   | Type   | Description                                          |
 |--------|--------|------------------------------------------------------|
 |        |        | np.ndarray of shape (n_points,) with cluster labels. |
+
+## Raises {.doc-section .doc-section-raises}
+
+| Name   | Type                       | Description                                                     |
+|--------|----------------------------|-----------------------------------------------------------------|
+|        | [ValueError](`ValueError`) | If the tree shape is unrecognized or ``embeddings`` is missing. |

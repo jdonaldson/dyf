@@ -6,16 +6,11 @@ boundary_persistence_scores(tree, margin_pct=0.1, max_depth=None)
 
 Compute depth-weighted boundary persistence bridge scores.
 
-Convenience wrapper that calls extract_boundary_persistence and returns
-a single score array.  Each boundary depth contributes
-(max_depth - depth) to the score, so boundaries at coarse (shallow)
-levels count more.
-
 ## Parameters {.doc-section .doc-section-parameters}
 
 | Name       | Type   | Description                                                                  | Default    |
 |------------|--------|------------------------------------------------------------------------------|------------|
-| tree       |        | PCA tree dict from build_pca_tree().                                         | _required_ |
+| tree       |        | DYF tree dict from build_dyf_tree().                                         | _required_ |
 | margin_pct |        | Percentile threshold (0-1) for boundary detection.                           | `0.1`      |
 | max_depth  |        | Tree depth used for weighting.  If None, inferred        from tree['depth']. | `None`     |
 

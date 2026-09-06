@@ -22,13 +22,13 @@ score low on both.
 
 ## Parameters {.doc-section .doc-section-parameters}
 
-| Name         | Type                                                                      | Description                                                       | Default    |
-|--------------|---------------------------------------------------------------------------|-------------------------------------------------------------------|------------|
-| embeddings   | [np](`numpy`).[ndarray](`numpy.ndarray`)                                  | Normalized embeddings (n, d)                                      | _required_ |
-| k            | [int](`int`)                                                              | Number of neighbors for k-NN graph                                | `30`       |
-| n_iterations | [int](`int`)                                                              | Iterations for eigenvector power method                           | `30`       |
-| neighbors    | [Optional](`typing.Optional`)\[[np](`numpy`).[ndarray](`numpy.ndarray`)\] | Pre-computed k-NN indices (n, k+1). If None, computed internally. | `None`     |
-| similarities | [Optional](`typing.Optional`)\[[np](`numpy`).[ndarray](`numpy.ndarray`)\] | Pre-computed similarities (n, k+1). If None, computed internally. | `None`     |
+| Name         | Type                                             | Description                                                       | Default    |
+|--------------|--------------------------------------------------|-------------------------------------------------------------------|------------|
+| embeddings   | [np](`numpy`).[ndarray](`numpy.ndarray`)         | Normalized embeddings (n, d)                                      | _required_ |
+| k            | [int](`int`)                                     | Number of neighbors for k-NN graph                                | `30`       |
+| n_iterations | [int](`int`)                                     | Iterations for eigenvector power method                           | `30`       |
+| neighbors    | [np](`numpy`).[ndarray](`numpy.ndarray`) \| None | Pre-computed k-NN indices (n, k+1). If None, computed internally. | `None`     |
+| similarities | [np](`numpy`).[ndarray](`numpy.ndarray`) \| None | Pre-computed similarities (n, k+1). If None, computed internally. | `None`     |
 
 ## Returns {.doc-section .doc-section-returns}
 

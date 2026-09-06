@@ -17,14 +17,14 @@ parents, enabling multiple inheritance and diamond patterns.
 
 ## Attributes {.doc-section .doc-section-attributes}
 
-| Name      | Type                                                                                                                                        | Description                                           |
-|-----------|---------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------|
-| n_nodes   | [int](`int`)                                                                                                                                | Total number of nodes in the taxonomy                 |
-| diversity | [np](`numpy`).[ndarray](`numpy.ndarray`)                                                                                                    | Neighbor diversity score for each node                |
-| children  | [Dict](`typing.Dict`)\[[int](`int`), [List](`typing.List`)\[[Tuple](`typing.Tuple`)\[[int](`int`), [float](`float`), [float](`float`)\]\]\] | Dict mapping node → list of (child, similarity, gap)  |
-| parents   | [Dict](`typing.Dict`)\[[int](`int`), [List](`typing.List`)\[[Tuple](`typing.Tuple`)\[[int](`int`), [float](`float`), [float](`float`)\]\]\] | Dict mapping node → list of (parent, similarity, gap) |
-| roots     | [List](`typing.List`)\[[int](`int`)\]                                                                                                       | Nodes with no parents (most general concepts)         |
-| leaves    | [List](`typing.List`)\[[int](`int`)\]                                                                                                       | Nodes with no children (most specific concepts)       |
+| Name      | Type                                                                                                                   | Description                                           |
+|-----------|------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------|
+| n_nodes   | [int](`int`)                                                                                                           | Total number of nodes in the taxonomy                 |
+| diversity | [np](`numpy`).[ndarray](`numpy.ndarray`)                                                                               | Neighbor diversity score for each node                |
+| children  | [dict](`dict`)\[[int](`int`), [list](`list`)\[[tuple](`tuple`)\[[int](`int`), [float](`float`), [float](`float`)\]\]\] | Dict mapping node → list of (child, similarity, gap)  |
+| parents   | [dict](`dict`)\[[int](`int`), [list](`list`)\[[tuple](`tuple`)\[[int](`int`), [float](`float`), [float](`float`)\]\]\] | Dict mapping node → list of (parent, similarity, gap) |
+| roots     | [list](`list`)\[[int](`int`)\]                                                                                         | Nodes with no parents (most general concepts)         |
+| leaves    | [list](`list`)\[[int](`int`)\]                                                                                         | Nodes with no children (most specific concepts)       |
 
 ## Example {.doc-section .doc-section-example}
 
@@ -80,9 +80,9 @@ In a lattice, there can be multiple paths between nodes.
 
 #### Returns {.doc-section .doc-section-returns}
 
-| Name   | Type                                                           | Description                                              |
-|--------|----------------------------------------------------------------|----------------------------------------------------------|
-|        | [List](`typing.List`)\[[List](`typing.List`)\[[int](`int`)\]\] | List of paths, where each path is a list of node indices |
+| Name   | Type                                             | Description                                              |
+|--------|--------------------------------------------------|----------------------------------------------------------|
+|        | [list](`list`)\[[list](`list`)\[[int](`int`)\]\] | List of paths, where each path is a list of node indices |
 
 ### get_ancestors { #dyf.DAGTaxonomy.get_ancestors }
 
@@ -156,9 +156,9 @@ These are abstract concepts where many paths converge.
 
 #### Returns {.doc-section .doc-section-returns}
 
-| Name   | Type                                                                           | Description                                                         |
-|--------|--------------------------------------------------------------------------------|---------------------------------------------------------------------|
-|        | [List](`typing.List`)\[[Tuple](`typing.Tuple`)\[[int](`int`), [int](`int`)\]\] | List of (node_idx, parent_count) tuples, sorted by count descending |
+| Name   | Type                                                             | Description                                                         |
+|--------|------------------------------------------------------------------|---------------------------------------------------------------------|
+|        | [list](`list`)\[[tuple](`tuple`)\[[int](`int`), [int](`int`)\]\] | List of (node_idx, parent_count) tuples, sorted by count descending |
 
 ### get_descendants { #dyf.DAGTaxonomy.get_descendants }
 
@@ -199,9 +199,9 @@ Diamonds indicate multiple inheritance / non-tree structure.
 
 #### Returns {.doc-section .doc-section-returns}
 
-| Name   | Type                                                                                                       | Description                               |
-|--------|------------------------------------------------------------------------------------------------------------|-------------------------------------------|
-|        | [List](`typing.List`)\[[Tuple](`typing.Tuple`)\[[int](`int`), [int](`int`), [int](`int`), [int](`int`)\]\] | List of (top, left, right, bottom) tuples |
+| Name   | Type                                                                                         | Description                               |
+|--------|----------------------------------------------------------------------------------------------|-------------------------------------------|
+|        | [list](`list`)\[[tuple](`tuple`)\[[int](`int`), [int](`int`), [int](`int`), [int](`int`)\]\] | List of (top, left, right, bottom) tuples |
 
 ### get_divergence_points { #dyf.DAGTaxonomy.get_divergence_points }
 
@@ -221,9 +221,9 @@ These are branching hubs where paths diverge.
 
 #### Returns {.doc-section .doc-section-returns}
 
-| Name   | Type                                                                           | Description                                                        |
-|--------|--------------------------------------------------------------------------------|--------------------------------------------------------------------|
-|        | [List](`typing.List`)\[[Tuple](`typing.Tuple`)\[[int](`int`), [int](`int`)\]\] | List of (node_idx, child_count) tuples, sorted by count descending |
+| Name   | Type                                                             | Description                                                        |
+|--------|------------------------------------------------------------------|--------------------------------------------------------------------|
+|        | [list](`list`)\[[tuple](`tuple`)\[[int](`int`), [int](`int`)\]\] | List of (node_idx, child_count) tuples, sorted by count descending |
 
 ### get_lowest_common_ancestors { #dyf.DAGTaxonomy.get_lowest_common_ancestors }
 
@@ -246,9 +246,9 @@ descendants that are also common ancestors.
 
 #### Returns {.doc-section .doc-section-returns}
 
-| Name   | Type                                  | Description                                        |
-|--------|---------------------------------------|----------------------------------------------------|
-|        | [List](`typing.List`)\[[int](`int`)\] | List of LCA indices (may be multiple in a lattice) |
+| Name   | Type                           | Description                                        |
+|--------|--------------------------------|----------------------------------------------------|
+|        | [list](`list`)\[[int](`int`)\] | List of LCA indices (may be multiple in a lattice) |
 
 ### get_node_depth { #dyf.DAGTaxonomy.get_node_depth }
 
@@ -296,9 +296,9 @@ Find a path from start to end (following parent→child direction).
 
 #### Returns {.doc-section .doc-section-returns}
 
-| Name   | Type                                                                   | Description                                                |
-|--------|------------------------------------------------------------------------|------------------------------------------------------------|
-|        | [Optional](`typing.Optional`)\[[List](`typing.List`)\[[int](`int`)\]\] | List of node indices from start to end, or None if no path |
+| Name   | Type                                   | Description                                                |
+|--------|----------------------------------------|------------------------------------------------------------|
+|        | [list](`list`)\[[int](`int`)\] \| None | List of node indices from start to end, or None if no path |
 
 ### summary { #dyf.DAGTaxonomy.summary }
 

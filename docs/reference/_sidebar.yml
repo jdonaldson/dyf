@@ -11,7 +11,6 @@ website:
       - reference/boundary_persistence_scores.qmd
       - reference/build_dyf_tree.qmd
       - reference/refine_dyf_tree.qmd
-      - reference/cut_dyf_tree_to_labels.qmd
       - reference/refine_clusters.qmd
       section: Tree Methods
     - contents:

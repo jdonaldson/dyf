@@ -13,12 +13,12 @@ neighbors (tight clusters) are "specific".
 
 ## Attributes {.doc-section .doc-section-attributes}
 
-| Name               | Type                                                                                                               | Description                                     |
-|--------------------|--------------------------------------------------------------------------------------------------------------------|-------------------------------------------------|
-| chains             | [List](`typing.List`)\[[DAGChain](`dyf.ontology.DAGChain`)\]                                                       | List of extracted DAG chains                    |
-| diversity          | [np](`numpy`).[ndarray](`numpy.ndarray`)                                                                           | Neighbor diversity score for each point         |
-| parent_child_edges | [List](`typing.List`)\[[Tuple](`typing.Tuple`)\[[int](`int`), [int](`int`), [float](`float`), [float](`float`)\]\] | List of (parent, child, similarity, gap) tuples |
-| n_components       | [int](`int`)                                                                                                       | Number of connected components in the DAG       |
+| Name               | Type                                                                                                 | Description                                     |
+|--------------------|------------------------------------------------------------------------------------------------------|-------------------------------------------------|
+| chains             | [list](`list`)\[[DAGChain](`dyf.ontology.DAGChain`)\]                                                | List of extracted DAG chains                    |
+| diversity          | [np](`numpy`).[ndarray](`numpy.ndarray`)                                                             | Neighbor diversity score for each point         |
+| parent_child_edges | [list](`list`)\[[tuple](`tuple`)\[[int](`int`), [int](`int`), [float](`float`), [float](`float`)\]\] | List of (parent, child, similarity, gap) tuples |
+| n_components       | [int](`int`)                                                                                         | Number of connected components in the DAG       |
 
 ## Methods
 

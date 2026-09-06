@@ -12,8 +12,8 @@ discontinuities at subtree boundaries.
 
 ## Parameters {.doc-section .doc-section-parameters}
 
-| Name           | Type   | Description                                         | Default    |
-|----------------|--------|-----------------------------------------------------|------------|
-| labels         |        | per-item cluster/bucket labels (array-like of ints) | _required_ |
-| tree_structure |        | list of node dicts from idx.get_tree_structure()    | _required_ |
-| item_leaf_map  |        | array of length N mapping item index → leaf node_id | _required_ |
+| Name           | Type                                                                       | Description                                         | Default    |
+|----------------|----------------------------------------------------------------------------|-----------------------------------------------------|------------|
+| labels         | [list](`list`)\[[int](`int`)\] \| [np](`numpy`).[ndarray](`numpy.ndarray`) | per-item cluster/bucket labels (array-like of ints) | _required_ |
+| tree_structure | [list](`list`)\[[dict](`dict`)\]                                           | list of node dicts from idx.get_tree_structure()    | _required_ |
+| item_leaf_map  | [np](`numpy`).[ndarray](`numpy.ndarray`)                                   | array of length N mapping item index → leaf node_id | _required_ |
