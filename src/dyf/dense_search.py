@@ -19,6 +19,7 @@ import dyf_rs
 import numpy as np
 
 from .dyf_tree import build_dyf_tree
+from .lazy_index import SearchResult
 
 
 def flatten_tree(tree: dict) -> dict:
@@ -106,13 +107,21 @@ class DenseSearchIndex:
         )
         self._flat = flatten_tree(self.tree)
 
-    def search(self, queries, k: int = 10, nprobe: int = 256):
-        """Return (indices, scores) of the top-``k`` per query.
+    def search(self, queries, k: int = 10, nprobe: int = 256) -> SearchResult:
+        """Return a :class:`SearchResult` with the top-``k`` per query.
 
-        ``queries`` may be 1D ``(dim,)`` -> returns ``(k,)`` arrays, or 2D
-        ``(nq, dim)`` -> returns ``(nq, k)`` arrays. ``nprobe`` leaves are probed
-        (higher = more recall, more latency). Missing slots are padded with index
-        -1 / score -inf.
+        ``queries`` may be 1D ``(dim,)`` -> ``(k,)`` arrays, or 2D ``(nq, dim)`` ->
+        ``(nq, k)`` arrays. ``nprobe`` leaves are probed (higher = more recall, more
+        latency). Missing slots are padded with index -1 / score -inf.
+
+        Returns the same type as :meth:`LazyIndex.search`, so callers can treat the two
+        indexes interchangeably. This previously returned a bare ``(indices, scores)``
+        tuple, which a caller could not introspect or extend — you had to already know
+        the arity. ``SearchResult`` unpacks as a 2-tuple, so
+        ``indices, scores = idx.search(...)`` keeps working unchanged.
+
+        ``fields`` is always empty here: a ``DenseSearchIndex`` holds raw embeddings and
+        has no stored fields to gather.
         """
         q = np.ascontiguousarray(queries, dtype=np.float32)
         single = q.ndim == 1
@@ -135,4 +144,6 @@ class DenseSearchIndex:
             int(nprobe),
         )
         idx, sc = np.asarray(idx), np.asarray(sc)
-        return (idx[0], sc[0]) if single else (idx, sc)
+        if single:
+            idx, sc = idx[0], sc[0]
+        return SearchResult(indices=idx, scores=sc)

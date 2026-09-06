@@ -91,9 +91,16 @@ same Rust kernel (batched queries supported):
 from dyf import DenseSearchIndex
 
 idx = DenseSearchIndex(embeddings)                  # builds tree + flattens
-indices, scores = idx.search(query, k=10, nprobe=256)
-I, S = idx.search(query_batch, k=10, nprobe=256)    # batched -> (nq, k)
+
+result = idx.search(query, k=10, nprobe=256)
+result.indices, result.scores                       # same SearchResult as LazyIndex
+
+indices, scores = idx.search(query, k=10, nprobe=256)   # also unpacks as a tuple
+I, S = idx.search(query_batch, k=10, nprobe=256)        # batched -> (nq, k)
 ```
+
+Both index types return the same `SearchResult`, so they are interchangeable at the call
+site. It unpacks as a 2-tuple, so the positional form keeps working.
 
 ### Inspect an Index
 

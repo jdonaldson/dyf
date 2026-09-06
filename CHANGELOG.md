@@ -41,6 +41,24 @@
   v1** — that is what the version stamp is for. Callers get something parseable now while
   the project stays free to change the shape.
 
+### Changed
+
+- **`DenseSearchIndex.search` now returns a `SearchResult`, like `LazyIndex.search`.** It
+  previously returned a bare `(indices, scores)` tuple — a shape a caller cannot
+  introspect or extend, and which forced you to already know the arity. The two index
+  types are now interchangeable at the call site.
+
+  **Not a breaking change**: `SearchResult` implements `__iter__`/`__getitem__`/`__len__`,
+  so `indices, scores = idx.search(...)` and `I, S = idx.search(batch, ...)` keep working
+  exactly as documented. `fields` is always `{}` here, since a dense index holds raw
+  embeddings and has no stored fields to gather.
+
+  `DenseSearchIndex` had **no tests at all** despite being public, exported, and shown in
+  the README — one of the 31 callables `audit_public_api.py` cannot exercise without a
+  fixture. Added 11, covering the return shape, tuple-unpacking compatibility, and
+  behaviour (a vector's nearest neighbour is itself; scores rank descending; batched
+  results match single queries; higher `nprobe` does not reduce recall).
+
 ### Fixed
 
 - **The CLI produced no output at all.** `__init__.py` installs a `NullHandler` on the
