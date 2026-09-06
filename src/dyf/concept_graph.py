@@ -585,7 +585,22 @@ def _cmd_build(config: ConceptGraphConfig, extra_sources: list[str], no_embeddin
         except ImportError as exc:
             # Degrade rather than die. `check` tells the user to run `build`, so a build
             # that cannot run without a multi-GB torch stack makes the tool's own advice
-            # unfollowable. Warn loudly — a silent downgrade would be worse.
+            # unfollowable.
+            #
+            # But refuse to *silently downgrade* a graph that already has neighbors.
+            # dyf is installed globally as a lightweight tool while the project venv
+            # carries the model, so the same `dyf concepts build` means different things
+            # depending on which one is on PATH — and the lightweight one would otherwise
+            # quietly delete every edge the other computed.
+            existing_path = config.expand_path("output_path")
+            if os.path.exists(existing_path) and load_graph_meta(existing_path).get("has_embeddings") is not False:
+                logger.error("Embedding model unavailable (%s)", exc)
+                logger.error("  Refusing to overwrite the existing graph at %s,", existing_path)
+                logger.error("  which has semantic neighbors this build cannot reproduce.")
+                logger.error("  Install the model:  pip install 'dyf[concepts]'")
+                logger.error("  Or discard neighbors deliberately:  dyf concepts build --no-embeddings")
+                return 1
+
             logger.warning("Embedding model unavailable (%s)", exc)
             logger.warning("  Building a header-only graph: no semantic neighbors.")
             logger.warning("  For neighbors and `query --semantic`: pip install 'dyf[concepts]'")

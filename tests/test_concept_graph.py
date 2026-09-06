@@ -392,6 +392,66 @@ class TestHeaderOnlyGraph:
         save_graph(build_header_only_graph(self._chunks()), path)
         assert load_graph_meta(path) == {"has_embeddings": True}
 
+    def test_build_refuses_to_downgrade_a_graph_with_neighbors(self, tmp_path, monkeypatch):
+        """A lightweight install must not silently delete edges a heavier one computed.
+
+        dyf is installed globally without the model while the project venv has it, so the
+        same `dyf concepts build` means different things depending on PATH. Without this
+        guard the lightweight one wipes every neighbor — measured at 710 edges lost.
+        """
+        import dyf.concept_graph as cg
+
+        graph_path = tmp_path / "graph.json"
+        source = tmp_path / "notes.md"
+        source.write_text("## Alpha\n\nA body long enough to survive the min_length filter.\n")
+
+        # An existing graph that has embeddings.
+        save_graph(
+            {"notes/alpha": ConceptNode(header="Alpha", source=str(source), line=1)},
+            str(graph_path),
+            has_embeddings=True,
+        )
+
+        def no_model(*args, **kwargs):
+            raise ImportError("No module named 'sentence_transformers'")
+
+        monkeypatch.setattr(cg, "build_concept_graph", no_model)
+
+        config = ConceptGraphConfig(
+            sources=[str(source)],
+            output_path=str(graph_path),
+            embeddings_cache_path=str(tmp_path / "emb.npz"),
+        )
+
+        assert cg._cmd_build(config, []) == 1, "should refuse rather than downgrade"
+        assert load_graph_meta(str(graph_path)) == {"has_embeddings": True}, "graph was overwritten"
+
+        # The explicit flag is the escape hatch and must still work.
+        assert cg._cmd_build(config, [], no_embeddings=True) == 0
+        assert load_graph_meta(str(graph_path)) == {"has_embeddings": False}
+
+    def test_build_without_model_is_fine_when_no_graph_exists(self, tmp_path, monkeypatch):
+        """The fresh-machine case must still produce a usable graph."""
+        import dyf.concept_graph as cg
+
+        graph_path = tmp_path / "graph.json"
+        source = tmp_path / "notes.md"
+        source.write_text("## Alpha\n\nA body long enough to survive the min_length filter.\n")
+
+        def no_model(*args, **kwargs):
+            raise ImportError("No module named 'sentence_transformers'")
+
+        monkeypatch.setattr(cg, "build_concept_graph", no_model)
+
+        config = ConceptGraphConfig(
+            sources=[str(source)],
+            output_path=str(graph_path),
+            embeddings_cache_path=str(tmp_path / "emb.npz"),
+        )
+        assert cg._cmd_build(config, []) == 0
+        assert load_graph_meta(str(graph_path)) == {"has_embeddings": False}
+        assert set(load_graph(str(graph_path))) == {"notes/alpha"}
+
     def test_graph_without_meta_still_loads(self, tmp_path):
         """Graphs written before the _meta key existed must keep working."""
         path = tmp_path / "old.json"
