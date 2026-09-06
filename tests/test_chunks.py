@@ -332,3 +332,9 @@ class TestClusterQuality:
         labels = np.array([0, 0, 1, 1])
         result = cluster_quality(coherence, labels)
         assert isinstance(result["meta_clusters"], set)
+        # Behavioural: it must flag the RIGHT cluster, not merely return a set. Cluster
+        # means are 0.55 and 0.35; the 75th percentile of those is 0.50, so only cluster 0
+        # is above threshold. An empty set passes the isinstance check alone.
+        assert result["meta_clusters"] == {0}
+        assert result["threshold"] == pytest.approx(0.50)
+        np.testing.assert_allclose(result["cluster_mean_coherence"], [0.55, 0.35])

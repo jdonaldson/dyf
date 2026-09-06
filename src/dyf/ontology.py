@@ -1,6 +1,11 @@
 """
 DAG taxonomy and ontology extraction from embedding spaces.
 
+⚠ **"Ontology" here is *discovered*, not declared.** Nothing is read from a schema, a
+controlled vocabulary or a standards file — the hierarchy is inferred from the embeddings
+alone, and its nodes are your own data points rather than named concepts. The opposite
+direction from `catalog.py`, which matches against a taxonomy you already have.
+
 Discovers hierarchical structure using neighbor diversity as a generality signal:
 points with diverse neighbors (connecting many topics) are "general", while points
 with coherent neighbors (tight clusters) are "specific".

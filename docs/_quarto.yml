@@ -3,6 +3,10 @@ project:
   output-dir: _site
   resources:
     - CNAME
+    # Served verbatim at https://dyf.io/llms.txt. Must be listed here — Quarto only
+    # copies non-.qmd files into _site if they are declared as resources, so without
+    # this the file exists in the repo and 404s on the site.
+    - llms.txt
     - gallery/cifar100-deck/
     - gallery/cifar100-deck-thumb.jpg
 
@@ -70,7 +74,6 @@ quartodoc:
     - title: Tree Methods
       desc: Hierarchical tree construction for multi-resolution analysis of embeddings.
       contents:
-        - build_pca_tree
         - cut_tree_to_labels
         - extract_boundary_persistence
         - boundary_persistence_scores

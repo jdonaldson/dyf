@@ -1,5 +1,86 @@
 # DYF Project Notes
 
+## Heading (asserted 2026-08-31, consumers amended 2026-09-05)
+
+**Destination: dyf's primitives become trustworthy enough that downstream consumers can
+rely on them. Moving toward v1 *quality*, not more capability.**
+
+Score work against that. The test is "can someone depend on this?", not "is this
+interesting?".
+
+**Consumers (amended 2026-09-05).** `sec10quant` and `shortorder` via the Python API —
+and **agents, as a first-class consumer, via both the CLI and the Python API.** Agents
+are a target, not a side effect of having shipped a CLI.
+
+This widens *which surface* the heading covers, not what counts as done on it. Before the
+amendment the dependency surface was the exported Python API, which is why the three
+standing audits look only there — and why a CLI that printed nothing at all survived
+(`AGENT_LEGIBILITY_TODO.md`). The CLI and the module-to-module contracts are now in
+scope. The bar is unchanged: can someone depend on it?
+
+⚠ **The risk this amendment carries.** A bearing check found this project drifting
+because no destination was stated, and "add a consumer class mid-flight" is structurally
+the same move that produced the drift. The guard: agent work earns its place only where
+it makes an *existing* surface dependable. Parseable output, loud failure, honest
+docs — yes. New mechanisms to serve agents — no, same as before.
+
+**Why this heading, and why now.** A bearing check found the project *drifting* — real
+progress, but effort allocated opportunistically because no destination was stated, which is
+also why "is this good bang for buck?" had no crisp answer. The evidence:
+
+- **The validated surface is materially smaller than the shipped surface.** `dyf.overview()`
+  reports the current export count and `benchmarks/audit_public_api.py` reports how many it
+  can actually exercise; the gap between them is the point. (Counts are deliberately not
+  written here — every hand-typed total in this repo went stale, including the ones that
+  used to sit on this line.)
+- **Two of the handful of features inspected by hand were silently broken** — both with
+  performance claims in their docstrings (`KNOWN_ISSUES` #4, #5). That is a poor base rate
+  for the ones not inspected.
+- **Tests that pass on a degenerate result**: measured 5% shape-only, plus vacuous,
+  fully-guarded and no-assert categories — all now closed.
+  `benchmarks/audit_test_assertions.py` measures this and carries a `--selftest`.
+- **12+ absolute cosine/margin constants** are measured inert on real corpora. A v1 would
+  freeze those into the API.
+
+Pre-v1 is the only cheap moment to fix any of that (see "Backward Compatibility" in
+`~/Projects/CLAUDE.md` — break freely before v1).
+
+### What this heading implies
+
+- **In scope**: making existing primitives correct, measured, and honestly documented;
+  closing the gap between shipped and validated surface; deleting or relativising knobs that
+  do nothing.
+- **In scope as of 2026-09-05**: giving the CLI and the Python API a contract an agent can
+  rely on — machine-readable output, meaningful exit codes, errors that say what to do,
+  and a cheap way to ask what an artifact contains before paying to open it. This is the
+  same "can someone depend on this?" test applied to a consumer that cannot squint at a
+  blank terminal and guess.
+- **Out of scope until the floor is solid**: new mechanisms in dyf. `SPECTRAL_NOTES.md`
+  records six consecutive falsified hypotheses of that shape; the only thing that shipped
+  from that arc (`dyf.dedup`) started from a *measurement of the data*, not from a mechanism.
+- **The one rule that keeps paying**: pick the outcome variable before building the probe.
+  And measure against a null or an incumbent, never against intuition about what a number
+  should look like.
+
+### Standing audits
+
+Re-run these when touching the public surface; each exists because it caught a real defect:
+
+| command | catches |
+|---|---|
+| `python benchmarks/audit_public_api.py` | exported callables returning empty/all-zero/constant (has a canary that reproduces #5) |
+| `python benchmarks/audit_test_assertions.py` | tests asserting only types and lengths |
+| `python benchmarks/audit_absolute_thresholds.py` | absolute cosine constants that do not transfer across corpora |
+| `python benchmarks/audit_cli_surface.py` | subcommands that exit 0 saying nothing, or fail with a traceback instead of a message (has a `--selftest` and a live mute canary) |
+
+⚠ The first three inspect the **exported Python API only**. That is why a CLI printing
+zero bytes passed all three; `cli.py` is not in the public surface. The fourth exists to
+cover it, and deliberately does **not** test `--help` — argparse prints help itself
+without touching the logger, so every subcommand answers `--help` with rc 0 even when its
+real execution path is mute. It runs real invocations instead.
+
+Open queue with priorities: `KNOWN_ISSUES.md`.
+
 ## Release Workflow
 
 When adding features or making API changes:

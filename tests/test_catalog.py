@@ -335,10 +335,23 @@ class TestGapDetection:
         query /= np.linalg.norm(query)
 
         result = space.match_single("gapped", query)
-        # We can't guarantee gap detection fires with random data,
-        # but the structure is there. Test the mechanism runs without error.
         assert isinstance(result.gap_detected, bool)
         assert isinstance(result.gap_score, float)
+
+        # The engineered gap IS present and large: measured per-depth best similarity on
+        # this fixture is 0.962 / 0.885 / 0.247, i.e. a 0.64 collapse into depth 3, versus
+        # 0.02 for a control whose commodities sit near their parents.
+        assert len([n for n in node_ids if n.startswith("K")]) == 30, "fixture no longer builds 30 depth-3 commodities"
+
+        # ...and `_detect_gap` does NOT fire on it. See KNOWN_ISSUES #6: the detector is a
+        # conjunction of five absolute constants, and here the decisive one misses by
+        # 0.005 (parent_entropy 0.5051 vs the required < 0.5) while the 0.64 similarity
+        # drop it should be detecting is ignored. Asserting the CURRENT behaviour so the
+        # fix flips this test loudly instead of silently.
+        assert result.gap_detected is False, (
+            "gap detection now fires — good; update this test and close KNOWN_ISSUES #6"
+        )
+        assert result.gap_score == 0.0
 
 
 class TestDiverseAlternatives:
@@ -358,17 +371,23 @@ class TestDiverseAlternatives:
 
         result = space.match_single("test", query, top_k=5)
 
-        if result.alternatives:
-            # Alternatives should not share the primary's parent
-            primary_id = result.node_id
-            primary_parents = graph.get_parents(primary_id)
+        # This test previously ended in `pass  # structure verified, no crash` inside two
+        # nested `if`s — the only test in the suite that asserted nothing at all, while
+        # being named for a property it never checked. Measured over 5 seeds
+        # (`benchmarks/probe_catalog_alternatives.py`): 15 of 15 alternatives came from a
+        # different parent, 0 from the same one. So diversification is strict here and the
+        # name is assertable as written.
+        assert result.alternatives, "no alternatives returned"
 
-            for alt_id, _alt_name, _alt_sim in result.alternatives:
-                alt_parents = graph.get_parents(alt_id)
-                # At least some alternatives should be from different parents
-                # (can't guarantee ALL are, but the mechanism should work)
-                if alt_parents and primary_parents:
-                    pass  # structure verified, no crash
+        primary_parents = set(graph.get_parents(result.node_id))
+        assert primary_parents, "primary has no parent; the test cannot discriminate"
+
+        for alt_id, _alt_name, _alt_sim in result.alternatives:
+            alt_parents = set(graph.get_parents(alt_id))
+            assert alt_parents, f"alternative {alt_id} has no parent"
+            assert not (alt_parents & primary_parents), (
+                f"alternative {alt_id} shares a parent with primary {result.node_id}"
+            )
 
 
 # ── Phase 2: Multi-catalog tests ─────────────────────────────────────────

@@ -10,20 +10,30 @@ Usage (via CLI):
     dyf index-source src/mypackage/ -o mypackage.dyf
     dyf index-source . -o project.dyf --model nomic-embed-text
 
-Requires: pip install "dyf[source]"
+Requires: pip install "dyf[source]", and a running Ollama server. The server is checked
+up front by `check_embedding_service` — parsing a whole tree and only then discovering
+the service is down used to fail with a 69-line ConnectionError traceback.
+
+Exit codes (see `_ingest_errors`): 0 ok, 1 nothing to index, 2 bad request,
+3 dependency or service unavailable.
 """
 
 import argparse
 import logging
-import sys
 import time
 from pathlib import Path
 
 import numpy as np
 import requests
 
-from .dyf_tree import build_dyf_tree
-from .lazy_index import write_lazy_index
+from ._ingest_common import add_common_index_args, finalize_index
+from ._ingest_errors import (
+    BadIngestRequest,
+    EmbeddingServiceError,
+    EmptyIngestError,
+    IngestError,
+)
+from ._preview import IngestPreview, batches_for
 
 logger = logging.getLogger(__name__)
 
@@ -244,32 +254,142 @@ def chunk_source_file(path: Path) -> list[dict]:
     return chunks
 
 
+def check_embedding_service(
+    ollama_url: str = DEFAULT_OLLAMA_URL,
+    model: str = DEFAULT_MODEL,
+    timeout: float = 5.0,
+) -> None:
+    """Verify Ollama is up and serving `model`, before any expensive work starts.
+
+    Indexing parses and chunks an entire source tree before it embeds anything, so
+    without this the failure mode was: do all the parsing, then die on the first
+    embedding call with a **69-line `requests.ConnectionError` traceback** that never
+    mentions Ollama by name. Measured — that was the worst error message in the package.
+
+    A missing *service* is not an ImportError, so the CLI's dependency handler does not
+    catch it. Checking up front costs one HTTP round trip.
+
+    Raises:
+        EmbeddingServiceError: with a message naming the URL and what to do.
+    """
+    version_url = ollama_url.split("/api/")[0] + "/api/version"
+    try:
+        requests.get(version_url, timeout=timeout).raise_for_status()
+    except requests.exceptions.RequestException as exc:
+        raise EmbeddingServiceError(
+            f"cannot reach the embedding service at {ollama_url} ({type(exc).__name__}).\n"
+            f"  Start it with: ollama serve\n"
+            f"  Or point elsewhere with: --ollama-url"
+        ) from exc
+
+    # The server is up; confirm it can actually serve this model.
+    tags_url = ollama_url.split("/api/")[0] + "/api/tags"
+    try:
+        resp = requests.get(tags_url, timeout=timeout)
+        resp.raise_for_status()
+        available = {m.get("name", "").split(":")[0] for m in resp.json().get("models", [])}
+    except (requests.exceptions.RequestException, ValueError):
+        return  # Server is up but the tag listing failed — do not block on a soft check.
+
+    if available and model.split(":")[0] not in available:
+        raise EmbeddingServiceError(
+            f"the embedding service at {ollama_url} does not have model {model!r}.\n"
+            f"  Pull it with: ollama pull {model}\n"
+            f"  Available: {', '.join(sorted(available)) or '(none)'}"
+        )
+
+
 def embed_batch(
     texts: list[str],
     ollama_url: str = DEFAULT_OLLAMA_URL,
     model: str = DEFAULT_MODEL,
     batch_size: int = 64,
 ) -> np.ndarray:
-    """Embed texts using Ollama."""
+    """Embed texts using Ollama.
+
+    Raises:
+        EmbeddingServiceError: If the service becomes unreachable mid-run. The preflight
+            in :func:`check_embedding_service` catches the common case earlier, but a
+            server that dies partway through must not surface as a bare traceback either.
+    """
     all_embeddings = []
 
     for i in range(0, len(texts), batch_size):
         batch = texts[i : i + batch_size]
-        resp = requests.post(
-            ollama_url,
-            json={
-                "model": model,
-                "input": batch,
-            },
-        )
-        resp.raise_for_status()
-        embs = resp.json()["embeddings"]
+        try:
+            resp = requests.post(
+                ollama_url,
+                json={
+                    "model": model,
+                    "input": batch,
+                },
+            )
+            resp.raise_for_status()
+            embs = resp.json()["embeddings"]
+        except requests.exceptions.RequestException as exc:
+            done = i
+            raise EmbeddingServiceError(
+                f"embedding failed after {done}/{len(texts)} texts: {type(exc).__name__}.\n"
+                f"  Service: {ollama_url}, model: {model}\n"
+                f"  Check it is still running: ollama serve"
+            ) from exc
         all_embeddings.extend(embs)
 
         if (i + batch_size) % 128 == 0 or i + batch_size >= len(texts):
             logger.info(f"  Embedded {min(i + batch_size, len(texts))}/{len(texts)}")
 
     return np.array(all_embeddings, dtype=np.float32)
+
+
+def preview_source(
+    source_dir: Path,
+    output: Path,
+    model: str = DEFAULT_MODEL,
+    ollama_url: str = DEFAULT_OLLAMA_URL,
+    batch_size: int = 64,
+) -> IngestPreview:
+    """Report what `index_source` would do, without embedding anything.
+
+    Scans and chunks — both cheap next to the embedding pass, and chunking is what makes
+    the count *exact* rather than a guess at chunks-per-file. Stops before the first
+    Ollama call, which is the expensive and irreversible part.
+
+    Falls back to a file count when tree-sitter is absent, since a preview that cannot run
+    without an optional dependency is not much of a preview.
+    """
+    files = [f for ext in sorted(SUPPORTED_EXTENSIONS) for f in sorted(source_dir.rglob(f"*{ext}"))]
+
+    notes: list[str] = []
+    counts: dict[str, int | None] = {"files": len(files)}
+
+    try:
+        n_chunks: int | None = sum(len(chunk_source_file(f)) for f in files)
+    except ImportError:
+        n_chunks = None
+        notes.append("chunk count needs tree-sitter: pip install 'dyf[source]'")
+    counts["chunks"] = n_chunks
+
+    try:
+        check_embedding_service(ollama_url=ollama_url, model=model)
+        service = f"{ollama_url} — reachable, model available"
+    except EmbeddingServiceError as exc:
+        service = f"{ollama_url} — UNAVAILABLE"
+        notes.append(str(exc).splitlines()[0])
+
+    if n_chunks == 0 and files:
+        notes.append("files matched but produced no chunks — none contain indexable definitions")
+
+    return IngestPreview(
+        command="index-source",
+        source=str(source_dir),
+        output=str(output),
+        model=model,
+        batch_size=batch_size,
+        counts=counts,
+        batches=batches_for(n_chunks, batch_size),
+        service=service,
+        notes=notes,
+    )
 
 
 def index_source(
@@ -281,14 +401,28 @@ def index_source(
     num_bits: int = 4,
     min_leaf_size: int = 5,
     seed: int = 42,
+    dedup: float | None = None,
 ) -> None:
-    """Index source code into a .dyf file."""
+    """Index source code into a .dyf file.
+
+    Args:
+        dedup: If set, cosine threshold for ingest-time near-duplicate collapsing (0.99 is
+            a good default). One representative per duplicate cluster is indexed and the
+            mapping is stored as ``orig_index`` / ``dup_members`` fields. Source trees
+            repeat themselves heavily — vendored copies, generated files, boilerplate
+            headers — so this can shrink the index substantially. ``None`` disables it.
+    """
     logger.info("Indexing source code")
     logger.info(f"  Source: {source_dir}")
     logger.info(f"  Output: {output}")
     logger.info(f"  Model:  {model}")
 
     # Chunk all supported source files
+    # Preflight before any parsing. Chunking a large tree and *then* discovering the
+    # embedding service is down wastes the expensive half of the run and reports it as a
+    # connection traceback. One HTTP round trip buys a legible failure.
+    check_embedding_service(ollama_url=ollama_url, model=model)
+
     t0 = time.time()
     all_chunks = []
     langs_seen: set[str] = set()
@@ -302,8 +436,12 @@ def index_source(
                 logger.debug(f"  {src_file.relative_to(source_dir)}: {len(chunks)} chunks")
 
     if not all_chunks:
-        logger.warning("No source chunks found.")
-        sys.exit(1)
+        # Raise rather than sys.exit: this is a library function, and SystemExit derives
+        # from BaseException, so it sails past normal handling and kills the interpreter
+        # of anyone who imported this. `main` turns it into exit code 1.
+        raise EmptyIngestError(
+            f"no indexable source found under {source_dir}.\n  Supported languages: {', '.join(sorted(LANG_CONFIG))}"
+        )
 
     langs_str = ", ".join(sorted(langs_seen))
     logger.info(f"Total: {len(all_chunks)} chunks ({langs_str}) in {time.time() - t0:.1f}s")
@@ -315,61 +453,34 @@ def index_source(
     embeddings = embed_batch(texts, ollama_url=ollama_url, model=model)
     logger.info(f"  {embeddings.shape} in {time.time() - t0:.1f}s")
 
-    # Normalize
-    norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
-    embeddings = embeddings / np.where(norms > 0, norms, 1)
+    # Stored fields, kept parallel with `embeddings` so dedup can subset both in lockstep.
+    stored_fields = {
+        "title": [c["title"] for c in all_chunks],
+        "file": [c["file"] for c in all_chunks],
+        "kind": [c["kind"] for c in all_chunks],
+        "line": [str(c["line"]) for c in all_chunks],
+        "language": [c["language"] for c in all_chunks],
+    }
 
-    # Build DYF tree
-    logger.info("Building DYF tree...")
-    t0 = time.time()
-    tree = build_dyf_tree(
+    # Dedup, normalize, build and write — shared with index-images and index-video. Dedup
+    # happens before the tree is built, so the tree is fitted on distinct content rather
+    # than on repeated copies.
+    finalize_index(
         embeddings,
-        max_depth=max_depth,
-        num_bits=num_bits,
-        min_leaf_size=min_leaf_size,
-        seed=seed,
-        fit_method="itq",
-    )
-    logger.info(f"  Tree built in {time.time() - t0:.1f}s")
-
-    # Write .dyf
-    logger.info("Writing .dyf...")
-    t0 = time.time()
-    titles = [c["title"] for c in all_chunks]
-    files = [c["file"] for c in all_chunks]
-    kinds = [c["kind"] for c in all_chunks]
-    line_nums = [str(c["line"]) for c in all_chunks]
-    languages = [c["language"] for c in all_chunks]
-
-    write_lazy_index(
-        tree,
-        embeddings,
-        str(output),
-        compression="none",
-        quantization="float16",
+        output,
+        stored_fields=stored_fields,
         metadata={
             "embedding_model": model,
             "domain": "source code",
             "chunk_method": "tree_sitter",
             "languages": langs_str,
         },
-        build_params={
-            "max_depth": max_depth,
-            "num_bits": num_bits,
-            "min_leaf_size": min_leaf_size,
-            "seed": seed,
-        },
-        stored_fields={
-            "title": titles,
-            "file": files,
-            "kind": kinds,
-            "line": line_nums,
-            "language": languages,
-        },
+        max_depth=max_depth,
+        num_bits=num_bits,
+        min_leaf_size=min_leaf_size,
+        seed=seed,
+        dedup=dedup,
     )
-    size_mb = output.stat().st_size / (1024 * 1024)
-    logger.info(f"  Written {output.name} ({size_mb:.1f} MB) in {time.time() - t0:.1f}s")
-    logger.info(f"Done. {len(all_chunks)} chunks indexed.")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -383,67 +494,48 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         help="Directory containing source files",
     )
-    parser.add_argument(
-        "-o",
-        "--output",
-        type=Path,
-        default=None,
-        help="Output .dyf file path (default: <dirname>.dyf)",
-    )
-    parser.add_argument(
-        "--model",
-        default=DEFAULT_MODEL,
-        help=f"Ollama embedding model (default: {DEFAULT_MODEL})",
-    )
+    add_common_index_args(parser, default_model=DEFAULT_MODEL)
     parser.add_argument(
         "--ollama-url",
         default=DEFAULT_OLLAMA_URL,
         help=f"Ollama API URL (default: {DEFAULT_OLLAMA_URL})",
-    )
-    parser.add_argument(
-        "--max-depth",
-        type=int,
-        default=4,
-        help="DYF tree max depth (default: 4)",
-    )
-    parser.add_argument(
-        "--num-bits",
-        type=int,
-        default=4,
-        help="LSH bits per level (default: 4)",
-    )
-    parser.add_argument(
-        "--min-leaf-size",
-        type=int,
-        default=5,
-        help="Minimum leaf size (default: 5)",
-    )
-    parser.add_argument(
-        "--seed",
-        type=int,
-        default=42,
-        help="Random seed (default: 42)",
     )
 
     args = parser.parse_args(argv)
 
     source_dir = args.source_dir.resolve()
     if not source_dir.is_dir():
-        logger.warning(f"Error: {source_dir} is not a directory")
-        return 1
+        logger.error("not a directory: %s", source_dir)
+        return BadIngestRequest.exit_code
 
     output = args.output
     if output is None:
         output = Path(f"{source_dir.name}.dyf")
 
-    index_source(
-        source_dir=source_dir,
-        output=output.resolve(),
-        model=args.model,
-        ollama_url=args.ollama_url,
-        max_depth=args.max_depth,
-        num_bits=args.num_bits,
-        min_leaf_size=args.min_leaf_size,
-        seed=args.seed,
-    )
+    if args.dry_run:
+        return preview_source(
+            source_dir=source_dir,
+            output=output.resolve(),
+            model=args.model,
+            ollama_url=args.ollama_url,
+        ).emit(args.as_json, logger)
+
+    try:
+        index_source(
+            source_dir=source_dir,
+            output=output.resolve(),
+            model=args.model,
+            ollama_url=args.ollama_url,
+            max_depth=args.max_depth,
+            num_bits=args.num_bits,
+            min_leaf_size=args.min_leaf_size,
+            seed=args.seed,
+            dedup=args.dedup,
+        )
+    except IngestError as exc:
+        # Every message here is written to be shown verbatim, so print it as-is rather
+        # than wrapping it in a second layer of explanation.
+        for line in str(exc).splitlines():
+            logger.error("%s", line)
+        return exc.exit_code
     return 0

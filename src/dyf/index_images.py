@@ -9,13 +9,22 @@ Usage (via CLI):
     dyf index-images . -o images.dyf --model nomic-ai/nomic-embed-vision-v1.5
 
 Requires: pip install "dyf[vision]"
+
+⚠ **The `title` stored field is the filename**, not a description of the image. The
+embeddings are genuinely visual, but anything downstream that reads `title` — LLM cluster
+labelling, TF-IDF keywording, the browser tour in `dyfviz` — is reading filenames and has
+never seen a pixel. On a corpus of `IMG_4821.jpg` names that degrades quietly rather than
+failing, which is the worst way for it to go wrong. Pass better titles by writing the
+index yourself if the labels matter.
+
+Exit codes (see `_ingest_errors`): 0 ok, 1 nothing to index, 2 bad request,
+3 dependency or service unavailable.
 """
 
 import argparse
 import base64
 import io
 import logging
-import sys
 import time
 from pathlib import Path
 
@@ -23,8 +32,9 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-from .dyf_tree import build_dyf_tree
-from .lazy_index import write_lazy_index
+from ._ingest_common import add_common_index_args, finalize_index
+from ._ingest_errors import BadIngestRequest, EmptyIngestError, IngestError
+from ._preview import IngestPreview, batches_for
 
 DEFAULT_MODEL = "nomic-ai/nomic-embed-vision-v1.5"
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tiff", ".tif"}
@@ -124,6 +134,42 @@ def scan_images(source_dir: Path) -> list[Path]:
     return results
 
 
+def preview_images(
+    source_dir: Path,
+    output: Path,
+    model: str = DEFAULT_MODEL,
+    batch_size: int = 16,
+) -> IngestPreview:
+    """Report what `index_images` would do, without loading the model or embedding.
+
+    Scanning is free; decoding every image to check it is valid is not, and neither is
+    downloading a vision model. So the file count is exact and the *usable* count is not
+    known until the real run — stated rather than guessed at.
+    """
+    paths = scan_images(source_dir)
+    by_ext: dict[str, int] = {}
+    for p in paths:
+        by_ext[p.suffix.lower()] = by_ext.get(p.suffix.lower(), 0) + 1
+
+    notes = []
+    if paths:
+        spread = ", ".join(f"{ext} {n}" for ext, n in sorted(by_ext.items()))
+        notes.append(f"by extension: {spread}")
+        notes.append("some files may fail to decode; the usable count is only known after a real run")
+    total_mb = sum(p.stat().st_size for p in paths) / 1_048_576 if paths else 0.0
+
+    return IngestPreview(
+        command="index-images",
+        source=str(source_dir),
+        output=str(output),
+        model=model,
+        batch_size=batch_size,
+        counts={"images": len(paths), "megabytes": int(total_mb)},
+        batches=batches_for(len(paths), batch_size),
+        notes=notes,
+    )
+
+
 def index_images(
     source_dir: Path,
     output: Path,
@@ -133,8 +179,17 @@ def index_images(
     min_leaf_size: int = 5,
     seed: int = 42,
     batch_size: int = 16,
+    dedup: float | None = None,
 ) -> None:
-    """Index images into a .dyf file."""
+    """Index images into a .dyf file.
+
+    Args:
+        dedup: Cosine threshold for collapsing near-duplicates before indexing. Reached
+            images for the first time in 0.13 — it had existed only in `index_source`
+            because the shared tail was copy-pasted rather than shared. Burst shots and
+            re-saved crops are exactly what it is for; measure with
+            `near_duplicate_clusters` first, since rates vary enormously by corpus.
+    """
     from PIL import Image
 
     logger.info("Indexing images")
@@ -146,8 +201,9 @@ def index_images(
     t0 = time.time()
     image_paths = scan_images(source_dir)
     if not image_paths:
-        logger.error("No images found.")
-        sys.exit(1)
+        raise EmptyIngestError(
+            f"no images found under {source_dir}.\n  Recognised extensions: {', '.join(sorted(IMAGE_EXTENSIONS))}"
+        )
     logger.info(f"Found {len(image_paths)} images in {time.time() - t0:.1f}s")
 
     # Load vision model
@@ -185,8 +241,11 @@ def index_images(
             logger.warning("Skipping %s: %s", path.name, e)
 
     if not images:
-        logger.error("No valid images could be loaded.")
-        sys.exit(1)
+        # Distinct from "no images found": files matched, but every one failed to decode.
+        raise EmptyIngestError(
+            f"found {len(image_paths)} image file(s) under {source_dir}, but none could be "
+            f"decoded.\n  Re-run with -v to see the per-file errors."
+        )
 
     logger.info(f"  Loaded {len(images)} images in {time.time() - t0:.1f}s")
 
@@ -196,44 +255,9 @@ def index_images(
     embeddings = embed_images(images, processor, vision_model, device, batch_size)
     logger.info(f"  {embeddings.shape} in {time.time() - t0:.1f}s")
 
-    # Normalize
-    norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
-    embeddings = embeddings / np.where(norms > 0, norms, 1)
-
-    # Build DYF tree
-    logger.info("Building DYF tree...")
-    t0 = time.time()
-    tree = build_dyf_tree(
+    finalize_index(
         embeddings,
-        max_depth=max_depth,
-        num_bits=num_bits,
-        min_leaf_size=min_leaf_size,
-        seed=seed,
-        fit_method="itq",
-    )
-    logger.info(f"  Tree built in {time.time() - t0:.1f}s")
-
-    # Write .dyf
-    logger.info("Writing .dyf...")
-    t0 = time.time()
-    write_lazy_index(
-        tree,
-        embeddings,
-        str(output),
-        compression="none",
-        quantization="float16",
-        metadata={
-            "embedding_model": model,
-            "domain": "images",
-            "thumbnail_size": "128x128",
-            "thumbnail_format": "webp",
-        },
-        build_params={
-            "max_depth": max_depth,
-            "num_bits": num_bits,
-            "min_leaf_size": min_leaf_size,
-            "seed": seed,
-        },
+        output,
         stored_fields={
             "title": titles,
             "thumbnail": thumbnails,
@@ -241,10 +265,18 @@ def index_images(
             "width": widths,
             "height": heights,
         },
+        metadata={
+            "embedding_model": model,
+            "domain": "images",
+            "thumbnail_size": "128x128",
+            "thumbnail_format": "webp",
+        },
+        max_depth=max_depth,
+        num_bits=num_bits,
+        min_leaf_size=min_leaf_size,
+        seed=seed,
+        dedup=dedup,
     )
-    size_mb = output.stat().st_size / (1024 * 1024)
-    logger.info(f"  Written {output.name} ({size_mb:.1f} MB) in {time.time() - t0:.1f}s")
-    logger.info(f"Done. {len(images)} images indexed.")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -258,42 +290,7 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         help="Directory containing images",
     )
-    parser.add_argument(
-        "-o",
-        "--output",
-        type=Path,
-        default=None,
-        help="Output .dyf file path (default: <dirname>.dyf)",
-    )
-    parser.add_argument(
-        "--model",
-        default=DEFAULT_MODEL,
-        help=f"HuggingFace vision model (default: {DEFAULT_MODEL})",
-    )
-    parser.add_argument(
-        "--max-depth",
-        type=int,
-        default=4,
-        help="DYF tree max depth (default: 4)",
-    )
-    parser.add_argument(
-        "--num-bits",
-        type=int,
-        default=4,
-        help="LSH bits per level (default: 4)",
-    )
-    parser.add_argument(
-        "--min-leaf-size",
-        type=int,
-        default=5,
-        help="Minimum leaf size (default: 5)",
-    )
-    parser.add_argument(
-        "--seed",
-        type=int,
-        default=42,
-        help="Random seed (default: 42)",
-    )
+    add_common_index_args(parser, default_model=DEFAULT_MODEL)
     parser.add_argument(
         "--batch-size",
         type=int,
@@ -305,21 +302,35 @@ def main(argv: list[str] | None = None) -> int:
 
     source_dir = args.source_dir.resolve()
     if not source_dir.is_dir():
-        logger.error(f"Error: {source_dir} is not a directory")
-        return 1
+        logger.error("not a directory: %s", source_dir)
+        return BadIngestRequest.exit_code
 
     output = args.output
     if output is None:
         output = Path(f"{source_dir.name}.dyf")
 
-    index_images(
-        source_dir=source_dir,
-        output=output.resolve(),
-        model=args.model,
-        max_depth=args.max_depth,
-        num_bits=args.num_bits,
-        min_leaf_size=args.min_leaf_size,
-        seed=args.seed,
-        batch_size=args.batch_size,
-    )
+    if args.dry_run:
+        return preview_images(
+            source_dir=source_dir,
+            output=output.resolve(),
+            model=args.model,
+            batch_size=args.batch_size,
+        ).emit(args.as_json, logger)
+
+    try:
+        index_images(
+            source_dir=source_dir,
+            output=output.resolve(),
+            model=args.model,
+            max_depth=args.max_depth,
+            num_bits=args.num_bits,
+            min_leaf_size=args.min_leaf_size,
+            seed=args.seed,
+            batch_size=args.batch_size,
+            dedup=args.dedup,
+        )
+    except IngestError as exc:
+        for line in str(exc).splitlines():
+            logger.error("%s", line)
+        return exc.exit_code
     return 0

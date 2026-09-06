@@ -14,6 +14,15 @@ Usage as CLI (via `dyf concepts`):
     dyf concepts check              # check if graph is stale
     dyf concepts list               # list all nodes
 
+Exit codes — these are a contract, not incidental. A caller that cannot tell "no such
+concept" from "the tool is broken" will report the wrong thing:
+
+    0  success; for `check`, the graph is current
+    1  a normal negative answer: nothing matched, or `check` found the graph stale
+       (grep's convention — a query finding nothing is not an error)
+    2  the request itself was wrong: bad or missing --config
+    3  a dependency is missing; the message names the extra to install
+
 Usage as library:
     >>> from dyf.concept_graph import chunk_markdown, build_concept_graph
     >>> chunks = chunk_markdown(text, "myfile.md")
@@ -23,13 +32,16 @@ Usage as library:
 from __future__ import annotations
 
 import argparse
+import contextlib
 import glob as glob_mod
+import io
 import json
 import logging
 import os
 import re
+import sys
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from difflib import SequenceMatcher
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -38,6 +50,14 @@ logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     import numpy as np
+
+
+class ConfigError(Exception):
+    """A config file was requested but cannot be used.
+
+    Carries a message meant to be shown to the caller verbatim — it should name the file
+    and say what to do about it, not just what went wrong.
+    """
 
 
 # ---------------------------------------------------------------------------
@@ -88,15 +108,47 @@ class ConceptGraphConfig:
 
     @classmethod
     def load(cls, path: str | None = None) -> ConceptGraphConfig:
-        """Load config from JSON file, falling back to defaults."""
+        """Load config from JSON file, falling back to defaults.
+
+        A config the caller *asked for* is treated differently from the default one:
+
+        * ``path=None`` — look in ``~/.config/dyf/concept_graph.json`` and silently use
+          defaults if it is not there. Having no config file is the normal case.
+        * an explicit ``path`` — missing, malformed or containing unknown keys is an
+          error. Falling back to defaults there is the worst outcome: the caller believes
+          their settings are in effect, the tool writes somewhere else, and nothing says
+          so. That silence was the original behaviour.
+
+        Raises:
+            ConfigError: with a message naming the file and the problem.
+        """
+        explicit = path is not None
         if path is None:
-            path = os.path.expanduser("~/.config/dyf/concept_graph.json")
+            path = "~/.config/dyf/concept_graph.json"
         path = os.path.expanduser(path)
-        if os.path.exists(path):
+
+        if not os.path.exists(path):
+            if explicit:
+                raise ConfigError(f"config file not found: {path}")
+            return cls()
+
+        try:
             with open(path) as f:
                 data = json.load(f)
-            return cls(**data)
-        return cls()
+        except json.JSONDecodeError as exc:
+            raise ConfigError(f"{path} is not valid JSON: {exc}") from exc
+        except OSError as exc:
+            raise ConfigError(f"could not read {path}: {exc}") from exc
+
+        if not isinstance(data, dict):
+            raise ConfigError(f"{path} must contain a JSON object, got {type(data).__name__}")
+
+        known = {f.name for f in fields(cls)}
+        unknown = sorted(set(data) - known)
+        if unknown:
+            raise ConfigError(f"{path} has unknown setting(s): {', '.join(unknown)}. Valid: {', '.join(sorted(known))}")
+
+        return cls(**data)
 
     def expand_sources(self) -> list[Path]:
         """Expand glob patterns and tilde in source paths."""
@@ -201,6 +253,31 @@ def chunk_markdown(
 # ---------------------------------------------------------------------------
 
 
+def build_header_only_graph(chunks: list[MarkdownChunk]) -> dict[str, ConceptNode]:
+    """Build the graph without embeddings — every node, no neighbors.
+
+    The index half of the concept graph (header -> source:line) needs no model at all,
+    and `fuzzy_match` is pure `SequenceMatcher`. Only *neighbors* require embedding. So
+    when sentence-transformers is unavailable, a header-only graph still supports
+    `concepts list`, `concepts check`, and `concepts query <header>` — which is the
+    common path.
+
+    This matters because the graph is consumed by agents told to run `dyf concepts`
+    before editing notes: a tool that cannot build at all without a multi-GB torch stack
+    is a tool they cannot use.
+    """
+    return {
+        chunk.id: ConceptNode(
+            header=chunk.header,
+            source=chunk.source,
+            line=chunk.line,
+            metadata=chunk.metadata,
+            neighbors=[],
+        )
+        for chunk in chunks
+    }
+
+
 def build_concept_graph(
     chunks: list[MarkdownChunk],
     top_k: int = 5,
@@ -209,7 +286,9 @@ def build_concept_graph(
 ) -> tuple[dict[str, ConceptNode], np.ndarray]:
     """Embed chunks and build a cosine-similarity neighbor graph.
 
-    Lazy-imports EmbedderConfig so that fuzzy_match stays dependency-free.
+    Lazy-imports EmbedderConfig so that fuzzy_match stays dependency-free. Raises
+    ImportError if the embedding stack is absent — callers wanting a graph regardless
+    should fall back to `build_header_only_graph`.
 
     Returns:
         (graph dict mapping chunk_id -> ConceptNode, embeddings array)
@@ -264,11 +343,21 @@ def build_concept_graph(
 # ---------------------------------------------------------------------------
 
 
-def save_graph(graph: dict[str, ConceptNode], path: str) -> None:
-    """Save concept graph to JSON."""
+# Reserved top-level key in the saved graph. Node ids come from markdown headers and are
+# slugified, so they cannot collide with a leading underscore.
+GRAPH_META_KEY = "_meta"
+
+
+def save_graph(graph: dict[str, ConceptNode], path: str, *, has_embeddings: bool = True) -> None:
+    """Save concept graph to JSON.
+
+    `has_embeddings` records whether neighbors were actually computed, so a reader can
+    distinguish "no neighbors above threshold" from "this graph was built without a
+    model". Graphs written before this key existed simply lack it.
+    """
     path = os.path.expanduser(path)
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    data = {}
+    data: dict = {GRAPH_META_KEY: {"has_embeddings": has_embeddings}}
     for node_id, node in graph.items():
         data[node_id] = asdict(node)
     with open(path, "w") as f:
@@ -282,8 +371,22 @@ def load_graph(path: str) -> dict[str, ConceptNode]:
         data = json.load(f)
     graph = {}
     for node_id, node_data in data.items():
+        if node_id == GRAPH_META_KEY:
+            continue
         graph[node_id] = ConceptNode(**node_data)
     return graph
+
+
+def load_graph_meta(path: str) -> dict:
+    """Read the saved graph's metadata. Returns {} for graphs written before it existed."""
+    path = os.path.expanduser(path)
+    try:
+        with open(path) as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return {}
+    meta = data.get(GRAPH_META_KEY)
+    return meta if isinstance(meta, dict) else {}
 
 
 # ---------------------------------------------------------------------------
@@ -398,8 +501,14 @@ def check_staleness(config: ConceptGraphConfig) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def _format_node(node: ConceptNode) -> str:
-    """Format a single node with its neighbors for display."""
+def _format_node(node: ConceptNode, header_only: bool = False) -> str:
+    """Format a single node with its neighbors for display.
+
+    `header_only` distinguishes the two reasons a node can show no neighbors: none scored
+    above the similarity threshold, or the graph was built without a model and *cannot*
+    have any. Reporting the first when the second is true sends a reader looking for a
+    threshold to tune.
+    """
     lines = [
         f"## {node.header}",
         f"   {node.source}:{node.line}",
@@ -409,6 +518,8 @@ def _format_node(node: ConceptNode) -> str:
         for n in node.neighbors:
             lines.append(f"   {n['similarity']:.3f}  {n['header']}")
             lines.append(f"          {n['source']}:{n['line']}")
+    elif header_only:
+        lines.append("   (header-only graph — rebuild with 'dyf[concepts]' for neighbors)")
     else:
         lines.append("   (no neighbors above threshold)")
     return "\n".join(lines)
@@ -430,6 +541,11 @@ def main(argv: list[str] | None = None) -> int:
     # build
     build_p = sub.add_parser("build", help="Build or rebuild the concept graph")
     build_p.add_argument("--config", help="Path to config JSON")
+    build_p.add_argument(
+        "--no-embeddings",
+        action="store_true",
+        help="Build a header-only graph: no model needed, no semantic neighbors",
+    )
     build_p.add_argument("extra_sources", nargs="*", help="Additional source files")
 
     # query
@@ -438,6 +554,12 @@ def main(argv: list[str] | None = None) -> int:
     query_p.add_argument("--semantic", action="store_true", help="Force embedding-based search")
     query_p.add_argument("--top-k", type=int, default=5)
     query_p.add_argument("--config", help="Path to config JSON")
+    query_p.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Emit JSON (schema_version 0 — unstable before v1)",
+    )
 
     # check
     check_p = sub.add_parser("check", help="Check if graph needs rebuilding")
@@ -447,6 +569,12 @@ def main(argv: list[str] | None = None) -> int:
     list_p = sub.add_parser("list", help="List all concept nodes")
     list_p.add_argument("--verbose", "-v", action="store_true", help="Show neighbors")
     list_p.add_argument("--config", help="Path to config JSON")
+    list_p.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Emit JSON (schema_version 0 — unstable before v1)",
+    )
 
     args = parser.parse_args(argv)
 
@@ -454,22 +582,30 @@ def main(argv: list[str] | None = None) -> int:
         parser.print_help()
         return 1
 
-    config = ConceptGraphConfig.load(getattr(args, "config", None))
+    try:
+        config = ConceptGraphConfig.load(getattr(args, "config", None))
+    except ConfigError as exc:
+        logger.error("%s", exc)
+        return 2
 
     if args.command == "build":
-        return _cmd_build(config, getattr(args, "extra_sources", []))
+        return _cmd_build(
+            config,
+            getattr(args, "extra_sources", []),
+            no_embeddings=getattr(args, "no_embeddings", False),
+        )
     elif args.command == "check":
         return _cmd_check(config)
     elif args.command == "query":
         query_text = " ".join(args.text)
-        return _cmd_query(config, query_text, args.semantic, args.top_k)
+        return _cmd_query(config, query_text, args.semantic, args.top_k, as_json=args.as_json)
     elif args.command == "list":
-        return _cmd_list(config, args.verbose)
+        return _cmd_list(config, args.verbose, as_json=args.as_json)
 
     return 1
 
 
-def _cmd_build(config: ConceptGraphConfig, extra_sources: list[str]) -> int:
+def _cmd_build(config: ConceptGraphConfig, extra_sources: list[str], no_embeddings: bool = False) -> int:
     """Build the concept graph from configured sources."""
     all_chunks: list[MarkdownChunk] = []
 
@@ -503,18 +639,48 @@ def _cmd_build(config: ConceptGraphConfig, extra_sources: list[str]) -> int:
 
     logger.info("Total: %d unique concept chunks", len(all_chunks))
 
-    graph, embeddings = build_concept_graph(
-        all_chunks,
-        top_k=config.top_k,
-        threshold=config.similarity_threshold,
-        embedder_name=config.embedder,
-    )
+    embeddings = None
+    if no_embeddings:
+        graph = build_header_only_graph(all_chunks)
+    else:
+        try:
+            graph, embeddings = build_concept_graph(
+                all_chunks,
+                top_k=config.top_k,
+                threshold=config.similarity_threshold,
+                embedder_name=config.embedder,
+            )
+        except ImportError as exc:
+            # Degrade rather than die. `check` tells the user to run `build`, so a build
+            # that cannot run without a multi-GB torch stack makes the tool's own advice
+            # unfollowable.
+            #
+            # But refuse to *silently downgrade* a graph that already has neighbors.
+            # dyf is installed globally as a lightweight tool while the project venv
+            # carries the model, so the same `dyf concepts build` means different things
+            # depending on which one is on PATH — and the lightweight one would otherwise
+            # quietly delete every edge the other computed.
+            existing_path = config.expand_path("output_path")
+            if os.path.exists(existing_path) and load_graph_meta(existing_path).get("has_embeddings") is not False:
+                logger.error("Embedding model unavailable (%s)", exc)
+                logger.error("  Refusing to overwrite the existing graph at %s,", existing_path)
+                logger.error("  which has semantic neighbors this build cannot reproduce.")
+                logger.error("  Install the model:  pip install 'dyf[concepts]'")
+                logger.error("  Or discard neighbors deliberately:  dyf concepts build --no-embeddings")
+                return 1
 
-    # Save graph
+            logger.warning("Embedding model unavailable (%s)", exc)
+            logger.warning("  Building a header-only graph: no semantic neighbors.")
+            logger.warning("  For neighbors and `query --semantic`: pip install 'dyf[concepts]'")
+            graph = build_header_only_graph(all_chunks)
+
     output_path = config.expand_path("output_path")
-    save_graph(graph, output_path)
+    save_graph(graph, output_path, has_embeddings=embeddings is not None)
     total_edges = sum(len(n.neighbors) for n in graph.values())
     logger.info("Graph saved to %s", output_path)
+    if embeddings is None:
+        logger.info("  %d nodes, header-only (no neighbors)", len(graph))
+        return 0
     logger.info("  %d nodes, %d edges", len(graph), total_edges)
 
     # Save embeddings cache
@@ -539,11 +705,132 @@ def _cmd_check(config: ConceptGraphConfig) -> int:
         return 0
 
 
+SCHEMA_VERSION = 0
+
+
+def _node_payload(node_id: str, node: ConceptNode, score: float | None = None) -> dict:
+    """One node as JSON. Shared by query and list so their shapes stay identical."""
+    payload = {
+        "id": node_id,
+        "header": node.header,
+        "source": node.source,
+        "line": node.line,
+    }
+    if score is not None:
+        payload["score"] = round(float(score), 4)
+    return payload
+
+
+def _query_json(
+    config: ConceptGraphConfig,
+    graph: dict[str, ConceptNode],
+    graph_path: str,
+    query_text: str,
+    force_semantic: bool,
+    top_k: int,
+    header_only: bool,
+) -> int:
+    """`concepts query --json`. Returns the same exit codes as the human path.
+
+    Schema version 0 — unstable before v1, same contract as `dyf info --json`. The
+    version field exists so a caller can detect a change rather than be surprised by one.
+
+    Stdout is captured while the work runs and replayed to stderr, so that only JSON
+    reaches stdout. This is enforced at the boundary rather than by fixing call sites:
+    `configs.py` alone has 21 bare `print()` calls (`Loading all-MiniLM-L6-v2...`), and
+    sentence-transformers and tqdm print too — none of which this module controls. One
+    stray line makes the whole payload unparseable, which is a worse failure than the
+    silence it replaced.
+    """
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        payload, code = _build_query_payload(config, graph, graph_path, query_text, force_semantic, top_k, header_only)
+    noise = buffer.getvalue()
+    if noise:
+        print(noise, end="", file=sys.stderr)
+    print(json.dumps(payload, indent=2, default=str))
+    return code
+
+
+def _build_query_payload(
+    config: ConceptGraphConfig,
+    graph: dict[str, ConceptNode],
+    graph_path: str,
+    query_text: str,
+    force_semantic: bool,
+    top_k: int,
+    header_only: bool,
+) -> tuple[dict, int]:
+    """Compute the query payload and exit code. Never writes to stdout itself."""
+    payload: dict = {
+        "schema_version": SCHEMA_VERSION,
+        "query": query_text,
+        "graph": {"path": graph_path, "has_embeddings": not header_only, "nodes": len(graph)},
+    }
+
+    def done(code: int) -> tuple[dict, int]:
+        return payload, code
+
+    if force_semantic and header_only:
+        payload["error"] = "semantic search unavailable: this graph was built without embeddings"
+        payload["remedy"] = "pip install 'dyf[concepts]' && dyf concepts build"
+        payload["match"] = None
+        payload["results"] = []
+        return done(1)
+
+    if not force_semantic:
+        node_id, score = fuzzy_match(query_text, graph)
+        if node_id:
+            node = graph[node_id]
+            payload["mode"] = "fuzzy"
+            payload["match"] = _node_payload(node_id, node, score)
+            payload["neighbors"] = [
+                {
+                    "id": n.get("id"),
+                    "header": n.get("header"),
+                    "source": n.get("source"),
+                    "line": n.get("line"),
+                    "similarity": n.get("similarity"),
+                }
+                for n in node.neighbors
+            ]
+            return done(0)
+
+        if header_only:
+            payload["mode"] = "fuzzy"
+            payload["match"] = None
+            payload["results"] = []
+            payload["note"] = "no header match; this graph has no embeddings to fall back on"
+            payload["remedy"] = "pip install 'dyf[concepts]' && dyf concepts build"
+            return done(1)
+
+    try:
+        results = semantic_search(
+            query_text,
+            graph,
+            embeddings_cache_path=config.expand_path("embeddings_cache_path"),
+            embedder_name=config.embedder,
+            top_k=top_k,
+        )
+    except ImportError as exc:
+        payload["error"] = f"semantic search unavailable: {exc}"
+        payload["remedy"] = "pip install 'dyf[concepts]'"
+        payload["match"] = None
+        payload["results"] = []
+        return done(3)
+
+    payload["mode"] = "semantic"
+    payload["match"] = None
+    payload["results"] = [_node_payload(nid, graph[nid], sim) for nid, sim in results]
+    return done(0 if results else 1)
+
+
 def _cmd_query(
     config: ConceptGraphConfig,
     query_text: str,
     force_semantic: bool,
     top_k: int,
+    as_json: bool = False,
 ) -> int:
     """Query the concept graph."""
     graph_path = config.expand_path("output_path")
@@ -553,6 +840,15 @@ def _cmd_query(
 
     t0 = time.time()
     graph = load_graph(graph_path)
+    header_only = load_graph_meta(graph_path).get("has_embeddings") is False
+
+    if as_json:
+        return _query_json(config, graph, graph_path, query_text, force_semantic, top_k, header_only)
+
+    if force_semantic and header_only:
+        logger.error("This graph was built without embeddings, so semantic search is unavailable.")
+        logger.error("  Rebuild with: pip install 'dyf[concepts]' && dyf concepts build")
+        return 1
 
     if force_semantic:
         results = semantic_search(
@@ -580,21 +876,38 @@ def _cmd_query(
 
     if node_id:
         node = graph[node_id]
-        logger.info(_format_node(node))
+        logger.info(_format_node(node, header_only=header_only))
         logger.debug("   (matched '%s' score=%.2f, %.1fms)", node_id, score, elapsed * 1000)
         return 0
 
-    # Fall back to semantic
+    # No header match. Exit 1 when nothing is found, following grep: a caller — human or
+    # agent — needs to distinguish "no such concept" from "the tool worked".
     logger.info('No header match for "%s" (best=%.2f)', query_text, score)
+
+    if header_only:
+        logger.warning("  This graph has no embeddings, so there is no semantic fallback.")
+        logger.warning("  For fuzzy-to-semantic search: pip install 'dyf[concepts]' && dyf concepts build")
+        return 1
+
     logger.info("Falling back to semantic search...")
-    results = semantic_search(
-        query_text,
-        graph,
-        embeddings_cache_path=config.expand_path("embeddings_cache_path"),
-        embedder_name=config.embedder,
-        top_k=top_k,
-    )
+    try:
+        results = semantic_search(
+            query_text,
+            graph,
+            embeddings_cache_path=config.expand_path("embeddings_cache_path"),
+            embedder_name=config.embedder,
+            top_k=top_k,
+        )
+    except ImportError as exc:
+        logger.error("  Semantic fallback unavailable (%s)", exc)
+        logger.error("  Install with: pip install 'dyf[concepts]'")
+        return 3
+
     elapsed = time.time() - t0
+    if not results:
+        logger.info("  No semantic matches either.")
+        return 1
+
     for node_id, sim_score in results:
         node = graph[node_id]
         logger.info("   %0.3f  %s", sim_score, node.header)
@@ -603,7 +916,7 @@ def _cmd_query(
     return 0
 
 
-def _cmd_list(config: ConceptGraphConfig, verbose: bool) -> int:
+def _cmd_list(config: ConceptGraphConfig, verbose: bool, as_json: bool = False) -> int:
     """List all nodes in the graph."""
     graph_path = config.expand_path("output_path")
     if not os.path.exists(graph_path):
@@ -611,11 +924,35 @@ def _cmd_list(config: ConceptGraphConfig, verbose: bool) -> int:
         return 1
 
     graph = load_graph(graph_path)
+
+    if as_json:
+        header_only = load_graph_meta(graph_path).get("has_embeddings") is False
+        payload = {
+            "schema_version": SCHEMA_VERSION,
+            "graph": {"path": graph_path, "has_embeddings": not header_only, "nodes": len(graph)},
+            "nodes": [
+                {
+                    **_node_payload(node_id, node),
+                    "neighbors": [
+                        {"id": n.get("id"), "header": n.get("header"), "similarity": n.get("similarity")}
+                        for n in node.neighbors
+                    ]
+                    if verbose
+                    else len(node.neighbors),
+                }
+                for node_id, node in graph.items()
+            ],
+        }
+        print(json.dumps(payload, indent=2, default=str))
+        return 0
     for node_id, node in graph.items():
         logger.info("  %s  [%s]", node_id, node.header)
         logger.debug("    %s:%d", node.source, node.line)
         if verbose and node.neighbors:
             for n in node.neighbors:
                 logger.info("      %0.3f  %s", n["similarity"], n["header"])
+    if load_graph_meta(graph_path).get("has_embeddings") is False:
+        logger.info("%d nodes total (header-only graph — no neighbors)", len(graph))
+        return 0
     logger.info("%d nodes total", len(graph))
     return 0

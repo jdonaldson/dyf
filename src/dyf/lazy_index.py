@@ -56,6 +56,57 @@ class ExtractedData(TypedDict):
     metadata: dict[str, str]
 
 
+class BuildParamsSummary(TypedDict):
+    """The build parameters recorded in a .dyf file."""
+
+    max_depth: int | None
+    num_bits: int | None
+    min_leaf_size: int | None
+    seed: int | None
+    quantization: str | None
+    compression: str | None
+
+
+class PQSummary(TypedDict):
+    """Product-quantization parameters. Present only on PQ-compressed indexes."""
+
+    n_subquantizers: int
+    dsub: int
+    bytes_per_vector: int
+    codebook_size_kb: float
+
+
+class StoredFieldSummary(TypedDict):
+    """One stored field's name and declared type."""
+
+    name: str
+    type: str
+
+
+class TreeSummary(TypedDict):
+    """Return type for ``LazyIndex.tree_summary`` — the cheap describe-without-loading call.
+
+    **Every key is always present.** Until 2026-09-05 the ``pq`` and ``stored_fields``
+    keys appeared only when applicable, so a consumer could not read them without first
+    testing for their existence — a *conditional schema*, which is the most awkward thing
+    to consume and the least safe to freeze into v1. `dyf info` is built on this call, so
+    it is the agent-facing shape of the whole package; it was also the least typed thing
+    in this file.
+
+    ``pq`` is ``None`` on a non-PQ index and ``stored_fields`` is ``[]`` when there are
+    none, so absence is now expressed as a value rather than a missing key.
+    """
+
+    version: str | None
+    embedding_dim: int
+    total_items: int
+    num_leaves: int
+    num_nodes: int
+    build_params: BuildParamsSummary | None
+    pq: PQSummary | None
+    stored_fields: list[StoredFieldSummary]
+
+
 MAGIC = b"DYF1"
 MAGIC_V2 = b"DYF2"
 MAGIC_V3 = b"DYF3"
@@ -89,7 +140,12 @@ def detect_dyf_version(path: str) -> int:
 
 @dataclass
 class SearchResult:
-    """Search result with indices, scores, and optional stored fields."""
+    """Search result with indices, scores, and optional stored fields.
+
+    The standard return type of every retrieval entry point — `LazyIndex.search`,
+    `LazyIndex.search_ivf`, `DenseSearchIndex.search` and `BridgeIndex.query` — so the
+    same calling code works against any index.
+    """
 
     indices: np.ndarray  # (k,) uint32
     scores: np.ndarray  # (k,) float32
@@ -102,12 +158,25 @@ class SearchResult:
         yield self.scores
 
     def __getitem__(self, key):
+        """`r["title"]` gets a stored field; `r[0]`/`r[1]` are indices/scores.
+
+        The positional form exists only so tuple-style access keeps working. Prefer
+        `.indices` / `.scores` — they say which one you meant.
+        """
         if isinstance(key, str):
             return self.fields[key]
         return (self.indices, self.scores)[key]
 
     def __len__(self):
-        return 2
+        """Number of hits — NOT the unpacking arity.
+
+        This returned a hard-coded 2 until 2026-09-05, so `len(result)` reported 2 on a
+        `k=10` search: a plausible-looking wrong number, of exactly the kind that gets
+        cited downstream without being questioned. Safe to change because tuple unpacking
+        goes through `__iter__`, never `__len__` — verified — so
+        `indices, scores = idx.search(...)` is unaffected.
+        """
+        return len(self.indices)
 
 
 @dataclass
@@ -1101,10 +1170,20 @@ class LazyIndex:
     """
 
     def __init__(self, path):
+        # Set every attribute `close()` touches BEFORE anything that can raise. `open()`
+        # on a missing path raises FileNotFoundError, `__del__` then calls `close()`, and
+        # `close()` used to hit `self._mm` on a half-built object — so Python printed a
+        # spurious `AttributeError: 'LazyIndex' object has no attribute '_mm'` traceback
+        # on top of the real error, burying it. The correct exception always propagated;
+        # the noise was the bug. Found 2026-09-05 by dyfviz's CLI audit, which reported a
+        # 1405-byte stderr for "point at a file that does not exist".
         self._path = path
+        self._file = None
+        self._mm = None
+        self._extra_files = []  # track companion chunk file handles
+
         self._file = open(path, "rb")
         self._mm = mmap.mmap(self._file.fileno(), 0, access=mmap.ACCESS_READ)
-        self._extra_files = []  # track companion chunk file handles
 
         # Parse header — detect format version
         magic = self._mm[:4]
@@ -1246,10 +1325,16 @@ class LazyIndex:
         return len(self.stored_field_names) > 0
 
     @property
-    def tree_summary(self):
-        """Return tree stats without touching Arrow data."""
+    def tree_summary(self) -> TreeSummary:
+        """Tree stats without touching Arrow data. See :class:`TreeSummary`.
+
+        Every key is always present; `pq` is None and `stored_fields` is [] when they do
+        not apply. Do not reintroduce conditional keys here — `dyf info` and anything
+        else describing an artifact reads this, and a schema that changes shape by index
+        type cannot be relied on.
+        """
         bp = self._index.BuildParams()
-        summary = {
+        summary: TreeSummary = {
             "version": self._index.Version().decode() if self._index.Version() else None,
             "embedding_dim": self.embedding_dim,
             "total_items": self.total_items,
@@ -1266,7 +1351,9 @@ class LazyIndex:
             if bp
             else None,
         }
-        # Add PQ section if applicable
+        # `pq` and `stored_fields` are always set — None / [] when they do not apply —
+        # so a consumer never has to test for a key's existence.
+        summary["pq"] = None
         if self.is_pq:
             meta = self._get_metadata()
             m = int(meta.get("pq_n_subquantizers", "0"))
@@ -1277,7 +1364,8 @@ class LazyIndex:
                 "bytes_per_vector": m,
                 "codebook_size_kb": round(m * 256 * dsub * 4 / 1024, 1),
             }
-        # Add stored fields info
+
+        summary["stored_fields"] = []
         sf_names = self.stored_field_names
         if sf_names:
             meta = self._get_metadata()

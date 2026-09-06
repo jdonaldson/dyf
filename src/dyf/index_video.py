@@ -9,21 +9,28 @@ Usage (via CLI):
     dyf index-video clip.webm -o clip.dyf --threshold 20
 
 Requires: pip install "dyf[video]"
+
+⚠ **Video is indexed as still images, and the `title` field is a timestamp** like
+`"Scene 3 at 1:24"`. There is no audio track, no motion or temporal embedding — one
+keyframe per scene goes through the *image* model. Anything downstream that reads `title`
+is reading timestamps, which carry no semantics at all, so LLM labelling and keywording
+degrade further here than they do for images.
+
+Exit codes (see `_ingest_errors`): 0 ok, 1 nothing to index, 2 bad request,
+3 dependency or service unavailable.
 """
 
 import argparse
 import logging
-import sys
 import time
 from pathlib import Path
 
-import numpy as np
-
 logger = logging.getLogger(__name__)
 
-from .dyf_tree import build_dyf_tree
+from ._ingest_common import add_common_index_args, finalize_index
+from ._ingest_errors import BadIngestRequest, EmptyIngestError, IngestError
+from ._preview import IngestPreview
 from .index_images import DEFAULT_MODEL, embed_images, load_vision_model, make_thumbnail
-from .lazy_index import write_lazy_index
 
 
 def _format_timestamp(seconds: float) -> str:
@@ -154,6 +161,42 @@ def extract_keyframes(video_path: Path, scenes: list[dict]) -> list:
     return images
 
 
+def preview_video(
+    video_path: Path,
+    output: Path,
+    model: str = DEFAULT_MODEL,
+    threshold: float = 27.0,
+    batch_size: int = 16,
+) -> IngestPreview:
+    """Report what `index_video` would do, without decoding the video.
+
+    Unlike source and images, here the *counting itself* is the expensive step: scene
+    detection is a full decode pass, and the scene count determines everything downstream.
+    So this reports the count as unknown rather than running the work a dry run exists to
+    help you avoid — a preview that costs as much as the run is not a preview.
+
+    What it can say cheaply — file size, and that the scene threshold is the parameter
+    that will decide the item count — is what a caller actually needs to choose between
+    running it and reconsidering.
+    """
+    size_mb = video_path.stat().st_size / 1_048_576
+
+    return IngestPreview(
+        command="index-video",
+        source=str(video_path),
+        output=str(output),
+        model=model,
+        batch_size=batch_size,
+        counts={"megabytes": int(size_mb), "scenes": None, "keyframes": None},
+        batches=None,
+        notes=[
+            "scene count is not previewable: detecting scenes is a full decode pass, "
+            "which is the expensive work this flag exists to let you avoid",
+            f"one keyframe is embedded per scene; --threshold {threshold} decides how many (lower finds more scenes)",
+        ],
+    )
+
+
 def index_video(
     video_path: Path,
     output: Path,
@@ -165,8 +208,17 @@ def index_video(
     min_leaf_size: int = 5,
     seed: int = 42,
     batch_size: int = 16,
+    dedup: float | None = None,
 ) -> None:
-    """Index video keyframes into a .dyf file."""
+    """Index video keyframes into a .dyf file.
+
+    Args:
+        dedup: Cosine threshold for collapsing near-duplicate keyframes before indexing.
+            Reached video for the first time in 0.13 -- it had existed only in
+            `index_source` because the shared tail was copy-pasted rather than shared.
+            This is the textbook case for it: the README measures 88.3% duplicates on
+            adjacent-frame data, and a static shot yields near-identical keyframes.
+    """
     logger.info("Indexing video")
     logger.info(f"  Video:  {video_path}")
     logger.info(f"  Output: {output}")
@@ -187,8 +239,11 @@ def index_video(
     # Filter out failed extractions
     valid = [(s, img) for s, img in zip(scenes, raw_images) if img is not None]
     if not valid:
-        logger.warning("No keyframes could be extracted.")
-        sys.exit(1)
+        raise EmptyIngestError(
+            f"detected {len(scenes)} scene(s) in {video_path.name}, but no keyframe could "
+            f"be extracted from any of them.\n"
+            f"  The file may be truncated, or in a codec OpenCV cannot decode."
+        )
 
     scenes_valid, images = zip(*valid)
     scenes_valid = list(scenes_valid)
@@ -211,10 +266,6 @@ def index_video(
     embeddings = embed_images(images, processor, vision_model, device, batch_size)
     logger.info(f"  {embeddings.shape} in {time.time() - t0:.1f}s")
 
-    # Normalize
-    norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
-    embeddings = embeddings / np.where(norms > 0, norms, 1)
-
     # Build stored fields
     titles = [f"Scene {s['scene_id']} at {_format_timestamp(s['keyframe_time'])}" for s in scenes_valid]
     files = [str(video_path.name)] * len(scenes_valid)
@@ -222,42 +273,9 @@ def index_video(
     scene_ids = [s["scene_id"] for s in scenes_valid]
     durations = [s["duration"] for s in scenes_valid]
 
-    # Build DYF tree
-    logger.info("Building DYF tree...")
-    t0 = time.time()
-    tree = build_dyf_tree(
+    finalize_index(
         embeddings,
-        max_depth=max_depth,
-        num_bits=num_bits,
-        min_leaf_size=min_leaf_size,
-        seed=seed,
-        fit_method="itq",
-    )
-    logger.info(f"  Tree built in {time.time() - t0:.1f}s")
-
-    # Write .dyf
-    logger.info("Writing .dyf...")
-    t0 = time.time()
-    write_lazy_index(
-        tree,
-        embeddings,
-        str(output),
-        compression="none",
-        quantization="float16",
-        metadata={
-            "embedding_model": model,
-            "domain": "video",
-            "thumbnail_size": "128x128",
-            "thumbnail_format": "webp",
-            "scene_threshold": str(threshold),
-            "source_video": video_path.name,
-        },
-        build_params={
-            "max_depth": max_depth,
-            "num_bits": num_bits,
-            "min_leaf_size": min_leaf_size,
-            "seed": seed,
-        },
+        output,
         stored_fields={
             "title": titles,
             "thumbnail": thumbnails,
@@ -266,9 +284,20 @@ def index_video(
             "scene_id": scene_ids,
             "duration": durations,
         },
+        metadata={
+            "embedding_model": model,
+            "domain": "video",
+            "thumbnail_size": "128x128",
+            "thumbnail_format": "webp",
+            "scene_threshold": str(threshold),
+            "source_video": video_path.name,
+        },
+        max_depth=max_depth,
+        num_bits=num_bits,
+        min_leaf_size=min_leaf_size,
+        seed=seed,
+        dedup=dedup,
     )
-    size_mb = output.stat().st_size / (1024 * 1024)
-    logger.info(f"  Written {output.name} ({size_mb:.1f} MB) in {time.time() - t0:.1f}s")
     logger.info(f"Done. {len(images)} keyframes indexed.")
 
 
@@ -283,18 +312,7 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         help="Video file to index",
     )
-    parser.add_argument(
-        "-o",
-        "--output",
-        type=Path,
-        default=None,
-        help="Output .dyf file path (default: <video_name>.dyf)",
-    )
-    parser.add_argument(
-        "--model",
-        default=DEFAULT_MODEL,
-        help=f"HuggingFace vision model (default: {DEFAULT_MODEL})",
-    )
+    add_common_index_args(parser, default_model=DEFAULT_MODEL)
     parser.add_argument(
         "--threshold",
         type=float,
@@ -308,30 +326,6 @@ def main(argv: list[str] | None = None) -> int:
         help="Minimum scene length in frames (default: 15)",
     )
     parser.add_argument(
-        "--max-depth",
-        type=int,
-        default=4,
-        help="DYF tree max depth (default: 4)",
-    )
-    parser.add_argument(
-        "--num-bits",
-        type=int,
-        default=4,
-        help="LSH bits per level (default: 4)",
-    )
-    parser.add_argument(
-        "--min-leaf-size",
-        type=int,
-        default=5,
-        help="Minimum leaf size (default: 5)",
-    )
-    parser.add_argument(
-        "--seed",
-        type=int,
-        default=42,
-        help="Random seed (default: 42)",
-    )
-    parser.add_argument(
         "--batch-size",
         type=int,
         default=16,
@@ -342,23 +336,38 @@ def main(argv: list[str] | None = None) -> int:
 
     video_path = args.video_file.resolve()
     if not video_path.is_file():
-        logger.warning(f"Error: {video_path} is not a file")
-        return 1
+        logger.error("not a file: %s", video_path)
+        return BadIngestRequest.exit_code
 
     output = args.output
     if output is None:
         output = Path(f"{video_path.stem}.dyf")
 
-    index_video(
-        video_path=video_path,
-        output=output.resolve(),
-        model=args.model,
-        threshold=args.threshold,
-        min_scene_len=args.min_scene_len,
-        max_depth=args.max_depth,
-        num_bits=args.num_bits,
-        min_leaf_size=args.min_leaf_size,
-        seed=args.seed,
-        batch_size=args.batch_size,
-    )
+    if args.dry_run:
+        return preview_video(
+            video_path=video_path,
+            output=output.resolve(),
+            model=args.model,
+            threshold=args.threshold,
+            batch_size=args.batch_size,
+        ).emit(args.as_json, logger)
+
+    try:
+        index_video(
+            video_path=video_path,
+            output=output.resolve(),
+            model=args.model,
+            threshold=args.threshold,
+            min_scene_len=args.min_scene_len,
+            max_depth=args.max_depth,
+            num_bits=args.num_bits,
+            min_leaf_size=args.min_leaf_size,
+            seed=args.seed,
+            batch_size=args.batch_size,
+            dedup=args.dedup,
+        )
+    except IngestError as exc:
+        for line in str(exc).splitlines():
+            logger.error("%s", line)
+        return exc.exit_code
     return 0

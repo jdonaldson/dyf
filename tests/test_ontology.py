@@ -96,5 +96,8 @@ class TestBuildRogLayer:
         layer = _build_rog_layer(
             remaining, knn, threshold=0.0, diversity_gap_threshold=0.01, depth=0, n_points=n, state=state
         )
-        if layer is not None:
-            assert len(remaining) < original_size
+        # `_build_rog_layer` returning None means no layer was built, so the test's only
+        # assertion never ran. threshold=0.0 admits every neighbour, so a layer is expected.
+        assert layer is not None, "no layer built at threshold=0.0; nothing was tested"
+        assert len(remaining) < original_size
+        assert layer.n_nodes > 0

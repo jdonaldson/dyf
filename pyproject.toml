@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dyf"
-version = "0.12.1"
+version = "0.13.0"
 description = "Density Yields Features - discover structure in embedding spaces"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -81,15 +81,9 @@ video = [
     "Pillow>=9.0",
     "torch>=2.0",
 ]
-enrich = [
-    "umap-learn>=0.5",
-    "scikit-learn>=1.0",
-    "datashader>=0.16",
-    "pandas>=1.5",
-    "pyarrow>=10.0",
-    "flatbuffers>=24.0",
-    "tornado>=6.0",
-]
+# NOTE: the `enrich` extra moved to the dyfviz package on 2026-09-05, along with the
+# code that used it. Install `dyfviz[all]` for UMAP projection, clustering, narration
+# and the browser tour.
 concepts = [
     "scikit-learn>=1.0",
     "sentence-transformers>=2.2",

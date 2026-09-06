@@ -4,7 +4,10 @@
 [![PyPI](https://img.shields.io/pypi/v/dyf)](https://pypi.org/project/dyf/)
 [![Python](https://img.shields.io/pypi/pyversions/dyf)](https://pypi.org/project/dyf/)
 
-Discover structure in embedding spaces. DYF uses density-based LSH to reveal the natural organization of your data:
+**Index embedding spaces, and see their structure.** DYF builds a density-based LSH tree
+over your embeddings, writes it to a `.dyf` file that opens in ~5 ms without loading data,
+and searches it with a Rust kernel — while exposing the *topology* that tree discovers
+along the way:
 
 - **Dense**: Core items in well-populated semantic regions
 - **Bridge**: Transitional items connecting different clusters
@@ -12,13 +15,69 @@ Discover structure in embedding spaces. DYF uses density-based LSH to reveal the
 
 ## What it does
 
-DYF transforms raw embeddings into navigable semantic maps. Instead of just clustering, it reveals the *topology* - which regions are dense, which items bridge between concepts, and which are truly unique.
+Two halves, and both matter:
+
+**Index and search.** Build a tree, write a `.dyf`, query it. Indexes are self-describing
+(`dyf info corpus.dyf`), open lazily, and carry your own stored fields alongside the
+vectors. Ingest helpers turn source code, images or video into embeddings, or bring your
+own array.
+
+**Reveal structure.** The same tree that makes search fast also exposes how the corpus is
+organized — which regions are dense, which items bridge between concepts, which are truly
+unique, and what hierarchy falls out of the embeddings on their own.
 
 Use cases:
 - **Semantic navigation**: Find paths between concepts
 - **Structure discovery**: Understand how your data organizes itself
 - **Anomaly detection**: Identify orphans and bridges
 - **Index building**: Pre-compute structure for fast queries
+
+> **Scope.** dyf is not competing to be the fastest ANN retriever — on the pure
+> recall-vs-latency frontier, mature graph libraries (HNSW, pynndescent) win. Its strengths
+> are structure discovery, hierarchy, instant-open on-disk indexes, and reaching exact
+> recall on a single index by raising `nprobe`. See [Performance](#performance).
+>
+> Enrichment and the browser tour — UMAP projection, clustering, LLM labelling, narration —
+> live downstream in [dyfviz](https://github.com/jdonaldson/dyfviz), split out in 0.13.
+
+## Finding your way around
+
+There are over a hundred public names, so start with the map rather than the list:
+
+```bash
+dyf api                 # grouped, with an entry point per group
+dyf api trees --json    # one group, parseable
+```
+
+```python
+import dyf
+print(dyf.overview())   # the same map from Python
+```
+
+## Command line
+
+```bash
+dyf index-source src/ -o code.dyf     # tree-sitter chunks, Ollama embeddings
+dyf index-images ~/photos -o pics.dyf # vision embeddings + thumbnails
+dyf index-video clip.mp4 -o clip.dyf  # scene detection, one keyframe per scene
+dyf info code.dyf                     # describe an index without loading it
+dyf api                               # map of the Python API
+dyf concepts query "Debrief Pattern"  # concept graph over your markdown notes
+```
+
+Add `--dry-run` to any `index-*` command to see what it *would* do — file and chunk
+counts, embedding batches, whether the embedding service is reachable — without embedding
+anything or writing a file. The embedding pass is the expensive, irreversible half; this
+lets you look before leaping.
+
+> **The `index-*` commands are CLI-only.** They are deliberately not in `__all__`, so
+> there is no `dyf.index_images(...)`. Import them directly
+> (`from dyf.index_source import index_source`) if you need them from Python, and note
+> they take a path and write a file rather than returning data.
+>
+> Exit codes across the CLI: `0` success, `1` a normal negative answer (nothing found,
+> graph stale), `2` a bad request, `3` a missing dependency or unreachable service. The
+> message names what to install or start.
 
 ## Installation
 
@@ -91,9 +150,69 @@ same Rust kernel (batched queries supported):
 from dyf import DenseSearchIndex
 
 idx = DenseSearchIndex(embeddings)                  # builds tree + flattens
-indices, scores = idx.search(query, k=10, nprobe=256)
-I, S = idx.search(query_batch, k=10, nprobe=256)    # batched -> (nq, k)
+
+result = idx.search(query, k=10, nprobe=256)
+result.indices, result.scores                       # same SearchResult as LazyIndex
+
+indices, scores = idx.search(query, k=10, nprobe=256)   # also unpacks as a tuple
+I, S = idx.search(query_batch, k=10, nprobe=256)        # batched -> (nq, k)
 ```
+
+Both index types return the same `SearchResult`, so they are interchangeable at the call
+site. It unpacks as a 2-tuple, so the positional form keeps working.
+
+### Inspect an Index
+
+`dyf info` describes a `.dyf` file without loading its data — item count, dimensionality,
+build params, stored fields, and how far the enrichment pipeline has been run:
+
+```bash
+dyf info index.dyf
+dyf info index.dyf --json    # machine-readable
+```
+
+It is backed by `LazyIndex`'s lazy-open path, so it stays cheap regardless of file size —
+**0.09s on a 479 MB, 229k-item index.** Useful for deciding what to do with an artifact
+before paying to open it.
+
+> The `--json` payload carries `"schema_version": 0` and is **unstable before v1**; the
+> field is there so callers can detect a change rather than be surprised by one.
+
+### Shrink the Index: Dedup on Ingest
+
+Real corpora repeat themselves. Index one representative per near-duplicate cluster and
+carry the mapping as a stored field:
+
+```python
+from dyf import near_duplicate_clusters, build_dyf_tree, write_lazy_index
+
+result = near_duplicate_clusters(embeddings)        # cosine > 0.99, ~2.5s / 229k points
+print(f"{result.n_removed:,} duplicates ({result.removed_fraction:.1%})")
+
+reps = embeddings[result.mask()]
+tree = build_dyf_tree(reps, max_depth=4, num_bits=4)
+write_lazy_index(tree, reps, "index.dyf",
+                 stored_fields={"dup_members": result.member_field()})
+
+# at query time, expand a hit back to the points it stands for
+from dyf import decode_members
+also_matched = decode_members(result_fields["dup_members"][0])
+```
+
+**Measure before enabling — the duplicate rate is wildly corpus-dependent:**
+
+| corpus | dup rate | `.dyf` saving |
+|---|---|---|
+| CMU MoCap (adjacent frames) | 88.3% | **77.1%** |
+| SEC 10-Q (legal boilerplate) | 29.4% | **25.6%** |
+| news / tweets / arxiv / wikipedia | 0.0–1.0% | ~0% |
+
+Curated document collections have almost no near-duplicates; templated or temporally
+oversampled corpora have many. Where duplicates exist, file saving is reliably **~0.87× the
+duplicate rate**. `near_duplicate_clusters` is itself the cheap diagnostic (~1s per 100k
+points), so measure first. Retrieval quality also improves when scored on distinct content,
+because the probe budget stops re-scanning near-identical vectors. No file-format change:
+the mapping is an ordinary utf8 stored field.
 
 ### Adaptive Probing
 
@@ -142,8 +261,10 @@ The key insight: items that appear as outliers globally often share structure at
 
 ## Performance
 
-Search runs on a Rust multiprobe kernel (`dyf-rs >= 0.8.0`, PyO3) — the default path for
-both `LazyIndex.search` and `DenseSearchIndex`. Results are **bit-identical** to the
+Search runs on a Rust multiprobe kernel (`dyf-rs`, PyO3) — the default path for
+both `LazyIndex.search` and `DenseSearchIndex`. The required version is declared in
+`pyproject.toml` and checked at import; it is not repeated here, because the copy in this
+sentence said `>= 0.8.0` while the requirement was `>= 0.10.0`. Results are **bit-identical** to the
 pure-Python reference (`backend="python"`); the kernel handles fixed *and* adaptive
 `nprobe` and `return_routing`. MSMARCO MiniLM-L6 (384d), Apple Silicon, batched unless
 noted:

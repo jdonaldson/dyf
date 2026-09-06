@@ -675,8 +675,46 @@ class TestEmbedWithDiagnostics:
         )
         # No re-embedding should happen
         assert call_count[0] == 0
-        assert before is after  # same object reference
+        assert before is after  # same object reference — see below
         np.testing.assert_array_equal(result_emb, embeddings)
+
+    def test_restructured_flag_replaces_the_identity_check(self):
+        """`before is after` was the only way to detect that no second pass ran.
+
+        Inferring "nothing happened" from object identity is fragile — it would break the
+        moment the early-exit path copied the list instead of reusing it, and it cannot
+        distinguish "re-embedding ran and produced identical diagnostics" from
+        "re-embedding never ran". `.restructured` states it directly.
+        """
+        rng = np.random.default_rng(42)
+        embeddings, texts, axis_good, _ = self._make_data(rng)
+
+        result = embed_with_diagnostics(
+            embeddings,
+            texts,
+            {"good": axis_good},
+            embed_fn=lambda t: embeddings,
+            lift_threshold=1.5,
+        )
+        assert result.restructured is False
+        assert result.promoted_axes == []
+        assert result.mean_lift_delta == 0.0
+        assert "unchanged" in result.summary()
+
+    def test_result_unpacks_as_the_original_4_tuple(self):
+        """Existing positional callers must be unaffected by the named type."""
+        rng = np.random.default_rng(42)
+        embeddings, texts, axis_good, _ = self._make_data(rng)
+
+        result = embed_with_diagnostics(
+            embeddings, texts, {"good": axis_good}, embed_fn=lambda t: embeddings, lift_threshold=1.5
+        )
+        emb, before, after, out_texts = result
+
+        assert emb is result.embeddings
+        assert before is result.before
+        assert after is result.after
+        assert out_texts is result.texts
 
     def test_weak_axis_triggers_reembedding(self):
         """Under-served axes trigger re-embedding with structured text."""

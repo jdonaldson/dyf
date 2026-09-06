@@ -1,6 +1,5 @@
 """Tests for dyf.splits — split-based TF-IDF keyword extraction."""
 
-import json
 import os
 import tempfile
 
@@ -372,103 +371,6 @@ class TestBuildTreeMaps:
 
 
 @lazy_deps
-class TestEnrichSplits:
-    """Test the enrich_splits function end-to-end."""
-
-    def test_stores_split_keywords_in_metadata(self):
-        from dyf import build_dyf_tree
-        from dyf.enrich._splits import enrich_splits
-        from dyf.lazy_index import LazyIndex, write_lazy_index
-
-        dim = 32
-        rng = np.random.default_rng(42)
-
-        # Create clustered embeddings so tree splits are meaningful
-        centers = rng.standard_normal((4, dim)).astype(np.float32)
-        centers /= np.linalg.norm(centers, axis=1, keepdims=True)
-        embeddings = []
-        for i in range(4):
-            pts = centers[i] + rng.standard_normal((50, dim)).astype(np.float32) * 0.1
-            pts /= np.linalg.norm(pts, axis=1, keepdims=True)
-            embeddings.append(pts)
-        embeddings = np.concatenate(embeddings)
-
-        tree = build_dyf_tree(embeddings, max_depth=3, num_bits=3, min_leaf_size=4, seed=42)
-
-        with tempfile.NamedTemporaryFile(suffix=".dyf", delete=False) as f:
-            path = f.name
-        with tempfile.NamedTemporaryFile(suffix=".dyf", delete=False) as f:
-            out_path = f.name
-
-        try:
-            # Use distinctive titles per cluster group
-            titles = (
-                [f"cardiac pacemaker device model {i}" for i in range(50)]
-                + [f"orthopedic hip screw titanium {i}" for i in range(50)]
-                + [f"dental crown bridge ceramic {i}" for i in range(50)]
-                + [f"surgical forceps instrument pack {i}" for i in range(50)]
-            )
-            write_lazy_index(tree, embeddings, path, quantization="float32", stored_fields={"title": titles})
-
-            # Use higher domain_threshold and lower min_child_items
-            # for small test corpus
-            enrich_splits(path, max_depth=3, output_path=out_path, domain_threshold=0.5, min_child_items=5)
-
-            with LazyIndex(out_path) as idx:
-                data = idx.extract_all_fields()
-                assert "split_keywords" in data["metadata"]
-
-                kw = json.loads(data["metadata"]["split_keywords"])
-                assert "splits" in kw
-                assert "domain_stopwords" in kw
-                assert len(kw["splits"]) > 0
-        finally:
-            for p in (path, out_path):
-                if os.path.exists(p):
-                    os.unlink(p)
-
-    def test_bigram_check_flag(self):
-        from dyf import build_dyf_tree
-        from dyf.enrich._splits import enrich_splits
-        from dyf.lazy_index import LazyIndex, write_lazy_index
-
-        n = 200
-        dim = 32
-        rng = np.random.default_rng(42)
-        embeddings = rng.standard_normal((n, dim)).astype(np.float32)
-        embeddings /= np.linalg.norm(embeddings, axis=1, keepdims=True)
-
-        tree = build_dyf_tree(embeddings, max_depth=3, num_bits=3, min_leaf_size=4, seed=42)
-
-        with tempfile.NamedTemporaryFile(suffix=".dyf", delete=False) as f:
-            path = f.name
-        with tempfile.NamedTemporaryFile(suffix=".dyf", delete=False) as f:
-            out_path = f.name
-
-        try:
-            titles = [f"Item {i}" for i in range(n)]
-            write_lazy_index(tree, embeddings, path, quantization="float32", stored_fields={"title": titles})
-
-            enrich_splits(path, max_depth=3, bigram_check=True, output_path=out_path)
-
-            with LazyIndex(out_path) as idx:
-                data = idx.extract_all_fields()
-                kw = json.loads(data["metadata"]["split_keywords"])
-
-                # With bigram_check, splits should have bigram_needed field
-                for split in kw["splits"].values():
-                    assert "bigram_needed" in split
-                    for cinfo in split["children"].values():
-                        assert "bigrams" in cinfo
-        finally:
-            for p in (path, out_path):
-                if os.path.exists(p):
-                    os.unlink(p)
-
-
-# ── Embedding keyword tests ──────────────────────────────────────
-
-
 class TestComputeEmbeddingKeywords:
     """Test embedding-space keyword projection."""
 
@@ -905,12 +807,19 @@ class TestLouvainClusterLeaves:
                 result = louvain_cluster_leaves(idx, coords, embeddings)
 
             if n_leaves < 2:
+                # Positional access still works (backward compat)...
                 assert result[0] is None
                 assert result[1] == {}
                 assert result[2] == []
+                # ...but `.ok` is what actually names the condition, instead of making
+                # the caller decode four sentinel values.
+                assert result.ok is False
+                assert result.n_groups == 0
             else:
                 # If tree happened to have 2+ leaves, just verify structure
                 assert result[0] is not None
+                assert result.ok is True
+                assert result.n_groups > 0
         finally:
             if os.path.exists(path):
                 os.unlink(path)
@@ -1007,169 +916,6 @@ class TestGetSplitHyperplanes:
 
 
 @lazy_deps
-class TestLabelClustersWithSplitContext:
-    """Test that label_clusters uses split keywords when provided."""
-
-    def test_split_context_in_prompt(self):
-        """Verify split keywords affect the LLM prompt."""
-        from unittest.mock import patch
-
-        from dyf import build_dyf_tree
-        from dyf.enrich._cluster import enrich_cluster
-        from dyf.enrich._splits import enrich_splits
-        from dyf.lazy_index import write_lazy_index
-
-        n = 200
-        dim = 32
-        rng = np.random.default_rng(42)
-        embeddings = rng.standard_normal((n, dim)).astype(np.float32)
-        embeddings /= np.linalg.norm(embeddings, axis=1, keepdims=True)
-
-        tree = build_dyf_tree(embeddings, max_depth=3, num_bits=3, min_leaf_size=4, seed=42)
-
-        with tempfile.NamedTemporaryFile(suffix=".dyf", delete=False) as f:
-            path = f.name
-        with tempfile.NamedTemporaryFile(suffix=".dyf", delete=False) as f:
-            out_path = f.name
-
-        try:
-            # Use diverse titles so diversity gate doesn't skip LLM
-            words = [
-                "cardiac",
-                "pacemaker",
-                "implant",
-                "defibrillator",
-                "stent",
-                "catheter",
-                "orthopedic",
-                "titanium",
-                "screw",
-                "plate",
-                "dental",
-                "crown",
-                "bridge",
-                "ceramic",
-                "surgical",
-                "forceps",
-                "clamp",
-                "retractor",
-                "scissors",
-                "endoscope",
-                "laparoscope",
-                "arthroscope",
-                "electrode",
-                "monitor",
-                "sensor",
-                "transducer",
-                "prosthetic",
-                "knee",
-                "shoulder",
-                "ankle",
-                "bandage",
-                "gauze",
-                "dressing",
-                "adhesive",
-                "suture",
-                "syringe",
-                "needle",
-                "cannula",
-                "infusion",
-                "tubing",
-                "ventilator",
-                "respirator",
-                "oxygen",
-                "humidifier",
-                "wheelchair",
-                "walker",
-                "crutch",
-                "brace",
-                "splint",
-                "microscope",
-                "spectrometer",
-                "centrifuge",
-                "pipette",
-            ]
-            title_rng = np.random.default_rng(99)
-            titles = []
-            for _ in range(n):
-                picked = title_rng.choice(words, size=4, replace=False)
-                titles.append(" ".join(picked))
-            sf = {
-                "title": titles,
-                "umap_x": rng.standard_normal(n).astype(np.float32),
-                "umap_y": rng.standard_normal(n).astype(np.float32),
-                "umap_z": rng.standard_normal(n).astype(np.float32),
-            }
-            write_lazy_index(tree, embeddings, path, quantization="float32", stored_fields=sf)
-
-            # First enrich with splits
-            enrich_splits(path, max_depth=3, output_path=out_path)
-
-            # Then cluster — should load split_keywords from metadata
-            prompts_seen = []
-
-            def mock_ollama(model, prompt, timeout=300):
-                prompts_seen.append(prompt)
-                return "Test Label"
-
-            with patch("dyf.enrich._labeling._call_ollama", side_effect=mock_ollama):
-                enrich_cluster(out_path)
-
-            # Verify that at least some prompts were generated
-            # (if split keywords are available, they may appear in prompts)
-            assert len(prompts_seen) > 0
-        finally:
-            for p in (path, out_path):
-                if os.path.exists(p):
-                    os.unlink(p)
-
-    def test_cluster_without_splits_still_works(self):  # noqa: C901
-        """Backward compat: cluster without prior splits uses contrastive TF-IDF."""
-        from unittest.mock import patch
-
-        from dyf import build_dyf_tree
-        from dyf.enrich._cluster import enrich_cluster
-        from dyf.lazy_index import LazyIndex, write_lazy_index
-
-        n = 200
-        dim = 32
-        rng = np.random.default_rng(42)
-        embeddings = rng.standard_normal((n, dim)).astype(np.float32)
-        embeddings /= np.linalg.norm(embeddings, axis=1, keepdims=True)
-
-        tree = build_dyf_tree(embeddings, max_depth=3, num_bits=3, min_leaf_size=4, seed=42)
-
-        with tempfile.NamedTemporaryFile(suffix=".dyf", delete=False) as f:
-            path = f.name
-        with tempfile.NamedTemporaryFile(suffix=".dyf", delete=False) as f:
-            out_path = f.name
-
-        try:
-            titles = [f"Item {i}" for i in range(n)]
-            sf = {
-                "title": titles,
-                "umap_x": rng.standard_normal(n).astype(np.float32),
-                "umap_y": rng.standard_normal(n).astype(np.float32),
-                "umap_z": rng.standard_normal(n).astype(np.float32),
-            }
-            write_lazy_index(tree, embeddings, path, quantization="float32", stored_fields=sf)
-
-            # Cluster WITHOUT splits — should still work (Louvain default)
-            with patch("dyf.enrich._labeling._call_ollama", return_value="Test Label"):
-                enrich_cluster(path, output_path=out_path)
-
-            with LazyIndex(out_path) as idx:
-                level = idx.detect_enrichment_level()
-                assert level >= 2
-        finally:
-            for p in (path, out_path):
-                if os.path.exists(p):
-                    os.unlink(p)
-
-
-# ── Direct unit tests for extracted helpers ──────────────────────────
-
-
 class TestComputeDepthFromRoot:
     """Tests for _compute_depth_from_root BFS."""
 

@@ -97,6 +97,85 @@ class TestWriteAndLoad:
             assert summary["build_params"]["quantization"] == "float16"
             assert summary["build_params"]["compression"] == "zstd"
 
+    def test_failed_open_does_not_emit_a_spurious_traceback(self, tmp_path, capfd):
+        """A missing file must raise FileNotFoundError and print nothing else.
+
+        `__init__` assigned `_file` and `_mm` only after `open()` succeeded, so on a
+        missing path `__del__` called `close()` on a half-built object and Python printed
+        `AttributeError: 'LazyIndex' object has no attribute '_mm'` on top of the real
+        error. The correct exception always propagated — the noise was the bug, and it
+        buried the message a caller needed. Found by dyfviz's CLI audit, which measured a
+        1405-byte stderr for "point at a file that does not exist".
+        """
+        import gc
+
+        from dyf.lazy_index import LazyIndex
+
+        with pytest.raises(FileNotFoundError):
+            LazyIndex(str(tmp_path / "absent.dyf"))
+        gc.collect()  # force __del__ on the half-built object
+
+        captured = capfd.readouterr()
+        assert "AttributeError" not in captured.err
+        assert "Exception ignored" not in captured.err
+
+    def test_invalid_file_still_raises_a_named_error(self, tmp_path, capfd):
+        """The half-built path also runs for a file that exists but is not a .dyf."""
+        import gc
+
+        from dyf.lazy_index import LazyIndex
+
+        junk = tmp_path / "junk.dyf"
+        junk.write_bytes(b"not a dyf file at all")
+
+        with pytest.raises(ValueError, match="Invalid magic"):
+            LazyIndex(str(junk))
+        gc.collect()
+
+        assert "AttributeError" not in capfd.readouterr().err
+
+    def test_tree_summary_schema_is_unconditional(self, index_data, tmp_path):
+        """Every key is present regardless of index type.
+
+        `pq` and `stored_fields` used to appear only when applicable, so a consumer could
+        not read them without first testing for the key — a schema that changed shape by
+        index type. `dyf info` is built on this call, so it is the agent-facing shape of
+        the package, and v1 would have frozen the conditional version.
+        """
+        import numpy as np
+
+        from dyf.dyf_tree import build_dyf_tree
+        from dyf.lazy_index import LazyIndex, write_lazy_index
+
+        expected = {
+            "version",
+            "embedding_dim",
+            "total_items",
+            "num_leaves",
+            "num_nodes",
+            "build_params",
+            "pq",
+            "stored_fields",
+        }
+
+        # An index with stored fields.
+        with LazyIndex(index_data["path"]) as idx:
+            assert set(idx.tree_summary) == expected
+
+        # A bare index: no stored fields, no PQ — the case that used to omit both keys.
+        rng = np.random.default_rng(0)
+        X = np.ascontiguousarray(rng.standard_normal((64, 16)).astype(np.float32))
+        tree = build_dyf_tree(X, max_depth=3, num_bits=3, min_leaf_size=4, seed=42)
+        bare = str(tmp_path / "bare.dyf")
+        write_lazy_index(tree, X, bare)
+
+        with LazyIndex(bare) as idx:
+            summary = idx.tree_summary
+            assert set(summary) == expected
+            # Absence is a value, not a missing key.
+            assert summary["pq"] is None
+            assert summary["stored_fields"] == []
+
     def test_search_returns_results(self, index_data):
         """Search returns indices and scores."""
         from dyf.lazy_index import LazyIndex

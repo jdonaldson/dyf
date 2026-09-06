@@ -81,6 +81,10 @@ class TestEjectPeriphery:
         labels, emb, coherence, members = self._make_cluster_data(n_clusters=2, points_per=30)
         threshold = 1.0  # eject from all
         labels_out, ejected = _eject_periphery(labels.copy(), emb, coherence, members, threshold)
+        # threshold=1.0 ejects from every cluster, so an empty `ejected` means _eject_periphery
+        # did nothing — assert rather than skip, or the test passes on a no-op.
+        assert len(ejected) > 0, "threshold=1.0 should eject from all clusters"
+
         # All ejected indices should have -1
         if len(ejected) > 0:
             assert np.all(labels_out[ejected] == -1)

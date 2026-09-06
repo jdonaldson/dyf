@@ -323,33 +323,3 @@ class TestDagRoundtrip:
         json_str = dag.to_json()
         dag2 = CategoryGraph.from_json(json_str)
         assert dag.all_nodes() == dag2.all_nodes()
-
-
-class TestBackwardCompat:
-    """Test backward compatibility — label_clusters without DAG still works."""
-
-    def test_label_clusters_without_dag(self):
-        """label_clusters() without path_labels/sibling_keywords still works.
-
-        This tests that the existing codepath (contrastive TF-IDF) remains
-        functional when DAG data is not provided.
-        """
-        from unittest.mock import patch
-
-        from dyf.enrich._labeling import label_clusters
-
-        n = 200
-        rng = np.random.default_rng(42)
-        titles = [f"Item type {i % 10} variant {i}" for i in range(n)]
-        coords = rng.standard_normal((n, 3)).astype(np.float32)
-        labels = np.array([i % 4 for i in range(n)], dtype=np.int32)
-        embeddings = rng.standard_normal((n, 32)).astype(np.float32)
-        embeddings /= np.linalg.norm(embeddings, axis=1, keepdims=True)
-
-        # Without split_keywords — should use contrastive TF-IDF fallback
-        with patch("dyf.enrich._labeling._call_ollama", return_value="Test Label"):
-            names = label_clusters(titles, coords, labels, embeddings, split_keywords=None)
-
-        assert len(names) == 4
-        for cid in range(4):
-            assert cid in names

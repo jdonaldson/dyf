@@ -44,6 +44,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from ._arrays import ensure_f32
+from .lazy_index import SearchResult
 
 logger = logging.getLogger(__name__)
 
@@ -123,6 +124,69 @@ class OrthogonalAnchorResult:
         return len(self.indices)
 
 
+#: Default percentile of a corpus's own centroid-similarity distribution used as the bridge
+#: cut. See :func:`_relative_bridge_threshold` for why this is not an absolute constant.
+DEFAULT_BRIDGE_PERCENTILE = 10.0
+
+
+def _derive_num_bits(n_points: int, min_bucket_size: int, cap: int = 12) -> int:
+    """Bucket resolution scaled to corpus size, so dense buckets can actually exist.
+
+    Faceting only runs inside buckets that clear ``min_bucket_size``. A *fixed* bit count
+    fixes the bucket count at ``2**bits`` regardless of ``n``, so below some corpus size no
+    bucket ever qualifies and the dense-bucket gate closes completely. Measured with the old
+    ``global_num_bits=12`` default (4096 buckets, ``min_bucket_size=20``):
+
+    =========  =======  ==============  =============  ================
+    data       n        largest bucket  dense buckets  super connectors
+    =========  =======  ==============  =============  ================
+    isotropic      500               2              0                 0
+    isotropic   30,000              20              0                 0
+    clustered    2,000              18              0                 0
+    clustered    8,000             113            112                50
+    =========  =======  ==============  =============  ================
+
+    So the feature was silently inert below ~8k points, and on isotropic data at every size
+    tested. Targeting a mean occupancy of ``2 * min_bucket_size`` puts the upper quartile of
+    buckets clear of the gate at any ``n``; the cap preserves the previous behaviour on large
+    corpora, where 12 bits was already in the right regime.
+
+    This is the same failure as an absolute cosine threshold (see
+    :func:`_relative_bridge_threshold`) with *corpus size* as the axis that does not
+    transfer rather than anisotropy.
+    """
+    if n_points <= 0:
+        return 2
+    target_buckets = max(n_points / max(2 * min_bucket_size, 1), 4.0)
+    return int(np.clip(int(np.log2(target_buckets)), 2, cap))
+
+
+def _relative_bridge_threshold(clf, percentile: float = DEFAULT_BRIDGE_PERCENTILE) -> float:
+    """Bridge cut as a percentile of *this* corpus's centroid-similarity distribution.
+
+    `DensityClassifier.analyze_bridges` treats a point as a bridge when its centroid
+    similarity falls below `bridge_threshold`, whose 0.5 default is an **absolute cosine**.
+    Embedding anisotropy varies enormously, so no constant transfers. Measured over
+    4,000-point samples:
+
+    ==========================  ==================  ================
+    corpus                      % below cosine 0.5  bridges flagged
+    ==========================  ==================  ================
+    SEC 768d unit-norm text                   0.0%                0
+    CMU MoCap 62d                             0.4%               14
+    isotropic gaussian 64d                   92.3%    3,693 of 4,000
+    ==========================  ==================  ================
+
+    So the default finds nothing or nearly everything. A percentile lands in a usable regime
+    on every corpus. Every `analyze_bridges` call in this module routes through here; passing
+    ``percentile=0`` reproduces the old absolute-floor behaviour for comparison.
+    """
+    cs = np.asarray(clf.get_centroid_similarities(), dtype=np.float64)
+    if len(cs) == 0:
+        return 0.5
+    return float(np.percentile(cs, percentile))
+
+
 def _precompute_neighborhoods(
     anchor_indices: np.ndarray,
     embeddings: np.ndarray,
@@ -167,7 +231,8 @@ class BridgeIndex:
         n_anchors: Number of anchor points to use
         n_query_anchors: Number of anchors to retrieve per query
         expansion_k: Size of neighborhood to expand from each anchor
-        global_num_bits: LSH bits for global bucketing (default 12)
+        global_num_bits: LSH bits for global bucketing (default None = derive from
+            corpus size; a fixed value closes the dense-bucket gate on small corpora)
         seed: Random seed for reproducibility
 
     Example:
@@ -185,8 +250,8 @@ class BridgeIndex:
     n_anchors: int = 1000
     n_query_anchors: int = 10
     expansion_k: int = 200
-    global_num_bits: int = 12
-    facet_num_bits: int = 10
+    global_num_bits: int | None = None
+    facet_num_bits: int | None = None
     dense_percentile: float = 75
     min_bucket_size: int = 20
     include_sparse_points: int = 0  # Number of sparse region points to add
@@ -221,8 +286,18 @@ class BridgeIndex:
         self._embeddings = embeddings
         n_points, dim = embeddings.shape
 
+        # Resolve bucket resolution against the corpus we were actually handed, and record
+        # it, so `global_num_bits` reads back as the value that was used rather than None.
+        if self.global_num_bits is None:
+            self.global_num_bits = _derive_num_bits(n_points, self.min_bucket_size)
+        if self.facet_num_bits is None:
+            self.facet_num_bits = max(2, self.global_num_bits - 2)
+
         if verbose:
-            logger.info(f"Building BridgeIndex: {n_points:,} points, dim={dim}")
+            logger.info(
+                f"Building BridgeIndex: {n_points:,} points, dim={dim}, "
+                f"num_bits={self.global_num_bits}/{self.facet_num_bits}"
+            )
 
         # Step 1: Find super connectors
         if verbose:
@@ -242,7 +317,7 @@ class BridgeIndex:
         # Step 2: Get all bridge indices
         clf = DensityClassifier(embedding_dim=dim, num_bits=self.global_num_bits, seed=self.seed)
         clf.fit(embeddings)
-        bridge_analysis = clf.analyze_bridges(embeddings)
+        bridge_analysis = clf.analyze_bridges(embeddings, bridge_threshold=_relative_bridge_threshold(clf))
         self._bridge_indices = np.array(bridge_analysis.bridge_indices)
 
         if verbose:
@@ -316,18 +391,23 @@ class BridgeIndex:
 
     def query(
         self, query: np.ndarray, k: int = 10, n_query_anchors: int | None = None, return_scores: bool = True
-    ) -> tuple[np.ndarray, np.ndarray | None]:
+    ) -> SearchResult:
         """
         Retrieve top-k candidates for a query embedding.
+
+        Returns the same :class:`SearchResult` as `LazyIndex.search` and
+        `DenseSearchIndex.search`, so every retriever in the package answers with one
+        shape. It unpacks as a 2-tuple, so `indices, scores = index.query(...)` keeps
+        working.
 
         Args:
             query: (d,) query embedding vector
             k: Number of results to return
             n_query_anchors: Override default number of anchors to probe
-            return_scores: Whether to return similarity scores
+            return_scores: Whether to compute similarity scores (`scores` is None if not)
 
         Returns:
-            (indices, scores) where indices are the top-k candidate indices
+            SearchResult whose `indices` are the top-k candidate indices
             and scores are their cosine similarities (or None if return_scores=False)
         """
         if not self._fitted:
@@ -364,15 +444,10 @@ class BridgeIndex:
         top_k_local = np.argsort(candidate_sims)[-k:][::-1]
         top_k_indices = candidates[top_k_local]
 
-        if return_scores:
-            top_k_scores = candidate_sims[top_k_local]
-            return top_k_indices, top_k_scores
-        else:
-            return top_k_indices, None
+        top_k_scores = candidate_sims[top_k_local] if return_scores else None
+        return SearchResult(indices=top_k_indices, scores=top_k_scores)
 
-    def query_batch(
-        self, queries: np.ndarray, k: int = 10, n_query_anchors: int | None = None
-    ) -> list[tuple[np.ndarray, np.ndarray]]:
+    def query_batch(self, queries: np.ndarray, k: int = 10, n_query_anchors: int | None = None) -> list[SearchResult]:
         """
         Batch query for multiple embeddings.
 
@@ -382,13 +457,9 @@ class BridgeIndex:
             n_query_anchors: Override default number of anchors to probe
 
         Returns:
-            List of (indices, scores) tuples, one per query
+            List of SearchResult, one per query. Each unpacks as (indices, scores).
         """
-        results = []
-        for query in queries:
-            indices, scores = self.query(query, k=k, n_query_anchors=n_query_anchors)
-            results.append((indices, scores))
-        return results
+        return [self.query(query, k=k, n_query_anchors=n_query_anchors) for query in queries]
 
     def get_anchors(self) -> np.ndarray:
         """Return the anchor point indices."""
@@ -498,6 +569,7 @@ def _compute_local_centrality(
     facet_num_bits: int,
     min_bucket_size: int,
     seed: int,
+    bridge_percentile: float = 10,
 ) -> np.ndarray:
     """
     Compute local (facet) bridge centrality within dense buckets.
@@ -532,7 +604,9 @@ def _compute_local_centrality(
         try:
             facet_clf = DensityClassifier(embedding_dim=dim, num_bits=bits, seed=seed)
             facet_clf.fit(ensure_f32(bucket_emb, "embeddings"))
-            facet_bridge = facet_clf.analyze_bridges(bucket_emb)
+            facet_bridge = facet_clf.analyze_bridges(
+                bucket_emb, bridge_threshold=_relative_bridge_threshold(facet_clf, bridge_percentile)
+            )
 
             for i in range(len(facet_bridge.bridge_indices)):
                 local_idx, _, neighbors = facet_bridge.get_bridge_connections(i)
@@ -547,13 +621,14 @@ def _compute_local_centrality(
 
 def find_super_connectors(
     embeddings: np.ndarray,
-    global_num_bits: int = 12,
-    facet_num_bits: int = 10,
+    global_num_bits: int | None = None,
+    facet_num_bits: int | None = None,
     dense_percentile: float = 75,
     global_threshold_percentile: float = 50,
     local_threshold_percentile: float = 50,
     min_bucket_size: int = 20,
     seed: int = 42,
+    bridge_percentile: float = 10,
 ) -> SuperConnectorResult:
     """
     Find super connectors: points with high centrality in both global and local
@@ -566,24 +641,41 @@ def find_super_connectors(
 
     Args:
         embeddings: Normalized embeddings (n_points, dim)
-        global_num_bits: LSH bits for global bucketing
-        facet_num_bits: LSH bits for facet bucketing
+        global_num_bits: LSH bits for global bucketing. ``None`` (default) derives it from
+            the corpus size via :func:`_derive_num_bits`, which is required for the
+            dense-bucket gate to open at all below ~8k points — the previous fixed default
+            of 12 returned zero super connectors on every smaller corpus.
+        facet_num_bits: LSH bits for facet bucketing within a dense bucket. ``None``
+            (default) uses two bits below the global resolution.
         dense_percentile: Percentile threshold for dense buckets
         global_threshold_percentile: Percentile for "high" global centrality
         local_threshold_percentile: Percentile for "high" local centrality
         min_bucket_size: Minimum bucket size for faceting
         seed: Random seed
+        bridge_percentile: Bridges are the lowest-centroid-similarity points; this is the
+            percentile of *this corpus's* similarity distribution used as the cut. Relative
+            by design — `analyze_bridges`'s absolute 0.5 default returns zero bridges on
+            unit-norm text embeddings (0.0% fall below it) and floods on isotropic data
+            (92.3% below), so an absolute constant cannot serve both.
 
     Returns:
         SuperConnectorResult with indices and centrality data
     """
     n_points, dim = embeddings.shape
 
+    if global_num_bits is None:
+        global_num_bits = _derive_num_bits(n_points, min_bucket_size)
+    if facet_num_bits is None:
+        facet_num_bits = max(2, global_num_bits - 2)
+
     # Global DYF and bridge analysis
     global_clf = DensityClassifier(embedding_dim=dim, num_bits=global_num_bits, seed=seed)
     global_clf.fit(embeddings)
     global_buckets = global_clf.get_bucket_ids()
-    global_bridge = global_clf.analyze_bridges(embeddings)
+
+    global_bridge = global_clf.analyze_bridges(
+        embeddings, bridge_threshold=_relative_bridge_threshold(global_clf, bridge_percentile)
+    )
 
     # Compute global centrality (number of buckets connected)
     global_centrality = np.zeros(n_points, dtype=np.int32)
@@ -610,6 +702,7 @@ def find_super_connectors(
         facet_num_bits,
         min_bucket_size,
         seed,
+        bridge_percentile,
     )
 
     # Compute thresholds from non-zero values
@@ -619,10 +712,14 @@ def find_super_connectors(
     global_thresh = np.percentile(global_nonzero, global_threshold_percentile) if len(global_nonzero) > 0 else 1
     local_thresh = np.percentile(local_nonzero, local_threshold_percentile) if len(local_nonzero) > 0 else 1
 
-    # Classify into quadrants
+    # Classify into quadrants.
+    # `>=`, not `>`: centrality is a small integer count, so its percentile frequently lands
+    # ON the modal value. Measured on 8k SEC points the 50th percentile of nonzero global
+    # centrality equalled the maximum (195), so a strict `>` selected nothing and the
+    # function returned an empty `indices` even once bridges were being found.
+    high_global = global_centrality >= global_thresh
+    high_local = local_centrality >= local_thresh
     quadrant = np.full(n_points, "Regular", dtype=object)
-    high_global = global_centrality > global_thresh
-    high_local = local_centrality > local_thresh
     is_bridge = (global_centrality > 0) | (local_centrality > 0)
 
     quadrant[is_bridge & ~high_global & ~high_local] = "Minor Bridge"
@@ -681,11 +778,19 @@ def select_orthogonal_anchors(
         if use_bridges:
             clf = DensityClassifier(embedding_dim=dim, num_bits=global_num_bits, seed=seed)
             clf.fit(embeddings)
-            bridge_analysis = clf.analyze_bridges(embeddings)
+            bridge_analysis = clf.analyze_bridges(embeddings, bridge_threshold=_relative_bridge_threshold(clf))
             candidate_indices = np.array(bridge_analysis.bridge_indices)
             candidate_source = "bridges"
-            # Fall back to all points if no bridges found
+            # Fall back to all points if no bridges found. Before the threshold was made
+            # relative this fired on EVERY unit-norm text corpus, so `use_bridges=True`
+            # silently produced output identical to `use_bridges=False` — measured on 3k SEC
+            # sections, 60 anchors either way, with no warning.
             if len(candidate_indices) == 0:
+                logger.warning(
+                    "use_bridges=True found no bridges; falling back to all %d points. "
+                    "If this repeats, the corpus may need a larger bridge percentile.",
+                    n_points,
+                )
                 candidate_indices = np.arange(n_points)
                 candidate_source = "all"
         else:
@@ -902,7 +1007,7 @@ def _find_candidate_bridges(
             seed_offset = seed_idx * 1000
             clf = DensityClassifier(embedding_dim=dim, num_bits=global_num_bits, seed=seed + seed_offset)
             clf.fit(embeddings)
-            bridge_analysis = clf.analyze_bridges(embeddings)
+            bridge_analysis = clf.analyze_bridges(embeddings, bridge_threshold=_relative_bridge_threshold(clf))
             for bridge_idx in bridge_analysis.bridge_indices:
                 bridge_counts[bridge_idx] += 1
 
@@ -923,7 +1028,7 @@ def _find_candidate_bridges(
         # Use single-seed bridges
         clf = DensityClassifier(embedding_dim=dim, num_bits=global_num_bits, seed=seed)
         clf.fit(embeddings)
-        bridge_analysis = clf.analyze_bridges(embeddings)
+        bridge_analysis = clf.analyze_bridges(embeddings, bridge_threshold=_relative_bridge_threshold(clf))
         candidate_indices = np.array(bridge_analysis.bridge_indices)
 
         if verbose:

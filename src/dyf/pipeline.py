@@ -45,6 +45,48 @@ from .provenance import (
 )
 
 
+def _dyf_provenance_value(meta: dict) -> str | None:
+    """Pick the provenance record from `.dyf` metadata, or None.
+
+    Two shapes exist in the wild:
+
+    * ``_provenance`` — a single record, what this module originally looked for.
+    * ``_provenance_level_N`` — one record per enrichment stage. This is what actually
+      gets written: the enrichment ladder (now in the downstream `dyfviz` package)
+      stamps `_provenance_level_1/2/3` as it projects, clusters and prepares a file for
+      the viewer.
+
+    Only the first was ever read, and nothing in dyf writes it, so every `.dyf` stage
+    reported ``stale (no provenance)`` forever and the rebuild-skipping this module
+    exists for never engaged. Verified against a real artifact before the fix.
+
+    The highest level wins: it is the most recent stage to have touched the file, so its
+    params hash is the one a staleness check should compare against.
+
+    Reading a key that dyfviz writes is deliberate and not new coupling — it is the same
+    format convention `LazyIndex.detect_enrichment_level` already relies on. dyf reads
+    the ladder; dyfviz writes it.
+    """
+    direct = meta.get("_provenance")
+    if direct:
+        return direct
+
+    best_level = -1
+    best_value = None
+    for key, value in meta.items():
+        if not key.startswith("_provenance_level_"):
+            continue
+        suffix = key[len("_provenance_level_") :]
+        try:
+            level = int(suffix)
+        except ValueError:
+            continue
+        if level > best_level:
+            best_level = level
+            best_value = value
+    return best_value
+
+
 @dataclass
 class Stage:
     """A single pipeline stage."""
@@ -134,7 +176,11 @@ class Pipeline:
 
     @staticmethod
     def _read_provenance(path: str) -> Provenance | None:
-        """Try to read provenance from a file, return None if absent."""
+        """Try to read provenance from a file, return None if absent.
+
+        For `.dyf`, see `_dyf_provenance_value` — enrichment stages stamp one record per
+        level rather than a single `_provenance` key.
+        """
         p = Path(path)
         if not p.exists():
             return None
@@ -160,8 +206,7 @@ class Pipeline:
                 from .lazy_index import LazyIndex
 
                 with LazyIndex(str(p)) as idx:
-                    meta = idx._get_metadata()
-                    raw_str = meta.get("_provenance")
+                    raw_str = _dyf_provenance_value(idx._get_metadata())
                     if raw_str:
                         return provenance_from_dict(json.loads(raw_str))
         except Exception as e:
