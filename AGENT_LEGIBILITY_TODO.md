@@ -201,9 +201,23 @@ is a place an agent will confidently report the wrong thing.
       *committed*. Known-broken fields are omitted rather than serialized — `gap_detected`
       is always `False` and `adaptive_nprobe` resolves to 5 for 85% of queries; publishing
       either into a contract agents will trust is worse than publishing nothing.
-      - [ ] Still to do: `--json` for `concepts query` and `concepts list`. (`enrich` and
-        `index-*` emit progress, which agents do not need to parse — this helps two or
-        three commands well, not the whole surface.)
+      - [x] `--json` for `concepts query` and `concepts list` *(done 2026-09-05.)*
+        `query` reports the match with its fuzzy score, neighbors with similarities, and
+        a `graph` block; `list` reports a neighbor count per node, expanding under `-v`.
+        Exit codes verified identical between the human and JSON paths — `--json` must
+        change how something is reported, never what happened.
+
+        ⚠ **Stdout purity had to be enforced at the boundary.** `configs.py` alone has 21
+        bare `print()` calls, and sentence-transformers and tqdm print too; measured, the
+        semantic path emitted unparseable stdout. `_query_json` now runs the work under
+        `contextlib.redirect_stdout` and replays the noise to stderr. Chasing 21 call
+        sites would not have covered the third-party ones — and one stray line makes a
+        whole payload unparseable, which is a worse failure than the silence it replaced.
+
+      - [ ] Noticed while testing, not changed: **`semantic_search` has no similarity
+        floor**, so a nonsense query returns `top_k` confident-looking results and exits
+        0 on a full graph. The JSON carries the scores so a caller *can* judge, but a
+        human reading the text output cannot. Design question, not a bug.
 
 - [x] **CLI results go to stdout, problems to stderr.** *(done 2026-09-05.)* Caught while
       testing `dyf info`: `logging.StreamHandler` defaults to **stderr**, so the P0
@@ -270,13 +284,31 @@ is a place an agent will confidently report the wrong thing.
       - [ ] Still open: `index-source` also needs a live Ollama server and only finds out
         mid-run (`index_source.py:247-272`). A missing *service* is not an ImportError,
         so the boundary fix does not cover it.
-- [ ] **`concepts query` with no match must say so.** It currently falls through to
-      semantic search and can return zero lines at rc 0.
-- [ ] **Audit exit codes across subcommands.** `check` returning rc 1 for STALE is
-      correct and useful; confirm the rest are meaningful and documented.
-- [ ] **Make error messages actionable.** An error string is documentation delivered
-      exactly when it's needed at zero context cost until then. Prefer
-      `no graph at ~/.dyf/concept_graph.json — run: dyf concepts build` over `not found`.
+- [x] **`concepts query` with no match must say so.** *(done 2026-09-05.)* It fell
+      through to semantic search and could return zero lines at rc 0. Now exits 1 when
+      nothing matched — grep's convention, since finding nothing is a negative answer
+      rather than a failure — a header-only graph says it has no semantic fallback
+      instead of attempting one, and an empty semantic result says so explicitly.
+
+- [x] **Audit exit codes across `concepts`.** *(done 2026-09-05, documented in the module
+      docstring as a contract.)* `0` success, `1` normal negative answer (no match, or
+      `check` finding the graph stale), `2` bad request (missing/malformed `--config`),
+      `3` missing dependency. Verified identical between human and `--json` paths.
+      - [ ] Still to do: the same pass over `info` and the `index-*` commands. `info`
+        already uses 1/2/3 consistently; `index-*` have not been audited.
+
+- [x] **Config errors were tracebacks — and worse, silence.** *(done 2026-09-05,
+      `ConfigError`, 6 tests.)* The reported symptom was a raw `JSONDecodeError` from
+      `--config /dev/null`. The bug next to it was worse: **an explicitly requested config
+      that did not exist fell back to defaults silently**, so a caller passing `--config`
+      believed their `output_path` was in effect while the tool wrote to `~/.dyf/`.
+      Missing, malformed, non-object and unknown-key configs now all exit 2 naming the
+      file and the problem — and for unknown keys, the valid settings.
+      ⚠ This changed behaviour a test had pinned (`test_load_missing_file`). Broken
+      deliberately per the pre-v1 rule, with the reason recorded in the test.
+
+- [ ] **Make the remaining error messages actionable.** `concepts` is done; `index-*` and
+      `info` still have paths that say only what went wrong, not what to do.
 
 - [ ] **Optional dependencies fail as tracebacks, not as messages.** One generator, five
       instances — worth one fix at the CLI boundary rather than five patches:
