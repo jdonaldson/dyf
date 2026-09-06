@@ -297,21 +297,34 @@ is a place an agent will confidently report the wrong thing.
       and `SearchResult` had just shown how a hard-coded arity becomes a plausible wrong
       number. When a container's `len()` could plausibly mean two things, don't define it.
 
-      4. **Missing-item contract differs between adjacent methods**:
-         `LazyIndex.get_item_vector` (`:1925`) raises `KeyError`;
-         `LazyIndex.get_stored_fields` (`:1962`) fills `None` for the same condition.
-      5. **"Not found" is `-1` in two places and `None` in two others** —
-         `CategoryGraph.lca_depth` (`categorical.py:111`) and `CatalogSpace.get_lca_depth`
-         (`catalog.py:1401`) vs `DAGTaxonomy.get_path` (`ontology.py:804`) and
-         `ROGResult.get_layer_for_node` (`:1353`). The `-1` is worse: it does arithmetic
-         silently.
-      6. **`lazy_index.py` uses two "named result" idioms** — `TypedDict` for `TreeNode`
-         and `ExtractedData`, `@dataclass` for `SearchResult` and `AdaptiveProbeConfig`.
-         Consumers get `d["node_id"]` for one and `r.indices` for the other.
-      7. **`LazyIndex.tree_summary` is the agent-facing call and the least typed thing in
-         the file** — a nested untyped dict with a *conditional* schema (`pq` and
-         `stored_fields` appear only sometimes), while the adjacent
-         `get_tree_structure` returns `list[TreeNode]`. `dyf info` depends on it.
+      4. ~~**Missing-item contract differs between adjacent methods**~~ — **investigated
+         2026-09-05, not a defect.** `get_item_vector` raising `KeyError` while the
+         adjacent `get_stored_fields` returns `None` is **singular vs plural**, and both
+         are right. One index in, one vector out: a missing item makes the request
+         unanswerable, so raising is correct. Many indices in, aligned lists out: raising
+         would kill a 10,000-item lookup over one bad index, and `None` in the aligned
+         slot is the only sensible encoding. Left alone deliberately.
+      5. ~~**"Not found" is `-1` in two places and `None` in two others**~~ —
+         **investigated 2026-09-05, latent not live.** `-1` is a *consistent* convention
+         inside `CategoryGraph` (`get_depth` uses it too), not a stray sentinel. Traced
+         where it flows: `catalog.py:513` builds a depth array that reaches
+         `CatalogMatch.depth` and would create a phantom `depth_masks[-1]` bucket — but
+         it does **no silent arithmetic** anywhere in the current code. Not worth an
+         `int → int | None` break on style grounds. Revisit if a caller ever does
+         arithmetic on a depth.
+      6. [x] **Two "named result" idioms in `lazy_index.py`** — resolved 2026-09-05 by
+         making the split *principled* rather than by unifying: **`TypedDict` for records,
+         `@dataclass` for things with behaviour.** `TreeNode`, `ExtractedData` and the new
+         `TreeSummary` are plain data read as dicts; `SearchResult` and
+         `AdaptiveProbeConfig` have methods. Unifying would have broken dict consumers for
+         no gain.
+      7. [x] **`LazyIndex.tree_summary` had a conditional schema** *(done 2026-09-05.)*
+         `pq` and `stored_fields` appeared only when applicable, so a consumer had to test
+         for a key's existence before reading it. Both are now always present — `None` and
+         `[]` respectively — and typed via `TreeSummary`. This is the call `dyf info` is
+         built on, so it is the agent-facing shape of the package; v1 would have frozen
+         the conditional version. `info.py` tested `"pq" in summary`, which would now
+         always be true, and tests the value instead.
       8. **Tree constructors return structurally-typed dicts** — `build_pca_tree` yields
          `{left, right, ...}`, `build_dyf_tree` yields `{children, ...}`, and
          `cut_tree_to_labels` (`cut.py:20`) tells them apart by **sniffing for the
