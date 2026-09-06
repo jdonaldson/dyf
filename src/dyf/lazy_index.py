@@ -1170,10 +1170,20 @@ class LazyIndex:
     """
 
     def __init__(self, path):
+        # Set every attribute `close()` touches BEFORE anything that can raise. `open()`
+        # on a missing path raises FileNotFoundError, `__del__` then calls `close()`, and
+        # `close()` used to hit `self._mm` on a half-built object — so Python printed a
+        # spurious `AttributeError: 'LazyIndex' object has no attribute '_mm'` traceback
+        # on top of the real error, burying it. The correct exception always propagated;
+        # the noise was the bug. Found 2026-09-05 by dyfviz's CLI audit, which reported a
+        # 1405-byte stderr for "point at a file that does not exist".
         self._path = path
+        self._file = None
+        self._mm = None
+        self._extra_files = []  # track companion chunk file handles
+
         self._file = open(path, "rb")
         self._mm = mmap.mmap(self._file.fileno(), 0, access=mmap.ACCESS_READ)
-        self._extra_files = []  # track companion chunk file handles
 
         # Parse header — detect format version
         magic = self._mm[:4]
