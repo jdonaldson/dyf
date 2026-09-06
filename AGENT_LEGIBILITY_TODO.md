@@ -22,6 +22,31 @@ The guard that came with the amendment: agent work earns its place only where it
 *existing* surface dependable. Parseable output, loud failure, honest docs — yes. New
 mechanisms to serve agents — no.
 
+## Scope change: the tour split (2026-09-05)
+
+`enrich/` (12 modules) and `tour.py` — 2,875 lines — moved to the new downstream
+**`dyfviz`** package, so dyf is indexing and search. Every open item below that concerns
+UMAP projection, Louvain clustering, LLM labelling, narration, TTS or the browser viewer
+went with them and is now dyfviz's queue, specifically:
+
+- `enrich audio` needing undeclared `kokoro` + `soundfile`, and its `SystemExit` from
+  inside a library call
+- `enrich reannotate` being dead against current output; the inert `--cluster-level` flag
+- `fit_birch` / `merge_tiny_clusters` never called from `src/`
+- `_scaffold._group_label_from_names` hardcoding medical-device vocabulary
+
+**Measurements taken before the split are left as written** — they were true of dyf at
+the time and are the evidence for the fixes that followed. The `enrich`/`tour` rows in
+the P0 logging table are the clearest case: that bug was real and shared, and the fix
+went to both packages.
+
+Two couplings deliberately survive the split, because they are format conventions rather
+than code dependencies:
+
+- `lazy_index.detect_enrichment_level()` still names `edge_pairs` / `tour_narration`.
+  dyf reads levels that dyfviz writes; that is the point of the ladder.
+- `dyf info` still reports the level, and still excludes `tour_audio` from its summary.
+
 ## The organizing finding (2026-09-05)
 
 The three standing audits pass cleanly at HEAD `707aebc`: public API **41/41 OK, 0

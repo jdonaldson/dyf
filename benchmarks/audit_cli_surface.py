@@ -147,9 +147,11 @@ def build_cases(fx: Fixtures) -> list[tuple[str, list[str] | None]]:
         ("index-source", ["index-source", fx.srcdir, "-o", out_dyf]),
         ("index-images", ["index-images", fx.srcdir, "-o", out_dyf]),
         ("index-video", ["index-video", str(Path(fx.tmpdir, "absent.mp4")), "-o", out_dyf]),
-        ("enrich project", ["enrich", "project", fx.dyf_path] if fx.dyf_path else None),
-        # `tour` starts a browser and blocks; there is no non-interactive invocation.
-        ("tour", None),
+        # `enrich` and `tour` moved to dyfviz on 2026-09-05. dyf keeps a redirect for
+        # them, and that redirect is worth auditing: it is what an old command line or a
+        # stale Makefile target hits.
+        ("enrich (moved)", ["enrich", "all", "x.dyf"]),
+        ("tour (moved)", ["tour", "x.dyf"]),
     ]
 
 

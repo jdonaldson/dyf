@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+### Removed
+
+- **`dyf enrich` and `dyf tour` moved to the new `dyfviz` package.** dyf is now a library
+  about indexing and search; UMAP projection, Louvain clustering, LLM labelling,
+  narration, Kokoro TTS and the browser viewer live downstream in
+  [dyfviz](https://github.com/jdonaldson/dyfviz). 2,875 lines across 12 modules.
+
+  The dependency runs one way — dyfviz reads and rewrites `.dyf` files, and nothing in
+  dyf imports dyfviz — so the move needed **no import rewrites**: every cross-package
+  import in `enrich/` was already an absolute `from dyf.X import Y`.
+
+  `dyf enrich ...` and `dyf tour ...` now exit 4 with a message naming the replacement
+  command, rather than dumping usage. The `enrich` extra is gone; use `dyfviz[all]`.
+
+  Two couplings survive on purpose, as format conventions rather than code dependencies:
+  `LazyIndex.detect_enrichment_level()` still recognises the levels dyfviz writes, and
+  `dyf info` still reports them.
+
 ### Added
 
 - **`benchmarks/audit_cli_surface.py` — a fourth standing audit, covering the CLI.** The

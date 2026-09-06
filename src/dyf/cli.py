@@ -10,11 +10,9 @@ Usage:
     dyf index-source dir/    # index source code into .dyf
     dyf index-images dir/    # index images into .dyf (vision embeddings)
     dyf index-video file.mp4 # index video keyframes into .dyf
-    dyf enrich project f.dyf # UMAP projection (Level 0→1)
-    dyf enrich cluster f.dyf # Louvain clustering (Level 1→2)
-    dyf enrich viz f.dyf     # Bridge edges + narration (Level 2→3)
-    dyf enrich all f.dyf     # Run all enrichment levels
-    dyf tour f.dyf           # Launch browser viewer with tour
+
+Enrichment (UMAP projection, clustering, narration, audio) and the browser tour live
+downstream in `dyfviz`, split out 2026-09-05: `dyfviz enrich all f.dyf`, `dyfviz tour`.
 """
 
 import logging
@@ -68,8 +66,14 @@ COMMAND_EXTRAS = {
     "index-source": "source",
     "index-images": "vision",
     "index-video": "video",
-    "enrich": "enrich",
-    "tour": "viz",
+}
+
+# Subcommands that moved to the downstream `dyfviz` package on 2026-09-05. Kept here so
+# an old command line gets a redirect instead of a bare usage dump — sec10quant's
+# Makefile and anyone's muscle memory still say `dyf enrich`.
+MOVED_COMMANDS = {
+    "enrich": "dyfviz enrich",
+    "tour": "dyfviz tour",
 }
 
 
@@ -91,11 +95,6 @@ def _dispatch(cmd: str, argv: list[str]) -> int | None:
         from .index_source import main as index_main
 
         return index_main(argv)
-    if cmd == "enrich":
-        from .enrich import main as enrich_main
-
-        enrich_main(argv)
-        return 0
     if cmd == "index-images":
         from .index_images import main as index_images_main
 
@@ -104,11 +103,6 @@ def _dispatch(cmd: str, argv: list[str]) -> int | None:
         from .index_video import main as index_video_main
 
         return index_video_main(argv)
-    if cmd == "tour":
-        from .tour import main as tour_main
-
-        tour_main(argv)
-        return 0
     return None
 
 
@@ -117,6 +111,14 @@ def main():
 
     if len(sys.argv) > 1:
         cmd = sys.argv[1]
+
+        if cmd in MOVED_COMMANDS:
+            logger = logging.getLogger("dyf")
+            logger.error("`dyf %s` moved to the dyfviz package on 2026-09-05.", cmd)
+            logger.error("  Use: %s %s", MOVED_COMMANDS[cmd], " ".join(sys.argv[2:]))
+            logger.error("  Install with: pip install dyfviz[all]")
+            sys.exit(4)
+
         try:
             code = _dispatch(cmd, sys.argv[2:])
         except ImportError as exc:
@@ -140,8 +142,8 @@ def main():
     print("  index-source  Index source code into a .dyf file (Python, JS, TS, Rust, Go, Java, C, C++, OCaml)")
     print("  index-images  Index images into a .dyf file (vision embeddings + thumbnails)")
     print("  index-video   Index video keyframes into a .dyf file (scene detection + vision)")
-    print("  enrich        Enrich a .dyf file (UMAP, clustering, narration)")
-    print("  tour          Launch browser viewer with tour autoplay")
+    print()
+    print("Enrichment and the browser tour moved to dyfviz: dyfviz enrich | dyfviz tour")
     sys.exit(1)
 
 
