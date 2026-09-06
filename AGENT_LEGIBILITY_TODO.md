@@ -228,11 +228,32 @@ is a place an agent will confidently report the wrong thing.
       `2>&1 >/dev/null` appear to show the summary on stderr. Assert on captured streams
       in a subprocess, not on shell redirection.
 
-- [ ] **Make the Python API discoverable.** `__all__` has ~109 entries in one flat list,
-      dominated by tree/clustering/RAG primitives, with the entire media half absent
-      (P2). An agent importing `dyf` has no cheap way to learn what exists or where to
-      start. Same index/body split as `dyf info`: a grouped `__init__` docstring, or a
-      one-line summary per public symbol, readable without opening 30 modules.
+- [x] **Make the Python API discoverable.** *(done 2026-09-05 — `_api_map.py`,
+      `dyf.overview()`, `dyf api`, 15 tests.)* 113 names in one flat `__all__` is a fine
+      manifest and a poor index: nothing said which are entry points, which are result
+      types that only appear as return values, or which belong together — and the module
+      docstring documented three of them.
+
+      Same index/body split as `dyf info`, applied to the package. 15 groups, each with a
+      summary and a **`start_here`** naming the one symbol to read first — the field a
+      flat list cannot express, since `SearchResult` and `DedupResult` are exported and
+      important but nobody should begin there.
+
+      **The sync is mechanical.** `tests/test_api_map.py` asserts the map covers `__all__`
+      exactly: no missing exports, no phantom names, no duplicates, every mapped name
+      resolves, every `start_here` is in its own group. A note asking contributors to
+      maintain an index would rot, and a map that is 95% right is worse than none because
+      a reader stops looking after it.
+
+      Two doc defects surfaced just by forcing every name to be placed: a stale
+      `# PCA tree` header still labelling the boundary functions after `pca_tree` was
+      dropped, and `Categorical DAG` silently holding `CatalogSpace` — two unrelated
+      concepts under one heading.
+
+      ⚠ The docstring originally stated "~111 public names" and was wrong **within the
+      same commit**, once `overview` and `API_GROUPS` were themselves exported. It now
+      states no count; `overview()` computes one. Any hand-written total is a stale number
+      waiting to happen.
 
 - [x] **Return-shape consistency for the search API.** *(done 2026-09-05, 11 tests.)*
       `LazyIndex.search` and `search_ivf` returned a `SearchResult`; `DenseSearchIndex.search`
