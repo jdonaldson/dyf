@@ -9,13 +9,15 @@ Usage (via CLI):
     dyf index-images . -o images.dyf --model nomic-ai/nomic-embed-vision-v1.5
 
 Requires: pip install "dyf[vision]"
+
+Exit codes (see `_ingest_errors`): 0 ok, 1 nothing to index, 2 bad request,
+3 dependency or service unavailable.
 """
 
 import argparse
 import base64
 import io
 import logging
-import sys
 import time
 from pathlib import Path
 
@@ -23,6 +25,7 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+from ._ingest_errors import BadIngestRequest, EmptyIngestError, IngestError
 from .dyf_tree import build_dyf_tree
 from .lazy_index import write_lazy_index
 
@@ -146,8 +149,9 @@ def index_images(
     t0 = time.time()
     image_paths = scan_images(source_dir)
     if not image_paths:
-        logger.error("No images found.")
-        sys.exit(1)
+        raise EmptyIngestError(
+            f"no images found under {source_dir}.\n  Recognised extensions: {', '.join(sorted(IMAGE_EXTENSIONS))}"
+        )
     logger.info(f"Found {len(image_paths)} images in {time.time() - t0:.1f}s")
 
     # Load vision model
@@ -185,8 +189,11 @@ def index_images(
             logger.warning("Skipping %s: %s", path.name, e)
 
     if not images:
-        logger.error("No valid images could be loaded.")
-        sys.exit(1)
+        # Distinct from "no images found": files matched, but every one failed to decode.
+        raise EmptyIngestError(
+            f"found {len(image_paths)} image file(s) under {source_dir}, but none could be "
+            f"decoded.\n  Re-run with -v to see the per-file errors."
+        )
 
     logger.info(f"  Loaded {len(images)} images in {time.time() - t0:.1f}s")
 
@@ -305,21 +312,26 @@ def main(argv: list[str] | None = None) -> int:
 
     source_dir = args.source_dir.resolve()
     if not source_dir.is_dir():
-        logger.error(f"Error: {source_dir} is not a directory")
-        return 1
+        logger.error("not a directory: %s", source_dir)
+        return BadIngestRequest.exit_code
 
     output = args.output
     if output is None:
         output = Path(f"{source_dir.name}.dyf")
 
-    index_images(
-        source_dir=source_dir,
-        output=output.resolve(),
-        model=args.model,
-        max_depth=args.max_depth,
-        num_bits=args.num_bits,
-        min_leaf_size=args.min_leaf_size,
-        seed=args.seed,
-        batch_size=args.batch_size,
-    )
+    try:
+        index_images(
+            source_dir=source_dir,
+            output=output.resolve(),
+            model=args.model,
+            max_depth=args.max_depth,
+            num_bits=args.num_bits,
+            min_leaf_size=args.min_leaf_size,
+            seed=args.seed,
+            batch_size=args.batch_size,
+        )
+    except IngestError as exc:
+        for line in str(exc).splitlines():
+            logger.error("%s", line)
+        return exc.exit_code
     return 0

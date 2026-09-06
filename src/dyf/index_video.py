@@ -9,11 +9,13 @@ Usage (via CLI):
     dyf index-video clip.webm -o clip.dyf --threshold 20
 
 Requires: pip install "dyf[video]"
+
+Exit codes (see `_ingest_errors`): 0 ok, 1 nothing to index, 2 bad request,
+3 dependency or service unavailable.
 """
 
 import argparse
 import logging
-import sys
 import time
 from pathlib import Path
 
@@ -21,6 +23,7 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+from ._ingest_errors import BadIngestRequest, EmptyIngestError, IngestError
 from .dyf_tree import build_dyf_tree
 from .index_images import DEFAULT_MODEL, embed_images, load_vision_model, make_thumbnail
 from .lazy_index import write_lazy_index
@@ -187,8 +190,11 @@ def index_video(
     # Filter out failed extractions
     valid = [(s, img) for s, img in zip(scenes, raw_images) if img is not None]
     if not valid:
-        logger.warning("No keyframes could be extracted.")
-        sys.exit(1)
+        raise EmptyIngestError(
+            f"detected {len(scenes)} scene(s) in {video_path.name}, but no keyframe could "
+            f"be extracted from any of them.\n"
+            f"  The file may be truncated, or in a codec OpenCV cannot decode."
+        )
 
     scenes_valid, images = zip(*valid)
     scenes_valid = list(scenes_valid)
@@ -342,23 +348,28 @@ def main(argv: list[str] | None = None) -> int:
 
     video_path = args.video_file.resolve()
     if not video_path.is_file():
-        logger.warning(f"Error: {video_path} is not a file")
-        return 1
+        logger.error("not a file: %s", video_path)
+        return BadIngestRequest.exit_code
 
     output = args.output
     if output is None:
         output = Path(f"{video_path.stem}.dyf")
 
-    index_video(
-        video_path=video_path,
-        output=output.resolve(),
-        model=args.model,
-        threshold=args.threshold,
-        min_scene_len=args.min_scene_len,
-        max_depth=args.max_depth,
-        num_bits=args.num_bits,
-        min_leaf_size=args.min_leaf_size,
-        seed=args.seed,
-        batch_size=args.batch_size,
-    )
+    try:
+        index_video(
+            video_path=video_path,
+            output=output.resolve(),
+            model=args.model,
+            threshold=args.threshold,
+            min_scene_len=args.min_scene_len,
+            max_depth=args.max_depth,
+            num_bits=args.num_bits,
+            min_leaf_size=args.min_leaf_size,
+            seed=args.seed,
+            batch_size=args.batch_size,
+        )
+    except IngestError as exc:
+        for line in str(exc).splitlines():
+            logger.error("%s", line)
+        return exc.exit_code
     return 0
