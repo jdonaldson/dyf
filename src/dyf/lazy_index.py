@@ -56,6 +56,57 @@ class ExtractedData(TypedDict):
     metadata: dict[str, str]
 
 
+class BuildParamsSummary(TypedDict):
+    """The build parameters recorded in a .dyf file."""
+
+    max_depth: int | None
+    num_bits: int | None
+    min_leaf_size: int | None
+    seed: int | None
+    quantization: str | None
+    compression: str | None
+
+
+class PQSummary(TypedDict):
+    """Product-quantization parameters. Present only on PQ-compressed indexes."""
+
+    n_subquantizers: int
+    dsub: int
+    bytes_per_vector: int
+    codebook_size_kb: float
+
+
+class StoredFieldSummary(TypedDict):
+    """One stored field's name and declared type."""
+
+    name: str
+    type: str
+
+
+class TreeSummary(TypedDict):
+    """Return type for ``LazyIndex.tree_summary`` — the cheap describe-without-loading call.
+
+    **Every key is always present.** Until 2026-09-05 the ``pq`` and ``stored_fields``
+    keys appeared only when applicable, so a consumer could not read them without first
+    testing for their existence — a *conditional schema*, which is the most awkward thing
+    to consume and the least safe to freeze into v1. `dyf info` is built on this call, so
+    it is the agent-facing shape of the whole package; it was also the least typed thing
+    in this file.
+
+    ``pq`` is ``None`` on a non-PQ index and ``stored_fields`` is ``[]`` when there are
+    none, so absence is now expressed as a value rather than a missing key.
+    """
+
+    version: str | None
+    embedding_dim: int
+    total_items: int
+    num_leaves: int
+    num_nodes: int
+    build_params: BuildParamsSummary | None
+    pq: PQSummary | None
+    stored_fields: list[StoredFieldSummary]
+
+
 MAGIC = b"DYF1"
 MAGIC_V2 = b"DYF2"
 MAGIC_V3 = b"DYF3"
@@ -1264,10 +1315,16 @@ class LazyIndex:
         return len(self.stored_field_names) > 0
 
     @property
-    def tree_summary(self):
-        """Return tree stats without touching Arrow data."""
+    def tree_summary(self) -> TreeSummary:
+        """Tree stats without touching Arrow data. See :class:`TreeSummary`.
+
+        Every key is always present; `pq` is None and `stored_fields` is [] when they do
+        not apply. Do not reintroduce conditional keys here — `dyf info` and anything
+        else describing an artifact reads this, and a schema that changes shape by index
+        type cannot be relied on.
+        """
         bp = self._index.BuildParams()
-        summary = {
+        summary: TreeSummary = {
             "version": self._index.Version().decode() if self._index.Version() else None,
             "embedding_dim": self.embedding_dim,
             "total_items": self.total_items,
@@ -1284,7 +1341,9 @@ class LazyIndex:
             if bp
             else None,
         }
-        # Add PQ section if applicable
+        # `pq` and `stored_fields` are always set — None / [] when they do not apply —
+        # so a consumer never has to test for a key's existence.
+        summary["pq"] = None
         if self.is_pq:
             meta = self._get_metadata()
             m = int(meta.get("pq_n_subquantizers", "0"))
@@ -1295,7 +1354,8 @@ class LazyIndex:
                 "bytes_per_vector": m,
                 "codebook_size_kb": round(m * 256 * dsub * 4 / 1024, 1),
             }
-        # Add stored fields info
+
+        summary["stored_fields"] = []
         sf_names = self.stored_field_names
         if sf_names:
             meta = self._get_metadata()

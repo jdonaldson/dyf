@@ -81,7 +81,9 @@ def collect_info(path: str) -> dict[str, Any]:
         info["num_leaves"] = summary.get("num_leaves")
         info["num_nodes"] = summary.get("num_nodes")
         info["build_params"] = summary.get("build_params")
-        if "pq" in summary:
+        # `tree_summary` always carries a `pq` key now; it is None on a non-PQ index.
+        # Test the value, not the key's presence.
+        if summary.get("pq"):
             info["pq"] = summary["pq"]
 
         info["stored_fields"] = sorted(idx.stored_field_names)
