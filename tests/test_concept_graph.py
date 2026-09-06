@@ -8,10 +8,12 @@ from dyf.concept_graph import (
     ConceptGraphConfig,
     ConceptNode,
     MarkdownChunk,
+    build_header_only_graph,
     check_staleness,
     chunk_markdown,
     fuzzy_match,
     load_graph,
+    load_graph_meta,
     save_graph,
     slugify,
 )
@@ -342,3 +344,69 @@ class TestMarkdownChunk:
             metadata={"project": "foo"},
         )
         assert chunk.metadata["project"] == "foo"
+
+
+# ---------------------------------------------------------------------------
+# Header-only graphs
+#
+# The index half of this tool needs no model: fuzzy_match is pure SequenceMatcher, and
+# only *neighbors* require embedding. Building without the multi-GB torch stack is what
+# makes `dyf concepts` usable as the globally-invoked tool it is documented to be.
+# ---------------------------------------------------------------------------
+
+
+class TestHeaderOnlyGraph:
+    def _chunks(self):
+        return [
+            MarkdownChunk(id="a/one", header="One", text="first", source="a.md", line=1, metadata={}),
+            MarkdownChunk(id="a/two", header="Two", text="second", source="a.md", line=9, metadata={}),
+        ]
+
+    def test_builds_every_node_without_a_model(self):
+        graph = build_header_only_graph(self._chunks())
+        assert set(graph) == {"a/one", "a/two"}
+        assert graph["a/one"].header == "One"
+        assert graph["a/two"].line == 9
+
+    def test_nodes_have_no_neighbors(self):
+        graph = build_header_only_graph(self._chunks())
+        assert all(node.neighbors == [] for node in graph.values())
+
+    def test_fuzzy_match_still_works(self):
+        """The query path must survive without embeddings — that is the whole point."""
+        graph = build_header_only_graph(self._chunks())
+        node_id, score = fuzzy_match("One", graph)
+        assert node_id == "a/one"
+        assert score > 0.5
+
+    def test_roundtrip_records_that_embeddings_are_absent(self, tmp_path):
+        path = str(tmp_path / "graph.json")
+        save_graph(build_header_only_graph(self._chunks()), path, has_embeddings=False)
+
+        assert load_graph_meta(path) == {"has_embeddings": False}
+        loaded = load_graph(path)
+        assert set(loaded) == {"a/one", "a/two"}, "the _meta key must not become a node"
+
+    def test_meta_defaults_to_embeddings_present(self, tmp_path):
+        path = str(tmp_path / "graph.json")
+        save_graph(build_header_only_graph(self._chunks()), path)
+        assert load_graph_meta(path) == {"has_embeddings": True}
+
+    def test_graph_without_meta_still_loads(self, tmp_path):
+        """Graphs written before the _meta key existed must keep working."""
+        path = tmp_path / "old.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "a/one": {
+                        "header": "One",
+                        "source": "a.md",
+                        "line": 1,
+                        "metadata": {},
+                        "neighbors": [],
+                    }
+                }
+            )
+        )
+        assert set(load_graph(str(path))) == {"a/one"}
+        assert load_graph_meta(str(path)) == {}

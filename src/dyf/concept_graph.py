@@ -201,6 +201,31 @@ def chunk_markdown(
 # ---------------------------------------------------------------------------
 
 
+def build_header_only_graph(chunks: list[MarkdownChunk]) -> dict[str, ConceptNode]:
+    """Build the graph without embeddings — every node, no neighbors.
+
+    The index half of the concept graph (header -> source:line) needs no model at all,
+    and `fuzzy_match` is pure `SequenceMatcher`. Only *neighbors* require embedding. So
+    when sentence-transformers is unavailable, a header-only graph still supports
+    `concepts list`, `concepts check`, and `concepts query <header>` — which is the
+    common path.
+
+    This matters because the graph is consumed by agents told to run `dyf concepts`
+    before editing notes: a tool that cannot build at all without a multi-GB torch stack
+    is a tool they cannot use.
+    """
+    return {
+        chunk.id: ConceptNode(
+            header=chunk.header,
+            source=chunk.source,
+            line=chunk.line,
+            metadata=chunk.metadata,
+            neighbors=[],
+        )
+        for chunk in chunks
+    }
+
+
 def build_concept_graph(
     chunks: list[MarkdownChunk],
     top_k: int = 5,
@@ -209,7 +234,9 @@ def build_concept_graph(
 ) -> tuple[dict[str, ConceptNode], np.ndarray]:
     """Embed chunks and build a cosine-similarity neighbor graph.
 
-    Lazy-imports EmbedderConfig so that fuzzy_match stays dependency-free.
+    Lazy-imports EmbedderConfig so that fuzzy_match stays dependency-free. Raises
+    ImportError if the embedding stack is absent — callers wanting a graph regardless
+    should fall back to `build_header_only_graph`.
 
     Returns:
         (graph dict mapping chunk_id -> ConceptNode, embeddings array)
@@ -264,11 +291,21 @@ def build_concept_graph(
 # ---------------------------------------------------------------------------
 
 
-def save_graph(graph: dict[str, ConceptNode], path: str) -> None:
-    """Save concept graph to JSON."""
+# Reserved top-level key in the saved graph. Node ids come from markdown headers and are
+# slugified, so they cannot collide with a leading underscore.
+GRAPH_META_KEY = "_meta"
+
+
+def save_graph(graph: dict[str, ConceptNode], path: str, *, has_embeddings: bool = True) -> None:
+    """Save concept graph to JSON.
+
+    `has_embeddings` records whether neighbors were actually computed, so a reader can
+    distinguish "no neighbors above threshold" from "this graph was built without a
+    model". Graphs written before this key existed simply lack it.
+    """
     path = os.path.expanduser(path)
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    data = {}
+    data: dict = {GRAPH_META_KEY: {"has_embeddings": has_embeddings}}
     for node_id, node in graph.items():
         data[node_id] = asdict(node)
     with open(path, "w") as f:
@@ -282,8 +319,22 @@ def load_graph(path: str) -> dict[str, ConceptNode]:
         data = json.load(f)
     graph = {}
     for node_id, node_data in data.items():
+        if node_id == GRAPH_META_KEY:
+            continue
         graph[node_id] = ConceptNode(**node_data)
     return graph
+
+
+def load_graph_meta(path: str) -> dict:
+    """Read the saved graph's metadata. Returns {} for graphs written before it existed."""
+    path = os.path.expanduser(path)
+    try:
+        with open(path) as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return {}
+    meta = data.get(GRAPH_META_KEY)
+    return meta if isinstance(meta, dict) else {}
 
 
 # ---------------------------------------------------------------------------
@@ -398,8 +449,14 @@ def check_staleness(config: ConceptGraphConfig) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def _format_node(node: ConceptNode) -> str:
-    """Format a single node with its neighbors for display."""
+def _format_node(node: ConceptNode, header_only: bool = False) -> str:
+    """Format a single node with its neighbors for display.
+
+    `header_only` distinguishes the two reasons a node can show no neighbors: none scored
+    above the similarity threshold, or the graph was built without a model and *cannot*
+    have any. Reporting the first when the second is true sends a reader looking for a
+    threshold to tune.
+    """
     lines = [
         f"## {node.header}",
         f"   {node.source}:{node.line}",
@@ -409,6 +466,8 @@ def _format_node(node: ConceptNode) -> str:
         for n in node.neighbors:
             lines.append(f"   {n['similarity']:.3f}  {n['header']}")
             lines.append(f"          {n['source']}:{n['line']}")
+    elif header_only:
+        lines.append("   (header-only graph — rebuild with 'dyf[concepts]' for neighbors)")
     else:
         lines.append("   (no neighbors above threshold)")
     return "\n".join(lines)
@@ -430,6 +489,11 @@ def main(argv: list[str] | None = None) -> int:
     # build
     build_p = sub.add_parser("build", help="Build or rebuild the concept graph")
     build_p.add_argument("--config", help="Path to config JSON")
+    build_p.add_argument(
+        "--no-embeddings",
+        action="store_true",
+        help="Build a header-only graph: no model needed, no semantic neighbors",
+    )
     build_p.add_argument("extra_sources", nargs="*", help="Additional source files")
 
     # query
@@ -457,7 +521,11 @@ def main(argv: list[str] | None = None) -> int:
     config = ConceptGraphConfig.load(getattr(args, "config", None))
 
     if args.command == "build":
-        return _cmd_build(config, getattr(args, "extra_sources", []))
+        return _cmd_build(
+            config,
+            getattr(args, "extra_sources", []),
+            no_embeddings=getattr(args, "no_embeddings", False),
+        )
     elif args.command == "check":
         return _cmd_check(config)
     elif args.command == "query":
@@ -469,7 +537,7 @@ def main(argv: list[str] | None = None) -> int:
     return 1
 
 
-def _cmd_build(config: ConceptGraphConfig, extra_sources: list[str]) -> int:
+def _cmd_build(config: ConceptGraphConfig, extra_sources: list[str], no_embeddings: bool = False) -> int:
     """Build the concept graph from configured sources."""
     all_chunks: list[MarkdownChunk] = []
 
@@ -503,18 +571,33 @@ def _cmd_build(config: ConceptGraphConfig, extra_sources: list[str]) -> int:
 
     logger.info("Total: %d unique concept chunks", len(all_chunks))
 
-    graph, embeddings = build_concept_graph(
-        all_chunks,
-        top_k=config.top_k,
-        threshold=config.similarity_threshold,
-        embedder_name=config.embedder,
-    )
+    embeddings = None
+    if no_embeddings:
+        graph = build_header_only_graph(all_chunks)
+    else:
+        try:
+            graph, embeddings = build_concept_graph(
+                all_chunks,
+                top_k=config.top_k,
+                threshold=config.similarity_threshold,
+                embedder_name=config.embedder,
+            )
+        except ImportError as exc:
+            # Degrade rather than die. `check` tells the user to run `build`, so a build
+            # that cannot run without a multi-GB torch stack makes the tool's own advice
+            # unfollowable. Warn loudly — a silent downgrade would be worse.
+            logger.warning("Embedding model unavailable (%s)", exc)
+            logger.warning("  Building a header-only graph: no semantic neighbors.")
+            logger.warning("  For neighbors and `query --semantic`: pip install 'dyf[concepts]'")
+            graph = build_header_only_graph(all_chunks)
 
-    # Save graph
     output_path = config.expand_path("output_path")
-    save_graph(graph, output_path)
+    save_graph(graph, output_path, has_embeddings=embeddings is not None)
     total_edges = sum(len(n.neighbors) for n in graph.values())
     logger.info("Graph saved to %s", output_path)
+    if embeddings is None:
+        logger.info("  %d nodes, header-only (no neighbors)", len(graph))
+        return 0
     logger.info("  %d nodes, %d edges", len(graph), total_edges)
 
     # Save embeddings cache
@@ -553,6 +636,12 @@ def _cmd_query(
 
     t0 = time.time()
     graph = load_graph(graph_path)
+    header_only = load_graph_meta(graph_path).get("has_embeddings") is False
+
+    if force_semantic and header_only:
+        logger.error("This graph was built without embeddings, so semantic search is unavailable.")
+        logger.error("  Rebuild with: pip install 'dyf[concepts]' && dyf concepts build")
+        return 1
 
     if force_semantic:
         results = semantic_search(
@@ -580,7 +669,7 @@ def _cmd_query(
 
     if node_id:
         node = graph[node_id]
-        logger.info(_format_node(node))
+        logger.info(_format_node(node, header_only=header_only))
         logger.debug("   (matched '%s' score=%.2f, %.1fms)", node_id, score, elapsed * 1000)
         return 0
 
@@ -617,5 +706,8 @@ def _cmd_list(config: ConceptGraphConfig, verbose: bool) -> int:
         if verbose and node.neighbors:
             for n in node.neighbors:
                 logger.info("      %0.3f  %s", n["similarity"], n["header"])
+    if load_graph_meta(graph_path).get("has_embeddings") is False:
+        logger.info("%d nodes total (header-only graph — no neighbors)", len(graph))
+        return 0
     logger.info("%d nodes total", len(graph))
     return 0
