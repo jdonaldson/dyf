@@ -96,6 +96,20 @@
 
 ### Changed
 
+- **`--dedup` now works on `index-images` and `index-video`, not just `index-source`.**
+  The three commands shared a byte-identical tail — normalize, build a tree with the same
+  five parameters, write a `.dyf` with the same settings — copy-pasted three times, along
+  with three argparse blocks carrying the same flags. `--dedup` lived in one of those
+  copies, so **a capability could not spread**: adjacent video keyframes are the textbook
+  case for collapsing duplicates (the table above measures 88.3% on that data) and could
+  not use it.
+
+  Now in `_ingest_common.finalize_index`. Dedup belongs in the shared tail specifically
+  because it must subset embeddings and stored fields **in lockstep** — subsetting one
+  without the other silently mislabels every row, which is not something three callers
+  should each get right independently. `add_common_index_args` defines the shared flags
+  once so the commands cannot drift apart again, which they already had.
+
 - **Named result types for the tuples whose positions could be silently swapped.** An
   audit of all 109 exports found several multi-value returns where a positional mistake
   would type-check clean. Each also hid a conditional the tuple could not express. All

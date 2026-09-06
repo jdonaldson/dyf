@@ -544,12 +544,28 @@ longer conflict with it. They are P3 because they are *large*, not because they 
 of scope. The unchanged guard: they must make an existing surface dependable, not add a
 new mechanism.
 
-- [ ] **Unify the three ingest scripts behind one interface.** No base class, registry or
-      protocol exists today; each of `index_images`/`index_video`/`index_source`
-      independently repeats the same normalize → `build_dyf_tree` → `write_lazy_index`
-      tail plus its own argparse block. The copy-paste already costs something concrete:
-      **`--dedup` exists only for source** (`index_source.py:284`), while near-identical
-      video keyframes are the textbook case for it.
+- [x] **Unify the three ingest scripts behind one interface.** *(done 2026-09-05,
+      `_ingest_common.py`, 12 tests.)* The three commands differ entirely in their *front*
+      — tree-sitter parsing, vision embedding, scene detection — and were byte-identical in
+      their *back*: normalize, build a tree with the same five parameters, write a `.dyf`
+      with the same compression and quantization, plus three argparse blocks carrying the
+      same flags.
+
+      **`--dedup` now reaches images and video for the first time.** That is the argument
+      for the refactor: the duplication was not a style problem, it was *a capability that
+      could not spread*. Adjacent video keyframes are the textbook case — the README's own
+      table measures **88.3% duplicates** on that data — and it could not be used there
+      because the flag lived in one of three copies.
+
+      `finalize_index` owns everything after "I have embeddings and stored fields". Dedup
+      belongs there specifically because it must subset embeddings and stored fields **in
+      lockstep** — subsetting one without the other silently mislabels every row, which is
+      not something three callers should each get right independently.
+
+      ⚠ Tested directly rather than through the commands: `test_index_images` and
+      `test_index_video` skip entirely without torch and a vision model, so a refactor of
+      their shared tail would have gone unvalidated — the shipped-vs-validated gap again.
+
 - [ ] **`llms.txt` for dyf.io** plus heading anchors, so agents can cite and retrieve a
       fragment rather than a page.
 
