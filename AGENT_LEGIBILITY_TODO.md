@@ -252,10 +252,64 @@ is a place an agent will confidently report the wrong thing.
       itself, scores rank descending, batched matches single, higher `nprobe` does not
       reduce recall.
 
+      - [x] **All four retrievers now agree** *(2026-09-05)* — `LazyIndex.search`,
+        `LazyIndex.search_ivf`, `DenseSearchIndex.search` and `BridgeIndex.query` return
+        `SearchResult`; `query_batch` returns `list[SearchResult]`. Verified on real
+        objects, all still unpacking.
+      - [x] **`SearchResult.__len__` returned a hard-coded 2.** With the type now used by
+        four entry points, `len(result)` reported **2 on a k=10 search** — and spreading
+        the type is what widened that. Returns the hit count now. Safe because unpacking
+        goes through `__iter__`, never `__len__` — checked directly, with a class whose
+        `__len__` returns 99 that still unpacks fine.
       - [ ] Follow-up: `SearchResult` is defined in `lazy_index.py` but is now the shared
         return type of the whole search API. It arguably belongs in a neutral module.
         Not moved — that would break `from dyf.lazy_index import SearchResult` for anyone
         doing it, for no functional gain today.
+
+- [ ] **Remaining return-shape work, from the full audit of all 109 exports (2026-09-05).**
+      Ranked by "would freezing this into v1 be a mistake?". The retrieval API is done;
+      these are not.
+
+      1. **`embed_with_diagnostics` returns a 4-tuple** (`categorical.py:782`) whose 2nd
+         and 3rd elements are *the same type* (`list[AxisDiagnostic]`) and differ only by
+         semantics — before/after weighting. Swapping them is silent and type-checks
+         clean. One return site (`:837`) already passes the same object for both.
+      2. **`agglomerate_tree_leaves` (`agglomerate.py:477`) and `louvain_cluster_leaves`
+         (`:553`) return identical unnamed 5-tuples**, documented as interchangeable — a
+         de-facto struct with no name. Both return a degenerate
+         `(None, {}, [], None, tree)` on the too-few-leaves path, an in-band `None`
+         sentinel where the rest of the API raises `ValueError`.
+      3. **`dedup_for_index` (`dedup.py:232`) is half-tuple, half-object** — element 3 is
+         already a `DedupResult` while the other two stay positional, in the same module
+         where `near_duplicate_clusters` returns a clean `DedupResult`.
+      4. **Missing-item contract differs between adjacent methods**:
+         `LazyIndex.get_item_vector` (`:1925`) raises `KeyError`;
+         `LazyIndex.get_stored_fields` (`:1962`) fills `None` for the same condition.
+      5. **"Not found" is `-1` in two places and `None` in two others** —
+         `CategoryGraph.lca_depth` (`categorical.py:111`) and `CatalogSpace.get_lca_depth`
+         (`catalog.py:1401`) vs `DAGTaxonomy.get_path` (`ontology.py:804`) and
+         `ROGResult.get_layer_for_node` (`:1353`). The `-1` is worse: it does arithmetic
+         silently.
+      6. **`lazy_index.py` uses two "named result" idioms** — `TypedDict` for `TreeNode`
+         and `ExtractedData`, `@dataclass` for `SearchResult` and `AdaptiveProbeConfig`.
+         Consumers get `d["node_id"]` for one and `r.indices` for the other.
+      7. **`LazyIndex.tree_summary` is the agent-facing call and the least typed thing in
+         the file** — a nested untyped dict with a *conditional* schema (`pq` and
+         `stored_fields` appear only sometimes), while the adjacent
+         `get_tree_structure` returns `list[TreeNode]`. `dyf info` depends on it.
+      8. **Tree constructors return structurally-typed dicts** — `build_pca_tree` yields
+         `{left, right, ...}`, `build_dyf_tree` yields `{children, ...}`, and
+         `cut_tree_to_labels` (`cut.py:20`) tells them apart by **sniffing for the
+         `"children"` vs `"left"` key**. v1 would freeze that duck-typing as the contract.
+      9. Raw dicts with fixed known keys that want small dataclasses — `refine_dyf_tree`
+         (pure telemetry, and the project already has a `*Report` naming precedent),
+         `cluster_quality`, `BridgeIndex.evaluate_recall`, `flatten_tree` (9 fixed arrays,
+         exported, unpacked by key), and `compute_split_keywords` /
+         `compute_embedding_keywords` — which have *identical* schemas, so one shared type
+         would prove they are interchangeable.
+
+      Cleanly typed already, for contrast: `catalog.py` and `ontology.py`. The untyped
+      ones are `agglomerate.py`, `splits.py`, `categorical.py`.
 
 - [ ] **Hidden requirements must be declarable before they fail.** `index-source` needs a
       live Ollama server at `localhost:11434` and only discovers this by raising mid-run
