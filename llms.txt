@@ -1,0 +1,59 @@
+# dyf
+
+> Index embedding spaces and see their structure. Builds a density-based LSH tree over
+> your embeddings, writes it to a `.dyf` file that opens in ~5 ms without loading data,
+> searches it with a Rust kernel, and exposes the topology that tree discovers along the
+> way — which regions are dense, which items bridge between concepts, which are unique.
+
+Python package, MIT, pre-v1. `pip install dyf`.
+
+**Not** competing to be the fastest ANN retriever — mature graph libraries (HNSW,
+pynndescent) win on the pure recall-vs-latency frontier. dyf's strengths are structure
+discovery, hierarchy, instant-open on-disk indexes, and reaching exact recall on a single
+index by raising `nprobe`.
+
+Two things worth knowing before reading further:
+
+- The package has over a hundred public names. Do not scan them — run `dyf api` or
+  `dyf.overview()`, which groups them with an entry point per group.
+- `dyf info <file.dyf>` describes an index without loading it (~0.09 s on a 479 MB,
+  229k-item file), and `--json` makes it parseable. That is the cheapest way to learn what
+  an artifact contains.
+
+## Docs
+
+- [Getting started](https://dyf.io/getting-started.html): installation, the typical
+  build-index-search path, and code recipes for each major feature.
+- [How it works](https://dyf.io/how-it-works.html): the two-stage PCA-based LSH algorithm,
+  the metrics it produces, and what Dense / Bridge / Orphan actually mean.
+- [API reference](https://dyf.io/reference/): every public class and function.
+- [README](https://github.com/jdonaldson/dyf/blob/main/README.md): the fastest orientation,
+  including the CLI and the measured performance table.
+
+## Command line
+
+Exit codes are a contract: `0` success, `1` a normal negative answer (nothing found, graph
+stale), `2` a bad request, `3` a missing dependency or unreachable service. Error messages
+name what to install or start.
+
+- `dyf info f.dyf [--json]`: describe an index without loading it.
+- `dyf api [group] [--json]`: grouped map of the Python API.
+- `dyf index-source|index-images|index-video`: build a `.dyf` from a source tree, an image
+  directory, or a video. Add `--dry-run` to see counts and cost first — it embeds nothing
+  and writes nothing.
+- `dyf concepts build|query|check|list`: a concept graph over your own markdown notes.
+
+The `index-*` commands are CLI-only and deliberately absent from `__all__`; from Python,
+build embeddings yourself and call `write_lazy_index`.
+
+## Optional
+
+- [dyfviz](https://github.com/jdonaldson/dyfviz): enrichment and the browser tour — UMAP
+  projection, Louvain clustering, LLM labelling, narration, TTS. Split out of dyf in 0.13.
+  It reads and rewrites `.dyf` files; nothing in dyf depends on it.
+- [dyf-rs](https://pypi.org/project/dyf-rs/): the Rust kernel behind search. Results are
+  bit-identical to the pure-Python reference.
+- [Changelog](https://github.com/jdonaldson/dyf/blob/main/CHANGELOG.md): pre-v1, so the API
+  breaks freely between releases; this is where it is recorded.
+- [Known issues](https://github.com/jdonaldson/dyf/blob/main/KNOWN_ISSUES.md): open defects
+  in the library surface, kept honest — including features that ship but do not work.
