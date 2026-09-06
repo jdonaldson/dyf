@@ -1,24 +1,63 @@
 """
 DYF - Density Yields Features
 
-Discover structure in embedding spaces using PCA-based LSH.
+Discover structure in embedding spaces using PCA-based LSH, and index it for search.
 
-The Rust core returns raw density metrics per item - classification is up to you:
+Finding your way around
+-----------------------
+There are over a hundred public names — too many to scan. `dyf.overview()` prints them
+grouped with an entry point per group, `dyf.overview("trees")` lists one group, and
+`dyf.overview(as_dict=True)` returns the same thing parseably. From a shell: `dyf api`.
+
+    >>> import dyf
+    >>> print(dyf.overview())
+
+(The exact count is deliberately not written here — it would go stale. `overview()`
+computes it, and a test asserts the map covers `__all__` exactly.)
+
+The groups, and the one name to read first in each:
+
+    density      DensityClassifier          dense / bridge / orphan by bucket density
+    trees        build_dyf_tree             the k-ary tree everything routes through
+    index        LazyIndex                  write and read .dyf files
+    search       DenseSearchIndex           in-memory search over a tree
+    retrieval    BridgeIndex                bridge-anchored ANN, and re-ranking
+    dedup        near_duplicate_clusters    collapse near-duplicates before indexing
+    ontology     build_unified_ontology     discover DAG taxonomies from embeddings
+    catalogs     CatalogSpace               match against declared hierarchies
+    categorical  diagnose_axes              label hierarchies and axis diagnostics
+    labeling     compute_split_keywords     human-readable names for splits/clusters
+    grouping     agglomerate_tree_leaves    merge leaves into N groups
+    chunks       chunk_redundancy           assess chunked-document corpora
+    provenance   create_provenance          artifact identity
+    color        spatial_rgb_map            structure to RGB for visualization
+
+Not re-exported — import directly: `dyf.pipeline`, `dyf.concept_graph`.
+
+Typical path
+------------
+    >>> from dyf import build_dyf_tree, write_lazy_index, LazyIndex
+    >>> tree = build_dyf_tree(embeddings, max_depth=4, num_bits=3)
+    >>> write_lazy_index(tree, embeddings, "corpus.dyf", stored_fields={"title": titles})
+    >>> with LazyIndex("corpus.dyf") as idx:
+    ...     result = idx.search(query, k=10, nprobe=256)
+
+From the shell, `dyf info corpus.dyf` describes an index without loading it.
+
+Density metrics
+---------------
+The Rust core returns raw per-item metrics; classification is up to you:
 - bucket_id: LSH bucket assignment
 - bucket_size: Number of items in the bucket
 - centroid_similarity: Cosine similarity to bucket centroid (0-1)
 - isolation_score: How isolated the item is (top_k_sim - median_sim)
 
-Quick Start:
     >>> from dyf import DensityClassifier
     >>> classifier = DensityClassifier(embedding_dim=384)
     >>> classifier.fit(embeddings)
     >>> print(classifier.report())
-    >>> bucket_sizes = classifier.get_bucket_sizes()
-    >>> isolation_scores = classifier.get_isolation_scores()
 
-Full-Featured Usage:
-    >>> from dyf import DensityClassifierFull, EmbedderConfig, LabelerConfig
+    >>> from dyf import DensityClassifierFull, LabelerConfig
     >>> classifier = DensityClassifierFull.from_texts(texts, categories=categories)
     >>> labels = classifier.label_buckets(**LabelerConfig.MEDIUM.as_kwargs())
 """
@@ -155,6 +194,10 @@ from . import (
     pipeline,  # noqa: F401
 )
 
+# Grouped index of the public API. `tests/test_api_map.py` asserts it covers __all__
+# exactly, so it cannot drift out of sync with the list below.
+from ._api_map import API_GROUPS, overview
+
 # Tree-leaf agglomeration
 from .agglomerate import (
     LeafGroupingResult,
@@ -270,6 +313,9 @@ from importlib.metadata import version as _get_version
 
 __version__ = _get_version("dyf")
 __all__ = [
+    # API introspection — start here
+    "overview",
+    "API_GROUPS",
     # Fast Rust core
     "DensityClassifier",
     "DensityReport",

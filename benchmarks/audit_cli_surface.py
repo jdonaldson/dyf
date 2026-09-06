@@ -141,6 +141,9 @@ def build_cases(fx: Fixtures) -> list[tuple[str, list[str] | None]]:
     return [
         ("info", ["info", fx.dyf_path] if fx.dyf_path else None),
         ("info --json", ["info", fx.dyf_path, "--json"] if fx.dyf_path else None),
+        ("api", ["api"]),
+        ("api --json", ["api", "--json"]),
+        ("api <group>", ["api", "trees"]),
         ("concepts check", ["concepts", "check"]),
         ("concepts list", ["concepts", "list"]),
         ("concepts query", ["concepts", "query", "critical rules"]),

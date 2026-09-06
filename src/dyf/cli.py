@@ -3,6 +3,7 @@ DYF CLI — entry point for `dyf` command.
 
 Usage:
     dyf info f.dyf           # describe a .dyf file (add --json to parse it)
+    dyf api                  # map of the public Python API, grouped
     dyf concepts build       # build concept graph
     dyf concepts query ...   # query concepts
     dyf concepts check       # check staleness
@@ -62,6 +63,7 @@ def _configure_cli_logging() -> None:
 # ModuleNotFoundError into a line the caller can act on.
 COMMAND_EXTRAS = {
     "info": "lazy",
+    "api": "",  # pure metadata, no optional deps
     "concepts": "concepts",
     "index-source": "source",
     "index-images": "vision",
@@ -87,6 +89,10 @@ def _dispatch(cmd: str, argv: list[str]) -> int | None:
         from .info import main as info_main
 
         return info_main(argv)
+    if cmd == "api":
+        from .api_cmd import main as api_main
+
+        return api_main(argv)
     if cmd == "concepts":
         from .concept_graph import main as concepts_main
 
@@ -138,6 +144,7 @@ def main():
     print()
     print("Commands:")
     print("  info          Describe a .dyf file (items, fields, enrichment level; --json)")
+    print("  api           Map of the public Python API, grouped with entry points (--json)")
     print("  concepts      Build and query concept graphs from markdown files")
     print("  index-source  Index source code into a .dyf file (Python, JS, TS, Rust, Go, Java, C, C++, OCaml)")
     print("  index-images  Index images into a .dyf file (vision embeddings + thumbnails)")
