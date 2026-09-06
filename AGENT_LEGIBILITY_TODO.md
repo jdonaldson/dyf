@@ -234,10 +234,28 @@ is a place an agent will confidently report the wrong thing.
       start. Same index/body split as `dyf info`: a grouped `__init__` docstring, or a
       one-line summary per public symbol, readable without opening 30 modules.
 
-- [ ] **Audit return-shape consistency.** `LazyIndex.search` returns a result object with
-      `.indices`/`.scores`/`.fields`; `DenseSearchIndex.search` returns a bare
-      `(indices, scores)` tuple. A tuple cannot be introspected or extended — an agent
-      has to already know the arity. Pick one convention before v1 freezes both.
+- [x] **Return-shape consistency for the search API.** *(done 2026-09-05, 11 tests.)*
+      `LazyIndex.search` and `search_ivf` returned a `SearchResult`; `DenseSearchIndex.search`
+      returned a bare `(indices, scores)` tuple, which cannot be introspected or extended
+      and forces the caller to already know the arity. Both now return `SearchResult`, so
+      the two index types are interchangeable at the call site.
+
+      **Non-breaking**, because `SearchResult` already implements
+      `__iter__`/`__getitem__`/`__len__` — someone had deliberately made it unpack as a
+      2-tuple, which is what let this be reconciled without touching a single caller.
+      Verified single and batched unpacking, positional indexing, and `len()`.
+
+      ⚠ **`DenseSearchIndex` had no tests at all** despite being public, exported, and
+      shown in the README — one of the 31 callables `audit_public_api.py` cannot exercise
+      without a hand-written fixture. That set is where this class of defect lives.
+      The 11 new tests assert *behaviour*, not shape: nearest neighbour of a vector is
+      itself, scores rank descending, batched matches single, higher `nprobe` does not
+      reduce recall.
+
+      - [ ] Follow-up: `SearchResult` is defined in `lazy_index.py` but is now the shared
+        return type of the whole search API. It arguably belongs in a neutral module.
+        Not moved — that would break `from dyf.lazy_index import SearchResult` for anyone
+        doing it, for no functional gain today.
 
 - [ ] **Hidden requirements must be declarable before they fail.** `index-source` needs a
       live Ollama server at `localhost:11434` and only discovers this by raising mid-run
