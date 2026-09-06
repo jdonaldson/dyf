@@ -9,6 +9,7 @@ individual points to their nearest bucket centroid to clean up impure leaves.
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import TypedDict
 
 import numpy as np
@@ -474,6 +475,74 @@ def compute_louvain_hierarchy(
     }
 
 
+@dataclass
+class LeafGroupingResult:
+    """Result of grouping a DYF tree's leaves — :func:`agglomerate_tree_leaves` and
+    :func:`louvain_cluster_leaves` both return this.
+
+    Replaces a bare 5-tuple that both functions returned identically, documented as
+    "Same tuple as ``agglomerate_tree_leaves``" — a struct in everything but name.
+
+    ``ok`` is the fact the tuple could not express. On the too-few-leaves path the old
+    code returned ``(None, {}, [], None, tree)``: four sentinel values that a caller had
+    to decode by testing position 0 for ``None``. The rest of this package raises
+    ``ValueError`` for unusable input, so the sentinel was also inconsistent — but
+    raising here would break callers that legitimately handle small trees, so the
+    condition is named instead.
+
+    Unpacks as the original 5-tuple, so existing callers are unaffected.
+
+    Note there is deliberately no ``__len__``: the only honest meanings would be "5"
+    (the unpacking arity, which is useless) or the group count, and ``SearchResult``
+    already demonstrated how a hard-coded arity becomes a plausible wrong number. Use
+    :attr:`n_groups`.
+    """
+
+    point_labels: np.ndarray | None
+    names: dict
+    label_data: list
+    item_leaf_map: np.ndarray | None
+    tree: object
+
+    def _as_tuple(self):
+        return (self.point_labels, self.names, self.label_data, self.item_leaf_map, self.tree)
+
+    def __iter__(self):
+        """Backward-compatible unpacking of the original 5-tuple."""
+        return iter(self._as_tuple())
+
+    def __getitem__(self, key):
+        """Backward-compatible positional access, e.g. ``result[0]``.
+
+        Integer-only, unlike ``SearchResult.__getitem__``, which is overloaded on key
+        type — there is no field mapping here to be ambiguous with. Prefer the named
+        attributes; this exists so existing positional callers keep working.
+        """
+        return self._as_tuple()[key]
+
+    @property
+    def ok(self) -> bool:
+        """True when grouping actually ran. False means the tree had too few leaves."""
+        return self.point_labels is not None
+
+    @property
+    def n_groups(self) -> int:
+        """Number of distinct groups found; 0 when grouping did not run."""
+        if self.point_labels is None:
+            return 0
+        return int(len(np.unique(self.point_labels)))
+
+    @classmethod
+    def insufficient_leaves(cls, tree) -> LeafGroupingResult:
+        """The degenerate case, named. Previously ``(None, {}, [], None, tree)``."""
+        return cls(point_labels=None, names={}, label_data=[], item_leaf_map=None, tree=tree)
+
+    def summary(self) -> str:
+        if not self.ok:
+            return "Leaf grouping did not run: tree has fewer than two leaves."
+        return f"{self.n_groups} groups over {len(self.point_labels)} points."
+
+
 def agglomerate_tree_leaves(idx, coords, embeddings, n_groups=50):
     """Agglomerate DYF tree leaves into ~n_groups using embedding centroids.
 
@@ -490,26 +559,25 @@ def agglomerate_tree_leaves(idx, coords, embeddings, n_groups=50):
         n_groups: Target number of agglomerated buckets (default 50).
 
     Returns:
-        Tuple of ``(point_labels, lsh_names, lsh_label_data,
-        item_leaf_map, tree_structure)`` ready for ``multi_level_data``.
+        :class:`LeafGroupingResult`, ready for ``multi_level_data``. Unpacks as the
+        original 5-tuple ``(point_labels, names, label_data, item_leaf_map, tree)``.
 
         *  ``point_labels`` – int32 array (N,) of bucket ids (0-based).
-        *  ``lsh_names`` – ``{cid: "Bucket <cid>"}`` placeholder names.
-        *  ``lsh_label_data`` – list of dicts with centroid x/y/z, size, cid.
+        *  ``names`` – ``{cid: "Bucket <cid>"}`` placeholder names.
+        *  ``label_data`` – list of dicts with centroid x/y/z, size, cid.
         *  ``item_leaf_map`` – int32 array (N,) mapping each item to its
            tree leaf ``node_id`` (before agglomeration).
-        *  ``tree_structure`` – raw tree node list from
-           ``idx.get_tree_structure()``.
+        *  ``tree`` – raw tree node list from ``idx.get_tree_structure()``.
 
-        Returns ``(None, {}, [], None, tree)`` when the tree has fewer than
-        two leaves.
+        When the tree has fewer than two leaves, ``.ok`` is False and the array fields
+        are None — check ``.ok`` rather than testing ``point_labels is None``.
     """
     from scipy.cluster.hierarchy import fcluster, linkage
 
     result = _collect_leaf_data(idx)
     if result is None:
         tree = idx.get_tree_structure()
-        return None, {}, [], None, tree
+        return LeafGroupingResult.insufficient_leaves(tree)
 
     leaves, leaf_centroids, leaf_point_indices, tree = result
     n_points = coords.shape[0]
@@ -547,7 +615,13 @@ def agglomerate_tree_leaves(idx, coords, embeddings, n_groups=50):
     point_labels = _reassign_points(point_labels, embeddings)
 
     lsh_names, lsh_label_data = _build_output(point_labels, coords)
-    return point_labels, lsh_names, lsh_label_data, item_leaf_map, tree
+    return LeafGroupingResult(
+        point_labels=point_labels,
+        names=lsh_names,
+        label_data=lsh_label_data,
+        item_leaf_map=item_leaf_map,
+        tree=tree,
+    )
 
 
 def louvain_cluster_leaves(idx, coords, embeddings, leaf_k=10, similarity_threshold=0.5, resolution=1.0):
@@ -568,17 +642,14 @@ def louvain_cluster_leaves(idx, coords, embeddings, leaf_k=10, similarity_thresh
             (default 1.0).
 
     Returns:
-        Same tuple as ``agglomerate_tree_leaves``:
-        ``(point_labels, lsh_names, lsh_label_data, item_leaf_map,
-        tree_structure)``.
-
-        Returns ``(None, {}, [], None, tree)`` when the tree has fewer than
-        two leaves.
+        The same :class:`LeafGroupingResult` as :func:`agglomerate_tree_leaves` — which
+        is now enforced by the shared type rather than asserted in prose. Check ``.ok``
+        for the fewer-than-two-leaves case.
     """
     result = _collect_leaf_data(idx)
     if result is None:
         tree = idx.get_tree_structure()
-        return None, {}, [], None, tree
+        return LeafGroupingResult.insufficient_leaves(tree)
 
     leaves, leaf_centroids, leaf_point_indices, tree = result
     n_points = coords.shape[0]
@@ -617,4 +688,10 @@ def louvain_cluster_leaves(idx, coords, embeddings, leaf_k=10, similarity_thresh
     point_labels = _reassign_points(point_labels, embeddings)
 
     lsh_names, lsh_label_data = _build_output(point_labels, coords)
-    return point_labels, lsh_names, lsh_label_data, item_leaf_map, tree
+    return LeafGroupingResult(
+        point_labels=point_labels,
+        names=lsh_names,
+        label_data=lsh_label_data,
+        item_leaf_map=item_leaf_map,
+        tree=tree,
+    )

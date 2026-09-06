@@ -158,7 +158,12 @@ from . import (
 )
 
 # Tree-leaf agglomeration
-from .agglomerate import agglomerate_tree_leaves, louvain_cluster_leaves, merge_to_max_k
+from .agglomerate import (
+    LeafGroupingResult,
+    agglomerate_tree_leaves,
+    louvain_cluster_leaves,
+    merge_to_max_k,
+)
 from .catalog import (
     CatalogConfig,
     CatalogMatch,
@@ -172,6 +177,7 @@ from .catalog import (
 # Categorical DAG
 from .categorical import (
     AxisDiagnostic,
+    AxisDiagnosticsResult,
     CategoryGraph,
     coarsen,
     diagnose_axes,
@@ -342,6 +348,7 @@ __all__ = [
     # extract_fisher_labels — deprecated, use coarsen() directly
     # Categorical DAG
     "AxisDiagnostic",
+    "AxisDiagnosticsResult",
     "CategoryGraph",
     "coarsen",
     "diagnose_axes",
@@ -378,6 +385,7 @@ __all__ = [
     "derive_path_labels",
     "format_cluster_context",
     # Tree-leaf agglomeration
+    "LeafGroupingResult",
     "agglomerate_tree_leaves",
     "louvain_cluster_leaves",
     "merge_to_max_k",

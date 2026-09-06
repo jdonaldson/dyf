@@ -779,6 +779,62 @@ def discover_categorical_columns(
     return result
 
 
+@dataclass
+class AxisDiagnosticsResult:
+    """Result of :func:`embed_with_diagnostics`.
+
+    Replaces a 4-tuple whose 2nd and 3rd elements were *the same type*
+    (``list[AxisDiagnostic]``) and differed only by meaning — before vs after
+    restructuring. Swapping them was silent and type-checked clean, and no reader could
+    catch it at the call site.
+
+    ``restructured`` is the fact the tuple could not express. On the early-exit path —
+    every axis already above ``lift_threshold`` — the second pass never runs, and the old
+    code returned ``before_diags`` in *both* slots. A caller could not distinguish
+    "re-embedding ran and changed nothing" from "re-embedding never happened", which are
+    very different findings when you are deciding whether the mechanism works.
+
+    Unpacks as the original 4-tuple, so existing callers are unaffected.
+    """
+
+    embeddings: np.ndarray
+    before: list[AxisDiagnostic]
+    after: list[AxisDiagnostic]
+    texts: list[str]
+    restructured: bool
+
+    def __iter__(self):
+        """Backward-compatible unpacking: embeddings, before, after, texts = ..."""
+        yield self.embeddings
+        yield self.before
+        yield self.after
+        yield self.texts
+
+    @property
+    def promoted_axes(self) -> list[str]:
+        """Axes that fell below the lift threshold and were promoted to explicit text."""
+        if not self.restructured:
+            return []
+        after_by_name = {d.name: d for d in self.after}
+        return [d.name for d in self.before if d.name in after_by_name and d.lift < after_by_name[d.name].lift]
+
+    @property
+    def mean_lift_delta(self) -> float:
+        """Change in mean lift across axes. 0.0 when nothing was restructured."""
+        if not self.restructured or not self.before:
+            return 0.0
+        before_mean = sum(d.lift for d in self.before) / len(self.before)
+        after_mean = sum(d.lift for d in self.after) / len(self.after)
+        return after_mean - before_mean
+
+    def summary(self) -> str:
+        if not self.restructured:
+            return f"No axes below threshold; {len(self.before)} diagnosed, embeddings unchanged."
+        return (
+            f"Restructured {len(self.promoted_axes)} of {len(self.before)} axes; mean lift {self.mean_lift_delta:+.2f}"
+        )
+
+
 def embed_with_diagnostics(
     embeddings: np.ndarray,
     text_col: list[str],
@@ -786,7 +842,7 @@ def embed_with_diagnostics(
     embed_fn: Callable[[list[str]], np.ndarray],
     lift_threshold: float = 3.0,
     prefix: str = "",
-) -> tuple[np.ndarray, list[AxisDiagnostic], list[AxisDiagnostic], list[str]]:
+) -> AxisDiagnosticsResult:
     """Two-pass embedding with axis diagnostics.
 
     1. Run ``diagnose_axes`` on the provided embeddings.
@@ -812,14 +868,10 @@ def embed_with_diagnostics(
 
     Returns
     -------
-    embeddings : (n, d) float32
-        Final embeddings (original if no axes promoted, re-embedded otherwise).
-    before_diags : list[AxisDiagnostic]
-        Diagnostics from the first pass.
-    after_diags : list[AxisDiagnostic]
-        Diagnostics from the second pass (same as before if no re-embedding).
-    texts : list[str]
-        Final text strings (original or structured).
+    AxisDiagnosticsResult
+        With ``.embeddings``, ``.before``, ``.after``, ``.texts`` and ``.restructured``.
+        Unpacks as the original 4-tuple. Check ``.restructured`` rather than comparing
+        ``before`` and ``after``: on the early-exit path they are the same object.
     """
     # Coerce label columns to numpy
     label_arrays: dict[str, np.ndarray | list] = {
@@ -833,8 +885,15 @@ def embed_with_diagnostics(
     promote_axes = [d.name for d in before_diags if d.lift < lift_threshold]
 
     if not promote_axes:
-        # Nothing to promote — return originals
-        return embeddings, before_diags, before_diags, list(text_col)
+        # Nothing to promote. `after` mirrors `before` because no second pass ran —
+        # `restructured=False` is what says so; do not infer it by comparing the two.
+        return AxisDiagnosticsResult(
+            embeddings=embeddings,
+            before=before_diags,
+            after=before_diags,
+            texts=list(text_col),
+            restructured=False,
+        )
 
     # Build structured text with promoted columns prepended
     n = len(text_col)
@@ -856,7 +915,13 @@ def embed_with_diagnostics(
     # Second pass: diagnose the new embeddings
     after_diags = diagnose_axes(new_embeddings, label_arrays)
 
-    return new_embeddings, before_diags, after_diags, structured_texts
+    return AxisDiagnosticsResult(
+        embeddings=new_embeddings,
+        before=before_diags,
+        after=after_diags,
+        texts=structured_texts,
+        restructured=True,
+    )
 
 
 def diagnostics_to_metadata(

@@ -807,12 +807,19 @@ class TestLouvainClusterLeaves:
                 result = louvain_cluster_leaves(idx, coords, embeddings)
 
             if n_leaves < 2:
+                # Positional access still works (backward compat)...
                 assert result[0] is None
                 assert result[1] == {}
                 assert result[2] == []
+                # ...but `.ok` is what actually names the condition, instead of making
+                # the caller decode four sentinel values.
+                assert result.ok is False
+                assert result.n_groups == 0
             else:
                 # If tree happened to have 2+ leaves, just verify structure
                 assert result[0] is not None
+                assert result.ok is True
+                assert result.n_groups > 0
         finally:
             if os.path.exists(path):
                 os.unlink(path)
