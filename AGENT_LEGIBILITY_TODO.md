@@ -483,44 +483,59 @@ is a place an agent will confidently report the wrong thing.
 
 ## P2 — make the package self-describing
 
-- [ ] **Three modules are named for things they are not.** `catalog.py` (1446 lines) is a
-      multi-catalog *taxonomy matcher* for UNSPSC/BroadJump/Curvo with **zero connection
-      to the ingest path** — its only in-repo consumer is `tests/test_catalog.py`.
-      `ontology.py` is *discovered* structure in embedding space, not a declared schema.
-      `provenance.py` is real but partial. A reader scanning the module list builds the
-      wrong model of the package. Fix by renaming, or by a one-line module docstring that
-      contradicts the name loudly.
-- [ ] **Decide what dyf is, then say it once.** `README.md` says "discover structure in
-      embedding spaces" (Dense/Bridge/Orphan topology). The working one-liner is
-      "generalized embeddings space over arbitrary media". These describe different
-      products. Pick one; the other is at best a section.
-- [ ] **The media half is absent from `__init__.py`.** `index_images`, `index_video`,
-      `index_source` and all of `enrich/` are CLI-only — there is no `dyf.index_images(...)`.
-      The ~109-entry `__all__` is dominated by tree/clustering/RAG primitives. Either
-      export it or state plainly that it is CLI-only.
-- [ ] **Document that image/video enrichment is degraded, not equivalent.** Enrichment is
-      media-agnostic only because it treats everything as *text titles*: images get the
-      filename (`index_images.py:163`), video gets `"Scene 3 at 1:24"`
-      (`index_video.py:219`). LLM labeling and TF-IDF then run over filenames and scene
-      strings, never pixels. Video titles will likely trip `assess_text_diversity`
-      (`_cluster.py:140`) into the frequency-label fallback. Silent quality cliff.
-- [ ] **Cross-reference this file from `KNOWN_ISSUES.md`** so there is one entry point to
-      the open queue rather than two.
-- [ ] **Prune or fence the dead paths** (each is a trap for an agent reading the code as
-      documentation):
-      - `enrich reannotate` is dead against current output — it discovers
-        `cluster_<k>_2d/_3d` fields that only `demo/dyfviz.py` ever wrote, and
-        `enrich_cluster` actively deletes them as stale (`_cluster.py:443-455`).
-      - `--cluster-level` is inert; `_viz.py:128-158`'s legacy branch only fires when
-        fields the current pipeline always writes are missing.
-      - `fit_birch` (`_cluster.py:19`) and `merge_tiny_clusters` (`_cluster.py:53`) are
-        never called from `src/`. `merge_tiny_clusters` has tests exercising code the
-        product does not use.
-      - `_scaffold._group_label_from_names` (`_scaffold.py:24-33`) hardcodes
-        medical-device vocabulary and brand names (`cardinal`, `medline`, `baxter`) in a
-        general module; on any non-GUDID corpus every group scores `None` and labels
-        silently fall through to the largest member's name.
-      - `enrich audio` needs `kokoro` + `soundfile`, declared in no pyproject extra.
+- [x] **Three modules are named for things they are not.** *(done 2026-09-05.)* Renaming
+      was the obvious move and the wrong one: the names are *ambiguous* rather than wrong,
+      downstream code imports them, and one accurate sentence resolves ambiguity for free.
+      Each docstring now leads with the correction instead of the description.
+
+      - **`provenance.py`** was the severe case — not a vague name but a **false claim**.
+        It said "each artifact carries a Provenance record"; nothing in dyf calls
+        `create_provenance`. That is the kind of sentence that gets believed and built on.
+      - **`catalog.py`** claimed to generalize "ANCHOR", a system referenced **exactly
+        once in the whole repo**, in that sentence, undefined. Now leads with: "catalog"
+        means a standards taxonomy (UNSPSC, GMDN), not a catalog of your indexed content,
+        and it is independent of the ingest and search path.
+      - **`ontology.py`** and `catalog.py` sit adjacent, both sound like "structure", and
+        run in **opposite directions** — one discovers a hierarchy from embeddings, the
+        other matches against one you declared. Each now names the other as the contrast,
+        which is the thing neither name can say alone.
+
+- [x] **Decide what dyf is, then say it once.** *(done 2026-09-05.)* The README described
+      only structure discovery, so half the package was invisible — indexing, search, the
+      `.dyf` format, and the entire CLI, which it never mentioned. It now states both
+      halves, and the honest scope note that was buried in *Performance* ("not competing to
+      be the fastest ANN retriever") is promoted to the top where it shapes the first
+      impression.
+
+- [x] **The media half is absent from `__init__.py`.** *(done 2026-09-05 — stated, not
+      changed.)* The `index-*` commands stay CLI-only, and the README now says so plainly
+      rather than leaving it to be discovered. Exporting them would have been the wrong
+      fix: they take a path and write a file rather than returning data, so a Python
+      caller wants `write_lazy_index` instead.
+
+- [x] **Document that image/video ingest is degraded, not equivalent.** *(done 2026-09-05.)*
+      `index_images` stores the **filename** as `title`; `index_video` stores a
+      **timestamp** like `"Scene 3 at 1:24"`. The embeddings are genuinely visual, but
+      everything downstream that reads `title` — LLM labelling, TF-IDF keywording, the
+      `dyfviz` tour — is reading `IMG_4821.jpg` and has never seen a pixel. Both module
+      docstrings now warn. It degrades quietly rather than failing, which is the worst way
+      to go wrong.
+
+- [x] **Cross-reference the two queues.** *(done 2026-09-05.)* `KNOWN_ISSUES.md` is the
+      **library** queue (Python API, return shapes, primitives); this file is the **CLI and
+      self-description** queue. Each now points at the other and says why they are
+      separate: their blind spots differ, which is how a CLI printing zero bytes passed all
+      three standing audits.
+      ⚠ Also fixed `KNOWN_ISSUES.md`'s opening line, which claimed **"None are blocking"**
+      while its own P1 section is titled *shipped features that do not work* — false since
+      the heading became v1 quality, and flagged this morning before being fixed here.
+
+- [x] **Prune or fence the dead paths.** *(moot 2026-09-05 — all of them left with the
+      split.)* `enrich reannotate`, the inert `--cluster-level`, uncalled `fit_birch` /
+      `merge_tiny_clusters`, `_scaffold`'s hardcoded medical-device vocabulary, and
+      `enrich audio`'s undeclared `kokoro`/`soundfile` were all in `enrich/`, which is now
+      **dyfviz**. Recorded there in `dyfviz/CLAUDE.md` under inherited debt — not fixed,
+      but findable, which they were not before.
 
 ## P3 — larger work, still bounded by the heading
 
