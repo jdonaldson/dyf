@@ -3,6 +3,12 @@
 Work queue for making dyf usable *by agents* — as a CLI they invoke, a package they
 import, and a repo they read. Opened 2026-09-05.
 
+> **The other queue.** `KNOWN_ISSUES.md` covers the **library**: Python API correctness,
+> return shapes, primitives downstream projects import. This file covers the **CLI and the
+> package's self-description**. They are separate because their blind spots differ — the
+> three standing audits inspect only the exported Python API, which is why a CLI printing
+> zero bytes passed every one of them. Check both.
+
 ## Relationship to the v1 heading
 
 `CLAUDE.md`'s heading is **v1 quality, not more capability**, scored by "can someone

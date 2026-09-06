@@ -10,6 +10,12 @@ Usage (via CLI):
 
 Requires: pip install "dyf[video]"
 
+⚠ **Video is indexed as still images, and the `title` field is a timestamp** like
+`"Scene 3 at 1:24"`. There is no audio track, no motion or temporal embedding — one
+keyframe per scene goes through the *image* model. Anything downstream that reads `title`
+is reading timestamps, which carry no semantics at all, so LLM labelling and keywording
+degrade further here than they do for images.
+
 Exit codes (see `_ingest_errors`): 0 ok, 1 nothing to index, 2 bad request,
 3 dependency or service unavailable.
 """

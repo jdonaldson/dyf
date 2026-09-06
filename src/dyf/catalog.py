@@ -1,8 +1,15 @@
-"""CatalogSpace: Multi-catalog matching with cross-catalog coherence.
+"""CatalogSpace: match queries against *declared* taxonomies, with cross-catalog coherence.
 
-Generalizes ANCHOR's single-ontology matching to N catalogs with
-joint coherence scoring. Uses CategoryGraph for hierarchy navigation
-instead of code-prefix logic.
+⚠ **"Catalog" here means a standards taxonomy — UNSPSC, GMDN, BroadJump — not a catalog of
+your indexed content.** This module is independent of the ingest and search path: nothing
+in `index_*`, `build_dyf_tree`, `LazyIndex` or `BridgeIndex` uses it, and nothing here
+reads a `.dyf`. You give it node embeddings and a `CategoryGraph` you already have; it
+tells you which nodes a query belongs under.
+
+That distinction is the whole reason to read this paragraph. The name sits next to
+`ontology.py` in the module list and both sound like "structure", but they run in opposite
+directions: **`ontology.py` discovers a hierarchy from embeddings; this matches against one
+you already declared.**
 
 Key concepts:
 - ontological_z: Does the query belong in this catalog at all?

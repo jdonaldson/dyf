@@ -4,7 +4,10 @@
 [![PyPI](https://img.shields.io/pypi/v/dyf)](https://pypi.org/project/dyf/)
 [![Python](https://img.shields.io/pypi/pyversions/dyf)](https://pypi.org/project/dyf/)
 
-Discover structure in embedding spaces. DYF uses density-based LSH to reveal the natural organization of your data:
+**Index embedding spaces, and see their structure.** DYF builds a density-based LSH tree
+over your embeddings, writes it to a `.dyf` file that opens in ~5 ms without loading data,
+and searches it with a Rust kernel — while exposing the *topology* that tree discovers
+along the way:
 
 - **Dense**: Core items in well-populated semantic regions
 - **Bridge**: Transitional items connecting different clusters
@@ -12,13 +15,69 @@ Discover structure in embedding spaces. DYF uses density-based LSH to reveal the
 
 ## What it does
 
-DYF transforms raw embeddings into navigable semantic maps. Instead of just clustering, it reveals the *topology* - which regions are dense, which items bridge between concepts, and which are truly unique.
+Two halves, and both matter:
+
+**Index and search.** Build a tree, write a `.dyf`, query it. Indexes are self-describing
+(`dyf info corpus.dyf`), open lazily, and carry your own stored fields alongside the
+vectors. Ingest helpers turn source code, images or video into embeddings, or bring your
+own array.
+
+**Reveal structure.** The same tree that makes search fast also exposes how the corpus is
+organized — which regions are dense, which items bridge between concepts, which are truly
+unique, and what hierarchy falls out of the embeddings on their own.
 
 Use cases:
 - **Semantic navigation**: Find paths between concepts
 - **Structure discovery**: Understand how your data organizes itself
 - **Anomaly detection**: Identify orphans and bridges
 - **Index building**: Pre-compute structure for fast queries
+
+> **Scope.** dyf is not competing to be the fastest ANN retriever — on the pure
+> recall-vs-latency frontier, mature graph libraries (HNSW, pynndescent) win. Its strengths
+> are structure discovery, hierarchy, instant-open on-disk indexes, and reaching exact
+> recall on a single index by raising `nprobe`. See [Performance](#performance).
+>
+> Enrichment and the browser tour — UMAP projection, clustering, LLM labelling, narration —
+> live downstream in [dyfviz](https://github.com/jdonaldson/dyfviz), split out in 0.13.
+
+## Finding your way around
+
+There are over a hundred public names, so start with the map rather than the list:
+
+```bash
+dyf api                 # grouped, with an entry point per group
+dyf api trees --json    # one group, parseable
+```
+
+```python
+import dyf
+print(dyf.overview())   # the same map from Python
+```
+
+## Command line
+
+```bash
+dyf index-source src/ -o code.dyf     # tree-sitter chunks, Ollama embeddings
+dyf index-images ~/photos -o pics.dyf # vision embeddings + thumbnails
+dyf index-video clip.mp4 -o clip.dyf  # scene detection, one keyframe per scene
+dyf info code.dyf                     # describe an index without loading it
+dyf api                               # map of the Python API
+dyf concepts query "Debrief Pattern"  # concept graph over your markdown notes
+```
+
+Add `--dry-run` to any `index-*` command to see what it *would* do — file and chunk
+counts, embedding batches, whether the embedding service is reachable — without embedding
+anything or writing a file. The embedding pass is the expensive, irreversible half; this
+lets you look before leaping.
+
+> **The `index-*` commands are CLI-only.** They are deliberately not in `__all__`, so
+> there is no `dyf.index_images(...)`. Import them directly
+> (`from dyf.index_source import index_source`) if you need them from Python, and note
+> they take a path and write a file rather than returning data.
+>
+> Exit codes across the CLI: `0` success, `1` a normal negative answer (nothing found,
+> graph stale), `2` a bad request, `3` a missing dependency or unreachable service. The
+> message names what to install or start.
 
 ## Installation
 

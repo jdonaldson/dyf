@@ -10,6 +10,13 @@ Usage (via CLI):
 
 Requires: pip install "dyf[vision]"
 
+⚠ **The `title` stored field is the filename**, not a description of the image. The
+embeddings are genuinely visual, but anything downstream that reads `title` — LLM cluster
+labelling, TF-IDF keywording, the browser tour in `dyfviz` — is reading filenames and has
+never seen a pixel. On a corpus of `IMG_4821.jpg` names that degrades quietly rather than
+failing, which is the worst way for it to go wrong. Pass better titles by writing the
+index yourself if the labels matter.
+
 Exit codes (see `_ingest_errors`): 0 ok, 1 nothing to index, 2 bad request,
 3 dependency or service unavailable.
 """

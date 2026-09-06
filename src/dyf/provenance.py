@@ -1,8 +1,23 @@
-"""Artifact provenance tracking for the DYF pipeline.
+"""Provenance records for pipeline artifacts — **which the caller must stamp itself**.
 
-Each artifact (parquet, ROG cache, .dyf, label cache) carries a Provenance
-record describing its identity and inputs.  Consumers can check compatibility
-before loading, failing loud on mismatch instead of silently degrading.
+⚠ This module provides the *vocabulary* for artifact identity, not the behaviour. Nothing
+in dyf calls `create_provenance`: `write_lazy_index` records `build_params` but no
+provenance, and `Pipeline` never stamps after running a stage — it assumes `build_fn` did.
+Verified 2026-09-05.
+
+The previous version of this docstring said "each artifact carries a Provenance record",
+which was simply untrue and is the kind of claim that gets believed. If you want
+provenance on a `.dyf`, you write it: build a record with `create_provenance` and pass it
+through `metadata=`. `Pipeline` reads either a `_provenance` key or the highest
+`_provenance_level_N` (the shape the downstream `dyfviz` enrichment stages write).
+
+A Provenance describes an artifact's identity and inputs so a consumer can check
+compatibility before loading and fail loudly rather than degrade silently — see
+`check_compatible`.
+
+Note `file_hash` is a *fast partial* hash — size, mtime and the first 64 KB — so a
+touched-but-unchanged file reads as changed. That is deliberate (it is a change detector,
+not a content address) but it is not a checksum.
 """
 
 from __future__ import annotations

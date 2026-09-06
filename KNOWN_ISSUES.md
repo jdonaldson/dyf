@@ -1,15 +1,27 @@
 # Known Issues / TODO
 
-Issues discovered while consuming dyf as a library. None are blocking, but
-each cost some time to diagnose.
+Issues discovered while consuming dyf as a **library** — the Python API, its return
+shapes, and the primitives downstream projects import.
+
+> **The other queue.** `AGENT_LEGIBILITY_TODO.md` covers the **CLI and the package's
+> self-description**: output, exit codes, error messages, discoverability. The two are
+> deliberately separate because they have different blind spots — the three standing
+> audits look only at the exported Python API, which is why a CLI printing zero bytes
+> passed all of them. Check both.
+
+⚠ This file used to open with "None are blocking". That stopped being true when the
+heading became v1 *quality*: a shipped feature that silently returns nothing is exactly
+what blocks "can someone depend on this?". The P1 section below is titled *shipped features
+that do not work*, which contradicted the opening line for months.
 
 ---
 
 ## Cleanup queue (opened 2026-08-31)
 
 Ordered by leverage, not by size. Evidence for each is in the numbered issues below.
-Heading this serves: see "Heading" at the top of `CLAUDE.md` — v1 *quality*, i.e. closing the
-gap between the shipped surface (109 exports / 72 callables) and the validated one.
+Heading this serves: see "Heading" at the top of `CLAUDE.md` — v1 *quality*, i.e. closing
+the gap between the shipped surface and the validated one. (Export counts are deliberately
+not quoted here; they go stale. `dyf.overview()` computes the current one.)
 
 **Standing audits** — re-run when touching the public surface; each caught a real defect:
 `benchmarks/audit_public_api.py` (41 of 72 callables, 41 OK, canary reproduces issue 5),
