@@ -48,6 +48,33 @@
 
 ### Added
 
+- **`--dry-run` on `index-source`, `index-images` and `index-video`.** Every ingest path is
+  cheap-then-expensive — scan, then parse or decode, then embed — and the embedding pass is
+  the one you cannot take back. `--dry-run` runs the cheap stages and reports what the
+  expensive one would cost: file and chunk counts, embedding batches, and for
+  `index-source` whether the Ollama service is reachable and has the model. Add `--json`
+  for a `schema_version: 0` payload.
+
+  This encodes the *Sanity Check Before Deep Work* judgement — "don't re-embed 2.7M records
+  when a regex gets 95%" — as something the tool affords rather than something a caller has
+  to remember.
+
+  Two rules it holds itself to:
+
+  - **A dry run stays cheap.** For `index-video` the *counting itself* is the expensive
+    step — scene detection is a full decode — so it reports the scene count as **unknown**
+    rather than doing the work the flag exists to help you avoid. A test asserts this by
+    previewing a file that is not a valid video at all: it succeeds, proving nothing tried
+    to decode it.
+  - **No invented time estimates.** Counts are exact and are never multiplied by a
+    throughput number, because no measured one exists. A plausible fabricated duration
+    would be believed, which makes it worse than an honest count. A test greps the output
+    for `eta` / `estimated time` / `minutes` to keep it that way.
+
+  `--dry-run` also works without the optional dependencies the real run needs — visible in
+  the CLI audit, where both dry-runs report OK while the real invocations CLEAN-FAIL on
+  missing extras.
+
 - **`benchmarks/audit_cli_surface.py` — a fourth standing audit, covering the CLI.** The
   other three inspect the exported Python API, which is why a CLI printing zero bytes
   passed all of them. Runs a real invocation of every subcommand and classifies it

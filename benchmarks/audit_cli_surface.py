@@ -147,6 +147,10 @@ def build_cases(fx: Fixtures) -> list[tuple[str, list[str] | None]]:
         ("concepts check", ["concepts", "check"]),
         ("concepts list", ["concepts", "list"]),
         ("concepts query", ["concepts", "query", "critical rules"]),
+        # --dry-run must work without the optional deps the real run needs; that is much
+        # of its value, so it is audited separately from the real invocation.
+        ("index-source --dry-run", ["index-source", fx.srcdir, "-o", out_dyf, "--dry-run"]),
+        ("index-images --dry-run", ["index-images", fx.srcdir, "-o", out_dyf, "--dry-run"]),
         ("index-source", ["index-source", fx.srcdir, "-o", out_dyf]),
         ("index-images", ["index-images", fx.srcdir, "-o", out_dyf]),
         ("index-video", ["index-video", str(Path(fx.tmpdir, "absent.mp4")), "-o", out_dyf]),

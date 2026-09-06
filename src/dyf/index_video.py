@@ -24,6 +24,7 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 from ._ingest_errors import BadIngestRequest, EmptyIngestError, IngestError
+from ._preview import IngestPreview
 from .dyf_tree import build_dyf_tree
 from .index_images import DEFAULT_MODEL, embed_images, load_vision_model, make_thumbnail
 from .lazy_index import write_lazy_index
@@ -155,6 +156,42 @@ def extract_keyframes(video_path: Path, scenes: list[dict]) -> list:
 
     cap.release()
     return images
+
+
+def preview_video(
+    video_path: Path,
+    output: Path,
+    model: str = DEFAULT_MODEL,
+    threshold: float = 27.0,
+    batch_size: int = 16,
+) -> IngestPreview:
+    """Report what `index_video` would do, without decoding the video.
+
+    Unlike source and images, here the *counting itself* is the expensive step: scene
+    detection is a full decode pass, and the scene count determines everything downstream.
+    So this reports the count as unknown rather than running the work a dry run exists to
+    help you avoid — a preview that costs as much as the run is not a preview.
+
+    What it can say cheaply — file size, and that the scene threshold is the parameter
+    that will decide the item count — is what a caller actually needs to choose between
+    running it and reconsidering.
+    """
+    size_mb = video_path.stat().st_size / 1_048_576
+
+    return IngestPreview(
+        command="index-video",
+        source=str(video_path),
+        output=str(output),
+        model=model,
+        batch_size=batch_size,
+        counts={"megabytes": int(size_mb), "scenes": None, "keyframes": None},
+        batches=None,
+        notes=[
+            "scene count is not previewable: detecting scenes is a full decode pass, "
+            "which is the expensive work this flag exists to let you avoid",
+            f"one keyframe is embedded per scene; --threshold {threshold} decides how many (lower finds more scenes)",
+        ],
+    )
 
 
 def index_video(
@@ -343,6 +380,17 @@ def main(argv: list[str] | None = None) -> int:
         default=16,
         help="Embedding batch size (default: 16)",
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Report what would be indexed and stop. Decodes nothing, writes nothing.",
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="With --dry-run, emit JSON (schema_version 0 — unstable before v1)",
+    )
 
     args = parser.parse_args(argv)
 
@@ -354,6 +402,15 @@ def main(argv: list[str] | None = None) -> int:
     output = args.output
     if output is None:
         output = Path(f"{video_path.stem}.dyf")
+
+    if args.dry_run:
+        return preview_video(
+            video_path=video_path,
+            output=output.resolve(),
+            model=args.model,
+            threshold=args.threshold,
+            batch_size=args.batch_size,
+        ).emit(args.as_json, logger)
 
     try:
         index_video(

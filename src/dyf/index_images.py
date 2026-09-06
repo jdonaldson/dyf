@@ -26,6 +26,7 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 from ._ingest_errors import BadIngestRequest, EmptyIngestError, IngestError
+from ._preview import IngestPreview, batches_for
 from .dyf_tree import build_dyf_tree
 from .lazy_index import write_lazy_index
 
@@ -125,6 +126,42 @@ def scan_images(source_dir: Path) -> list[Path]:
         if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS:
             results.append(p)
     return results
+
+
+def preview_images(
+    source_dir: Path,
+    output: Path,
+    model: str = DEFAULT_MODEL,
+    batch_size: int = 16,
+) -> IngestPreview:
+    """Report what `index_images` would do, without loading the model or embedding.
+
+    Scanning is free; decoding every image to check it is valid is not, and neither is
+    downloading a vision model. So the file count is exact and the *usable* count is not
+    known until the real run — stated rather than guessed at.
+    """
+    paths = scan_images(source_dir)
+    by_ext: dict[str, int] = {}
+    for p in paths:
+        by_ext[p.suffix.lower()] = by_ext.get(p.suffix.lower(), 0) + 1
+
+    notes = []
+    if paths:
+        spread = ", ".join(f"{ext} {n}" for ext, n in sorted(by_ext.items()))
+        notes.append(f"by extension: {spread}")
+        notes.append("some files may fail to decode; the usable count is only known after a real run")
+    total_mb = sum(p.stat().st_size for p in paths) / 1_048_576 if paths else 0.0
+
+    return IngestPreview(
+        command="index-images",
+        source=str(source_dir),
+        output=str(output),
+        model=model,
+        batch_size=batch_size,
+        counts={"images": len(paths), "megabytes": int(total_mb)},
+        batches=batches_for(len(paths), batch_size),
+        notes=notes,
+    )
 
 
 def index_images(
@@ -307,6 +344,17 @@ def main(argv: list[str] | None = None) -> int:
         default=16,
         help="Embedding batch size (default: 16)",
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Report what would be indexed and stop. Loads no model, writes nothing.",
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="With --dry-run, emit JSON (schema_version 0 — unstable before v1)",
+    )
 
     args = parser.parse_args(argv)
 
@@ -318,6 +366,14 @@ def main(argv: list[str] | None = None) -> int:
     output = args.output
     if output is None:
         output = Path(f"{source_dir.name}.dyf")
+
+    if args.dry_run:
+        return preview_images(
+            source_dir=source_dir,
+            output=output.resolve(),
+            model=args.model,
+            batch_size=args.batch_size,
+        ).emit(args.as_json, logger)
 
     try:
         index_images(

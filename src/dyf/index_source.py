@@ -32,6 +32,7 @@ from ._ingest_errors import (
     EmptyIngestError,
     IngestError,
 )
+from ._preview import IngestPreview, batches_for
 from .dyf_tree import build_dyf_tree
 from .lazy_index import write_lazy_index
 
@@ -341,6 +342,57 @@ def embed_batch(
     return np.array(all_embeddings, dtype=np.float32)
 
 
+def preview_source(
+    source_dir: Path,
+    output: Path,
+    model: str = DEFAULT_MODEL,
+    ollama_url: str = DEFAULT_OLLAMA_URL,
+    batch_size: int = 64,
+) -> IngestPreview:
+    """Report what `index_source` would do, without embedding anything.
+
+    Scans and chunks — both cheap next to the embedding pass, and chunking is what makes
+    the count *exact* rather than a guess at chunks-per-file. Stops before the first
+    Ollama call, which is the expensive and irreversible part.
+
+    Falls back to a file count when tree-sitter is absent, since a preview that cannot run
+    without an optional dependency is not much of a preview.
+    """
+    files = [f for ext in sorted(SUPPORTED_EXTENSIONS) for f in sorted(source_dir.rglob(f"*{ext}"))]
+
+    notes: list[str] = []
+    counts: dict[str, int | None] = {"files": len(files)}
+
+    try:
+        n_chunks: int | None = sum(len(chunk_source_file(f)) for f in files)
+    except ImportError:
+        n_chunks = None
+        notes.append("chunk count needs tree-sitter: pip install 'dyf[source]'")
+    counts["chunks"] = n_chunks
+
+    try:
+        check_embedding_service(ollama_url=ollama_url, model=model)
+        service = f"{ollama_url} — reachable, model available"
+    except EmbeddingServiceError as exc:
+        service = f"{ollama_url} — UNAVAILABLE"
+        notes.append(str(exc).splitlines()[0])
+
+    if n_chunks == 0 and files:
+        notes.append("files matched but produced no chunks — none contain indexable definitions")
+
+    return IngestPreview(
+        command="index-source",
+        source=str(source_dir),
+        output=str(output),
+        model=model,
+        batch_size=batch_size,
+        counts=counts,
+        batches=batches_for(n_chunks, batch_size),
+        service=service,
+        notes=notes,
+    )
+
+
 def index_source(
     source_dir: Path,
     output: Path,
@@ -529,6 +581,17 @@ def main(argv: list[str] | None = None) -> int:
         help="Random seed (default: 42)",
     )
     parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Report what would be indexed and stop. Embeds nothing, writes nothing.",
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="With --dry-run, emit JSON (schema_version 0 — unstable before v1)",
+    )
+    parser.add_argument(
         "--dedup",
         type=float,
         nargs="?",
@@ -549,6 +612,14 @@ def main(argv: list[str] | None = None) -> int:
     output = args.output
     if output is None:
         output = Path(f"{source_dir.name}.dyf")
+
+    if args.dry_run:
+        return preview_source(
+            source_dir=source_dir,
+            output=output.resolve(),
+            model=args.model,
+            ollama_url=args.ollama_url,
+        ).emit(args.as_json, logger)
 
     try:
         index_source(
