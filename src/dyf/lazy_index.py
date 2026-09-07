@@ -745,11 +745,9 @@ def _build_flatbuffer_index(
 
         # Hyperplanes vector
         if fnode["hyperplanes"] is not None:
-            hp = fnode["hyperplanes"]
-            FBNode.NodeStartHyperplanesVector(builder, len(hp))
-            for val in reversed(hp):
-                builder.PrependFloat32(float(val))
-            hp_vec = builder.EndVector()
+            # One memcpy per vector; the per-element PrependFloat32 loop this replaces
+            # was 75% of write time at 25k points (11M Python calls).
+            hp_vec = builder.CreateNumpyVector(np.ascontiguousarray(fnode["hyperplanes"], dtype=np.float32).ravel())
         else:
             hp_vec = None
 
@@ -764,19 +762,11 @@ def _build_flatbuffer_index(
             bids_vec = None
 
         # Centroid vector
-        cent = fnode["centroid"]
-        FBNode.NodeStartCentroidVector(builder, len(cent))
-        for val in reversed(cent):
-            builder.PrependFloat32(float(val))
-        cent_vec = builder.EndVector()
+        cent_vec = builder.CreateNumpyVector(np.ascontiguousarray(fnode["centroid"], dtype=np.float32).ravel())
 
         # Eigenvalues vector
         if fnode.get("eigenvalues") is not None:
-            ev = fnode["eigenvalues"]
-            FBNode.NodeStartEigenvaluesVector(builder, len(ev))
-            for val in reversed(ev):
-                builder.PrependFloat32(float(val))
-            ev_vec = builder.EndVector()
+            ev_vec = builder.CreateNumpyVector(np.ascontiguousarray(fnode["eigenvalues"], dtype=np.float32).ravel())
         else:
             ev_vec = None
 
@@ -813,12 +803,11 @@ def _build_flatbuffer_index(
         running_offset += len(buf)
 
     batch_desc_offsets = []
+    leaf_nodes = [n for n in flat_nodes if n["is_leaf"]]  # hoisted: was rebuilt per batch (O(leaves * nodes))
     for i, buf in enumerate(batch_buffers):
         FBBatch.BatchDescriptorStart(builder)
         FBBatch.BatchDescriptorAddOffset(builder, batch_offsets[i])
         FBBatch.BatchDescriptorAddLength(builder, len(buf))
-        # Count rows from the flat_nodes
-        leaf_nodes = [n for n in flat_nodes if n["is_leaf"]]
         FBBatch.BatchDescriptorAddNumRows(builder, len(leaf_nodes[i]["indices"]))
         batch_desc_offsets.append(FBBatch.BatchDescriptorEnd(builder))
 

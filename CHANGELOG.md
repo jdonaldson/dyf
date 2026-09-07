@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### Faster
+
+`write_lazy_index` spent 75% of its time in the FlatBuffers builder, appending every
+hyperplane, centroid and eigenvalue float through a separate Python call
+(11.4 million `PrependFloat32` calls at 25k points). Each vector is now one
+`CreateNumpyVector` memcpy. The batch-descriptor loop also rebuilt the leaf list once
+per batch, which was quadratic in the number of leaves. Output is byte-identical.
+
+| | before | after | |
+|---|---|---|---|
+| write n=2,500 d=768 | 0.40 s | **0.07 s** | 6x |
+| write n=25,000 d=768 | 6.67 s | **0.52 s** | 13x |
+
+Writing had been three times slower than building the tree; it is now faster. At
+n=250,000 the patched write takes 7.1 s for a 1.1 GB file against a 31 s tree build.
+
 ## 0.14.0 — 2026-09-06
 
 Isolation scoring was **97.8% of `fit()`**. It is a pure diagnostic — nothing in the
