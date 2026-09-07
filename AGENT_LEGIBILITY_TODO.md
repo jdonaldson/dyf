@@ -481,6 +481,31 @@ is a place an agent will confidently report the wrong thing.
       also distinguishes "no files matched" from "files matched but none could be
       decoded", which had been the same message.
 
+- [ ] **`index-source` first run needs network and a writable `~/Library/Caches`, and
+      fails with a traceback when it lacks either.** *(found 2026-09-07.)*
+      `tree-sitter-language-pack` is pinned `>=0.4` with no upper bound; the version that
+      now resolves (1.16) ships no grammars and downloads each one on first `get_parser`
+      into `~/Library/Caches/tree-sitter-language-pack/<ver>/libs`. In a sandbox that
+      blocks either the directory or the fetch, `chunk_source_file` raises
+      `tree_sitter_language_pack.DownloadError`, which nothing catches: the real path at
+      `index_source.py:432` has no handler, and the `--dry-run` preview catches only
+      `ImportError`, so both surface a traceback with rc 1 instead of the rc 3 "dependency
+      unavailable" message the module's own contract promises.
+
+      Measured: 23 tests in `tests/test_index_source.py` fail this way on a cold cache
+      inside the sandbox and pass once the grammar is cached — running them once outside
+      the sandbox populates the cache, after which every sandboxed run passes. So the
+      standing CLI audit (`audit_cli_surface.py`) cannot see it on a warm machine, and on
+      a cold one the Ollama check fires first (rc 3) and masks it. The churn probe that
+      found this first reported **zero chunks for every commit** because it caught the
+      exception itself; that silent zero is the agent-facing symptom.
+
+      Fix shape, smallest first: catch `DownloadError` in both paths and map it to
+      `EmbeddingServiceError`-style rc 3 with the cache path and a one-line remedy;
+      then decide whether dyf should call `configure(PackConfig(cache_dir=...))` to
+      point at `~/.cache` (XDG, writable in this sandbox) and whether the extra should
+      carry an upper pin.
+
 ## P2 — make the package self-describing
 
 - [x] **Three modules are named for things they are not.** *(done 2026-09-05.)* Renaming
