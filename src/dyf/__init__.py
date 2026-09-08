@@ -185,13 +185,15 @@ from .dyf_tree import (
     refine_dyf_tree,
 )
 
+# Shared return type of every search entry point; numpy-only, so never optional.
+from .search_result import SearchResult
+
 # Lazy index (FlatBuffers + Arrow IPC)
 try:
     from .lazy_index import (
         AdaptiveProbeConfig,
         ExtractedData,
         LazyIndex,
-        SearchResult,
         StoredFieldInput,
         StoredFieldValue,
         TreeNode,
@@ -210,7 +212,6 @@ except ImportError:
     rewrite_lazy_index = None
     split_dyf3 = None
     from_faiss = None
-    SearchResult = None
     AdaptiveProbeConfig = None
     ExtractedData = None
     StoredFieldValue = None

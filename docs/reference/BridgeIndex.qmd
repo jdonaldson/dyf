@@ -147,10 +147,10 @@ working.
 
 #### Returns {.doc-section .doc-section-returns}
 
-| Name   | Type                                          | Description                                                               |
-|--------|-----------------------------------------------|---------------------------------------------------------------------------|
-|        | [SearchResult](`dyf.lazy_index.SearchResult`) | SearchResult whose `indices` are the top-k candidate indices              |
-|        | [SearchResult](`dyf.lazy_index.SearchResult`) | and scores are their cosine similarities (or None if return_scores=False) |
+| Name   | Type                                             | Description                                                               |
+|--------|--------------------------------------------------|---------------------------------------------------------------------------|
+|        | [SearchResult](`dyf.search_result.SearchResult`) | SearchResult whose `indices` are the top-k candidate indices              |
+|        | [SearchResult](`dyf.search_result.SearchResult`) | and scores are their cosine similarities (or None if return_scores=False) |
 
 ### query_batch { #dyf.BridgeIndex.query_batch }
 
@@ -170,9 +170,9 @@ Batch query for multiple embeddings.
 
 #### Returns {.doc-section .doc-section-returns}
 
-| Name   | Type                                                            | Description                                                             |
-|--------|-----------------------------------------------------------------|-------------------------------------------------------------------------|
-|        | [list](`list`)\[[SearchResult](`dyf.lazy_index.SearchResult`)\] | List of SearchResult, one per query. Each unpacks as (indices, scores). |
+| Name   | Type                                                               | Description                                                             |
+|--------|--------------------------------------------------------------------|-------------------------------------------------------------------------|
+|        | [list](`list`)\[[SearchResult](`dyf.search_result.SearchResult`)\] | List of SearchResult, one per query. Each unpacks as (indices, scores). |
 
 ### summary { #dyf.BridgeIndex.summary }
 

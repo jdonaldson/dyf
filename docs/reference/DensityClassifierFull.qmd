@@ -269,6 +269,9 @@ DensityClassifierFull.get_stability_scores()
 
 Get stability scores for all items (0-1, higher = more stable).
 
+None when stability was not computed — which includes the default
+``num_stability_seeds < 2``, where there is nothing to compare across.
+
 ### label_buckets { #dyf.DensityClassifierFull.label_buckets }
 
 ```python

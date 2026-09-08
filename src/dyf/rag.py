@@ -44,7 +44,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from ._arrays import ensure_f32
-from .lazy_index import SearchResult
+from .search_result import SearchResult
 
 logger = logging.getLogger(__name__)
 

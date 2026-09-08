@@ -297,10 +297,13 @@ is a place an agent will confidently report the wrong thing.
         the type is what widened that. Returns the hit count now. Safe because unpacking
         goes through `__iter__`, never `__len__` — checked directly, with a class whose
         `__len__` returns 99 that still unpacks fine.
-      - [ ] Follow-up: `SearchResult` is defined in `lazy_index.py` but is now the shared
-        return type of the whole search API. It arguably belongs in a neutral module.
-        Not moved — that would break `from dyf.lazy_index import SearchResult` for anyone
-        doing it, for no functional gain today.
+      - [x] `SearchResult` moved to `dyf.search_result` *(done 2026-09-07, 0.15.0.)* The
+        neutral module the three constructors import from; `dyf.SearchResult` is now
+        unconditional rather than tied to the lazy-index import guard. The old
+        `dyf.lazy_index` path still resolves as a side effect of `lazy_index`
+        constructing the type — pinned by a test so a future removal is deliberate.
+        No downstream project imported it by the old path (grepped dyfviz, sec10quant,
+        shortorder). Reference docs regenerated with `quartodoc build`.
 
 - [ ] **Remaining return-shape work, from the full audit of every export (2026-09-05).**
       Ranked by "would freezing this into v1 be a mistake?". The retrieval API is done;

@@ -23,7 +23,7 @@ import dyf_rs
 import numpy as np
 
 from .dyf_tree import build_dyf_tree
-from .lazy_index import SearchResult
+from .search_result import SearchResult
 
 
 def flatten_tree(tree: dict) -> dict:

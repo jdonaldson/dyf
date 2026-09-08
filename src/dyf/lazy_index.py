@@ -24,10 +24,12 @@ import mmap
 import struct
 from collections import deque
 from collections.abc import Mapping, Sequence, Set
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TypedDict
 
 import numpy as np
+
+from .search_result import SearchResult
 
 # Stored field value types:
 # - Output (from extract_all_fields): specific list type
@@ -136,47 +138,6 @@ def detect_dyf_version(path: str) -> int:
         return 3
     else:
         raise ValueError(f"Unknown DYF magic: {magic!r}")
-
-
-@dataclass
-class SearchResult:
-    """Search result with indices, scores, and optional stored fields.
-
-    The standard return type of every retrieval entry point — `LazyIndex.search`,
-    `LazyIndex.search_ivf`, `DenseSearchIndex.search` and `BridgeIndex.query` — so the
-    same calling code works against any index.
-    """
-
-    indices: np.ndarray  # (k,) uint32
-    scores: np.ndarray  # (k,) float32
-    fields: dict = field(default_factory=dict)  # field_name -> (k,) values
-    routing: dict | None = None  # routing diagnostics when return_routing=True
-
-    def __iter__(self):
-        """Backward-compatible unpacking: indices, scores = idx.search(...)"""
-        yield self.indices
-        yield self.scores
-
-    def __getitem__(self, key):
-        """`r["title"]` gets a stored field; `r[0]`/`r[1]` are indices/scores.
-
-        The positional form exists only so tuple-style access keeps working. Prefer
-        `.indices` / `.scores` — they say which one you meant.
-        """
-        if isinstance(key, str):
-            return self.fields[key]
-        return (self.indices, self.scores)[key]
-
-    def __len__(self):
-        """Number of hits — NOT the unpacking arity.
-
-        This returned a hard-coded 2 until 2026-09-05, so `len(result)` reported 2 on a
-        `k=10` search: a plausible-looking wrong number, of exactly the kind that gets
-        cited downstream without being questioned. Safe to change because tuple unpacking
-        goes through `__iter__`, never `__len__` — verified — so
-        `indices, scores = idx.search(...)` is unaffected.
-        """
-        return len(self.indices)
 
 
 @dataclass
