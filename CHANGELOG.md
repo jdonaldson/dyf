@@ -1,6 +1,18 @@
 # Changelog
 
-## Unreleased
+## 0.15.0 — 2026-09-07
+
+### Changed
+
+**`SearchResult` moved to `dyf.search_result`.** Import it from the package:
+`from dyf import SearchResult`. It had lived in `lazy_index.py` since it was introduced,
+which made `DenseSearchIndex` and `BridgeIndex` import their return type from the on-disk
+index module — a dependency in the wrong direction, and a misleading home for a type that
+has nothing to do with files. The old path `from dyf.lazy_index import SearchResult` still
+resolves, because `lazy_index` constructs the type and so imports it, but it is not part
+of the export contract and a later cleanup may remove it; the test suite pins the current
+behaviour so that removal would be deliberate. `dyf.SearchResult` is now importable even
+when the FlatBuffers/Arrow stack is not, since the type depends on numpy alone.
 
 ### Fixed
 
