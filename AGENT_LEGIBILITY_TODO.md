@@ -481,8 +481,10 @@ is a place an agent will confidently report the wrong thing.
       also distinguishes "no files matched" from "files matched but none could be
       decoded", which had been the same message.
 
-- [ ] **`index-source` first run needs network and a writable `~/Library/Caches`, and
-      fails with a traceback when it lacks either.** *(found 2026-09-07.)*
+- [x] **`index-source` first run needs network and a writable `~/Library/Caches`, and
+      fails with a traceback when it lacks either.** *(found and fixed 2026-09-07:
+      `ParserUnavailableError` → exit 3 from one choke point, `_get_parser_or_explain`;
+      `--dry-run` notes it instead of raising; extra pinned `<2`; 3 tests.)*
       `tree-sitter-language-pack` is pinned `>=0.4` with no upper bound; the version that
       now resolves (1.16) ships no grammars and downloads each one on first `get_parser`
       into `~/Library/Caches/tree-sitter-language-pack/<ver>/libs`. In a sandbox that

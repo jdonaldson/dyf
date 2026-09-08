@@ -50,6 +50,19 @@ class BadIngestRequest(IngestError):
     exit_code = EXIT_BAD_REQUEST
 
 
+class ParserUnavailableError(IngestError):
+    """A source grammar could not be obtained, so nothing can be chunked.
+
+    `tree-sitter-language-pack` >= 1.x ships no grammars and downloads each one on first
+    use into a per-user cache. Without network access, or with that cache directory
+    unwritable (a sandbox, a read-only home), the download raises inside the parser
+    lookup. The package is importable, so an ImportError guard does not see it; it is a
+    dependency failure all the same, and gets the same exit code.
+    """
+
+    exit_code = EXIT_UNAVAILABLE
+
+
 class EmbeddingServiceError(IngestError):
     """An embedding backend is unreachable or cannot serve the requested model.
 

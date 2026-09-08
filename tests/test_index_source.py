@@ -470,3 +470,53 @@ def test_text_truncated_at_2000(tmp_source):
     chunks[0]["text"].split("\n", 1)[1] if "\n" in chunks[0]["text"] else ""
     # Total text length should be bounded
     assert len(chunks[0]["text"]) < 2200
+
+
+# ---------------------------------------------------------------------------
+# Grammar fetch failure: the pack downloads grammars on first use, and the failure
+# must be a legible exit-3 error in both the real and dry-run paths, not a traceback.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def grammar_download_fails(monkeypatch):
+    import tree_sitter_language_pack as tslp
+
+    def _raise(name):
+        raise tslp.DownloadError("Failed to fetch manifest from https://example.invalid/parsers.json")
+
+    monkeypatch.setattr(tslp, "get_parser", _raise)
+
+
+def test_grammar_download_failure_is_legible(tmp_source, grammar_download_fails):
+    from dyf._ingest_errors import EXIT_UNAVAILABLE, ParserUnavailableError
+
+    with pytest.raises(ParserUnavailableError) as info:
+        chunk_source_file(tmp_source("mod.py", PYTHON_SRC))
+    msg = str(info.value)
+    assert info.value.exit_code == EXIT_UNAVAILABLE
+    assert "python grammar" in msg
+    assert "Failed to fetch manifest" in msg
+    assert "cache_dir" in msg  # the remedy names the knob that relocates the cache
+
+
+def test_cli_grammar_failure_exits_3_without_traceback(tmp_path, grammar_download_fails, monkeypatch, caplog):
+    from dyf import index_source as mod
+    from dyf._ingest_errors import EXIT_UNAVAILABLE
+
+    monkeypatch.setattr(mod, "check_embedding_service", lambda **kw: None)  # Ollama is not the subject
+    (tmp_path / "mod.py").write_text(PYTHON_SRC)
+    rc = mod.main([str(tmp_path), "-o", str(tmp_path / "out.dyf")])
+    assert rc == EXIT_UNAVAILABLE
+    assert "python grammar" in caplog.text
+    assert "Traceback" not in caplog.text
+
+
+def test_dry_run_reports_grammar_failure_as_note(tmp_path, grammar_download_fails, monkeypatch):
+    from dyf import index_source as mod
+
+    monkeypatch.setattr(mod, "check_embedding_service", lambda **kw: None)
+    (tmp_path / "mod.py").write_text(PYTHON_SRC)
+    preview = mod.preview_source(source_dir=tmp_path, output=tmp_path / "out.dyf", model="m", ollama_url="http://x")
+    assert preview.counts["chunks"] is None
+    assert any("python grammar" in n for n in preview.notes)

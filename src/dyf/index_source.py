@@ -32,6 +32,7 @@ from ._ingest_errors import (
     EmbeddingServiceError,
     EmptyIngestError,
     IngestError,
+    ParserUnavailableError,
 )
 from ._preview import IngestPreview, batches_for
 
@@ -182,10 +183,33 @@ def _node_kind(node_type: str) -> str:
     return "function"
 
 
+def _get_parser_or_explain(language: str):
+    """Fetch a tree-sitter parser, turning a failed grammar download into a legible error.
+
+    The pack fetches grammars lazily on first use. Everything it can raise on that path —
+    download, checksum, dynamic load, cache lock — derives from its `Error` base and means
+    the same thing to a caller: no grammar, nothing to chunk, and the fix is environmental.
+    """
+    import tree_sitter_language_pack as tslp
+
+    try:
+        return tslp.get_parser(language)
+    except tslp.Error as exc:
+        first_line = str(exc).splitlines()[0] if str(exc) else type(exc).__name__
+        raise ParserUnavailableError(
+            f"cannot load the {language} grammar: {first_line}\n"
+            f"tree-sitter-language-pack fetches grammars on first use into {tslp.cache_dir()}.\n"
+            "Re-run once with network access and that directory writable, or relocate the cache:\n"
+            '  python -c "import tree_sitter_language_pack as t; '
+            "t.configure(t.PackConfig(cache_dir='<writable dir>')); "
+            f"t.get_parser('{language}')\""
+        ) from exc
+
+
 def chunk_source_file(path: Path) -> list[dict]:
     """Extract function/class/struct chunks from a source file using tree-sitter."""
     try:
-        from tree_sitter_language_pack import get_parser
+        import tree_sitter_language_pack  # noqa: F401 — presence check; the parser is fetched in _get_parser_or_explain
     except ImportError:
         raise ImportError(
             'tree-sitter-language-pack is required for source indexing.\nInstall it with: pip install "dyf[source]"'
@@ -199,7 +223,7 @@ def chunk_source_file(path: Path) -> list[dict]:
     chunk_types = set(config["chunk_types"])
 
     source_bytes = path.read_bytes()
-    parser = get_parser(language)
+    parser = _get_parser_or_explain(language)
     tree = parser.parse(source_bytes)
 
     source_text = source_bytes.decode("utf-8", errors="replace")
@@ -367,6 +391,10 @@ def preview_source(
     except ImportError:
         n_chunks = None
         notes.append("chunk count needs tree-sitter: pip install 'dyf[source]'")
+    except ParserUnavailableError as exc:
+        # The real run would fail with exit 3 here; a preview should say so, not traceback.
+        n_chunks = None
+        notes.extend(str(exc).splitlines())
     counts["chunks"] = n_chunks
 
     try:

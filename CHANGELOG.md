@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Fixed
+
+`dyf index-source` no longer dies with a `DownloadError` traceback when a grammar cannot
+be fetched. `tree-sitter-language-pack` 1.x downloads each grammar on first use into
+`~/Library/Caches` (macOS); without network access or with that directory unwritable —
+a sandbox, a read-only home — the parser lookup raised and nothing caught it, in either
+the real path or `--dry-run`. Both now report `ParserUnavailableError` (exit 3, the
+dependency-unavailable code) naming the language, the cache path and the remedy. The
+`source` extra is pinned `<2`: the 0.x→1.x change is what introduced the runtime fetch.
+
 ### Faster
 
 `write_lazy_index` spent 75% of its time in the FlatBuffers builder, appending every
