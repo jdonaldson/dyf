@@ -33,7 +33,7 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 from ._ingest_common import add_common_index_args, finalize_index
-from ._ingest_errors import BadIngestRequest, EmptyIngestError, IngestError
+from ._ingest_errors import BadIngestRequest, EmptyIngestError, IngestError, ModelUnavailableError
 from ._preview import IngestPreview, batches_for
 
 DEFAULT_MODEL = "nomic-ai/nomic-embed-vision-v1.5"
@@ -61,10 +61,57 @@ def load_vision_model(model_name: str = DEFAULT_MODEL, device: str | None = None
         else:
             device = "cpu"
 
-    processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True)
-    model = AutoModel.from_pretrained(model_name, trust_remote_code=True).to(device)
+    # transformers reports a hub fetch failure — offline, unwritable cache, unknown repo —
+    # as OSError from deep inside from_pretrained. Left alone it is a traceback with the
+    # real cause several screens up. Measured offline with a cold cache: bare OSError,
+    # "We couldn't connect to 'https://huggingface.co'".
+    try:
+        processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True)
+        model = AutoModel.from_pretrained(model_name, trust_remote_code=True).to(device)
+    except OSError as exc:
+        first_line = str(exc).splitlines()[0] if str(exc) else type(exc).__name__
+        raise ModelUnavailableError(
+            f"cannot load the vision model {model_name!r}: {first_line}\n"
+            f"transformers fetches models on first use into {_hf_hub_cache()}.\n"
+            "Re-run once with network access and that directory writable, or point HF_HOME "
+            "at a writable directory. If the name is wrong, check it on huggingface.co."
+        ) from exc
     model.eval()
     return processor, model, device
+
+
+def _hf_hub_cache() -> str:
+    """Where transformers will look for, and write, a model. Best effort."""
+    try:
+        from huggingface_hub.constants import HF_HUB_CACHE
+
+        return str(HF_HUB_CACHE)
+    except ImportError:
+        return "the Hugging Face hub cache (HF_HOME)"
+
+
+def vision_model_cache_note(model_name: str) -> str | None:
+    """One line for a dry run if `model_name` is not already in the local hub cache.
+
+    A preview must not load the model — that download is the expensive step it exists
+    to let a caller avoid — but it can say whether the real run will need the network.
+    `try_to_load_from_cache` answers that from the filesystem alone. Returns None when
+    the model is cached or when the question cannot be asked (no huggingface_hub).
+    """
+    try:
+        from huggingface_hub import try_to_load_from_cache
+    except ImportError:
+        return None
+    try:
+        hit = try_to_load_from_cache(model_name, "config.json")
+    except Exception:  # a malformed repo id raises HFValidationError; not a preview's problem
+        return None
+    if isinstance(hit, str):
+        return None
+    return (
+        f"model {model_name!r} is not in the local Hugging Face cache ({_hf_hub_cache()}); "
+        "the real run will download it and needs network access"
+    )
 
 
 def make_thumbnail(img, max_size: int = 128) -> str:
@@ -152,6 +199,9 @@ def preview_images(
         by_ext[p.suffix.lower()] = by_ext.get(p.suffix.lower(), 0) + 1
 
     notes = []
+    cache_note = vision_model_cache_note(model)
+    if cache_note:
+        notes.append(cache_note)
     if paths:
         spread = ", ".join(f"{ext} {n}" for ext, n in sorted(by_ext.items()))
         notes.append(f"by extension: {spread}")

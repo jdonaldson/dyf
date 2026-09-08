@@ -220,3 +220,66 @@ class TestIndexImagesE2E:
         meta = data["metadata"]
         assert meta.get("domain") == "images"
         assert meta.get("thumbnail_format") == "webp"
+
+
+# ---------------------------------------------------------------------------
+# Model fetch failure: transformers downloads the model on first use, and an offline
+# or unwritable cache must be a legible exit-3 error, not an OSError traceback.
+# ---------------------------------------------------------------------------
+
+
+def test_model_fetch_failure_is_legible(monkeypatch):
+    transformers = pytest.importorskip("transformers", reason="requires dyf[vision]")
+    from dyf._ingest_errors import EXIT_UNAVAILABLE, ModelUnavailableError
+    from dyf.index_images import load_vision_model
+
+    def _offline(*a, **kw):
+        raise OSError("We couldn't connect to 'https://huggingface.co' to load the files")
+
+    monkeypatch.setattr(transformers.AutoProcessor, "from_pretrained", _offline)
+    with pytest.raises(ModelUnavailableError) as info:
+        load_vision_model("org/some-model", device="cpu")
+    msg = str(info.value)
+    assert info.value.exit_code == EXIT_UNAVAILABLE
+    assert "org/some-model" in msg
+    assert "couldn't connect" in msg
+    assert "HF_HOME" in msg
+
+
+def test_cli_model_failure_exits_3_without_traceback(tmp_path, monkeypatch, caplog):
+    from dyf import index_images as mod
+    from dyf._ingest_errors import EXIT_UNAVAILABLE, ModelUnavailableError
+
+    def _unavailable(model_name, device=None):
+        raise ModelUnavailableError(f"cannot load the vision model {model_name!r}: offline")
+
+    monkeypatch.setattr(mod, "load_vision_model", _unavailable)
+    PIL.Image.new("RGB", (8, 8)).save(tmp_path / "a.png")
+    rc = mod.main([str(tmp_path), "-o", str(tmp_path / "out.dyf")])
+    assert rc == EXIT_UNAVAILABLE
+    assert "cannot load the vision model" in caplog.text
+    assert "Traceback" not in caplog.text
+
+
+def test_dry_run_notes_uncached_model(tmp_path, monkeypatch):
+    pytest.importorskip("huggingface_hub")
+    import huggingface_hub
+
+    from dyf import index_images as mod
+
+    monkeypatch.setattr(huggingface_hub, "try_to_load_from_cache", lambda *a, **kw: None)
+    PIL.Image.new("RGB", (8, 8)).save(tmp_path / "a.png")
+    preview = mod.preview_images(source_dir=tmp_path, output=tmp_path / "out.dyf", model="org/never-cached")
+    assert any("not in the local Hugging Face cache" in n for n in preview.notes)
+
+
+def test_dry_run_silent_when_model_cached(tmp_path, monkeypatch):
+    pytest.importorskip("huggingface_hub")
+    import huggingface_hub
+
+    from dyf import index_images as mod
+
+    monkeypatch.setattr(huggingface_hub, "try_to_load_from_cache", lambda *a, **kw: "/cache/config.json")
+    PIL.Image.new("RGB", (8, 8)).save(tmp_path / "a.png")
+    preview = mod.preview_images(source_dir=tmp_path, output=tmp_path / "out.dyf", model="org/cached")
+    assert not any("Hugging Face cache" in n for n in preview.notes)

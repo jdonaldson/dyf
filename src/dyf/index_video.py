@@ -30,7 +30,13 @@ logger = logging.getLogger(__name__)
 from ._ingest_common import add_common_index_args, finalize_index
 from ._ingest_errors import BadIngestRequest, EmptyIngestError, IngestError
 from ._preview import IngestPreview
-from .index_images import DEFAULT_MODEL, embed_images, load_vision_model, make_thumbnail
+from .index_images import (
+    DEFAULT_MODEL,
+    embed_images,
+    load_vision_model,
+    make_thumbnail,
+    vision_model_cache_note,
+)
 
 
 def _format_timestamp(seconds: float) -> str:
@@ -181,6 +187,15 @@ def preview_video(
     """
     size_mb = video_path.stat().st_size / 1_048_576
 
+    notes = [
+        "scene count is not previewable: detecting scenes is a full decode pass, "
+        "which is the expensive work this flag exists to let you avoid",
+        f"one keyframe is embedded per scene; --threshold {threshold} decides how many (lower finds more scenes)",
+    ]
+    cache_note = vision_model_cache_note(model)
+    if cache_note:
+        notes.append(cache_note)
+
     return IngestPreview(
         command="index-video",
         source=str(video_path),
@@ -189,11 +204,7 @@ def preview_video(
         batch_size=batch_size,
         counts={"megabytes": int(size_mb), "scenes": None, "keyframes": None},
         batches=None,
-        notes=[
-            "scene count is not previewable: detecting scenes is a full decode pass, "
-            "which is the expensive work this flag exists to let you avoid",
-            f"one keyframe is embedded per scene; --threshold {threshold} decides how many (lower finds more scenes)",
-        ],
+        notes=notes,
     )
 
 

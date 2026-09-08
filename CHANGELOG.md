@@ -12,6 +12,14 @@ the real path or `--dry-run`. Both now report `ParserUnavailableError` (exit 3, 
 dependency-unavailable code) naming the language, the cache path and the remedy. The
 `source` extra is pinned `<2`: the 0.x→1.x change is what introduced the runtime fetch.
 
+Same generator, swept: `index-images` and `index-video` load their vision model with
+`from_pretrained`, which reports an offline or unwritable hub cache as a bare `OSError`
+several screens deep. Both now raise `ModelUnavailableError` (exit 3) naming the model,
+the hub cache path and the remedy. Their `--dry-run` previews, which deliberately never
+load the model, now say when the model is not in the local cache and the real run will
+need the network — answered from the filesystem via `try_to_load_from_cache`. The three
+ingest commands' exit codes have now been audited against the 1/2/3 contract.
+
 ### Faster
 
 `write_lazy_index` spent 75% of its time in the FlatBuffers builder, appending every

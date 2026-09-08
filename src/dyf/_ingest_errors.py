@@ -13,7 +13,9 @@ Exit codes, matching `dyf concepts`:
     0  success
     1  a normal negative answer — nothing to index (EmptyIngestError)
     2  the request was wrong — bad path, bad argument (BadIngestRequest)
-    3  a dependency or service is unavailable (EmbeddingServiceError, ImportError)
+    3  a dependency or service is unavailable (EmbeddingServiceError, ImportError,
+       DependencyPayloadError — the package imports but the grammar or model it fetches
+       on first use cannot be obtained)
 
 Every message is meant to be shown to the caller verbatim, and should say what to do
 rather than only what went wrong.
@@ -50,17 +52,27 @@ class BadIngestRequest(IngestError):
     exit_code = EXIT_BAD_REQUEST
 
 
-class ParserUnavailableError(IngestError):
-    """A source grammar could not be obtained, so nothing can be chunked.
+class DependencyPayloadError(IngestError):
+    """An optional dependency imports fine but cannot fetch what it needs on first use.
 
-    `tree-sitter-language-pack` >= 1.x ships no grammars and downloads each one on first
-    use into a per-user cache. Without network access, or with that cache directory
-    unwritable (a sandbox, a read-only home), the download raises inside the parser
-    lookup. The package is importable, so an ImportError guard does not see it; it is a
-    dependency failure all the same, and gets the same exit code.
+    Two ingest extras defer their real payload to first use: `tree-sitter-language-pack`
+    downloads each grammar on the first `get_parser`, and `transformers` downloads a
+    vision model on the first `from_pretrained`. Without network access, or with the
+    per-user cache unwritable (a sandbox, a read-only home), that fetch raises from deep
+    inside the library. An ImportError guard does not see it, because the import
+    succeeded. It is a dependency failure all the same, with the same exit code, and the
+    remedy is always environmental: run once with network, or relocate the cache.
     """
 
     exit_code = EXIT_UNAVAILABLE
+
+
+class ParserUnavailableError(DependencyPayloadError):
+    """A tree-sitter grammar could not be obtained, so nothing can be chunked."""
+
+
+class ModelUnavailableError(DependencyPayloadError):
+    """A Hugging Face vision model could not be obtained, so nothing can be embedded."""
 
 
 class EmbeddingServiceError(IngestError):

@@ -438,9 +438,10 @@ is a place an agent will confidently report the wrong thing.
       cleanly, so the in-repo example to copy existed.
       - [ ] Still open: `enrich audio` needs `kokoro` + `soundfile`, declared in **no**
         extra, so there is no `dyf[...]` to name. Either add the extra or drop the path.
-      - [ ] Still open: `index-source` also needs a live Ollama server and only finds out
-        mid-run (`index_source.py:247-272`). A missing *service* is not an ImportError,
-        so the boundary fix does not cover it.
+      - [x] `index-source` needs a live Ollama server. *(closed 2026-09-07 as already
+        done: `check_embedding_service` preflights before any parsing and raises
+        `EmbeddingServiceError` → exit 3; the dry run reports the service as UNAVAILABLE.
+        This line had gone stale.)*
 - [x] **`concepts query` with no match must say so.** *(done 2026-09-05.)* It fell
       through to semantic search and could return zero lines at rc 0. Now exits 1 when
       nothing matched — grep's convention, since finding nothing is a negative answer
@@ -451,8 +452,11 @@ is a place an agent will confidently report the wrong thing.
       docstring as a contract.)* `0` success, `1` normal negative answer (no match, or
       `check` finding the graph stale), `2` bad request (missing/malformed `--config`),
       `3` missing dependency. Verified identical between human and `--json` paths.
-      - [ ] Still to do: the same pass over `info` and the `index-*` commands. `info`
-        already uses 1/2/3 consistently; `index-*` have not been audited.
+      - [x] The same pass over `info` and the `index-*` commands. *(done 2026-09-07.)*
+        `info` already used 1/2/3. All three `index-*` commands route `IngestError` to
+        its `exit_code` in `main` and return 0 otherwise; the gap was the class of
+        failure that reached `main` as something *other* than `IngestError` — a grammar
+        or model fetch failing on first use — which is now `DependencyPayloadError`.
 
 - [x] **Config errors were tracebacks — and worse, silence.** *(done 2026-09-05,
       `ConfigError`, 6 tests.)* The reported symptom was a raw `JSONDecodeError` from
@@ -485,6 +489,12 @@ is a place an agent will confidently report the wrong thing.
       fails with a traceback when it lacks either.** *(found and fixed 2026-09-07:
       `ParserUnavailableError` → exit 3 from one choke point, `_get_parser_or_explain`;
       `--dry-run` notes it instead of raising; extra pinned `<2`; 3 tests.)*
+      **Same generator, swept the same day:** `index-images`/`index-video` load their
+      model with `from_pretrained`, which raised a bare `OSError` offline (measured with
+      `HF_HUB_OFFLINE=1` and a cold cache). Now `ModelUnavailableError` → exit 3, and
+      both dry runs report "model not in local cache, real run needs network" from
+      `try_to_load_from_cache` without loading anything. Both errors share a
+      `DependencyPayloadError` base: the package imports, its first-use payload does not.
       `tree-sitter-language-pack` is pinned `>=0.4` with no upper bound; the version that
       now resolves (1.16) ships no grammars and downloads each one on first `get_parser`
       into `~/Library/Caches/tree-sitter-language-pack/<ver>/libs`. In a sandbox that

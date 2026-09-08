@@ -235,3 +235,16 @@ class TestIndexVideoE2E:
         assert meta.get("domain") == "video"
         assert meta.get("thumbnail_format") == "webp"
         assert meta.get("source_video") == "clip.mp4"
+
+
+def test_video_dry_run_notes_uncached_model(tmp_path, monkeypatch):
+    pytest.importorskip("huggingface_hub")
+    import huggingface_hub
+
+    from dyf import index_video as mod
+
+    monkeypatch.setattr(huggingface_hub, "try_to_load_from_cache", lambda *a, **kw: None)
+    fake = tmp_path / "clip.mp4"
+    fake.write_bytes(b"\x00" * 1024)
+    preview = mod.preview_video(video_path=fake, output=tmp_path / "out.dyf", model="org/never-cached")
+    assert any("not in the local Hugging Face cache" in n for n in preview.notes)
