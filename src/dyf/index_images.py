@@ -326,6 +326,7 @@ def index_images(
         min_leaf_size=min_leaf_size,
         seed=seed,
         dedup=dedup,
+        source_paths=valid_paths,
     )
 
 

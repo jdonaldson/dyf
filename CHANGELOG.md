@@ -4,6 +4,15 @@
 
 ### Fixed
 
+Every `dyf index-*` command now stamps provenance on the `.dyf` it writes, as
+`_provenance_level_0` — level 0 of the ladder dyfviz continues at 1, 2 and 3. The
+record carries the post-dedup item count, a hash over the input files, and every
+parameter that shaped the bytes, including the embedding model. Until now nothing in
+dyf wrote provenance at all: `provenance.py` exported seven symbols with no in-package
+producer, `Pipeline` reported every ingested `.dyf` as `stale (no provenance)`, and
+`dyf info` said `none recorded`. `dyf info` now prints `provenance levels 0` rather
+than `stages 0`, which read as "zero stages".
+
 `dyf index-source` no longer dies with a `DownloadError` traceback when a grammar cannot
 be fetched. `tree-sitter-language-pack` 1.x downloads each grammar on first use into
 `~/Library/Caches` (macOS); without network access or with that directory unwritable —

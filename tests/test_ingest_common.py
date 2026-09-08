@@ -179,3 +179,106 @@ def test_all_three_commands_accept_dedup(module_name):
     module = importlib.import_module(f"dyf.{module_name}")
     entry = getattr(module, module_name)
     assert "dedup" in inspect.signature(entry).parameters, f"{module_name} still cannot dedup"
+
+
+class TestProvenanceStamp:
+    """`finalize_index` writes `_provenance_level_0`; `Pipeline` and `dyf info` read it."""
+
+    @staticmethod
+    def _record(path):
+        import json
+
+        with LazyIndex(str(path)) as idx:
+            meta = dict(idx._get_metadata())
+        assert "_provenance_level_0" in meta, sorted(meta)
+        return json.loads(meta["_provenance_level_0"])
+
+    def test_stamps_level_0_with_counts_and_params(self, tmp_path):
+        X = _corpus()
+        out = tmp_path / "p.dyf"
+        finalize_index(X, out, stored_fields={}, metadata={"domain": "test", "embedding_model": "m1"}, seed=7)
+        rec = self._record(out)
+        assert rec["artifact_type"] == "dyf"
+        assert rec["n_items"] == len(X)
+        assert rec["params"]["seed"] == 7
+        assert rec["params"]["fit_method"] == "itq"
+        assert rec["params"]["embedding_model"] == "m1"
+
+    def test_n_items_is_the_post_dedup_count(self, tmp_path):
+        X = _corpus()
+        X = np.vstack([X, X[:10]])  # 10 exact duplicates
+        out = tmp_path / "d.dyf"
+        finalize_index(X, out, stored_fields={}, metadata={"domain": "t"}, dedup=0.999)
+        rec = self._record(out)
+        assert rec["n_items"] < len(X)
+        with LazyIndex(str(out)) as idx:
+            assert idx.total_items == rec["n_items"]
+
+    def test_params_hash_tracks_the_embedding_model(self, tmp_path):
+        """A model change must invalidate the artifact even with identical tree params."""
+        X = _corpus()
+        a, b = tmp_path / "a.dyf", tmp_path / "b.dyf"
+        finalize_index(X, a, stored_fields={}, metadata={"domain": "t", "embedding_model": "m1"})
+        finalize_index(X, b, stored_fields={}, metadata={"domain": "t", "embedding_model": "m2"})
+        assert self._record(a)["params_hash"] != self._record(b)["params_hash"]
+
+    def test_source_hash_tracks_the_inputs(self, tmp_path):
+        X = _corpus()
+        f1 = tmp_path / "one.txt"
+        f2 = tmp_path / "two.txt"
+        f1.write_text("alpha")
+        f2.write_text("beta")
+        a, b, c = (tmp_path / n for n in ("a.dyf", "b.dyf", "c.dyf"))
+        finalize_index(X, a, stored_fields={}, metadata={"domain": "t"}, source_paths=[f1])
+        finalize_index(X, b, stored_fields={}, metadata={"domain": "t"}, source_paths=[f1])
+        finalize_index(X, c, stored_fields={}, metadata={"domain": "t"}, source_paths=[f1, f2])
+        ra, rb, rc = (self._record(p) for p in (a, b, c))
+        assert ra["source_hash"] == rb["source_hash"]
+        assert ra["source_hash"] != rc["source_hash"]
+
+    def test_pipeline_reads_it(self, tmp_path):
+        """The consumer this exists for: before, every .dyf was 'stale (no provenance)'."""
+        from dyf.pipeline import Pipeline
+
+        out = tmp_path / "q.dyf"
+        finalize_index(_corpus(), out, stored_fields={}, metadata={"domain": "t"})
+        prov = Pipeline._read_provenance(str(out))
+        assert prov is not None
+        assert prov.artifact_type == "dyf"
+        assert prov.n_items == len(_corpus())
+
+    def test_pipeline_stage_declaring_ingest_params_reads_fresh(self, tmp_path):
+        """The contract: a Stage built with `ingest_params` matches the stamped hash.
+
+        Without this, a stage wrapping an index-* command could only ever read
+        'stale (params changed)', which is the state every .dyf was in before the stamp.
+        """
+        from dyf._ingest_common import ingest_params
+        from dyf.pipeline import Pipeline, Stage
+
+        out = tmp_path / "s.dyf"
+        finalize_index(
+            _corpus(), out, stored_fields={}, metadata={"domain": "t", "embedding_model": "m"}, seed=3, dedup=0.99
+        )
+        p = Pipeline()
+        p.add(
+            Stage(
+                name="ingest",
+                inputs=[],
+                output=str(out),
+                build_fn=lambda: None,
+                params=ingest_params(seed=3, dedup=0.99, embedding_model="m", domain="t"),
+            )
+        )
+        assert p._stage_status("ingest") == "fresh"
+        p.stages["ingest"].params = ingest_params(seed=4, dedup=0.99, embedding_model="m", domain="t")
+        assert p._stage_status("ingest") == "stale (params changed)"
+
+    def test_info_reports_level_0(self, tmp_path):
+        from dyf.info import _format_human, collect_info
+
+        out = tmp_path / "r.dyf"
+        finalize_index(_corpus(), out, stored_fields={}, metadata={"domain": "t"})
+        info = collect_info(str(out))
+        assert "0" in info["provenance"]
+        assert "provenance       levels 0" in _format_human(info)

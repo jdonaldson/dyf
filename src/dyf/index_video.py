@@ -308,6 +308,7 @@ def index_video(
         min_leaf_size=min_leaf_size,
         seed=seed,
         dedup=dedup,
+        source_paths=[video_path],
     )
     logger.info(f"Done. {len(images)} keyframes indexed.")
 

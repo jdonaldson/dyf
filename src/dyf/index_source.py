@@ -454,12 +454,14 @@ def index_source(
     t0 = time.time()
     all_chunks = []
     langs_seen: set[str] = set()
+    indexed_files: list[Path] = []
 
     for ext in sorted(SUPPORTED_EXTENSIONS):
         for src_file in sorted(source_dir.rglob(f"*{ext}")):
             chunks = chunk_source_file(src_file)
             all_chunks.extend(chunks)
             if chunks:
+                indexed_files.append(src_file)
                 langs_seen.add(chunks[0]["language"])
                 logger.debug(f"  {src_file.relative_to(source_dir)}: {len(chunks)} chunks")
 
@@ -508,6 +510,7 @@ def index_source(
         min_leaf_size=min_leaf_size,
         seed=seed,
         dedup=dedup,
+        source_paths=indexed_files,
     )
 
 

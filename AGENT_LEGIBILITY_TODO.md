@@ -177,12 +177,18 @@ useful lesson.
       that matters for real artifacts was broken — the degenerate-fixture pattern again,
       third instance today. Added 5 tests including one end-to-end on a real `.dyf`.
 
-      - [ ] Still open, and now sharper after the split: **nothing in dyf writes
-        provenance at all.** The ingest modules (`index_source`, `index_images`,
-        `index_video`) stamp `build_params` but no provenance, and `Pipeline` never
-        stamps after running a stage — it assumes `build_fn` did. So `provenance.py`
-        exports 7 public symbols with no in-package producer. Either the ingest path
-        should stamp, or the module should say plainly that stamping is the caller's job.
+      - [x] **Nothing in dyf wrote provenance at all** — *(fixed 2026-09-07.)* The
+        ingest tail (`_ingest_common.finalize_index`) now stamps `_provenance_level_0`
+        on every `.dyf` the three `index-*` commands write: post-dedup count, a hash
+        over the input files (each command passes what it actually indexed), and the
+        full parameter set including the embedding model, so a model swap invalidates.
+        `Pipeline` matches the hash byte for byte, so `ingest_params()` is exported as
+        the one way to declare a stage's params that can ever read "fresh"; outcomes
+        (pre-dedup count) are deliberately not hashed for the same reason.
+        `Pipeline._read_provenance` and `dyf info` read it unchanged — level 0 was
+        always a valid rung, nothing wrote it. The Python API path (`write_lazy_index`
+        direct) still does not stamp; `provenance.py`'s docstring now lists who does.
+        6 tests, including the `Pipeline` and `info` consumers.
 
 ## P1 — give both surfaces a contract
 

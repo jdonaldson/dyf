@@ -144,8 +144,8 @@ def _format_human(info: dict[str, Any]) -> str:
     lines.append("")
     lines.append(f"  enrichment       level {info['enrichment_level']} — {info['enrichment_label']}")
     if info["provenance"]:
-        stages = ", ".join(sorted(info["provenance"]))
-        lines.append(f"  provenance       stages {stages}")
+        levels = ", ".join(sorted(info["provenance"]))
+        lines.append(f"  provenance       levels {levels}")
     else:
         lines.append("  provenance       none recorded")
 

@@ -1,15 +1,20 @@
-"""Provenance records for pipeline artifacts — **which the caller must stamp itself**.
+"""Provenance records for pipeline artifacts.
 
-⚠ This module provides the *vocabulary* for artifact identity, not the behaviour. Nothing
-in dyf calls `create_provenance`: `write_lazy_index` records `build_params` but no
-provenance, and `Pipeline` never stamps after running a stage — it assumes `build_fn` did.
-Verified 2026-09-05.
+Who stamps, as of 2026-09-07:
 
-The previous version of this docstring said "each artifact carries a Provenance record",
-which was simply untrue and is the kind of claim that gets believed. If you want
-provenance on a `.dyf`, you write it: build a record with `create_provenance` and pass it
-through `metadata=`. `Pipeline` reads either a `_provenance` key or the highest
-`_provenance_level_N` (the shape the downstream `dyfviz` enrichment stages write).
+* The `dyf index-*` commands, through `_ingest_common.finalize_index`, write
+  ``_provenance_level_0`` on every `.dyf` they produce — level 0 of the ladder the
+  downstream `dyfviz` stages continue at ``_provenance_level_1/2/3``.
+* `write_lazy_index` itself records `build_params` but **no** provenance, and `Pipeline`
+  never stamps after running a stage — it assumes `build_fn` did. A `.dyf` written
+  directly through the Python API carries provenance only if the caller builds a record
+  with `create_provenance` and passes it through `metadata=`.
+
+`Pipeline` reads either a `_provenance` key or the highest `_provenance_level_N`.
+
+(Until 2026-09-07 nothing in dyf called `create_provenance` at all, and an earlier
+docstring claiming "each artifact carries a Provenance record" was simply untrue — the
+kind of claim that gets believed. Hence the explicit list above.)
 
 A Provenance describes an artifact's identity and inputs so a consumer can check
 compatibility before loading and fail loudly rather than degrade silently — see

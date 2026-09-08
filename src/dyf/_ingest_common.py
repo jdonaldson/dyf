@@ -20,14 +20,17 @@ fields from a source, and the `metadata` that describes the medium.
 
 from __future__ import annotations
 
+import json
 import logging
 import time
+from collections.abc import Sequence
 from pathlib import Path
 
 import numpy as np
 
 from .dyf_tree import build_dyf_tree
 from .lazy_index import write_lazy_index
+from .provenance import create_provenance, provenance_to_dict
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +80,40 @@ def add_common_index_args(parser, *, default_model: str) -> None:
     )
 
 
+def ingest_params(
+    *,
+    max_depth: int = DEFAULT_MAX_DEPTH,
+    num_bits: int = DEFAULT_NUM_BITS,
+    min_leaf_size: int = DEFAULT_MIN_LEAF_SIZE,
+    seed: int = DEFAULT_SEED,
+    dedup: float | None = None,
+    embedding_model: str | None = None,
+    domain: str | None = None,
+) -> dict:
+    """The exact dict `finalize_index` hashes into the provenance record.
+
+    `Pipeline` decides "fresh" by comparing `params_hash(stage.params)` to the stamped
+    hash byte for byte, so a stage that wraps an `index-*` command must declare the
+    same dict — build it with this rather than guessing the keys. Only inputs go in:
+    tree parameters, the dedup threshold, the fixed storage format, and the embedding
+    model (which lives in the medium's metadata and would otherwise not invalidate).
+    Outcomes such as the pre-dedup count do not, since a caller cannot know them ahead
+    of the run and they would make "fresh" unreachable.
+    """
+    return {
+        "max_depth": max_depth,
+        "num_bits": num_bits,
+        "min_leaf_size": min_leaf_size,
+        "seed": seed,
+        "fit_method": FIT_METHOD,
+        "quantization": "float16",
+        "compression": "none",
+        "dedup": dedup,
+        "embedding_model": embedding_model,
+        "domain": domain,
+    }
+
+
 def finalize_index(
     embeddings: np.ndarray,
     output: Path,
@@ -88,8 +125,9 @@ def finalize_index(
     min_leaf_size: int = DEFAULT_MIN_LEAF_SIZE,
     seed: int = DEFAULT_SEED,
     dedup: float | None = None,
+    source_paths: Sequence[str | Path] = (),
 ) -> None:
-    """Dedup, normalize, build the tree, and write the `.dyf`.
+    """Dedup, normalize, build the tree, and write the `.dyf`, stamped with provenance.
 
     Everything after "I have embeddings and stored fields". Callers supply the medium's
     own `metadata`; the rest is identical by construction rather than by three people
@@ -103,6 +141,16 @@ def finalize_index(
             the other silently mislabels every row.
         metadata: Medium-specific description, e.g. ``{"domain": "images"}``.
         dedup: Cosine threshold, or None to skip.
+        source_paths: The files this index was built from. Hashed (size, mtime, first
+            64 KB each) into the provenance record's ``source_hash`` so `Pipeline` can
+            tell whether the inputs changed. Empty means "unknown inputs": the record is
+            still written, but its source hash is a constant and cannot detect change.
+
+    Provenance: the written file carries ``_provenance_level_0`` — level 0 of the same
+    ladder the downstream `dyfviz` stages continue at 1, 2 and 3 — holding the item
+    count after dedup, the source hash, and every parameter that shaped the output.
+    Before 2026-09-07 nothing in dyf wrote provenance at all, so `Pipeline` reported
+    every `.dyf` as ``stale (no provenance)`` and `dyf info` said ``none recorded``.
     """
     n_original = len(embeddings)
 
@@ -134,6 +182,28 @@ def finalize_index(
     )
     logger.info(f"  Tree built in {time.time() - t0:.1f}s")
 
+    build_params = {
+        "max_depth": max_depth,
+        "num_bits": num_bits,
+        "min_leaf_size": min_leaf_size,
+        "seed": seed,
+    }
+    provenance = create_provenance(
+        artifact_type="dyf",
+        n_items=len(embeddings),
+        source_paths=list(source_paths),
+        params=ingest_params(
+            max_depth=max_depth,
+            num_bits=num_bits,
+            min_leaf_size=min_leaf_size,
+            seed=seed,
+            dedup=dedup,
+            embedding_model=metadata.get("embedding_model"),
+            domain=metadata.get("domain"),
+        ),
+    )
+    metadata = {**metadata, "_provenance_level_0": json.dumps(provenance_to_dict(provenance))}
+
     logger.info("Writing .dyf...")
     t0 = time.time()
     write_lazy_index(
@@ -143,12 +213,7 @@ def finalize_index(
         compression="none",
         quantization="float16",
         metadata=metadata,
-        build_params={
-            "max_depth": max_depth,
-            "num_bits": num_bits,
-            "min_leaf_size": min_leaf_size,
-            "seed": seed,
-        },
+        build_params=build_params,
         stored_fields=stored_fields,
     )
     size_mb = output.stat().st_size / 1_048_576
