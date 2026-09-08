@@ -226,10 +226,13 @@ is a place an agent will confidently report the wrong thing.
         sites would not have covered the third-party ones — and one stray line makes a
         whole payload unparseable, which is a worse failure than the silence it replaced.
 
-      - [ ] Noticed while testing, not changed: **`semantic_search` has no similarity
-        floor**, so a nonsense query returns `top_k` confident-looking results and exits
-        0 on a full graph. The JSON carries the scores so a caller *can* judge, but a
-        human reading the text output cannot. Design question, not a bug.
+      - [x] **`semantic_search` has no similarity floor** — *(closed 2026-09-07 as
+        decided, not built.)* Two corrections to the line as written: the text output
+        does print the score beside every hit (`concept_graph.py`, the `%0.3f  %s`
+        lines), so a human can judge; and a floor would be an absolute cosine constant,
+        which is exactly the class `KNOWN_ISSUES` #5 measured as non-transferring across
+        corpora. Not adding one. If a relative signal is ever wanted, it is the gap
+        between the top hit and the corpus-wide similarity distribution, not a constant.
 
 - [x] **CLI results go to stdout, problems to stderr.** *(done 2026-09-05.)* Caught while
       testing `dyf info`: `logging.StreamHandler` defaults to **stderr**, so the P0
@@ -442,8 +445,10 @@ is a place an agent will confidently report the wrong thing.
       nobody caught. Measured before: `index-source`, `index-images` and `enrich project`
       all raised bare tracebacks; `index-video` was the one command already failing
       cleanly, so the in-repo example to copy existed.
-      - [ ] Still open: `enrich audio` needs `kokoro` + `soundfile`, declared in **no**
-        extra, so there is no `dyf[...]` to name. Either add the extra or drop the path.
+      - [x] `enrich audio` needs `kokoro` + `soundfile`, declared in no extra.
+        *(closed here 2026-09-07: moved to dyfviz with the enrichment split — see "Scope
+        change: the tour split" above, which already lists it as dyfviz's. This line
+        survived the split by oversight.)*
       - [x] `index-source` needs a live Ollama server. *(closed 2026-09-07 as already
         done: `check_embedding_service` preflights before any parsing and raises
         `EmbeddingServiceError` → exit 3; the dry run reports the service as UNAVAILABLE.
