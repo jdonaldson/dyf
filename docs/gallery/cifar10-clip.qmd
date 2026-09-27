@@ -62,7 +62,7 @@ Drag the slider. Each position is a different cut of DYF's partition tree — sa
 #| fig-cap: "DYF's partition (left, slider-controlled) vs ground-truth classes (right, fixed). Hover for class names."
 fig = hierarchy_slider(
     result, X, y,
-    k_values=[23, 20, 17, 15, 12, 10, 8, 6, 4, 3, 2],
+    k_values=[10, 8, 6, 4, 3, 2],
     class_names=CLASS_NAMES,
     show_ground_truth=True,
     height=500,
@@ -72,11 +72,11 @@ fig
 
 Three things to try:
 
-- **Start at k=2** (default). The partition collapses to two clusters — roughly *vehicles* (airplane/car/ship/truck) vs *animals* (bird/cat/deer/dog/frog/horse). The same superclass split humans use, emerging from raw CLIP similarity alone.
-- **Stop at k=10.** This is the ARI peak: DYF's partition at its best alignment with the flat 10-class label. The metric in the title beats the oracle-tuned k-means below, which knew `k=10` going in.
-- **Slide right to k=23.** Each CIFAR class fragments into sub-styles — car probably splits into sedans vs trucks, dog into breeds / poses, etc. This is the finest resolution DYF's tree supports.
+- **Start at k=2** (default). The partition collapses to two clusters — in our runs, roughly *vehicles* (airplane/car/ship/truck) vs *animals*; hover to check where the boundary falls. A superclass split emerging from raw CLIP similarity alone.
+- **Slide to k=10.** This is DYF's own finest partition — ten communities for ten classes, recovered without being told the number. The metrics in the title beat the oracle-tuned k-means below.
+- **Watch what merging costs.** Every step left of 10 drops both metrics; the flat label is expressed at exactly the resolution DYF stopped at.
 
-K-means would need **ten separate runs** at ten different `k` to produce this range — and those runs are not guaranteed to nest. DYF's tree nests by construction: every coarser partition is a strict merge of a finer one.
+K-means would need a separate run at every `k` to produce this range — and those runs are not guaranteed to nest. DYF's tree nests by construction: every coarser partition is a strict merge of a finer one.
 
 ## How we got here
 
@@ -87,7 +87,7 @@ The setup code is collapsed above. The short version:
 3. Run DYF with its standard defaults on those embeddings.
 4. Run oracle-k-means (`k=10`) for comparison.
 
-Why CLIP and not raw pixels? Because [Olivetti](olivetti-faces.qmd) showed what happens when raw pixels go straight into DYF: at 400 samples × 4,096d, DYF collapsed to 5 clusters against a 40-class ground truth and posted NMI=0.296. The diagnosis was that raw pixel space has bad geometry for density clustering — identity manifolds are curved and narrow, not the tight blobs density methods need. Swapping in a pretrained visual encoder fixes the geometry *and* gives DYF adequate sample density per latent class.
+Why CLIP and not raw pixels? Because [Olivetti](olivetti-faces.qmd) showed what happens when raw pixels go straight into DYF: at 400 samples × 4,096d, DYF collapsed to 3 clusters against a 40-class ground truth and posted NMI=0.199. The diagnosis was that raw pixel space has bad geometry for density clustering — identity manifolds are curved and narrow, not the tight blobs density methods need. Swapping in a pretrained visual encoder fixes the geometry *and* gives DYF adequate sample density per latent class.
 
 This notebook is the counter-narrative to Olivetti: **images aren't hostile to DYF; raw pixels are.**
 
@@ -110,7 +110,7 @@ walk = merge_walk(result, X, y, targets=[15, 10, 5, 2])
 print(merge_walk_table(walk, result))
 ```
 
-The `merge → 10` row — **NMI 0.709, ARI 0.622** — beats oracle-k k-means (0.686 / 0.515) at its own resolution. DYF found the 10-class structure without being told the number.
+The raw partition **is** the `k=10` row — **NMI 0.690, ARI 0.601** against oracle-k k-means at 0.686 / 0.515. DYF found the 10-class structure without being told the number, and the merge walk only goes down from there.
 
 ## Static figures (for the record)
 
@@ -126,7 +126,7 @@ plot_single(result.umap_2d, y, title=f"Ground truth (k={result.true_k})")
 
 ```{python}
 #| label: fig-dyf
-#| fig-cap: "DYF — parameter-free, over-partitions into sub-categories."
+#| fig-cap: "DYF — parameter-free; recovers the class count on its own."
 plot_single(result.umap_2d, result.labels, title=f"DYF (recovered k={result.recovered_k})")
 ```
 
@@ -144,10 +144,10 @@ Stack this alongside Olivetti:
 
 | Dataset | Input | n × d | DYF k | DYF NMI | KMeans NMI | DYF NMI − KMeans |
 |---------|-------|-------|------:|--------:|-----------:|-----------------:|
-| Olivetti | Raw pixels | 400 × 4096  | 5  | 0.296 | 0.629 | **−0.333** |
-| **CIFAR-10** | **CLIP embeddings** | **10,000 × 512** | **23** | **0.660** | **0.686** | **−0.026** |
+| Olivetti | Raw pixels | 400 × 4096  | 3  | 0.199 | 0.629 | **−0.430** |
+| **CIFAR-10** | **CLIP embeddings** | **10,000 × 512** | **10** | **0.690** | **0.686** | **+0.004** |
 
-The DYF-vs-oracle-k-means gap shrunk by an order of magnitude once the features changed. Same algorithm family, same defaults, transformative result. Two things moved together:
+The DYF-vs-oracle-k-means gap went from a rout to a dead heat on NMI — and a clear DYF win on ARI (0.601 vs 0.515) — once the features changed. Same algorithm, same defaults, transformative result. Two things moved together:
 
 **1. The geometry changed.**
 Raw face pixels don't form tight identity clusters — lighting, pose, and expression spread each person across a long, curved manifold in 4,096-dimensional pixel space. CLIP embeddings, by contrast, were trained to put visually-distinct classes into tight blobs in 512-dimensional representation space. Density-based clustering needs "tight blobs separated by empty space" to work; CLIP gives you exactly that.
@@ -169,6 +169,7 @@ This is the same logic behind "put an embedding model in front of your retrieval
 
 ## Caveats
 
-- **Test split only** (10,000 images). The full CIFAR-10 train split (50,000) would give DYF more density per class and probably push NMI closer to k-means's; we use the test split to keep the notebook render fast.
+- **Test split only** (10,000 images). The full CIFAR-10 train split (50,000) would give DYF more density per class; we use the test split to keep the notebook render fast.
 - **CLIP was trained on internet-scale image-text pairs**, which almost certainly included CIFAR-like images. It's the "home court" of pretrained vision encoders. A domain-specific corpus (medical imaging, satellite, microscopy) would need a domain-specific encoder to tell the same story.
-- **No fine-tuning.** The CLIP encoder is used off-the-shelf. Fine-tuning on CIFAR would tighten the clusters further and probably erase the DYF-vs-oracle gap entirely. That's also the recipe for "why does this method work so well on this benchmark" in a lot of published clustering papers.
+- **No fine-tuning.** The CLIP encoder is used off-the-shelf. Fine-tuning on CIFAR would tighten the clusters further. That's also the recipe for "why does this method work so well on this benchmark" in a lot of published clustering papers.
+- **Earlier versions of this page reported 21–23 DYF clusters** and a merge-walk that "found" the 10-class structure at `merge → 10`. The extra clusters were an artifact of a single-level Louvain in `dyf-rs` before 0.12.0 that could not merge communities (dyf `KNOWN_ISSUES.md`, issue 10). With the corrected optimiser the raw partition lands at 10.

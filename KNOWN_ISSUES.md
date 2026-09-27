@@ -66,6 +66,15 @@ one-off measurements.
       *and* a probe range wider than 1–5
 - [ ] `analyze_bridges`'s own `bridge_threshold=0.5` default — cross-repo, `dyf-core/dyf-rs`
 - [ ] `connection_threshold=0.3` in the same function — also absolute, never audited
+- [ ] `DenseSearchIndex` ranks by cosine and the Python surface never says so — Euclidean
+      callers got recall@15 = 0.06 with no warning (issue 8). Documentation + a unit-norm
+      check, not a new mechanism
+- [ ] `auto_tune_tree_params` caps `max_depth` at 6, so `target_bucket_size` is inert above
+      ~1M points — four settings, ~3,700 leaves each (issue 9). Issue 6's class, as a cap
+- [x] **`louvain_communities` has no aggregation phase** (issue 10) — fixed in the `dyf-core`
+      working tree 2026-09-27 (multilevel); brain shipped-path ARI 0.26 → 0.60 = incumbent.
+      ⚠ Unreleased: needs dyf-core release + `dyf-rs` pin bump here, then re-render the gallery
+      (every published number ran through the old optimiser) and re-validate the auto-tune (#9)
 
 **P2 — sweep the rest of the pattern (see the rule at the end of issue 5)**
 
@@ -441,6 +450,137 @@ obvious candidate, since a gap there is checkable by hand.
 update the test. Previously it asserted only `isinstance(result.gap_detected, bool)`, with a
 comment conceding it could not guarantee detection fired — so a feature that never fires at
 all passed a test named for it firing.
+
+---
+
+## 8. `DenseSearchIndex` ranks by cosine and does not say so — OPEN
+
+The batched kernel L2-normalises the query (`dyf-rs/src/dense_search.rs`, `l2_normalize`) and
+scores every candidate with `dot_normed(row, &qn)`, so results are ordered by **cosine
+similarity**. Neither `DenseSearchIndex`'s docstring, `dense_search.py`, nor the README section
+that introduces it names a metric. `LazyIndex` at least says "(will be L2-normalized)" on its
+embeddings argument; the dense path says nothing.
+
+Measured 2026-09-25 (`/Volumes/Models/dyf_brain_1m/rerun_2026-09-25/`): on a 20k synthetic set
+with **every leaf probed**, top-10 overlap with exact cosine is 1.000, with exact dot product
+0.339, with exact Euclidean 0.587. On 1.29M × 50 PCA rows — Euclidean data, the standard
+scRNA-seq input — a caller who assumes dot-product ranking (the exact-Euclidean augmentation
+`x → (x, -|x|²/2)`, `q → (q, 1)`) gets **recall@15 = 0.06** against true neighbours, with no
+warning and `frac_missing = 0`. Confidently wrong output is the worst failure mode a search index
+has.
+
+**Fix:** state the metric in the class docstring, `search()` docstring and README; either warn
+when input rows are not unit-norm or document that non-unit input is normalised on the way in.
+Deciding whether to *offer* dot-product/Euclidean ranking is a separate question — do not add a
+mechanism to close a documentation defect.
+
+## 9. `auto_tune_tree_params(target_bucket_size)` is inert above ~1M points — OPEN
+
+`docs/gallery/_gallery.py::auto_tune_tree_params` caps `max_depth` at 6 with `num_bits=2`, so the
+tree can have at most 4⁶ = 4,096 leaves regardless of `n`. At 1.29M cells every leaf holds ~350
+points and `min_leaf_size` (5 / 10 / 15 for targets 10 / 20 / 30) never binds:
+
+| target_bucket_size | params | leaves | k | ARI vs scanpy |
+|---|---|---|---|---|
+| 10 | (2, 6, 5) | 3,846 | 104 | 0.309 |
+| 20 | (2, 6, 10) | 3,759 | 106 | 0.296 |
+| 30 | (2, 6, 15) | 3,684 | 114 | 0.285 |
+| (default) | (3, 4, 20) | 3,691 | 115 | 0.264 |
+
+The April 2026 note "auto target=10 best: +0.045 ARI over default" read leaf-boundary jitter as
+the knob working. This is issue 6's bug class — an absolute resolution that does not scale with
+`n` — on the other side: a cap instead of a floor. The docstring's validation ("beats defaults on
+6-7/9 gallery datasets") was done at n ≤ ~70k, where the cap never engages.
+
+**Fix:** derive the depth from `n / target_bucket_size` without the cap, or make the cap a
+function of `n`; re-validate at 1.3M with the leaf-count actually varying. Measured in
+`/Volumes/Models/dyf_brain_1m/rerun_2026-09-25/s1_gallery_results.json`.
+
+---
+
+## 10. `louvain_communities` is a single-level Louvain — it cannot merge, so `resolution` barely works — FIXED IN dyf-core (unreleased)
+
+**Fix (2026-09-27):** `dyf-core/dyf-core/src/louvain.rs` is now the multilevel algorithm —
+local moves, collapse communities to super-nodes (summed weights, intra weight as self-loop so
+degrees and `m` are preserved), repeat until a level makes no merge. Public signature unchanged.
+Two tests added: γ=0.05 must merge two 0.5-bridged triangles (the crossover is γ=0.154); an
+8-triangle chain must be 8 at γ=1 and 1 at γ=0.01. Planted partition now matches igraph exactly
+(k=1 at γ≤0.1, 8 blocks / ARI 1.000 at γ=1). **Not yet committed, versioned or released** — dyf
+still pins `dyf-rs>=0.11.0`, which ships the old optimiser.
+
+Effect with the Python side untouched (`/Volumes/Models/dyf_bench_2026-09-27/`): brain shipped
+path ARI **0.264 → 0.603** (incumbent 0.608) at 4.6 s vs 34 s; on identical centroid graphs
+at the shipped setting the new optimiser is within ±0.06 ARI of igraph Leiden on all seven
+datasets, where the old one returned 3–20× too many communities. The remaining gap to
+pynndescent + Leiden is the centroid graph, not the optimiser (systematic NMI deficit; MNIST
+0.48 vs 0.87 against a leaf oracle of 0.72).
+
+**Gallery re-rendered against the fix (2026-09-27), old → new at the shipped `resolution=1.0`:**
+
+| page | n | k (true) | NMI | ARI |
+|---|---|---|---|---|
+| mnist | 70k | 86 → 12 (10) | 0.546 → 0.550 | 0.183 → **0.429** |
+| cifar10-clip | 10k | 21 → 10 (10) | 0.678 → 0.690 | 0.537 → **0.601** |
+| cmu-mocap | 140k | 56 → 18 (25) | 0.412 → 0.290 | 0.085 → 0.112 |
+| twenty-newsgroups | 18.8k | 23 → 10 (20) | 0.497 → 0.472 | 0.350 → 0.301 |
+| digits | 1.8k | 9 → 7 (10) | 0.679 → 0.627 | 0.545 → 0.475 |
+| synthetic-shapes, olivetti-faces, diagnostic-stack | | unchanged | | |
+
+Not a uniform win at small n: a correct modularity optimiser at γ=1 *under*-resolves small leaf
+graphs (the resolution limit), where the old one over-split — and over-splitting happened to
+score better against fine-grained labels (20 newsgroups, 25 MoCap trials). On digits, γ=2 through
+the shipped `louvain_cluster_leaves` path gives k=11 / NMI 0.744 / ARI 0.630 (the gallery page
+now runs this cell), above anything the old code produced; the knob works now. No single
+resolution won across the eleven datasets measured (best values 0.5–4), so the default stays
+1.0. ⚠ **The gallery prose is stale on mnist / cmu-mocap / digits / twenty-newsgroups /
+cifar10-clip** — the "over-partitioning is hierarchy" argument on the MNIST page (81 pure
+sub-clusters, a 2,325-sample 98%-sevens cluster) was the broken optimiser; the merge-walk
+tables collapse to one row. Original report follows.
+
+`dyf-core/dyf-core/src/louvain.rs` is, per its own doc comment, "Single-level Louvain community
+detection", "ported from `boids-wasm/src/louvain.rs`". It runs the local node-move phase (at most
+20 passes) and **never aggregates**. Without the coarsening phase, two communities can only merge
+one node at a time, and moving a single node across is unfavourable even when merging the two
+communities would be — that barrier is exactly what Louvain's aggregation step exists to cross.
+Every consumer of `louvain_from_centroids` / `louvain_cluster_leaves` (the gallery, the 1.3M
+brain, the GUDID viz, `dyfviz`) has been running on it.
+
+**Unit-level evidence** (planted partition, n=2000, 8 blocks, p_in 0.08 / p_out 0.004, seed 0):
+
+| resolution | dyf_rs `louvain_communities` | igraph Leiden (same graph) |
+|---|---|---|
+| 0.01 | k=7, ARI 0.64 | k=1 |
+| 0.1 | k=7, ARI 0.64 | k=1 |
+| 1.0 | **k=11, ARI 0.91** | **k=8, ARI 1.00** |
+| 3.0 | k=8, ARI 1.00 | k=8, ARI 1.00 |
+| 10.0 | k=239 | k=177 |
+
+It over-splits at the standard resolution and cannot merge below 7 communities at any resolution;
+a correct optimiser collapses the graph to one community by γ=0.1.
+
+**At scale** (1.29M-cell brain, leaf-centroid cosine kNN graphs, k=10 as shipped): the graph is
+**connected** (1 component, checked) yet resolution 1.0 → 0.01 moves k only 138 → 107 (3.8k
+leaves) and 1289 → 974 (66k leaves) — k tracks the graph's degree, not γ. Running igraph Leiden on
+the **identical graphs** (`rerun_2026-09-25/s7_*`, `s8_*`):
+
+| tree (leaves) | leaf-majority oracle | dyf Louvain, best k≈35 | igraph Leiden, same graph, k≈35 | pynndescent + Leiden (incumbent) |
+|---|---|---|---|---|
+| auto10 (3.8k) | ARI 0.72 | 0.36 (k=102) | **0.50** (k=35) | 0.60 (k=34) |
+| depth 8 (25k) | 0.78 | 0.15 (k=385) | **0.52** (k=32) | |
+| depth 10 (66k) | 0.81 | 0.11 (k=748) | **0.52** (k=37); 0.57 at k=27 | |
+
+Swapping only the optimiser recovers about two-thirds of the ARI gap to the incumbent on the
+shipped tree, and ~85% with a deeper tree, at ~15 s total. NMI reaches 0.74 vs the incumbent's
+0.82. Leaf-size edge weighting (`cos × sqrt(s_i s_j)`) was tried and does not help — dropped.
+
+**The test that let it ship**: `test_resolution_parameter` asserts `k_high >= k_low`, which an
+inert knob passes with equality. `benchmarks/audit_test_assertions.py`'s "vacuous comparison"
+class, in the Rust crate where the audit does not look.
+
+**Fix:** add the aggregation phase (collapse communities to super-nodes with summed edge weights,
+recurse until no improvement) — a correction to an existing primitive, not a new mechanism. Then
+assert on a planted partition that γ=1 recovers the blocks exactly and γ→0 yields k=1. Re-run
+`s5`–`s8` afterwards; the gallery numbers and the brain memory note will all move.
 
 ---
 

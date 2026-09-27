@@ -59,11 +59,13 @@ The gallery's cross-notebook findings cluster into four patterns:
 | Cluster *shape*  | Low-dim curved / topologically nested (HDBSCAN wins — [see Moons](synthetic-shapes.qmd)) | Convex or hierarchical clusters in medium-to-high dim |
 | Data *scale*     | Very small n, very high d ([Olivetti](olivetti-faces.qmd) 400 × 4096 breaks it) | Medium-to-large n, moderate d — where HDBSCAN's O(n²) breaks |
 
-**Over-partitioning is often a feature.** On [MNIST](mnist.qmd) DYF finds 81 communities for 10 classes, and on [20 Newsgroups](twenty-newsgroups.qmd) it finds 34 for 20. The merge walk shows those extra splits are genuine hierarchy — collapsing 81 → 20 on MNIST roughly doubles ARI while barely moving NMI. The finer grain isn't noise; it's sub-style / sub-topic / sub-motion structure that the flat ground-truth label ignores.
+**Recovered k tracks the label once the tree has enough leaves.** On [MNIST](mnist.qmd) DYF finds 12 communities for 10 classes and on [CIFAR-10 + CLIP](cifar10-clip.qmd) exactly 10 for 10 — in both cases beating oracle k-means on ARI without being told `k`. The failure mode runs the other way on small data: [Digits](digits.qmd) (1,797 points, ~170 leaves) recovers 7 for 10 and [20 Newsgroups](twenty-newsgroups.qmd) 10 for 20, because a modularity optimiser on a graph of a few hundred leaf centroids hits its resolution limit and merges real classes. Raising Louvain `resolution` fixes that (Digits at `resolution=2`: 11 communities, better on both metrics); the default is left at 1.0 because no single value won across the gallery.
+
+*(Earlier versions of this page said the opposite — "over-partitioning is often a feature", citing 81 MNIST communities. That count came from a single-level Louvain in `dyf-rs` before 0.12.0 that could not merge communities; see dyf's `KNOWN_ISSUES.md`, issue 10.)*
 
 **Merging walks hierarchy; it can't fix bad geometry.** On [Moons](synthetic-shapes.qmd) merging 3 → 2 *decreases* NMI. That's diagnostic: the raw over-partition must contain the coarser structure as a sub-partition for the merge to help.
 
-**"True k" is frequently a fiction.** [CMU MoCap](cmu-mocap.qmd) has three plausible ground-truth labels at different granularities (7 / 25 / 80 classes). DYF's partition beats oracle k-means on NMI against every one of them, because it doesn't commit to a single k at fit time.
+**"True k" is frequently a fiction.** [CMU MoCap](cmu-mocap.qmd) has three plausible ground-truth labels at different granularities (7 / 25 / 80 classes). DYF recovers 18 communities and edges oracle k-means on ARI against the 25-class label (0.112 vs 0.103) while trailing it on NMI (0.290 vs 0.348) — and both are far from the leaf-level ceiling, because trial labels describe *trajectories* through pose space, not blobs in it. Frame-level clustering is the wrong tool for that label at any `k`; the notebook says so.
 
 ## Who should be in your toolbox?
 
@@ -89,14 +91,14 @@ Not needing `k` or `eps` is the real claim DYF makes. The ones below are structu
 
 ### Parameters DYF fixes at defaults
 
-Every notebook uses **these same values** — not tuned per-dataset, not adaptive. Where they break, the relevant notebook says so honestly.
+Every notebook uses **the same rule** — `auto_tune_tree_params(n)` in `_gallery.py`, which sets the tree parameters from the sample count alone. Nothing is tuned per dataset against the labels. Where the rule breaks, the relevant notebook says so honestly.
 
 | Parameter | Default | What it does | Known failure mode |
 |---|---:|---|---|
-| `max_depth` | 4 | Tree depth cap (→ 4096 leaves max) | Needs deeper tree at n > ~250K |
-| `num_bits` | 3 | Branching factor (8-way splits) | Alternatives untested |
-| `min_leaf_size` | 20 | Leaves must contain ≥20 points | Breaks below ~10 points per latent class ([Olivetti](olivetti-faces.qmd)) |
-| Louvain `resolution` | 1.0 | Modularity granularity | Fails on extreme imbalance (10:1–20:1 minority-size range) |
+| `max_depth` | ⌈log₄(n/20)⌉, capped at 6 | Tree depth (→ ≤ 4⁶ = 4,096 leaves) | The cap makes the leaf count stop growing above ~80K points, so `target_bucket_size` is inert at 1M+ (dyf `KNOWN_ISSUES.md` #9) |
+| `num_bits` | 2 | Branching factor (4-way splits) | Alternatives untested at gallery scale |
+| `min_leaf_size` | 10 | Leaves must contain ≥10 points | Breaks below ~10 points per latent class ([Olivetti](olivetti-faces.qmd)) |
+| Louvain `resolution` | 1.0 | Modularity granularity | Under-splits small leaf graphs (≲ a few hundred leaves — [Digits](digits.qmd), [20 Newsgroups](twenty-newsgroups.qmd)); `resolution=2` fixes Digits |
 | Louvain `leaf_k` | 10 | kNN on leaf centroids | No observed failure mode |
 | Metric | cosine | Implicit in LSH tree construction | Wrong for low-dim Euclidean ([Moons](synthetic-shapes.qmd) partial failure) |
 | `seed` | 42 | Reproducibility | Run-to-run variance uncharacterized |

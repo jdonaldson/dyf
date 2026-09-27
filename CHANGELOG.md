@@ -1,5 +1,34 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+**Community detection results change: `dyf-rs>=0.12.0` required, whose Louvain is now
+multilevel.** The Rust `louvain_communities` behind `louvain_from_centroids` /
+`louvain_cluster_leaves` / every gallery page was a *single-level* optimiser (local node moves
+only, no aggregation phase). It could not merge two communities once formed, so it over-split at
+resolution 1 and `resolution → 0` never collapsed the graph — the knob was close to inert
+(`KNOWN_ISSUES.md` #10). On the 1.29M-cell brain benchmark the shipped pipeline goes from ARI
+0.264 to 0.603 against scanpy's labels (pynndescent + Leiden: 0.608) with no Python change; on
+identical leaf-centroid graphs across seven labelled datasets the new optimiser is within ±0.06
+ARI of igraph Leiden, where the old one returned 3–20× too many communities.
+
+Consequences worth knowing about:
+
+- **Fewer communities everywhere.** MNIST gallery: 86 → 12 (true 10), ARI 0.18 → 0.43.
+  Any downstream code that keyed on the old community count, or on the "over-partitioning is
+  hierarchy" reading, sees different labels.
+- **Small graphs can under-split at the default `resolution=1.0`.** `digits` (1,797 points,
+  ~170 leaves) went k=9 → 7, NMI 0.68 → 0.63; at `resolution=2.0` the same pipeline reaches
+  k=11, NMI 0.74, ARI 0.63 (the Digits gallery page now shows this cell) — better than the old
+  code ever did. That is modularity's resolution
+  limit on a ~170-node graph, not a regression in the optimiser. The default is unchanged
+  because no single value won across the seven datasets (best resolutions ranged 0.5–4); the
+  knob now actually does what its docstring says, so tune it.
+- Gallery pages were re-rendered against the fixed optimiser; their prose is being brought
+  in line with the new numbers.
+
 ## 0.15.0 — 2026-09-07
 
 ### Changed

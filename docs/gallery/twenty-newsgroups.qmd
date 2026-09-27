@@ -122,9 +122,33 @@ plot_single(result.umap_2d, kmeans["labels"], title=f"k-means (told k={result.tr
 print(metrics_table(result, kmeans, None))
 ```
 
+## Ten communities for twenty classes — which twenty?
+
+DYF stopped at 10. That is half the flat label's count, and it could mean two very different things: the community-detection stage under-resolved the leaf graph (as it does on [Digits](digits.qmd), a much smaller dataset), or DYF landed on a *coarser real level* of the newsgroup hierarchy. 20 Newsgroups has seven top-level buckets — `alt`, `comp`, `misc`, `rec`, `sci`, `soc`, `talk` — so the second reading is testable: score the same partition against the top-level label.
+
+```{python}
+#| label: top-level
+from sklearn.metrics import adjusted_rand_score, normalized_mutual_info_score
+
+top_names = sorted({n.split(".")[0] for n in data.target_names})
+y_top = np.asarray([top_names.index(data.target_names[t].split(".")[0]) for t in y])
+
+def score(lab):
+    return normalized_mutual_info_score(y_top, lab), adjusted_rand_score(y_top, lab)
+
+print(f"{len(top_names)} top-level groups: {top_names}\n")
+print(f"{'partition':32s}   NMI    ARI   (vs top-level label)")
+for name, lab in [(f"DYF raw (k={result.recovered_k})", result.labels),
+                  ("k-means (told k=20)", kmeans["labels"])]:
+    n_, a_ = score(lab)
+    print(f"{name:32s}  {n_:.3f}  {a_:.3f}")
+```
+
+Compare the two rows to the same methods scored against the 20-class label above. The answer is *both readings at once*. DYF's ten communities keep the top-level structure better than k-means's twenty do — ARI 0.299 vs 0.214 against the seven buckets, NMI tied — and DYF's ARI is essentially the same whether you judge it by buckets (0.299) or by the 20 classes (0.301), which is what a partition sitting between two levels of a hierarchy looks like. But NMI 0.42 against seven buckets is not a clean seven-way split either. The ten communities are coarser than the leaves and finer than the branches, and they respect the branches about as well as anything here does.
+
 ## Walking down the hierarchy
 
-DYF's 34 communities aren't a commitment to k=34. They're the finest resolution of a partition hierarchy that can be collapsed to any coarser k by walking up the merge tree:
+Whatever the reading, DYF's 10 communities are the top of a partition hierarchy that can be collapsed further:
 
 ```{python}
 #| label: merge-walk
@@ -135,7 +159,7 @@ walk = merge_walk(result, X, y, targets=[25, 20, 10, 7, 4])
 print(merge_walk_table(walk, result))
 ```
 
-The `merge → 20` row is the direct comparison to the flat 20-class label — and for 20 Newsgroups' hierarchical structure, `merge → 7` is interesting too, because 20 Newsgroups' top-level topic buckets (`comp.*`, `rec.*`, `sci.*`, `talk.*`, `alt.*`, `soc.*`, `misc.*`) are 7 in number. If DYF's merge tree reflects the real topic hierarchy, collapsing to 7 should still score reasonably well.
+Targets above 10 are no-ops. `merge → 7` is the interesting row: seven is the number of top-level newsgroup buckets. Collapsing to it costs 0.05 NMI and 0.08 ARI against the 20-class label — a real loss, but a smaller one than k-means's twenty clusters suffer when judged at the bucket level (ARI 0.345 → 0.214 in the cell above). The coarse structure is in the tree; it is just not the level DYF stopped at.
 
 ## How DYF and k-means disagree — and why
 
@@ -143,22 +167,22 @@ Compare this to the Digits notebook:
 
 | Dataset  | k-means NMI | DYF NMI | Gap   |
 |----------|------------:|--------:|------:|
-| Digits   | 0.773       | 0.696   | 0.077 |
-| **20 Newsgroups** | **0.505** | **0.487** | **0.018** |
+| Digits   | 0.773       | 0.627   | 0.146 |
+| **20 Newsgroups** | **0.505** | **0.472** | **0.033** |
 
-**The gap shrunk by roughly 75%.** On text, oracle-tuned k-means is only a statistical rounding error ahead of DYF-with-no-knobs. Two things changed between the notebooks:
+**The gap shrank by about three-quarters.** On text, oracle-tuned k-means is a few hundredths of NMI ahead of DYF-with-no-knobs, at half the cluster count. Two things changed between the notebooks:
 
 **1. The manifold started to bend.**
 Sentence embeddings for `comp.sys.ibm.pc.hardware` and `comp.sys.mac.hardware` overlap — they share vocabulary ("driver", "boot", "RAM"), writing style, question types. In UMAP those classes don't sit as disjoint blobs; they bleed into each other along a curved seam. K-means has to plant a Voronoi boundary *somewhere* in that seam, and wherever it plants it, it misclassifies the items near the line. DYF's density-based cut can follow the seam instead of cutting straight across it.
 
-**2. The flat k=20 ground truth is arguably wrong.**
-DYF found 34 natural communities, which over-shoots the 20-class label — but 20 Newsgroups has an implicit *hierarchy* (`comp.*`, `rec.*`, `sci.*`, `talk.*`) with uneven subgroup structure within each branch. Splitting `comp.sys.*` into an IBM community and a Mac community isn't a mistake; it's finding real sub-topic structure the flat label doesn't encode. NMI partially rewards this (it normalizes for mismatched cluster counts) but not fully.
+**2. The tree is bigger.**
+Digits hands community detection ~170 leaf centroids and gets under-split to 7 for 10. Here the tree has several times as many leaves and DYF recovers 10 for 20 — still coarse, but the label it is coarse *against* is itself a two-level hierarchy, which is why the top-level cell above exists. On [MNIST](mnist.qmd) (70,000 points, thousands of leaves) the same code recovers 12 for 10. Leaf count, not sample count, is the axis to watch.
 
 ### The home-court / away-game framing, continued
 
-K-means is a superb algorithm when the problem matches its inductive bias: *"minimize within-cluster Euclidean variance, and I'll tell you how many clusters there are."* Digits satisfies both conditions perfectly — ten convex blobs, k handed over. Text embeddings break both conditions at once: the geometry isn't convex, and the real number of semantic communities isn't even well-defined (there are 4 top-level topic groups, 20 flat labels, and probably 30+ meaningful sub-topics).
+K-means is a superb algorithm when the problem matches its inductive bias: *"minimize within-cluster Euclidean variance, and I'll tell you how many clusters there are."* Digits satisfies both conditions perfectly — ten convex blobs, k handed over. Text embeddings break both conditions at once: the geometry isn't convex, and the real number of semantic communities isn't even well-defined (there are 7 top-level topic groups, 20 flat labels, and a debatable number of sub-topics).
 
-On its home court k-means wins by 0.077 NMI. On the away game it wins by 0.018. As we get into the remaining notebooks — Olivetti Faces (40 identities, 10 examples each, *very* non-convex in pixel space), CMU MoCap (continuous motion manifolds, no discrete labels at all) — that gap should continue to shrink or invert.
+On its home court k-means wins by 0.146 NMI. On the away game it wins by 0.033. The remaining notebooks — Olivetti Faces (40 identities, 10 examples each, *very* non-convex in pixel space) and CMU MoCap (continuous motion manifolds, no single right `k`) — push both methods into regimes where neither does well, for different reasons.
 
 ### Pros and cons recap
 
@@ -166,13 +190,14 @@ On its home court k-means wins by 0.077 NMI. On the away game it wins by 0.018. 
 |----------------------------|----------------------------------------------------------------------|---------------------------------------------------------|
 | Needs `k`?                 | No.                                                                  | Yes — given 20 upfront.                                 |
 | Behavior on curved manifolds | Follows density; can trace seams.                                  | Cuts straight Voronoi lines across them.                |
-| Behavior when true structure is hierarchical | Finds sub-topics (34 vs 20), partially rewarded by NMI. | Forced to a flat 20-partition; can't express hierarchy. |
+| Behavior when true structure is hierarchical | Stops at one level of it (10 here); the merge walk gives the coarser ones. | Forced to a flat 20-partition; can't express hierarchy. |
 | Behavior when embedding noise is high | Tree leaves absorb some noise before Louvain merges. | Sensitive — outliers pull centroids.                    |
-| Tree output                | Yes — can re-cut at coarser or finer resolution post-hoc.            | No — flat at exactly `k`.                               |
+| Tree output                | Yes — can re-cut at coarser resolution post-hoc.                     | No — flat at exactly `k`.                               |
 
 ## What to take away
 
-- **DYF essentially ties oracle k-means on text.** 0.018 NMI is well inside the run-to-run variance of either method.
-- **The "recovered 34" isn't over-partitioning, it's hierarchy.** The 20-class label is a human convenience; the semantic structure has more joints.
+- **DYF comes within 0.03 NMI of oracle k-means on text**, without `k` and with half the clusters.
+- **The recovered 10 is coarse against the 20-class label, and half-right against the 7-bucket one.** It keeps the top-level structure better than oracle k-means's twenty clusters (ARI 0.30 vs 0.21) without being a clean seven-way split. Read the two scores together; either alone tells a tidier, wrong story.
 - **HDBSCAN doesn't scale here.** 144 seconds and 84% discarded is a dealbreaker at 18K+ documents, which is small by real-world RAG standards.
-- **Parameter-free is getting cheaper to justify.** On digits, the oracle gave k-means a 0.077 NMI edge. On 20NG, it bought k-means 0.018. The cost of parameter-free is dropping as the geometry gets harder — which is the regime you're in whenever you don't already know what's in your corpus.
+- **Parameter-free is getting cheaper to justify.** On digits the oracle gave k-means a 0.146 NMI edge; here it bought 0.033. The cost of not knowing `k` drops as the geometry gets harder — which is the regime you're in whenever you don't already know what's in your corpus.
+- **Earlier versions of this page reported 23–34 communities** and read them as sub-topic hierarchy. That count came from a single-level Louvain in `dyf-rs` before 0.12.0 that could not merge communities (dyf `KNOWN_ISSUES.md`, issue 10); the numbers here are from the corrected optimiser.

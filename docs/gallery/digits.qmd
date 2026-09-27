@@ -16,6 +16,8 @@ execute:
 
 The smallest, fastest sanity check. `sklearn.datasets.load_digits` ships with the library — no downloads, runs in seconds, and the ground truth (`k=10`) is unambiguous. If DYF can't recover 10 groups here, nothing downstream matters.
 
+It doesn't, quite. At the gallery defaults DYF recovers **7** groups for 10 classes — and the reason is the most useful thing this small dataset has to teach about how DYF works.
+
 ## Load the data
 
 ```{python}
@@ -88,17 +90,47 @@ print(metrics_table(result, kmeans, hdb))
 
 ## How DYF and k-means disagree — and why
 
-Squint at the three panels and the difference is obvious: **k-means's partitions track the ground-truth digit classes more faithfully than DYF's do.** K-means wins on every alignment metric here (NMI 0.77 vs 0.70, ARI 0.73 vs 0.61). That's worth being honest about.
+Squint at the three panels and the difference is obvious: **k-means's partitions track the ground-truth digit classes more faithfully than DYF's do.** K-means wins on every alignment metric here (NMI 0.77 vs 0.63, ARI 0.73 vs 0.48). That's worth being honest about.
 
 Two things are driving the gap:
 
 **1. The oracle is doing a lot of work.**
 K-means was *told* `k=10`. That's not a small hint — it's the whole answer to the only question DYF actually has to solve. An algorithm with `k` handed to it is solving a completely different problem (a constrained one) than an algorithm that has to discover `k` from the data. The gallery exists precisely because you usually don't have that oracle.
 
-**2. The dataset's ground truth is shaped exactly like what k-means assumes.**
-The ten digit classes project to ten roughly-convex blobs in UMAP space, and k-means's implicit model — *"the world is a Voronoi diagram around k centroids"* — is an excellent fit. When the ground truth matches your algorithm's inductive bias, you look smart. MNIST-style digits are the home court where k-means was born.
+**2. DYF under-splits here, and the reason is size.**
+DYF does not cluster the 1,797 points directly. It builds a tree, takes the centroid of each leaf, and runs Louvain community detection on a k-nearest-neighbour graph of those centroids. On this dataset the tree has about 170 leaves. Modularity — the quantity Louvain maximises — has a well-known *resolution limit*: on a graph that small it cannot see communities below a certain size, and merges them. Three digit classes get absorbed into neighbours, and DYF reports 7.
 
-DYF doesn't assume convexity. Its clusters follow density and graph connectivity on the LSH-tree leaf network, which means its boundaries can bend and curve. Here that flexibility is a liability: it lets DYF slice a single digit class into two close-by sub-clusters (e.g., two stylistic variants of "7"), or bridge two classes that happen to touch in UMAP space. Neither is a mistake in any absolute sense — sub-styles *are* real structure — but if the task is "recover exactly the 10 labeled classes," k-means's rigidity is an advantage.
+That is not a property of the digits; it is a property of running a modularity optimiser on a 170-node graph at the standard resolution. The next cell shows the fix.
+
+### Turning the one knob DYF actually has
+
+`resolution` is the Louvain granularity parameter. At 1.0 (the default, used in every notebook) it under-splits this graph; at 2.0 it doesn't:
+
+```{python}
+#| label: run-dyf-res2
+import tempfile
+from pathlib import Path
+import numpy as np
+from sklearn.metrics import adjusted_rand_score, normalized_mutual_info_score
+from dyf import LazyIndex, build_dyf_tree, write_lazy_index
+from dyf.agglomerate import louvain_cluster_leaves
+from _gallery import auto_tune_tree_params
+
+params = auto_tune_tree_params(len(X))          # the same tree the defaults use
+tree = build_dyf_tree(X, seed=42, **params)
+with tempfile.TemporaryDirectory() as td:
+    path = str(Path(td) / "digits.dyf")
+    write_lazy_index(tree, X, path, compression="none", quantization="float32")
+    with LazyIndex(path) as idx:
+        res2 = louvain_cluster_leaves(idx, result.umap_2d, X, resolution=2.0)
+labels2 = np.asarray(res2.point_labels)
+
+print(f"resolution=2.0 → recovered k: {len(set(labels2))}  "
+      f"NMI: {normalized_mutual_info_score(y, labels2):.3f}  "
+      f"ARI: {adjusted_rand_score(y, labels2):.3f}")
+```
+
+Same tree, same leaves, one knob moved — and the count lands at the label's granularity with both metrics up. The gallery keeps `resolution=1.0` everywhere anyway, because no single value wins across the datasets (the large ones prefer 1–2, the small ones 2–4), and tuning it per dataset against the labels would defeat the point of the exercise. Read this cell as the diagnosis, not the recipe.
 
 ### Pros and cons, side by side
 
@@ -106,22 +138,23 @@ DYF doesn't assume convexity. Its clusters follow density and graph connectivity
 |-----------------------------------|-------------------------------------------------------------------------|----------------------------------------------------------------------------------------------|
 | Needs `k`?                        | No — recovered from data.                                               | Yes — given k=10 upfront.                                                                    |
 | Cluster shape                     | Arbitrary (density + graph connectivity).                               | Convex Voronoi cells around centroids.                                                       |
-| Behavior when ground truth *is* convex blobs | Slightly over- or under-splits as Louvain finds sub-communities. | Excellent — this is exactly the geometry k-means optimizes for.                              |
+| Behavior when ground truth *is* convex blobs | Good once the tree has enough leaves; under-splits when it doesn't. | Excellent — this is exactly the geometry k-means optimizes for.                              |
 | Behavior when ground truth is curved / elongated / nested | Follows the manifold; non-convex clusters are fine.          | Fails — forces straight-line Voronoi cuts through curved structure.                          |
 | Hierarchical output?              | Yes — the tree gives you a multi-resolution structure for free.         | No — flat partition at exactly `k`.                                                          |
 | Sensitivity to ghost centers / init | Low — deterministic given seed.                                       | High — `n_init` and `random_state` matter; can get stuck.                                    |
 
 ### So why run DYF on digits at all?
 
-Because the *story* of the gallery isn't "DYF beats k-means on every dataset." It's "DYF holds up *close enough* to oracle-tuned k-means on easy datasets like this, and wins outright on the harder ones where the oracle's assumptions break (curved manifolds, unknown k, nested structure, streaming data)." Digits is the easy mode — the honest sanity check that DYF doesn't collapse or explode when you point it at the textbook example. The later notebooks (20 Newsgroups, CMU MoCap) are where the rigidity of k-means starts to cost you real accuracy.
+Because the *story* of the gallery isn't "DYF beats k-means on every dataset." It's "DYF holds up *close enough* to oracle-tuned k-means on easy datasets, and pulls ahead where the oracle's assumptions break or the data gets big." Digits is the easy mode *and* the small mode — the one regime where DYF's leaf-centroid design is at a genuine disadvantage. [MNIST](mnist.qmd) is the same task at 40× the size, and there DYF beats oracle k-means on both metrics with the same defaults.
 
 ## What to take away
 
-- **Recovered k** — DYF should land within ±2 of the ground-truth 10. If it splits to 15, Louvain is finding genuine sub-clusters of digit styles (e.g., two ways to write a "7"); if it collapses to 4-5, the tree's leaf resolution is too coarse for this tiny dataset.
-- **NMI** — the fairer comparison. K-means with the oracle *k* is the ceiling. DYF's gap to that ceiling is what you're paying for the privilege of not having to know *k*.
-- **HDBSCAN** — looks like a blowout when its NMI is reported in isolation, but note the `% discarded` column: HDBSCAN's defaults label most points as *noise* on this dataset, and the NMI is computed only on the non-noise subset. It's answering a different question ("can you cluster the easy points?") than DYF and k-means ("can you cluster every point?").
+- **Recovered k** — DYF landed at 7 for 10. Below a few hundred leaves, expect this: the community-detection stage under-resolves small graphs at the default resolution. Above a few thousand leaves (MNIST, CIFAR) it lands on or next to the true count.
+- **NMI** — the fairer comparison. K-means with the oracle *k* is the ceiling. DYF's gap to that ceiling is what you're paying for the privilege of not having to know *k* — and on this dataset, also for running a graph method on a tiny graph.
+- **HDBSCAN** — looks like a blowout when its NMI is reported in isolation, but note the `% discarded` column: HDBSCAN's defaults label a third of the points as *noise* on this dataset, and the NMI is computed only on the non-noise subset. It's answering a different question ("can you cluster the easy points?") than DYF and k-means ("can you cluster every point?").
 
 ## What this does not prove
 
 - `load_digits` is a tiny, clean, well-separated dataset — the easy mode. The later notebooks (MNIST 70K, 20 Newsgroups, Olivetti) stress the same call under harder regimes.
-- The pixel-space Euclidean metric on 8×8 images is kind to any clustering algorithm. The MNIST notebook repeats this on 70K samples at 28×28, where the geometry gets noticeably harder.
+- The pixel-space Euclidean metric on 8×8 images is kind to any clustering algorithm. The MNIST notebook repeats this on 70K samples at 28×28, where the geometry gets noticeably harder — and DYF gets noticeably better.
+- Earlier versions of this page reported 9 communities and quoted NMI/ARI that did not match the cell output. The community counts before `dyf-rs` 0.12.0 came from a single-level Louvain that could not merge communities (dyf `KNOWN_ISSUES.md`, issue 10); the numbers here are from the corrected optimiser.

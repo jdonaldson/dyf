@@ -53,8 +53,13 @@ class GalleryResult:
 def auto_tune_tree_params(n: int, target_bucket_size: int = 20) -> dict:
     """Pick tree parameters from N + a single externalized knob.
 
-    Validated across 9 gallery datasets: beats DYF's documented defaults
-    (num_bits=3, max_depth=4, min_leaf=20) on 6-7/9 by mean +0.05 ARI.
+    Was validated across 9 gallery datasets as beating DYF's documented defaults
+    (num_bits=3, max_depth=4, min_leaf=20) on 6-7/9 by mean +0.05 ARI — but that
+    validation ran on the single-level Louvain fixed in dyf-rs 0.12.0 (dyf
+    KNOWN_ISSUES #10). Re-measured 2026-09-27 on seven labelled datasets with the
+    fixed optimiser the two configs split 2/3, so treat the claim as unvalidated
+    until redone. Also: ``max_depth`` is capped at 6, so above ~1M points the
+    ``target_bucket_size`` knob is inert (KNOWN_ISSUES #9).
 
     The single knob ``target_bucket_size`` is roughly the smallest natural
     cluster you want to detect. Default 20 is reasonable; drop to 5-10 for
