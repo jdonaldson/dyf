@@ -197,6 +197,8 @@ API_GROUPS: dict[str, APIGroup] = {
             "LeafGroupingResult",
         ),
     ),
+            "leaf_graph_spectrum",
+            "LeafGraphSpectrum",
     "chunks": APIGroup(
         summary="Assess chunked-document corpora: redundancy, coherence, spread.",
         start_here="chunk_redundancy",

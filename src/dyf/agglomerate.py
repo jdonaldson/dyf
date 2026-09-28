@@ -243,6 +243,144 @@ def _compute_community_linkage(point_labels, embeddings):
     return Z, unique_ids, centroids
 
 
+@dataclass(frozen=True)
+class LeafGraphSpectrum:
+    """The bottom of the normalised-Laplacian spectrum of the leaf graph Louvain ran on.
+
+    A read-out, not a decision: it says which kind of graph the community stage was handed.
+    Modularity is the right objective for a graph whose natural cuts are all of similar
+    strength (a mixture of blobs); it is the wrong one for a graph that is disconnected, or one
+    weak cut away from it (rings, arcs, well-separated groups), where it chops the pieces into
+    similar-size communities instead of cutting at the weak edge.
+
+    Measured 2026-09-27 on the gallery shapes and the labelled bench (KNOWN_ISSUES #11):
+
+    ============  =========  ===============  =============================================
+    dataset       lambda_2   max ratio        what worked
+    ============  =========  ===============  =============================================
+    moons         0.00013    10x (i=2)        spectral bisection 0.98 NMI; Louvain 0.42
+    circles       0 (x2)     inf              components 1.00; Louvain 0.39
+    5 blobs       ~0 (x4)    15-100x (i=4)    spectral k=4-5 ~0.75; Louvain 0.51-0.58
+    digits        0.011      1.8              Louvain 0.71 > spectral 0.69
+    MNIST PCA-50  0.025      1.3              Louvain 0.66 > spectral 0.59
+    ============  =========  ===============  =============================================
+
+    Attributes:
+        eigenvalues: the smallest ``n_eigen`` eigenvalues of the symmetric normalised
+            Laplacian, ascending, clipped at 0. ``eigenvalues[0]`` is always ~0.
+        lambda2: algebraic connectivity — how weak the weakest cut is. ~1e-4 means one
+            edge away from disconnected; ~1e-2 means no cut is much weaker than another.
+        n_components: eigenvalues that are zero to numerical precision — the connected
+            components of the graph. A graph one weak edge from splitting still has
+            ``n_components == 1``; that case shows up as a tiny ``lambda2`` instead.
+        k_gap: the eigenvalue count before the largest *multiplicative* jump
+            ``eigenvalues[i] / eigenvalues[i-1]``, searched from ``max(2, n_components)``.
+            The additive eigengap is the wrong decoder for manifolds (their spectrum grows
+            smoothly, so the largest additive gap sits far up — it picked k=14 on moons).
+        max_ratio: that largest jump. Below ~2 there is no natural k in the spectrum.
+        regime: ``"connectivity"`` when ``n_components > 1`` or (``lambda2`` below the
+            threshold and ``max_ratio`` above it); ``"blob"`` otherwise; ``"degenerate"``
+            for graphs too small to say anything. Thresholds are the measured ones above,
+            not universal constants — they sit between two regimes ~100x apart at k=5-10.
+    """
+
+    eigenvalues: np.ndarray
+    lambda2: float
+    n_components: int
+    k_gap: int
+    max_ratio: float
+    regime: str
+
+    def summary(self) -> str:
+        if self.regime == "degenerate":
+            return "leaf graph too small for a spectrum"
+        return (
+            f"leaf graph: {self.regime} regime — lambda_2={self.lambda2:.2e}, "
+            f"{self.n_components} component(s), largest spectral jump {self.max_ratio:.1f}x "
+            f"after {self.k_gap} eigenvalue(s)"
+        )
+
+
+def leaf_graph_spectrum(
+    edges,
+    n_leaves: int,
+    *,
+    n_eigen: int = 16,
+    ratio_threshold: float = 5.0,
+    lambda2_threshold: float = 1e-3,
+) -> LeafGraphSpectrum:
+    """Compute :class:`LeafGraphSpectrum` for a weighted leaf graph.
+
+    Args:
+        edges: iterable of ``(src, dst, weight)`` — the same edge list handed to
+            ``dyf_rs.louvain_communities``. Direction is ignored (symmetrised by max).
+        n_leaves: number of nodes.
+        n_eigen: how many of the smallest eigenvalues to compute (dense below 2,000 nodes,
+            ``scipy.sparse.linalg.eigsh`` above).
+        ratio_threshold, lambda2_threshold: the regime cut-offs (see the class docstring).
+
+    Cost: milliseconds at a few hundred leaves, ~1 s at a few thousand.
+    """
+    import scipy.sparse as sp
+
+    if n_leaves < 1:
+        raise ValueError(f"n_leaves must be positive, got {n_leaves}")
+    edges = list(edges)
+    m = min(n_eigen, n_leaves)
+    degenerate = LeafGraphSpectrum(
+        eigenvalues=np.zeros(min(m, 1)), lambda2=0.0, n_components=1, k_gap=1, max_ratio=0.0, regime="degenerate"
+    )
+    if n_leaves < 3 or not edges:
+        return degenerate
+
+    src = np.fromiter((e[0] for e in edges), dtype=np.int64, count=len(edges))
+    dst = np.fromiter((e[1] for e in edges), dtype=np.int64, count=len(edges))
+    w = np.fromiter((float(e[2]) for e in edges), dtype=np.float64, count=len(edges))
+    W = sp.coo_matrix((w, (src, dst)), shape=(n_leaves, n_leaves)).tocsr()
+    W = W.maximum(W.T)
+    deg = np.asarray(W.sum(axis=1)).ravel()
+    d_inv_sqrt = 1.0 / np.sqrt(np.maximum(deg, 1e-12))
+    if n_leaves <= 2000:
+        lsym = np.eye(n_leaves) - (d_inv_sqrt[:, None] * W.toarray() * d_inv_sqrt[None, :])
+        vals = np.linalg.eigvalsh(lsym)[:m]
+    else:
+        from scipy.sparse.linalg import eigsh
+
+        lsym = sp.identity(n_leaves, format="csr") - sp.diags(d_inv_sqrt) @ W @ sp.diags(d_inv_sqrt)
+        vals = np.sort(eigsh(lsym, k=m, which="SA", return_eigenvectors=False))
+    vals = np.clip(vals, 0.0, None)
+
+    # Exact components: eigenvalues that are zero to numerical precision (the normalised
+    # Laplacian's spectrum is O(1), so an absolute tolerance is meaningful). Near-disconnection
+    # is reported through lambda2 and the ratio, not folded into this count.
+    n_components = max(1, int((vals < 1e-6).sum()))
+    # Ratio search floor: tiny eigenvalues are numerically noisy, so a ratio between two of
+    # them means nothing. Relative to the top of the window so it scales with the graph.
+    floor = max(1e-9, 1e-3 * float(vals[-1]))
+    lambda2 = float(vals[1])
+    # multiplicative jumps, 1-based: ratio_i = lambda_{i+1} / lambda_i for i >= max(2, n_components)
+    start = max(2, n_components)
+    k_gap, max_ratio = n_components, 0.0
+    for i in range(start, m):  # i is 1-based index of the eigenvalue before the jump
+        ratio = float(vals[i] / max(vals[i - 1], floor))
+        if ratio > max_ratio:
+            max_ratio, k_gap = ratio, i
+    if n_components > 1 and max_ratio < ratio_threshold:
+        k_gap = n_components
+    if n_components > 1 or (lambda2 < lambda2_threshold and max_ratio >= ratio_threshold):
+        regime = "connectivity"
+    else:
+        regime = "blob"
+    return LeafGraphSpectrum(
+        eigenvalues=vals,
+        lambda2=lambda2,
+        n_components=n_components,
+        k_gap=int(k_gap),
+        max_ratio=max_ratio,
+        regime=regime,
+    )
+
+
 def _run_louvain_on_centroids(centroids_normed, k, resolution, similarity_threshold):
     """Run Louvain community detection on L2-normalized leaf centroids.
 
@@ -257,22 +395,39 @@ def _run_louvain_on_centroids(centroids_normed, k, resolution, similarity_thresh
             (only used by the NetworkX fallback).
 
     Returns:
-        Tuple of (leaf_labels, n_communities) where leaf_labels is an int32
-        array (L,) and n_communities is the count of distinct communities.
+        Tuple of (leaf_labels, n_communities, spectrum) where leaf_labels is an int32
+        array (L,), n_communities is the count of distinct communities, and spectrum is
+        the :class:`LeafGraphSpectrum` of the graph Louvain ran on (None on the NetworkX
+        fallback path).
     """
+    spectrum = None
     try:
-        from dyf_rs import louvain_from_centroids
+        from dyf_rs import build_knn_graph, louvain_communities
 
         from ._arrays import ensure_f32
 
-        labels_arr, n_communities = louvain_from_centroids(
-            ensure_f32(centroids_normed, "centroids_normed"), k=k, resolution=resolution
-        )
-        leaf_labels = labels_arr.astype(np.int32)
+        # Build the graph once and hand the same edges to Louvain and to the spectrum, so
+        # the read-out describes exactly the graph the communities came from.
+        adjacency = build_knn_graph(ensure_f32(centroids_normed, "centroids_normed"), k=k)
+        edges = [(i, int(j), float(wt)) for i, nbrs in enumerate(adjacency) for j, wt in nbrs]
+        labels_arr, n_communities = louvain_communities(len(centroids_normed), edges, resolution=resolution)
+        leaf_labels = np.asarray(labels_arr).astype(np.int32)
+        spectrum = leaf_graph_spectrum(edges, len(centroids_normed))
         logger.info(
             f"    Louvain (Rust) found {n_communities} communities "
-            f"from {len(centroids_normed)} leaves (k={k}, res={resolution})"
+            f"from {len(centroids_normed)} leaves (k={k}, res={resolution}); {spectrum.summary()}"
         )
+        if spectrum.regime == "connectivity":
+            logger.warning(
+                "    Leaf graph is disconnected or one weak cut from it (lambda_2=%.2e, %d component(s), "
+                "jump %.1fx after %d eigenvalues). Modularity tends to split such structure into "
+                "similar-size pieces; connected components or a spectral cut at k=%d may match it better.",
+                spectrum.lambda2,
+                spectrum.n_components,
+                spectrum.max_ratio,
+                spectrum.k_gap,
+                spectrum.k_gap,
+            )
     except ImportError:
         # Fall back to NetworkX Louvain
         import networkx as nx
@@ -315,7 +470,7 @@ def _run_louvain_on_centroids(centroids_normed, k, resolution, similarity_thresh
             f"from {len(centroids_normed)} leaves (k={k}, res={resolution})"
         )
 
-    return leaf_labels, n_communities
+    return leaf_labels, n_communities, spectrum
 
 
 def _compute_point_metrics(point_labels, embeddings, community_centroids_emb, unique_ids):
@@ -418,7 +573,9 @@ def compute_louvain_hierarchy(
     if k < 1:
         k = 1
 
-    leaf_labels, n_communities = _run_louvain_on_centroids(centroids_normed, k, resolution, similarity_threshold)
+    leaf_labels, n_communities, _spectrum = _run_louvain_on_centroids(
+        centroids_normed, k, resolution, similarity_threshold
+    )
 
     # Map points -> leaf -> community
     point_labels = np.full(n_points, -1, dtype=np.int32)
@@ -503,6 +660,10 @@ class LeafGroupingResult:
     label_data: list
     item_leaf_map: np.ndarray | None
     tree: object
+    spectrum: LeafGraphSpectrum | None = None
+    """Spectrum of the leaf graph the communities came from (:func:`louvain_cluster_leaves`
+    only; None for :func:`agglomerate_tree_leaves` and the too-few-leaves case). Not part of
+    the 5-tuple unpacking."""
 
     def _as_tuple(self):
         return (self.point_labels, self.names, self.label_data, self.item_leaf_map, self.tree)
@@ -540,7 +701,10 @@ class LeafGroupingResult:
     def summary(self) -> str:
         if not self.ok:
             return "Leaf grouping did not run: tree has fewer than two leaves."
-        return f"{self.n_groups} groups over {len(self.point_labels)} points."
+        text = f"{self.n_groups} groups over {len(self.point_labels)} points."
+        if self.spectrum is not None:
+            text += f" {self.spectrum.summary()}."
+        return text
 
 
 def agglomerate_tree_leaves(idx, coords, embeddings, n_groups=50):
@@ -669,7 +833,9 @@ def louvain_cluster_leaves(idx, coords, embeddings, leaf_k=10, similarity_thresh
         # Degenerate: only 2 leaves, put everything in one bucket
         k = 1
 
-    leaf_labels, _n_communities = _run_louvain_on_centroids(centroids_normed, k, resolution, similarity_threshold)
+    leaf_labels, _n_communities, spectrum = _run_louvain_on_centroids(
+        centroids_normed, k, resolution, similarity_threshold
+    )
 
     # Map points -> leaf -> community (initial assignment)
     point_labels = np.full(n_points, -1, dtype=np.int32)
@@ -694,4 +860,5 @@ def louvain_cluster_leaves(idx, coords, embeddings, leaf_k=10, similarity_thresh
         label_data=lsh_label_data,
         item_leaf_map=item_leaf_map,
         tree=tree,
+        spectrum=spectrum,
     )

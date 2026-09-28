@@ -75,6 +75,10 @@ one-off measurements.
       working tree 2026-09-27 (multilevel); brain shipped-path ARI 0.26 → 0.60 = incumbent.
       ⚠ Unreleased: needs dyf-core release + `dyf-rs` pin bump here, then re-render the gallery
       (every published number ran through the old optimiser) and re-validate the auto-tune (#9)
+- [ ] **Every tree fit L2-normalises rows and nothing documents it** (issue 11). In 2-D the tree
+      is an angular hash: circles leaf purity 0.525 = chance; a Euclidean-acting tree gets 1.000
+      and connected components then recover the rings exactly. Document now; `normalize=False`
+      is a mechanism decision for after the bench
 
 **P2 — sweep the rest of the pattern (see the rule at the end of issue 5)**
 
@@ -581,6 +585,63 @@ class, in the Rust crate where the audit does not look.
 recurse until no improvement) — a correction to an existing primitive, not a new mechanism. Then
 assert on a planted partition that γ=1 recovers the blocks exactly and γ→0 yields k=1. Re-run
 `s5`–`s8` afterwards; the gallery numbers and the brain memory note will all move.
+
+---
+
+## 11. Every tree fit L2-normalises rows first, and `build_dyf_tree` does not say so — OPEN
+
+`DensityClassifier::{fit_flat, fit_raw_pca_flat, fit_with_hyperplanes_flat, fit_ensemble_flat,
+fit_iterative_flat}` (`dyf-core/src/density_classifier.rs`) all copy the input into a
+`normalized` buffer — each row divided by its L2 norm — before PCA, hashing and centroids. So
+the tree only ever sees *directions*. `build_dyf_tree`'s docstring says "(n, d) array of
+embedding vectors" and nothing about unit norm; the README never mentions it. For text/CLIP
+embeddings the assumption is harmless (they live on the sphere anyway). For anything where the
+norm carries information it silently throws that information away, and in low dimension it is
+catastrophic: in 2-D the tree becomes an *angular hash*.
+
+Measured 2026-09-27 on the gallery's synthetic shapes (`make_circles`, 3,000 points, centred at
+the origin): **leaf purity vs ring label = 0.525 — chance for two classes**. The inner and outer
+ring are the same set of unit vectors. Translate the identical data by +10 and purity is 0.79.
+Emulate a Euclidean tree by appending a large constant coordinate (the row normalisation then
+acts as a uniform scaling): purity **1.000** on circles and 0.998 on moons, with 160–700 leaves
+where the angular hash produced 31 (most of the 256 possible buckets were empty because the
+data had collapsed to one dimension). This is why the shapes page reads NMI 0.000 on circles
+— it was never a clustering result, it was the input being erased.
+
+The community stage compounds it but is a separate question, also measured: on the
+Euclidean-acting leaves, **connected components of a sparse (k=5) leaf-centroid graph recover
+the two circles exactly (NMI 1.000)**, while Louvain at resolution 1 on the same graph gives
+0.39–0.42 because modularity chops a ring into arcs of similar size. Moons additionally need a
+density-aware bridge cut (the 0.08 noise connects them at k≥5) — which is HDBSCAN's mutual
+reachability, and which the leaf sizes could supply. So "Louvain over the leaves should recover
+topology" is right about the *leaves* and wrong about the *objective*: connectivity does it,
+modularity does not.
+
+Related: #8 (`DenseSearchIndex` cosine, same undocumented assumption on the search side) and
+the brain/TMS results, where cosine-vs-Euclidean neighbour agreement is only 59% on PCA-50
+scores — the norm is being discarded there too, just less fatally in 50-D.
+
+**A cheap regime detector exists at the Louvain phase**, measured the same day: the bottom
+eigenvalues of the normalised Laplacian of the leaf graph (milliseconds at a few hundred
+leaves). λ₂ ≲ 1e-3 with a ≥5× multiplicative jump low in the spectrum marks the connectivity
+regime — moons λ₂ = 0.00013, λ₃/λ₂ = 10, and spectral bisection at k=2 gives NMI 0.981 / ARI
+0.992 where Louvain gets 0.42; circles two exact zeros → 1.000. λ₂ ≈ 0.01–0.03 with ratios ≤ 2
+marks the blob regime — digits, MNIST — where Louvain beats spectral (0.714 vs 0.694; 0.656 vs
+0.591). The absolute eigengap is the wrong decoder (picks k=14 on moons); the ratio is right.
+Same measurement: a Euclidean Gaussian-weighted leaf graph beats the shipped cosine one for
+Louvain in the blob regime too (digits 0.714 vs 0.627; MNIST 0.656 vs 0.550).
+
+**Shipped (same day):** the read-out. `leaf_graph_spectrum` / `LeafGraphSpectrum` on
+`LeafGroupingResult.spectrum`, computed on the exact edges Louvain ran on, with a warning in the
+connectivity regime; `tests/test_leaf_graph_spectrum.py` pins the decoder on graphs whose
+structure is known by construction and checks the read-out reaches the caller through a real
+index. It reproduces the table above on all five datasets.
+
+**Still to do:** document the row-normalisation assumption on `build_dyf_tree`,
+`DensityClassifier` and the README (a legibility fix, in scope now). Whether to offer `normalize=False` — or to centre and not normalise for non-embedding inputs —
+and whether to auto-switch objective on the flag are mechanism decisions that need the
+seven-dataset bench re-run under them; not made here. The gallery's "Metric: cosine" row on the index attributes the
+Moons failure to the metric; the cause is one level down, in the tree's input handling.
 
 ---
 

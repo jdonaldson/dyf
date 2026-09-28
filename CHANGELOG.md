@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+### Added
+
+**`leaf_graph_spectrum` / `LeafGraphSpectrum` — a read-out of the graph Louvain ran on, now
+carried on `LeafGroupingResult.spectrum`.** `louvain_cluster_leaves` builds the leaf-centroid
+kNN graph once, hands the same edges to Louvain and to the spectrum, and reports the bottom of
+the normalised-Laplacian spectrum: `lambda2` (how weak the weakest cut is), `n_components`,
+the largest *multiplicative* eigengap and where it sits (`max_ratio`, `k_gap`), and a `regime`
+— `"connectivity"` when the graph is disconnected or one weak cut from it, `"blob"` when no cut
+is much weaker than another. Milliseconds at a few hundred leaves.
+
+Why it exists: modularity is the wrong objective for the first regime. Measured on the gallery
+shapes with a Euclidean-acting tree, moons has `lambda2 = 0.00013` and a 10× jump at the second
+eigenvalue; spectral bisection there scores NMI 0.98 where Louvain scores 0.42, and connected
+components recover circles exactly where Louvain scores 0.39. Digits and MNIST sit in the other
+regime (`lambda2 ≈ 0.01–0.03`, ratios ≤ 2) and there Louvain beats spectral clustering on the
+same graph. The read-out says which graph you were handed; it does not switch objective — that
+is a mechanism decision left for the bench (`KNOWN_ISSUES.md` #11). It logs a warning in the
+connectivity regime. The additive eigengap is deliberately not used: on a manifold the largest
+additive gap sits far up the spectrum (it picked k=14 on moons).
+
 ### Changed
 
 **Community detection results change: `dyf-rs>=0.12.0` required, whose Louvain is now

@@ -243,8 +243,10 @@ from .agglomerate import (
 )
 from .catalog import (
     CatalogConfig,
+    LeafGraphSpectrum,
     CatalogMatch,
     CatalogSpace,
+    leaf_graph_spectrum,
     CrossMapping,
     FittedCatalog,
     JointMatchResult,
@@ -474,8 +476,10 @@ __all__ = [
     "spatial_rgb_map",
     "spatial_color_map",
     "tree_rgb_map",
+    "LeafGraphSpectrum",
     # Pipeline DAG runner — internal/experimental, import directly from dyf.pipeline
     # Provenance tracking
+    "leaf_graph_spectrum",
     "Provenance",
     "file_hash",
     "params_hash",
