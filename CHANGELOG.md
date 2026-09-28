@@ -68,6 +68,15 @@ when the FlatBuffers/Arrow stack is not, since the type depends on numpy alone.
 Every `dyf index-*` command now stamps provenance on the `.dyf` it writes, as
 `_provenance_level_0` — level 0 of the ladder dyfviz continues at 1, 2 and 3. The
 record carries the post-dedup item count, a hash over the input files, and every
+One more field from the same eigenvalues, no extra cost. `intrinsic_dim` is a Weyl-law estimate
+of the dimension the leaves sample (eigenvalues grow like `k**(2/d)`): synthetic ring 0.9,
+path 0.8, the brain's large neuron clusters 3–4 and its cell-cycle cluster ~2 — the same
+"mostly 3-D, cell cycle is a 2-D sheet" picture the diagnostic stack reached from covariance
+spectra, now read off the graph. A ring detector (eigenvalue pairing) was measured on the same
+data and not shipped: it separates a synthetic ring from a path (0.14 vs 0.48) but on the brain
+the known cell-cycle cluster paired *less* than a column-shuffle null of itself, so it detects
+nothing real. The class docstring records the numbers.
+
 parameter that shaped the bytes, including the embedding model. Until now nothing in
 dyf wrote provenance at all: `provenance.py` exported seven symbols with no in-package
 producer, `Pipeline` reported every ingested `.dyf` as `stale (no provenance)`, and

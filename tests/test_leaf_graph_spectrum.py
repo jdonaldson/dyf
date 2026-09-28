@@ -100,3 +100,52 @@ def test_readout_reaches_the_caller_through_louvain_cluster_leaves(tmp_path):
 def test_n_leaves_must_be_positive(bad):
     with pytest.raises(ValueError):
         leaf_graph_spectrum([(0, 0, 1.0)], bad)
+
+
+def _ring_edges(n, width=2):
+    # a kNN-like graph on a cycle: each node linked to its `width` neighbours either side
+    edges = []
+    for i in range(n):
+        for d in range(1, width + 1):
+            edges.append((i, (i + d) % n, 1.0))
+            edges.append(((i + d) % n, i, 1.0))
+    return edges
+
+
+def _path_edges(n, width=2):
+    return [(i, j, 1.0) for i in range(n) for j in range(max(0, i - width), min(n, i + width + 1)) if i != j]
+
+
+def _grid_edges(side):
+    def idx(r, c):
+        return r * side + c
+
+    edges = []
+    for r in range(side):
+        for c in range(side):
+            for dr, dc in ((0, 1), (1, 0), (0, -1), (-1, 0)):
+                rr, cc = r + dr, c + dc
+                if 0 <= rr < side and 0 <= cc < side:
+                    edges.append((idx(r, c), idx(rr, cc), 1.0))
+    return edges
+
+
+def test_ring_and_path_are_one_dimensional():
+    ring = leaf_graph_spectrum(_ring_edges(240), 240)
+    path = leaf_graph_spectrum(_path_edges(240), 240)
+    # Weyl: 1-D manifolds -> lambda_k ~ k^2 -> intrinsic_dim ~ 1
+    assert 0.7 < ring.intrinsic_dim < 1.4, ring.intrinsic_dim
+    assert 0.7 < path.intrinsic_dim < 1.4, path.intrinsic_dim
+
+
+def test_grid_is_two_dimensional():
+    side = 16
+    grid = leaf_graph_spectrum(_grid_edges(side), side * side)
+    assert 1.5 < grid.intrinsic_dim < 2.6, grid.intrinsic_dim
+
+
+def test_intrinsic_dim_appears_in_summary_and_is_nan_on_degenerate():
+    s = leaf_graph_spectrum(_ring_edges(60), 60)
+    assert "-D" in s.summary()
+    d = leaf_graph_spectrum([], 1)
+    assert np.isnan(d.intrinsic_dim)

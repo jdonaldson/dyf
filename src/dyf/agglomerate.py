@@ -282,6 +282,25 @@ class LeafGraphSpectrum:
             threshold and ``max_ratio`` above it); ``"blob"`` otherwise; ``"degenerate"``
             for graphs too small to say anything. Thresholds are the measured ones above,
             not universal constants — they sit between two regimes ~100x apart at k=5-10.
+        intrinsic_dim: Weyl-law estimate of the manifold dimension the leaves sample. On a
+            d-dimensional manifold the Laplacian eigenvalues grow like ``k ** (2/d)``, so the
+            log-log slope of the low spectrum (after the component zeros) estimates ``2/d``.
+            Measured: synthetic ring 0.9, path 0.8, 2-D blob 1.5 (noisy from 11 eigenvalues),
+            the brain's largest neuron cluster 2.9, its cell-cycle and endothelium clusters 1.8 —
+            reproducing the covariance-based classes of the diagnostic stack from the graph
+            alone. NaN when there are too few eigenvalues to fit.
+
+    A ring detector was tried here and removed. A cycle graph's eigenvalues come in equal
+    pairs, so the relative gap inside (λ₂,λ₃), (λ₄,λ₅), (λ₆,λ₇) separates a synthetic ring
+    (0.14) from a path (0.48) cleanly. On the 1.29M-cell brain, against a within-cluster
+    column-shuffle null, the known cell-cycle cluster paired *less* than its null (0.198 vs
+    0.130 ± 0.031) and the score ranged 0.08–0.43 across the 35 clusters with no relation to
+    which ones carry cycles; no cluster is near 1-D, the only regime where pairing means
+    anything. For what it is worth, persistent homology on the whole brain's bucket centroids
+    did not find a clean cell-cycle ring in this dataset either (E18 cycling cells span
+    lineages); the cycle it did confirm under the same null, at z=+12.8, is the vascular
+    state-cycle spanning the endothelium and pericyte clusters — a feature that crosses cluster
+    boundaries, which a per-cluster spectrum cannot see by construction. KNOWN_ISSUES #11.
     """
 
     eigenvalues: np.ndarray
@@ -290,14 +309,16 @@ class LeafGraphSpectrum:
     k_gap: int
     max_ratio: float
     regime: str
+    intrinsic_dim: float = float("nan")
 
     def summary(self) -> str:
         if self.regime == "degenerate":
             return "leaf graph too small for a spectrum"
+        dim = f", ~{self.intrinsic_dim:.1f}-D" if np.isfinite(self.intrinsic_dim) else ""
         return (
             f"leaf graph: {self.regime} regime — lambda_2={self.lambda2:.2e}, "
             f"{self.n_components} component(s), largest spectral jump {self.max_ratio:.1f}x "
-            f"after {self.k_gap} eigenvalue(s)"
+            f"after {self.k_gap} eigenvalue(s){dim}"
         )
 
 
@@ -371,6 +392,17 @@ def leaf_graph_spectrum(
         regime = "connectivity"
     else:
         regime = "blob"
+
+    # Weyl: lambda_k ~ k^(2/d). Fit log lambda against log k over the eigenvalues after the
+    # component zeros (k re-indexed from 1 there), using at most the first 11 of them.
+    tail = vals[n_components : min(n_components + 11, m)]
+    tail = tail[tail > floor]
+    intrinsic_dim = float("nan")
+    if len(tail) >= 4:
+        slope = float(np.polyfit(np.log(np.arange(1, len(tail) + 1)), np.log(tail), 1)[0])
+        if slope > 0:
+            intrinsic_dim = 2.0 / slope
+
     return LeafGraphSpectrum(
         eigenvalues=vals,
         lambda2=lambda2,
@@ -378,6 +410,7 @@ def leaf_graph_spectrum(
         k_gap=int(k_gap),
         max_ratio=max_ratio,
         regime=regime,
+        intrinsic_dim=intrinsic_dim,
     )
 
 

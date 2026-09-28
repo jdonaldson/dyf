@@ -657,6 +657,26 @@ either (modularity chops the rings; only a connectivity objective reached 1.000)
 community stage on the shipped tree is a wash. So the shapes are a different regime — low-d raw
 geometry where the norm *is* the structure — not evidence that the tree's geometry is wrong.
 
+**Spectrum-shape read-outs, measured (same day):** `intrinsic_dim` (Weyl slope) shipped —
+synthetic ring 0.9 / path 0.8 / 2-D grid ~2, brain clusters 1.6–4.5 with the big neuron
+clusters 3–4 and the cell-cycle cluster ~2, matching the April covariance-based classes. It is
+coarse (±1): column-shuffled nulls read higher-dimensional in 25/35 clusters, not all. A ring
+detector (`pairing`: relative gap inside the eigenvalue pairs a cycle graph produces) separates
+synthetic ring 0.14 from path 0.48 but is **falsified on real data**: against a within-cluster
+column-shuffle null over all 35 brain clusters, the known cell-cycle cluster 13 scored 0.198 vs
+null 0.130 ± 0.031 (less ring-like than noise), endothelium 32 likewise, endothelium 24 below
+its null but 33rd of 35 in absolute terms, and the null itself spanned 0.08–0.43 — the score
+tracks leaf count and graph idiosyncrasy, not cycles. Removed before shipping.
+`pairing_null_brain_clusters.py`. ⚠ An earlier draft of this paragraph said "PH confirmed
+cluster 13's cycle at z=+12.8" — wrong cluster. The z=+12.82 (real top-1 persistence 14.24 vs
+within-cluster-shuffle 6.62 ± 0.59) is the **vascular state-cycle** spanning the endothelium
+and pericyte clusters; the E18 re-test found the cell-cycle ring *not* cleanly detectable
+because E18 cycling cells span lineages. So the spectrum and PH agree about cluster 13. The
+vascular cycle crosses cluster boundaries, which a per-cluster spectrum cannot see by
+construction — and a graph 0-Laplacian is the wrong operator for a 1-cycle in any case
+(cycles live in the kernel of the Hodge 1-Laplacian on edges, which is what PH tracks across
+scale).
+
 **Decision:** document, do not add a flag. `build_dyf_tree` partitions *directions*: state it,
 name where that is the right thing (embeddings; PCA scores whose norm is nuisance) and where it
 is not (low-d raw features whose norm carries structure — pre-scale, or use a density/connectivity
