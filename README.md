@@ -259,6 +259,16 @@ Two-stage PCA-based LSH:
 
 The key insight: items that appear as outliers globally often share structure at coarser resolution. Bridges are these "misplaced" items - they connect different semantic regions.
 
+**Geometry: the tree partitions directions.** Every fit L2-normalises each row before PCA and
+hashing, so points with the same direction and different norms share a leaf. That is right for
+embeddings (unit-norm already) and for PCA scores whose norm is a nuisance — on scRNA-seq PCA-50
+the norm is library size and cell-cycle amplitude, and an un-normalised tree measurably lost
+0.1–0.45 ARI on every such dataset (`KNOWN_ISSUES.md` #11). It is wrong for low-dimensional raw
+features whose norm *is* the structure: concentric rings centred at the origin are one set of
+directions and cannot be separated. For that regime pre-scale the data so norm is uninformative,
+or reach for a connectivity/density method; `LeafGroupingResult.spectrum` tells you which regime
+the leaf graph is in.
+
 ## Performance
 
 Search runs on a Rust multiprobe kernel (`dyf-rs`, PyO3) — the default path for

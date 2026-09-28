@@ -637,8 +637,30 @@ connectivity regime; `tests/test_leaf_graph_spectrum.py` pins the decoder on gra
 structure is known by construction and checks the read-out reaches the caller through a real
 index. It reproduces the table above on all five datasets.
 
-**Still to do:** document the row-normalisation assumption on `build_dyf_tree`,
-`DensityClassifier` and the README (a legibility fix, in scope now). Whether to offer `normalize=False` — or to centre and not normalise for non-embedding inputs —
+**Mechanism test — `normalize=False` is falsified by the bench (same day, stages E/E2 in
+`/Volumes/Models/dyf_bench_2026-09-27/`).** Emulating an un-normalised tree with the projective
+lift (exactly the geometry a `normalize=False` flag would give, no format change) and running the
+shipped pipeline:
+
+| ARI vs labels | as-is | lifted tree, shipped stage | lifted tree + Euclidean stage | shipped tree + Euclidean stage |
+|---|---|---|---|---|
+| TMS droplet (123 types) | **0.543** | 0.234 | 0.147 | 0.527 |
+| TMS FACS (120 types) | **0.618** | 0.173 | 0.065 | 0.570 |
+| brain 1.29M | **0.472** | 0.372 | 0.062 | 0.390 |
+| MNIST PCA-50 | 0.409 | 0.411 | 0.439 | **0.496** |
+| circles | 0.000 | 0.000 | 0.214 | 0.000 |
+
+The un-normalised *tree alone* costs 0.1–0.45 ARI on every PCA-score dataset: on scRNA PCA
+scores the row norm is library size and cell-cycle amplitude — a nuisance — and normalising it
+away is doing real work. A fully Euclidean mode is worse still, and does not rescue circles
+either (modularity chops the rings; only a connectivity objective reached 1.000). A Euclidean
+community stage on the shipped tree is a wash. So the shapes are a different regime — low-d raw
+geometry where the norm *is* the structure — not evidence that the tree's geometry is wrong.
+
+**Decision:** document, do not add a flag. `build_dyf_tree` partitions *directions*: state it,
+name where that is the right thing (embeddings; PCA scores whose norm is nuisance) and where it
+is not (low-d raw features whose norm carries structure — pre-scale, or use a density/connectivity
+method). Whether to offer `normalize=False` — or to centre and not normalise for non-embedding inputs —
 and whether to auto-switch objective on the flag are mechanism decisions that need the
 seven-dataset bench re-run under them; not made here. The gallery's "Metric: cosine" row on the index attributes the
 Moons failure to the metric; the cause is one level down, in the tree's input handling.

@@ -173,8 +173,21 @@ def build_dyf_tree(embeddings, max_depth, num_bits=3, min_leaf_size=4, seed=42, 
     up to 2^num_bits children per node.  Centroid similarities are stored as
     per-point margins for boundary persistence analysis.
 
+    The tree partitions **directions**, not positions. Every fit path in the underlying
+    ``DensityClassifier`` L2-normalises each row before PCA and hashing, so two points with the
+    same direction and different norms land in the same leaf. That is the right geometry for
+    embeddings (already unit-norm) and for PCA scores whose norm is a nuisance — on scRNA-seq
+    PCA-50 the norm is library size and cell-cycle amplitude, and removing it measurably helps
+    (``KNOWN_ISSUES.md`` #11: an un-normalised tree cost 0.1–0.45 ARI on every such dataset).
+    It is the wrong geometry for low-dimensional raw features whose norm *is* the structure:
+    two concentric rings centred at the origin are the same set of directions and become
+    indistinguishable (leaf purity at chance). For such data, pre-scale so the norm is
+    uninformative, or use a connectivity / density method instead.
+
     Args:
-        embeddings: (n, d) array of embedding vectors.
+        embeddings: (n, d) array of embedding vectors. Rows are L2-normalised internally
+                    (see above); passing unit vectors is not required but is what the
+                    geometry assumes.
         max_depth: Maximum tree depth (number of recursive splits).
         num_bits: LSH bits per level (default 3 = up to 8-way splits).
         min_leaf_size: Stop splitting when a node has fewer than
