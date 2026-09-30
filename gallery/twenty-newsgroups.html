@@ -64,7 +64,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </style>
 
 
-<script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js" integrity="sha384-ZvpUoO/+PpLXR1lu4jmpXWu80pZlYUAfxl5NsBMWOEPSjUn/6Z/hRTt8+pR6L4N2" crossorigin="anonymous"></script><script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
 <script src="../site_libs/quarto-nav/headroom.min.js"></script>
 <script src="../site_libs/clipboard/clipboard.min.js"></script>
 <script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
@@ -82,9 +82,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../site_libs/quarto-html/quarto-syntax-highlighting-1ed79dc1172df127c7d94f8abf7ffee9.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-fe61d81b2be1daba325453eee3df7579.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../site_libs/bootstrap/bootstrap-dark-c122dbc3143c92ed75df82cc48f880cb.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="../site_libs/bootstrap/bootstrap-fe61d81b2be1daba325453eee3df7579.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-077483bf2c889e981b53a146dc5bf4c0.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-cbc012ce124f2a4a088cd0732150ebc5.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../site_libs/bootstrap/bootstrap-077483bf2c889e981b53a146dc5bf4c0.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -121,10 +121,6 @@ function gtag(){dataLayer.push(arguments);}
 gtag('js', new Date());
 gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 </script>
-<script src="https://cdn.jsdelivr.net/npm/requirejs@2.3.6/require.min.js" integrity="sha384-c9c+LnTbwQ3aujuU7ULEPVvgLs+Fn6fJUvIGTsuu1ZcCf11fiEubah0ttpca4ntM sha384-6V1/AdqZRWk1KAlWbKBlGhN7VG4iE/yAZcO6NZPMF8od0vukrvr0tg4qY6NSrItx" crossorigin="anonymous"></script>
-
-<script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
-<script src="https://cdn.jsdelivr.net/npm/@jupyter-widgets/html-manager@*/dist/embed-amd.js" crossorigin="anonymous"></script>
 
 
 </head>
@@ -360,6 +356,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
   <li><a href="#what-about-hdbscan" id="toc-what-about-hdbscan" class="nav-link" data-scroll-target="#what-about-hdbscan">What about HDBSCAN?</a></li>
   <li><a href="#figures" id="toc-figures" class="nav-link" data-scroll-target="#figures">Figures</a></li>
   <li><a href="#metrics" id="toc-metrics" class="nav-link" data-scroll-target="#metrics">Metrics</a></li>
+  <li><a href="#ten-communities-for-twenty-classes-which-twenty" id="toc-ten-communities-for-twenty-classes-which-twenty" class="nav-link" data-scroll-target="#ten-communities-for-twenty-classes-which-twenty">Ten communities for twenty classes — which twenty?</a></li>
   <li><a href="#walking-down-the-hierarchy" id="toc-walking-down-the-hierarchy" class="nav-link" data-scroll-target="#walking-down-the-hierarchy">Walking down the hierarchy</a></li>
   <li><a href="#how-dyf-and-k-means-disagree-and-why" id="toc-how-dyf-and-k-means-disagree-and-why" class="nav-link" data-scroll-target="#how-dyf-and-k-means-disagree-and-why">How DYF and k-means disagree — and why</a>
   <ul class="collapse">
@@ -448,18 +445,8 @@ Examples: ['alt.atheism', 'comp.graphics', 'comp.os.ms-windows.misc', 'comp.sys.
 <span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"Embedded </span><span class="sc">{</span>X<span class="sc">.</span>shape[<span class="dv">0</span>]<span class="sc">:,}</span><span class="ss"> posts in </span><span class="sc">{</span>time<span class="sc">.</span>time() <span class="op">-</span> t0<span class="sc">:.1f}</span><span class="ss">s → </span><span class="sc">{</span>X<span class="sc">.</span>shape[<span class="dv">1</span>]<span class="sc">}</span><span class="ss">d"</span>)</span>
 <span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>    np.savez(CACHE, X<span class="op">=</span>X, y<span class="op">=</span>y)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
-<div id="embed-1" class="cell-output cell-output-display">
-<script type="application/vnd.jupyter.widget-view+json">
-{"model_id":"197b654b12054e18a9a681c6ba8377dd","version_major":2,"version_minor":0,"quarto_mimetype":"application/vnd.jupyter.widget-view+json"}
-</script>
-</div>
-<div id="embed-2" class="cell-output cell-output-display">
-<script type="application/vnd.jupyter.widget-view+json">
-{"model_id":"c4207634669f4a2182e65e67e986fb67","version_major":2,"version_minor":0,"quarto_mimetype":"application/vnd.jupyter.widget-view+json"}
-</script>
-</div>
 <div class="cell-output cell-output-stdout">
-<pre><code>Embedded 18,846 posts in 23.8s → 384d</code></pre>
+<pre><code>Cache hit: 18,846 × 384d embeddings</code></pre>
 </div>
 </div>
 </section>
@@ -480,9 +467,9 @@ Examples: ['alt.atheism', 'comp.graphics', 'comp.os.ms-windows.misc', 'comp.sys.
 <span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"ARI:         </span><span class="sc">{</span>result<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stdout">
-<pre><code>Recovered k: 23  (true k = 20)
-NMI:         0.497
-ARI:         0.350</code></pre>
+<pre><code>Recovered k: 10  (true k = 20)
+NMI:         0.472
+ARI:         0.301</code></pre>
 </div>
 </div>
 </section>
@@ -583,9 +570,9 @@ Figure&nbsp;3: K-means given the oracle k=20.
 <tbody>
 <tr class="odd">
 <td><strong>DYF</strong> (parameter-free)</td>
-<td style="text-align: right;">23</td>
-<td style="text-align: right;">0.497</td>
-<td style="text-align: right;">0.350</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.472</td>
+<td style="text-align: right;">0.301</td>
 <td style="text-align: right;">0%</td>
 </tr>
 <tr class="even">
@@ -599,16 +586,47 @@ Figure&nbsp;3: K-means given the oracle k=20.
 </table>
 </div>
 </section>
-<section id="walking-down-the-hierarchy" class="level2">
-<h2 class="anchored" data-anchor-id="walking-down-the-hierarchy">Walking down the hierarchy</h2>
-<p>DYF’s 34 communities aren’t a commitment to k=34. They’re the finest resolution of a partition hierarchy that can be collapsed to any coarser k by walking up the merge tree:</p>
-<div id="merge-walk" class="cell" data-execution_count="9">
+<section id="ten-communities-for-twenty-classes-which-twenty" class="level2">
+<h2 class="anchored" data-anchor-id="ten-communities-for-twenty-classes-which-twenty">Ten communities for twenty classes — which twenty?</h2>
+<p>DYF stopped at 10. That is half the flat label’s count, and it could mean two very different things: the community-detection stage under-resolved the leaf graph (as it does on <a href="../gallery/digits.html">Digits</a>, a much smaller dataset), or DYF landed on a <em>coarser real level</em> of the newsgroup hierarchy. 20 Newsgroups has seven top-level buckets — <code>alt</code>, <code>comp</code>, <code>misc</code>, <code>rec</code>, <code>sci</code>, <code>soc</code>, <code>talk</code> — so the second reading is testable: score the same partition against the top-level label.</p>
+<div id="top-level" class="cell" data-execution_count="9">
 <details open="" class="code-fold">
 <summary>Code</summary>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> _gallery <span class="im">import</span> merge_walk, merge_walk_table</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.metrics <span class="im">import</span> adjusted_rand_score, normalized_mutual_info_score</span>
 <span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>walk <span class="op">=</span> merge_walk(result, X, y, targets<span class="op">=</span>[<span class="dv">25</span>, <span class="dv">20</span>, <span class="dv">10</span>, <span class="dv">7</span>, <span class="dv">4</span>])</span>
-<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(merge_walk_table(walk, result))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>top_names <span class="op">=</span> <span class="bu">sorted</span>({n.split(<span class="st">"."</span>)[<span class="dv">0</span>] <span class="cf">for</span> n <span class="kw">in</span> data.target_names})</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>y_top <span class="op">=</span> np.asarray([top_names.index(data.target_names[t].split(<span class="st">"."</span>)[<span class="dv">0</span>]) <span class="cf">for</span> t <span class="kw">in</span> y])</span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> score(lab):</span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> normalized_mutual_info_score(y_top, lab), adjusted_rand_score(y_top, lab)</span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span><span class="bu">len</span>(top_names)<span class="sc">}</span><span class="ss"> top-level groups: </span><span class="sc">{</span>top_names<span class="sc">}</span><span class="ch">\n</span><span class="ss">"</span>)</span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span><span class="st">'partition'</span><span class="sc">:32s}</span><span class="ss">   NMI    ARI   (vs top-level label)"</span>)</span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> name, lab <span class="kw">in</span> [(<span class="ss">f"DYF raw (k=</span><span class="sc">{</span>result<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">)"</span>, result.labels),</span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>                  (<span class="st">"k-means (told k=20)"</span>, kmeans[<span class="st">"labels"</span>])]:</span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>    n_, a_ <span class="op">=</span> score(lab)</span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span>name<span class="sc">:32s}</span><span class="ss">  </span><span class="sc">{</span>n_<span class="sc">:.3f}</span><span class="ss">  </span><span class="sc">{</span>a_<span class="sc">:.3f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>7 top-level groups: ['alt', 'comp', 'misc', 'rec', 'sci', 'soc', 'talk']
+
+partition                          NMI    ARI   (vs top-level label)
+DYF raw (k=10)                    0.423  0.299
+k-means (told k=20)               0.426  0.214</code></pre>
+</div>
+</div>
+<p>Compare the two rows to the same methods scored against the 20-class label above. The answer is <em>both readings at once</em>. DYF’s ten communities keep the top-level structure better than k-means’s twenty do — ARI 0.299 vs 0.214 against the seven buckets, NMI tied — and DYF’s ARI is essentially the same whether you judge it by buckets (0.299) or by the 20 classes (0.301), which is what a partition sitting between two levels of a hierarchy looks like. But NMI 0.42 against seven buckets is not a clean seven-way split either. The ten communities are coarser than the leaves and finer than the branches, and they respect the branches about as well as anything here does.</p>
+</section>
+<section id="walking-down-the-hierarchy" class="level2">
+<h2 class="anchored" data-anchor-id="walking-down-the-hierarchy">Walking down the hierarchy</h2>
+<p>Whatever the reading, DYF’s 10 communities are the top of a partition hierarchy that can be collapsed further:</p>
+<div id="merge-walk" class="cell" data-execution_count="10">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> _gallery <span class="im">import</span> merge_walk, merge_walk_table</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>walk <span class="op">=</span> merge_walk(result, X, y, targets<span class="op">=</span>[<span class="dv">25</span>, <span class="dv">20</span>, <span class="dv">10</span>, <span class="dv">7</span>, <span class="dv">4</span>])</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(merge_walk_table(walk, result))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <table class="caption-top table table-sm table-striped small">
 <thead>
@@ -622,44 +640,44 @@ Figure&nbsp;3: K-means given the oracle k=20.
 <tbody>
 <tr class="odd">
 <td><strong>Raw DYF</strong></td>
-<td style="text-align: right;"><strong>23</strong></td>
-<td style="text-align: right;"><strong>0.497</strong></td>
-<td style="text-align: right;"><strong>0.350</strong></td>
+<td style="text-align: right;"><strong>10</strong></td>
+<td style="text-align: right;"><strong>0.472</strong></td>
+<td style="text-align: right;"><strong>0.301</strong></td>
 </tr>
 <tr class="even">
 <td>merge → 25</td>
-<td style="text-align: right;">23</td>
-<td style="text-align: right;">0.497</td>
-<td style="text-align: right;">0.350</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.472</td>
+<td style="text-align: right;">0.301</td>
 </tr>
 <tr class="odd">
 <td>merge → 20</td>
-<td style="text-align: right;">20</td>
-<td style="text-align: right;">0.489</td>
-<td style="text-align: right;">0.343</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.472</td>
+<td style="text-align: right;">0.301</td>
 </tr>
 <tr class="even">
 <td>merge → 10</td>
 <td style="text-align: right;">10</td>
-<td style="text-align: right;">0.446</td>
-<td style="text-align: right;">0.261</td>
+<td style="text-align: right;">0.472</td>
+<td style="text-align: right;">0.301</td>
 </tr>
 <tr class="odd">
 <td>merge → 7</td>
 <td style="text-align: right;">7</td>
-<td style="text-align: right;">0.426</td>
-<td style="text-align: right;">0.216</td>
+<td style="text-align: right;">0.420</td>
+<td style="text-align: right;">0.224</td>
 </tr>
 <tr class="even">
 <td>merge → 4</td>
 <td style="text-align: right;">4</td>
-<td style="text-align: right;">0.342</td>
-<td style="text-align: right;">0.144</td>
+<td style="text-align: right;">0.319</td>
+<td style="text-align: right;">0.127</td>
 </tr>
 </tbody>
 </table>
 </div>
-<p>The <code>merge → 20</code> row is the direct comparison to the flat 20-class label — and for 20 Newsgroups’ hierarchical structure, <code>merge → 7</code> is interesting too, because 20 Newsgroups’ top-level topic buckets (<code>comp.*</code>, <code>rec.*</code>, <code>sci.*</code>, <code>talk.*</code>, <code>alt.*</code>, <code>soc.*</code>, <code>misc.*</code>) are 7 in number. If DYF’s merge tree reflects the real topic hierarchy, collapsing to 7 should still score reasonably well.</p>
+<p>Targets above 10 are no-ops. <code>merge → 7</code> is the interesting row: seven is the number of top-level newsgroup buckets. Collapsing to it costs 0.05 NMI and 0.08 ARI against the 20-class label — a real loss, but a smaller one than k-means’s twenty clusters suffer when judged at the bucket level (ARI 0.345 → 0.214 in the cell above). The coarse structure is in the tree; it is just not the level DYF stopped at.</p>
 </section>
 <section id="how-dyf-and-k-means-disagree-and-why" class="level2">
 <h2 class="anchored" data-anchor-id="how-dyf-and-k-means-disagree-and-why">How DYF and k-means disagree — and why</h2>
@@ -677,24 +695,24 @@ Figure&nbsp;3: K-means given the oracle k=20.
 <tr class="odd">
 <td>Digits</td>
 <td style="text-align: right;">0.773</td>
-<td style="text-align: right;">0.696</td>
-<td style="text-align: right;">0.077</td>
+<td style="text-align: right;">0.627</td>
+<td style="text-align: right;">0.146</td>
 </tr>
 <tr class="even">
 <td><strong>20 Newsgroups</strong></td>
 <td style="text-align: right;"><strong>0.505</strong></td>
-<td style="text-align: right;"><strong>0.487</strong></td>
-<td style="text-align: right;"><strong>0.018</strong></td>
+<td style="text-align: right;"><strong>0.472</strong></td>
+<td style="text-align: right;"><strong>0.033</strong></td>
 </tr>
 </tbody>
 </table>
-<p><strong>The gap shrunk by roughly 75%.</strong> On text, oracle-tuned k-means is only a statistical rounding error ahead of DYF-with-no-knobs. Two things changed between the notebooks:</p>
+<p><strong>The gap shrank by about three-quarters.</strong> On text, oracle-tuned k-means is a few hundredths of NMI ahead of DYF-with-no-knobs, at half the cluster count. Two things changed between the notebooks:</p>
 <p><strong>1. The manifold started to bend.</strong> Sentence embeddings for <code>comp.sys.ibm.pc.hardware</code> and <code>comp.sys.mac.hardware</code> overlap — they share vocabulary (“driver”, “boot”, “RAM”), writing style, question types. In UMAP those classes don’t sit as disjoint blobs; they bleed into each other along a curved seam. K-means has to plant a Voronoi boundary <em>somewhere</em> in that seam, and wherever it plants it, it misclassifies the items near the line. DYF’s density-based cut can follow the seam instead of cutting straight across it.</p>
-<p><strong>2. The flat k=20 ground truth is arguably wrong.</strong> DYF found 34 natural communities, which over-shoots the 20-class label — but 20 Newsgroups has an implicit <em>hierarchy</em> (<code>comp.*</code>, <code>rec.*</code>, <code>sci.*</code>, <code>talk.*</code>) with uneven subgroup structure within each branch. Splitting <code>comp.sys.*</code> into an IBM community and a Mac community isn’t a mistake; it’s finding real sub-topic structure the flat label doesn’t encode. NMI partially rewards this (it normalizes for mismatched cluster counts) but not fully.</p>
+<p><strong>2. The tree is bigger.</strong> Digits hands community detection ~170 leaf centroids and gets under-split to 7 for 10. Here the tree has several times as many leaves and DYF recovers 10 for 20 — still coarse, but the label it is coarse <em>against</em> is itself a two-level hierarchy, which is why the top-level cell above exists. On <a href="../gallery/mnist.html">MNIST</a> (70,000 points, thousands of leaves) the same code recovers 12 for 10. Leaf count, not sample count, is the axis to watch.</p>
 <section id="the-home-court-away-game-framing-continued" class="level3">
 <h3 class="anchored" data-anchor-id="the-home-court-away-game-framing-continued">The home-court / away-game framing, continued</h3>
-<p>K-means is a superb algorithm when the problem matches its inductive bias: <em>“minimize within-cluster Euclidean variance, and I’ll tell you how many clusters there are.”</em> Digits satisfies both conditions perfectly — ten convex blobs, k handed over. Text embeddings break both conditions at once: the geometry isn’t convex, and the real number of semantic communities isn’t even well-defined (there are 4 top-level topic groups, 20 flat labels, and probably 30+ meaningful sub-topics).</p>
-<p>On its home court k-means wins by 0.077 NMI. On the away game it wins by 0.018. As we get into the remaining notebooks — Olivetti Faces (40 identities, 10 examples each, <em>very</em> non-convex in pixel space), CMU MoCap (continuous motion manifolds, no discrete labels at all) — that gap should continue to shrink or invert.</p>
+<p>K-means is a superb algorithm when the problem matches its inductive bias: <em>“minimize within-cluster Euclidean variance, and I’ll tell you how many clusters there are.”</em> Digits satisfies both conditions perfectly — ten convex blobs, k handed over. Text embeddings break both conditions at once: the geometry isn’t convex, and the real number of semantic communities isn’t even well-defined (there are 7 top-level topic groups, 20 flat labels, and a debatable number of sub-topics).</p>
+<p>On its home court k-means wins by 0.146 NMI. On the away game it wins by 0.033. The remaining notebooks — Olivetti Faces (40 identities, 10 examples each, <em>very</em> non-convex in pixel space) and CMU MoCap (continuous motion manifolds, no single right <code>k</code>) — push both methods into regimes where neither does well, for different reasons.</p>
 </section>
 <section id="pros-and-cons-recap" class="level3">
 <h3 class="anchored" data-anchor-id="pros-and-cons-recap">Pros and cons recap</h3>
@@ -724,7 +742,7 @@ Figure&nbsp;3: K-means given the oracle k=20.
 </tr>
 <tr class="odd">
 <td>Behavior when true structure is hierarchical</td>
-<td>Finds sub-topics (34 vs 20), partially rewarded by NMI.</td>
+<td>Stops at one level of it (10 here); the merge walk gives the coarser ones.</td>
 <td>Forced to a flat 20-partition; can’t express hierarchy.</td>
 </tr>
 <tr class="even">
@@ -734,7 +752,7 @@ Figure&nbsp;3: K-means given the oracle k=20.
 </tr>
 <tr class="odd">
 <td>Tree output</td>
-<td>Yes — can re-cut at coarser or finer resolution post-hoc.</td>
+<td>Yes — can re-cut at coarser resolution post-hoc.</td>
 <td>No — flat at exactly <code>k</code>.</td>
 </tr>
 </tbody>
@@ -744,10 +762,11 @@ Figure&nbsp;3: K-means given the oracle k=20.
 <section id="what-to-take-away" class="level2">
 <h2 class="anchored" data-anchor-id="what-to-take-away">What to take away</h2>
 <ul>
-<li><strong>DYF essentially ties oracle k-means on text.</strong> 0.018 NMI is well inside the run-to-run variance of either method.</li>
-<li><strong>The “recovered 34” isn’t over-partitioning, it’s hierarchy.</strong> The 20-class label is a human convenience; the semantic structure has more joints.</li>
+<li><strong>DYF comes within 0.03 NMI of oracle k-means on text</strong>, without <code>k</code> and with half the clusters.</li>
+<li><strong>The recovered 10 is coarse against the 20-class label, and half-right against the 7-bucket one.</strong> It keeps the top-level structure better than oracle k-means’s twenty clusters (ARI 0.30 vs 0.21) without being a clean seven-way split. Read the two scores together; either alone tells a tidier, wrong story.</li>
 <li><strong>HDBSCAN doesn’t scale here.</strong> 144 seconds and 84% discarded is a dealbreaker at 18K+ documents, which is small by real-world RAG standards.</li>
-<li><strong>Parameter-free is getting cheaper to justify.</strong> On digits, the oracle gave k-means a 0.077 NMI edge. On 20NG, it bought k-means 0.018. The cost of parameter-free is dropping as the geometry gets harder — which is the regime you’re in whenever you don’t already know what’s in your corpus.</li>
+<li><strong>Parameter-free is getting cheaper to justify.</strong> On digits the oracle gave k-means a 0.146 NMI edge; here it bought 0.033. The cost of not knowing <code>k</code> drops as the geometry gets harder — which is the regime you’re in whenever you don’t already know what’s in your corpus.</li>
+<li><strong>Earlier versions of this page reported 23–34 communities</strong> and read them as sub-topic hierarchy. That count came from a single-level Louvain in <code>dyf-rs</code> before 0.12.0 that could not merge communities (dyf <code>KNOWN_ISSUES.md</code>, issue 10); the numbers here are from the corrected optimiser.</li>
 </ul>
 
 
@@ -756,9 +775,6 @@ Figure&nbsp;3: K-means given the oracle k=20.
 </section>
 
 </main> <!-- /main -->
-<script type="application/vnd.jupyter.widget-state+json">
-{"state":{"197b654b12054e18a9a681c6ba8377dd":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"HBoxModel","state":{"_dom_classes":[],"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"HBoxModel","_view_count":null,"_view_module":"@jupyter-widgets/controls","_view_module_version":"2.0.0","_view_name":"HBoxView","box_style":"","children":["IPY_MODEL_cc737174972f43b29ebfa75c2cea132c","IPY_MODEL_8e96088f7ee646b1825ad333b1067c1a","IPY_MODEL_32b1269848d64d509bcf9b398ba7161d"],"layout":"IPY_MODEL_58b9e50e08ac4ea8a2e076dec0fd1762","tabbable":null,"tooltip":null}},"2a10aa64be5f4fa4840b347ac2baa99e":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"HTMLModel","state":{"_dom_classes":[],"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"HTMLModel","_view_count":null,"_view_module":"@jupyter-widgets/controls","_view_module_version":"2.0.0","_view_name":"HTMLView","description":"","description_allow_html":false,"layout":"IPY_MODEL_b8c34537500547d395515ed4d4946582","placeholder":"​","style":"IPY_MODEL_8b990701a187437fb8d9c9b3ea2b286c","tabbable":null,"tooltip":null,"value":"Loading weights: 100%"}},"2cbdc5f2711046868fb8fa2fe23231b7":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"HTMLModel","state":{"_dom_classes":[],"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"HTMLModel","_view_count":null,"_view_module":"@jupyter-widgets/controls","_view_module_version":"2.0.0","_view_name":"HTMLView","description":"","description_allow_html":false,"layout":"IPY_MODEL_55a21a819834437f94db81afdb1363c1","placeholder":"​","style":"IPY_MODEL_66ce1c6f1e3c45f59876ca503205153a","tabbable":null,"tooltip":null,"value":" 103/103 [00:00&lt;00:00, 5490.62it/s]"}},"32b1269848d64d509bcf9b398ba7161d":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"HTMLModel","state":{"_dom_classes":[],"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"HTMLModel","_view_count":null,"_view_module":"@jupyter-widgets/controls","_view_module_version":"2.0.0","_view_name":"HTMLView","description":"","description_allow_html":false,"layout":"IPY_MODEL_f3a417a37a144cc69384d55d3852d4e3","placeholder":"​","style":"IPY_MODEL_7d3513a00d8b42068a227fc33a258d03","tabbable":null,"tooltip":null,"value":" 10.5k/? [00:00&lt;00:00, 2.07MB/s]"}},"55a21a819834437f94db81afdb1363c1":{"model_module":"@jupyter-widgets/base","model_module_version":"2.0.0","model_name":"LayoutModel","state":{"_model_module":"@jupyter-widgets/base","_model_module_version":"2.0.0","_model_name":"LayoutModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"LayoutView","align_content":null,"align_items":null,"align_self":null,"border_bottom":null,"border_left":null,"border_right":null,"border_top":null,"bottom":null,"display":null,"flex":null,"flex_flow":null,"grid_area":null,"grid_auto_columns":null,"grid_auto_flow":null,"grid_auto_rows":null,"grid_column":null,"grid_gap":null,"grid_row":null,"grid_template_areas":null,"grid_template_columns":null,"grid_template_rows":null,"height":null,"justify_content":null,"justify_items":null,"left":null,"margin":null,"max_height":null,"max_width":null,"min_height":null,"min_width":null,"object_fit":null,"object_position":null,"order":null,"overflow":null,"padding":null,"right":null,"top":null,"visibility":null,"width":null}},"58b9e50e08ac4ea8a2e076dec0fd1762":{"model_module":"@jupyter-widgets/base","model_module_version":"2.0.0","model_name":"LayoutModel","state":{"_model_module":"@jupyter-widgets/base","_model_module_version":"2.0.0","_model_name":"LayoutModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"LayoutView","align_content":null,"align_items":null,"align_self":null,"border_bottom":null,"border_left":null,"border_right":null,"border_top":null,"bottom":null,"display":null,"flex":null,"flex_flow":null,"grid_area":null,"grid_auto_columns":null,"grid_auto_flow":null,"grid_auto_rows":null,"grid_column":null,"grid_gap":null,"grid_row":null,"grid_template_areas":null,"grid_template_columns":null,"grid_template_rows":null,"height":null,"justify_content":null,"justify_items":null,"left":null,"margin":null,"max_height":null,"max_width":null,"min_height":null,"min_width":null,"object_fit":null,"object_position":null,"order":null,"overflow":null,"padding":null,"right":null,"top":null,"visibility":null,"width":null}},"66ce1c6f1e3c45f59876ca503205153a":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"HTMLStyleModel","state":{"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"HTMLStyleModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"StyleView","background":null,"description_width":"","font_size":null,"text_color":null}},"7a8c7ad080ce456c9be80f55fea585eb":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"FloatProgressModel","state":{"_dom_classes":[],"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"FloatProgressModel","_view_count":null,"_view_module":"@jupyter-widgets/controls","_view_module_version":"2.0.0","_view_name":"ProgressView","bar_style":"success","description":"","description_allow_html":false,"layout":"IPY_MODEL_f1220c53f88741ad9025bce75d7875b7","max":103,"min":0,"orientation":"horizontal","style":"IPY_MODEL_c2692ef791b545848027495f08572eff","tabbable":null,"tooltip":null,"value":103}},"7d3513a00d8b42068a227fc33a258d03":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"HTMLStyleModel","state":{"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"HTMLStyleModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"StyleView","background":null,"description_width":"","font_size":null,"text_color":null}},"8b990701a187437fb8d9c9b3ea2b286c":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"HTMLStyleModel","state":{"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"HTMLStyleModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"StyleView","background":null,"description_width":"","font_size":null,"text_color":null}},"8e96088f7ee646b1825ad333b1067c1a":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"FloatProgressModel","state":{"_dom_classes":[],"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"FloatProgressModel","_view_count":null,"_view_module":"@jupyter-widgets/controls","_view_module_version":"2.0.0","_view_name":"ProgressView","bar_style":"success","description":"","description_allow_html":false,"layout":"IPY_MODEL_f4930f599423488fb322970f5cde8b30","max":1,"min":0,"orientation":"horizontal","style":"IPY_MODEL_b6459784a2744f4d94bb76947473d136","tabbable":null,"tooltip":null,"value":1}},"9eaf721bb5df4c09af2e3e6aa6668bb0":{"model_module":"@jupyter-widgets/base","model_module_version":"2.0.0","model_name":"LayoutModel","state":{"_model_module":"@jupyter-widgets/base","_model_module_version":"2.0.0","_model_name":"LayoutModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"LayoutView","align_content":null,"align_items":null,"align_self":null,"border_bottom":null,"border_left":null,"border_right":null,"border_top":null,"bottom":null,"display":null,"flex":null,"flex_flow":null,"grid_area":null,"grid_auto_columns":null,"grid_auto_flow":null,"grid_auto_rows":null,"grid_column":null,"grid_gap":null,"grid_row":null,"grid_template_areas":null,"grid_template_columns":null,"grid_template_rows":null,"height":null,"justify_content":null,"justify_items":null,"left":null,"margin":null,"max_height":null,"max_width":null,"min_height":null,"min_width":null,"object_fit":null,"object_position":null,"order":null,"overflow":null,"padding":null,"right":null,"top":null,"visibility":null,"width":null}},"ac59b0bdd04f4281895e5da9f2579eca":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"HTMLStyleModel","state":{"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"HTMLStyleModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"StyleView","background":null,"description_width":"","font_size":null,"text_color":null}},"b6459784a2744f4d94bb76947473d136":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"ProgressStyleModel","state":{"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"ProgressStyleModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"StyleView","bar_color":null,"description_width":""}},"b8c34537500547d395515ed4d4946582":{"model_module":"@jupyter-widgets/base","model_module_version":"2.0.0","model_name":"LayoutModel","state":{"_model_module":"@jupyter-widgets/base","_model_module_version":"2.0.0","_model_name":"LayoutModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"LayoutView","align_content":null,"align_items":null,"align_self":null,"border_bottom":null,"border_left":null,"border_right":null,"border_top":null,"bottom":null,"display":null,"flex":null,"flex_flow":null,"grid_area":null,"grid_auto_columns":null,"grid_auto_flow":null,"grid_auto_rows":null,"grid_column":null,"grid_gap":null,"grid_row":null,"grid_template_areas":null,"grid_template_columns":null,"grid_template_rows":null,"height":null,"justify_content":null,"justify_items":null,"left":null,"margin":null,"max_height":null,"max_width":null,"min_height":null,"min_width":null,"object_fit":null,"object_position":null,"order":null,"overflow":null,"padding":null,"right":null,"top":null,"visibility":null,"width":null}},"c2692ef791b545848027495f08572eff":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"ProgressStyleModel","state":{"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"ProgressStyleModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"StyleView","bar_color":null,"description_width":""}},"c4207634669f4a2182e65e67e986fb67":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"HBoxModel","state":{"_dom_classes":[],"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"HBoxModel","_view_count":null,"_view_module":"@jupyter-widgets/controls","_view_module_version":"2.0.0","_view_name":"HBoxView","box_style":"","children":["IPY_MODEL_2a10aa64be5f4fa4840b347ac2baa99e","IPY_MODEL_7a8c7ad080ce456c9be80f55fea585eb","IPY_MODEL_2cbdc5f2711046868fb8fa2fe23231b7"],"layout":"IPY_MODEL_d55e6d3888e84493a522c4831e5eb648","tabbable":null,"tooltip":null}},"cc737174972f43b29ebfa75c2cea132c":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"HTMLModel","state":{"_dom_classes":[],"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"HTMLModel","_view_count":null,"_view_module":"@jupyter-widgets/controls","_view_module_version":"2.0.0","_view_name":"HTMLView","description":"","description_allow_html":false,"layout":"IPY_MODEL_9eaf721bb5df4c09af2e3e6aa6668bb0","placeholder":"​","style":"IPY_MODEL_ac59b0bdd04f4281895e5da9f2579eca","tabbable":null,"tooltip":null,"value":"README.md: "}},"d55e6d3888e84493a522c4831e5eb648":{"model_module":"@jupyter-widgets/base","model_module_version":"2.0.0","model_name":"LayoutModel","state":{"_model_module":"@jupyter-widgets/base","_model_module_version":"2.0.0","_model_name":"LayoutModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"LayoutView","align_content":null,"align_items":null,"align_self":null,"border_bottom":null,"border_left":null,"border_right":null,"border_top":null,"bottom":null,"display":null,"flex":null,"flex_flow":null,"grid_area":null,"grid_auto_columns":null,"grid_auto_flow":null,"grid_auto_rows":null,"grid_column":null,"grid_gap":null,"grid_row":null,"grid_template_areas":null,"grid_template_columns":null,"grid_template_rows":null,"height":null,"justify_content":null,"justify_items":null,"left":null,"margin":null,"max_height":null,"max_width":null,"min_height":null,"min_width":null,"object_fit":null,"object_position":null,"order":null,"overflow":null,"padding":null,"right":null,"top":null,"visibility":null,"width":null}},"f1220c53f88741ad9025bce75d7875b7":{"model_module":"@jupyter-widgets/base","model_module_version":"2.0.0","model_name":"LayoutModel","state":{"_model_module":"@jupyter-widgets/base","_model_module_version":"2.0.0","_model_name":"LayoutModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"LayoutView","align_content":null,"align_items":null,"align_self":null,"border_bottom":null,"border_left":null,"border_right":null,"border_top":null,"bottom":null,"display":null,"flex":null,"flex_flow":null,"grid_area":null,"grid_auto_columns":null,"grid_auto_flow":null,"grid_auto_rows":null,"grid_column":null,"grid_gap":null,"grid_row":null,"grid_template_areas":null,"grid_template_columns":null,"grid_template_rows":null,"height":null,"justify_content":null,"justify_items":null,"left":null,"margin":null,"max_height":null,"max_width":null,"min_height":null,"min_width":null,"object_fit":null,"object_position":null,"order":null,"overflow":null,"padding":null,"right":null,"top":null,"visibility":null,"width":null}},"f3a417a37a144cc69384d55d3852d4e3":{"model_module":"@jupyter-widgets/base","model_module_version":"2.0.0","model_name":"LayoutModel","state":{"_model_module":"@jupyter-widgets/base","_model_module_version":"2.0.0","_model_name":"LayoutModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"LayoutView","align_content":null,"align_items":null,"align_self":null,"border_bottom":null,"border_left":null,"border_right":null,"border_top":null,"bottom":null,"display":null,"flex":null,"flex_flow":null,"grid_area":null,"grid_auto_columns":null,"grid_auto_flow":null,"grid_auto_rows":null,"grid_column":null,"grid_gap":null,"grid_row":null,"grid_template_areas":null,"grid_template_columns":null,"grid_template_rows":null,"height":null,"justify_content":null,"justify_items":null,"left":null,"margin":null,"max_height":null,"max_width":null,"min_height":null,"min_width":null,"object_fit":null,"object_position":null,"order":null,"overflow":null,"padding":null,"right":null,"top":null,"visibility":null,"width":null}},"f4930f599423488fb322970f5cde8b30":{"model_module":"@jupyter-widgets/base","model_module_version":"2.0.0","model_name":"LayoutModel","state":{"_model_module":"@jupyter-widgets/base","_model_module_version":"2.0.0","_model_name":"LayoutModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"LayoutView","align_content":null,"align_items":null,"align_self":null,"border_bottom":null,"border_left":null,"border_right":null,"border_top":null,"bottom":null,"display":null,"flex":null,"flex_flow":null,"grid_area":null,"grid_auto_columns":null,"grid_auto_flow":null,"grid_auto_rows":null,"grid_column":null,"grid_gap":null,"grid_row":null,"grid_template_areas":null,"grid_template_columns":null,"grid_template_rows":null,"height":null,"justify_content":null,"justify_items":null,"left":null,"margin":null,"max_height":null,"max_width":null,"min_height":null,"min_width":null,"object_fit":null,"object_position":null,"order":null,"overflow":null,"padding":null,"right":null,"top":null,"visibility":null,"width":"20px"}}},"version_major":2,"version_minor":0}
-</script>
 <script id="quarto-html-after-body" type="application/javascript">
   window.document.addEventListener("DOMContentLoaded", function (event) {
     // Ensure there is a toggle, if there isn't float one in the top right
@@ -1223,184 +1239,209 @@ Figure&nbsp;3: K-means given the oracle k=20.
     }
   });
   </script><div class="modal fade" id="quarto-embedded-source-code-modal" tabindex="-1" aria-labelledby="quarto-embedded-source-code-modal-label" aria-hidden="true"><div class="modal-dialog modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="quarto-embedded-source-code-modal-label">Source Code</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="">
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
-<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> "20 Newsgroups"</span></span>
-<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a><span class="an">subtitle:</span><span class="co"> "18,846 posts, MiniLM-384d sentence embeddings, k=20 hierarchical topics."</span></span>
-<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a><span class="an">order:</span><span class="co"> 4</span></span>
-<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a><span class="an">image:</span><span class="co"> twenty-newsgroups_files/figure-html/fig-dyf-output-1.png</span></span>
-<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a><span class="an">categories:</span><span class="co"> [text, medium, embeddings, hierarchical]</span></span>
-<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a><span class="an">true-k:</span><span class="co"> 20</span></span>
-<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a><span class="an">format:</span></span>
-<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a><span class="co">  html:</span></span>
-<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a><span class="co">    code-fold: show</span></span>
-<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a><span class="co">    code-tools: true</span></span>
-<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a><span class="an">execute:</span></span>
-<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a><span class="co">  warning: false</span></span>
-<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a><span class="co">  message: false</span></span>
-<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
-<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a>If Digits was k-means's home court — ten roughly-convex blobs, exactly the geometry k-means was born to carve — 20 Newsgroups is an away game. Sentence embeddings produce *curved* topic manifolds that share vocabulary at their borders: <span class="in">`comp.sys.ibm.pc.hardware`</span> and <span class="in">`comp.sys.mac.hardware`</span> bleed into each other; <span class="in">`talk.politics.mideast`</span> and <span class="in">`talk.religion.misc`</span> share a substantial amount of language. K-means has to slice straight Voronoi lines through those seams. DYF can follow the curve.</span>
-<span id="cb14-18"><a href="#cb14-18" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-19"><a href="#cb14-19" aria-hidden="true" tabindex="-1"></a>That's the prediction. Let's see whether it pans out.</span>
-<span id="cb14-20"><a href="#cb14-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-21"><a href="#cb14-21" aria-hidden="true" tabindex="-1"></a><span class="fu">## Load 20 Newsgroups</span></span>
-<span id="cb14-22"><a href="#cb14-22" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-25"><a href="#cb14-25" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
-<span id="cb14-26"><a href="#cb14-26" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: load</span></span>
-<span id="cb14-27"><a href="#cb14-27" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.datasets <span class="im">import</span> fetch_20newsgroups</span>
-<span id="cb14-28"><a href="#cb14-28" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-29"><a href="#cb14-29" aria-hidden="true" tabindex="-1"></a>data <span class="op">=</span> fetch_20newsgroups(</span>
-<span id="cb14-30"><a href="#cb14-30" aria-hidden="true" tabindex="-1"></a>    subset<span class="op">=</span><span class="st">"all"</span>,</span>
-<span id="cb14-31"><a href="#cb14-31" aria-hidden="true" tabindex="-1"></a>    remove<span class="op">=</span>(<span class="st">"headers"</span>, <span class="st">"footers"</span>, <span class="st">"quotes"</span>),  <span class="co"># strip boilerplate so the model scores on content</span></span>
-<span id="cb14-32"><a href="#cb14-32" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb14-33"><a href="#cb14-33" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span><span class="bu">len</span>(data.data)<span class="sc">:,}</span><span class="ss"> posts across </span><span class="sc">{</span><span class="bu">len</span>(data.target_names)<span class="sc">}</span><span class="ss"> classes"</span>)</span>
-<span id="cb14-34"><a href="#cb14-34" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Examples: </span><span class="sc">{</span>data<span class="sc">.</span>target_names[:<span class="dv">4</span>]<span class="sc">}</span><span class="ss"> ..."</span>)</span>
-<span id="cb14-35"><a href="#cb14-35" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb14-36"><a href="#cb14-36" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-37"><a href="#cb14-37" aria-hidden="true" tabindex="-1"></a><span class="fu">## Embed with MiniLM-L6-v2 (384d)</span></span>
-<span id="cb14-38"><a href="#cb14-38" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-39"><a href="#cb14-39" aria-hidden="true" tabindex="-1"></a>Sentence embeddings, not TF-IDF. This is the standard "turn text into semantic vectors" move and it's what downstream RAG / retrieval systems actually use. Cached to <span class="in">`/tmp`</span> on first run so re-renders are cheap.</span>
-<span id="cb14-40"><a href="#cb14-40" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-43"><a href="#cb14-43" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
-<span id="cb14-44"><a href="#cb14-44" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: embed</span></span>
-<span id="cb14-45"><a href="#cb14-45" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> os</span>
-<span id="cb14-46"><a href="#cb14-46" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
-<span id="cb14-47"><a href="#cb14-47" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time</span>
-<span id="cb14-48"><a href="#cb14-48" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-49"><a href="#cb14-49" aria-hidden="true" tabindex="-1"></a>CACHE <span class="op">=</span> <span class="st">"/tmp/twenty_ng_minilm.npz"</span></span>
-<span id="cb14-50"><a href="#cb14-50" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-51"><a href="#cb14-51" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> os.path.exists(CACHE):</span>
-<span id="cb14-52"><a href="#cb14-52" aria-hidden="true" tabindex="-1"></a>    z <span class="op">=</span> np.load(CACHE)</span>
-<span id="cb14-53"><a href="#cb14-53" aria-hidden="true" tabindex="-1"></a>    X, y <span class="op">=</span> z[<span class="st">"X"</span>], z[<span class="st">"y"</span>]</span>
-<span id="cb14-54"><a href="#cb14-54" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"Cache hit: </span><span class="sc">{</span>X<span class="sc">.</span>shape[<span class="dv">0</span>]<span class="sc">:,}</span><span class="ss"> × </span><span class="sc">{</span>X<span class="sc">.</span>shape[<span class="dv">1</span>]<span class="sc">}</span><span class="ss">d embeddings"</span>)</span>
-<span id="cb14-55"><a href="#cb14-55" aria-hidden="true" tabindex="-1"></a><span class="cf">else</span>:</span>
-<span id="cb14-56"><a href="#cb14-56" aria-hidden="true" tabindex="-1"></a>    <span class="im">from</span> sentence_transformers <span class="im">import</span> SentenceTransformer</span>
-<span id="cb14-57"><a href="#cb14-57" aria-hidden="true" tabindex="-1"></a>    model <span class="op">=</span> SentenceTransformer(<span class="st">"sentence-transformers/all-MiniLM-L6-v2"</span>)</span>
-<span id="cb14-58"><a href="#cb14-58" aria-hidden="true" tabindex="-1"></a>    t0 <span class="op">=</span> time.time()</span>
-<span id="cb14-59"><a href="#cb14-59" aria-hidden="true" tabindex="-1"></a>    X <span class="op">=</span> model.encode(data.data, show_progress_bar<span class="op">=</span><span class="va">False</span>, batch_size<span class="op">=</span><span class="dv">64</span>)</span>
-<span id="cb14-60"><a href="#cb14-60" aria-hidden="true" tabindex="-1"></a>    X <span class="op">=</span> np.ascontiguousarray(X, dtype<span class="op">=</span>np.float32)</span>
-<span id="cb14-61"><a href="#cb14-61" aria-hidden="true" tabindex="-1"></a>    y <span class="op">=</span> np.asarray(data.target)</span>
-<span id="cb14-62"><a href="#cb14-62" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"Embedded </span><span class="sc">{</span>X<span class="sc">.</span>shape[<span class="dv">0</span>]<span class="sc">:,}</span><span class="ss"> posts in </span><span class="sc">{</span>time<span class="sc">.</span>time() <span class="op">-</span> t0<span class="sc">:.1f}</span><span class="ss">s → </span><span class="sc">{</span>X<span class="sc">.</span>shape[<span class="dv">1</span>]<span class="sc">}</span><span class="ss">d"</span>)</span>
-<span id="cb14-63"><a href="#cb14-63" aria-hidden="true" tabindex="-1"></a>    np.savez(CACHE, X<span class="op">=</span>X, y<span class="op">=</span>y)</span>
-<span id="cb14-64"><a href="#cb14-64" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb14-65"><a href="#cb14-65" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-66"><a href="#cb14-66" aria-hidden="true" tabindex="-1"></a><span class="fu">## Run DYF (parameter-free)</span></span>
-<span id="cb14-67"><a href="#cb14-67" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-68"><a href="#cb14-68" aria-hidden="true" tabindex="-1"></a>Same call as every other notebook in this gallery — no arguments tuned for text.</span>
-<span id="cb14-69"><a href="#cb14-69" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-72"><a href="#cb14-72" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
-<span id="cb14-73"><a href="#cb14-73" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: run-dyf</span></span>
-<span id="cb14-74"><a href="#cb14-74" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> sys</span>
-<span id="cb14-75"><a href="#cb14-75" aria-hidden="true" tabindex="-1"></a>sys.path.insert(<span class="dv">0</span>, <span class="st">"."</span>)</span>
-<span id="cb14-76"><a href="#cb14-76" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> _gallery <span class="im">import</span> run_dyf, run_kmeans, plot_single, metrics_table</span>
-<span id="cb14-77"><a href="#cb14-77" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-78"><a href="#cb14-78" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> run_dyf(X, y)</span>
-<span id="cb14-79"><a href="#cb14-79" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-80"><a href="#cb14-80" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Recovered k: </span><span class="sc">{</span>result<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">  (true k = </span><span class="sc">{</span>result<span class="sc">.</span>true_k<span class="sc">}</span><span class="ss">)"</span>)</span>
-<span id="cb14-81"><a href="#cb14-81" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"NMI:         </span><span class="sc">{</span>result<span class="sc">.</span>nmi<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
-<span id="cb14-82"><a href="#cb14-82" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"ARI:         </span><span class="sc">{</span>result<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
-<span id="cb14-83"><a href="#cb14-83" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb14-84"><a href="#cb14-84" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-85"><a href="#cb14-85" aria-hidden="true" tabindex="-1"></a><span class="fu">## Oracle k-means baseline</span></span>
-<span id="cb14-86"><a href="#cb14-86" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-89"><a href="#cb14-89" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
-<span id="cb14-90"><a href="#cb14-90" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: kmeans</span></span>
-<span id="cb14-91"><a href="#cb14-91" aria-hidden="true" tabindex="-1"></a>kmeans <span class="op">=</span> run_kmeans(X, y)</span>
-<span id="cb14-92"><a href="#cb14-92" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"k-means NMI=</span><span class="sc">{</span>kmeans[<span class="st">'nmi'</span>]<span class="sc">:.3f}</span><span class="ss">, ARI=</span><span class="sc">{</span>kmeans[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss"> (told k=</span><span class="sc">{</span>result<span class="sc">.</span>true_k<span class="sc">}</span><span class="ss">)"</span>)</span>
-<span id="cb14-93"><a href="#cb14-93" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb14-94"><a href="#cb14-94" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-95"><a href="#cb14-95" aria-hidden="true" tabindex="-1"></a><span class="fu">## What about HDBSCAN?</span></span>
-<span id="cb14-96"><a href="#cb14-96" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-97"><a href="#cb14-97" aria-hidden="true" tabindex="-1"></a>Skipped here. On 18,846 × 384d, HDBSCAN's defaults take ~2.5 minutes of wall clock and then flag **84% of points as noise** — it's scoring NMI on only the 16% of posts it was willing to cluster. The comparison becomes unfair in the other direction (HDBSCAN is allowed to pick its battles), and the notebook render balloons by 2+ minutes for a mostly uninformative number. The digits notebook keeps HDBSCAN because the noise fraction is small there; here it's not a useful reference.</span>
-<span id="cb14-98"><a href="#cb14-98" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-99"><a href="#cb14-99" aria-hidden="true" tabindex="-1"></a><span class="fu">## Figures</span></span>
-<span id="cb14-100"><a href="#cb14-100" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-101"><a href="#cb14-101" aria-hidden="true" tabindex="-1"></a>Three views of the same UMAP layout: ground-truth classes, DYF's parameter-free partition, and k-means given the oracle <span class="in">`k=20`</span>.</span>
-<span id="cb14-102"><a href="#cb14-102" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-103"><a href="#cb14-103" aria-hidden="true" tabindex="-1"></a>::: {.gallery-fluid}</span>
-<span id="cb14-104"><a href="#cb14-104" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-107"><a href="#cb14-107" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
-<span id="cb14-108"><a href="#cb14-108" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-truth</span></span>
-<span id="cb14-109"><a href="#cb14-109" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "Ground truth — 20 newsgroup classes."</span></span>
-<span id="cb14-110"><a href="#cb14-110" aria-hidden="true" tabindex="-1"></a>plot_single(result.umap_2d, y, title<span class="op">=</span><span class="ss">f"Ground truth (k=</span><span class="sc">{</span>result<span class="sc">.</span>true_k<span class="sc">}</span><span class="ss">)"</span>)</span>
-<span id="cb14-111"><a href="#cb14-111" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb14-112"><a href="#cb14-112" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-115"><a href="#cb14-115" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
-<span id="cb14-116"><a href="#cb14-116" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-dyf</span></span>
-<span id="cb14-117"><a href="#cb14-117" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "DYF — parameter-free, no k supplied."</span></span>
-<span id="cb14-118"><a href="#cb14-118" aria-hidden="true" tabindex="-1"></a>plot_single(result.umap_2d, result.labels, title<span class="op">=</span><span class="ss">f"DYF (recovered k=</span><span class="sc">{</span>result<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">)"</span>)</span>
-<span id="cb14-119"><a href="#cb14-119" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb14-120"><a href="#cb14-120" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-123"><a href="#cb14-123" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
-<span id="cb14-124"><a href="#cb14-124" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-kmeans</span></span>
-<span id="cb14-125"><a href="#cb14-125" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "K-means given the oracle k=20."</span></span>
-<span id="cb14-126"><a href="#cb14-126" aria-hidden="true" tabindex="-1"></a>plot_single(result.umap_2d, kmeans[<span class="st">"labels"</span>], title<span class="op">=</span><span class="ss">f"k-means (told k=</span><span class="sc">{</span>result<span class="sc">.</span>true_k<span class="sc">}</span><span class="ss">)"</span>)</span>
-<span id="cb14-127"><a href="#cb14-127" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb14-128"><a href="#cb14-128" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-129"><a href="#cb14-129" aria-hidden="true" tabindex="-1"></a>:::</span>
-<span id="cb14-130"><a href="#cb14-130" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-131"><a href="#cb14-131" aria-hidden="true" tabindex="-1"></a><span class="fu">## Metrics</span></span>
-<span id="cb14-132"><a href="#cb14-132" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-135"><a href="#cb14-135" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
-<span id="cb14-136"><a href="#cb14-136" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: metrics</span></span>
-<span id="cb14-137"><a href="#cb14-137" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: asis</span></span>
-<span id="cb14-138"><a href="#cb14-138" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(metrics_table(result, kmeans, <span class="va">None</span>))</span>
-<span id="cb14-139"><a href="#cb14-139" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb14-140"><a href="#cb14-140" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-141"><a href="#cb14-141" aria-hidden="true" tabindex="-1"></a><span class="fu">## Walking down the hierarchy</span></span>
-<span id="cb14-142"><a href="#cb14-142" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-143"><a href="#cb14-143" aria-hidden="true" tabindex="-1"></a>DYF's 34 communities aren't a commitment to k=34. They're the finest resolution of a partition hierarchy that can be collapsed to any coarser k by walking up the merge tree:</span>
-<span id="cb14-144"><a href="#cb14-144" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-147"><a href="#cb14-147" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
-<span id="cb14-148"><a href="#cb14-148" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: merge-walk</span></span>
-<span id="cb14-149"><a href="#cb14-149" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: asis</span></span>
-<span id="cb14-150"><a href="#cb14-150" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> _gallery <span class="im">import</span> merge_walk, merge_walk_table</span>
-<span id="cb14-151"><a href="#cb14-151" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-152"><a href="#cb14-152" aria-hidden="true" tabindex="-1"></a>walk <span class="op">=</span> merge_walk(result, X, y, targets<span class="op">=</span>[<span class="dv">25</span>, <span class="dv">20</span>, <span class="dv">10</span>, <span class="dv">7</span>, <span class="dv">4</span>])</span>
-<span id="cb14-153"><a href="#cb14-153" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(merge_walk_table(walk, result))</span>
-<span id="cb14-154"><a href="#cb14-154" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb14-155"><a href="#cb14-155" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-156"><a href="#cb14-156" aria-hidden="true" tabindex="-1"></a>The <span class="in">`merge → 20`</span> row is the direct comparison to the flat 20-class label — and for 20 Newsgroups' hierarchical structure, <span class="in">`merge → 7`</span> is interesting too, because 20 Newsgroups' top-level topic buckets (<span class="in">`comp.*`</span>, <span class="in">`rec.*`</span>, <span class="in">`sci.*`</span>, <span class="in">`talk.*`</span>, <span class="in">`alt.*`</span>, <span class="in">`soc.*`</span>, <span class="in">`misc.*`</span>) are 7 in number. If DYF's merge tree reflects the real topic hierarchy, collapsing to 7 should still score reasonably well.</span>
-<span id="cb14-157"><a href="#cb14-157" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-158"><a href="#cb14-158" aria-hidden="true" tabindex="-1"></a><span class="fu">## How DYF and k-means disagree — and why</span></span>
-<span id="cb14-159"><a href="#cb14-159" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-160"><a href="#cb14-160" aria-hidden="true" tabindex="-1"></a>Compare this to the Digits notebook:</span>
-<span id="cb14-161"><a href="#cb14-161" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-162"><a href="#cb14-162" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Dataset  <span class="pp">|</span> k-means NMI <span class="pp">|</span> DYF NMI <span class="pp">|</span> Gap   <span class="pp">|</span></span>
-<span id="cb14-163"><a href="#cb14-163" aria-hidden="true" tabindex="-1"></a><span class="pp">|----------|------------:|--------:|------:|</span></span>
-<span id="cb14-164"><a href="#cb14-164" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Digits   <span class="pp">|</span> 0.773       <span class="pp">|</span> 0.696   <span class="pp">|</span> 0.077 <span class="pp">|</span></span>
-<span id="cb14-165"><a href="#cb14-165" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> **20 Newsgroups** | **0.505** | **0.487** | **0.018** <span class="pp">|</span></span>
-<span id="cb14-166"><a href="#cb14-166" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-167"><a href="#cb14-167" aria-hidden="true" tabindex="-1"></a>**The gap shrunk by roughly 75%.** On text, oracle-tuned k-means is only a statistical rounding error ahead of DYF-with-no-knobs. Two things changed between the notebooks:</span>
-<span id="cb14-168"><a href="#cb14-168" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-169"><a href="#cb14-169" aria-hidden="true" tabindex="-1"></a>**1. The manifold started to bend.**</span>
-<span id="cb14-170"><a href="#cb14-170" aria-hidden="true" tabindex="-1"></a>Sentence embeddings for <span class="in">`comp.sys.ibm.pc.hardware`</span> and <span class="in">`comp.sys.mac.hardware`</span> overlap — they share vocabulary ("driver", "boot", "RAM"), writing style, question types. In UMAP those classes don't sit as disjoint blobs; they bleed into each other along a curved seam. K-means has to plant a Voronoi boundary *somewhere* in that seam, and wherever it plants it, it misclassifies the items near the line. DYF's density-based cut can follow the seam instead of cutting straight across it.</span>
-<span id="cb14-171"><a href="#cb14-171" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-172"><a href="#cb14-172" aria-hidden="true" tabindex="-1"></a>**2. The flat k=20 ground truth is arguably wrong.**</span>
-<span id="cb14-173"><a href="#cb14-173" aria-hidden="true" tabindex="-1"></a>DYF found 34 natural communities, which over-shoots the 20-class label — but 20 Newsgroups has an implicit *hierarchy* (`comp.*`, `rec.*`, `sci.*`, `talk.*`) with uneven subgroup structure within each branch. Splitting `comp.sys.*` into an IBM community and a Mac community isn't a mistake; it's finding real sub-topic structure the flat label doesn't encode. NMI partially rewards this (it normalizes for mismatched cluster counts) but not fully.</span>
-<span id="cb14-174"><a href="#cb14-174" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-175"><a href="#cb14-175" aria-hidden="true" tabindex="-1"></a><span class="fu">### The home-court / away-game framing, continued</span></span>
-<span id="cb14-176"><a href="#cb14-176" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-177"><a href="#cb14-177" aria-hidden="true" tabindex="-1"></a>K-means is a superb algorithm when the problem matches its inductive bias: *"minimize within-cluster Euclidean variance, and I'll tell you how many clusters there are."* Digits satisfies both conditions perfectly — ten convex blobs, k handed over. Text embeddings break both conditions at once: the geometry isn't convex, and the real number of semantic communities isn't even well-defined (there are 4 top-level topic groups, 20 flat labels, and probably 30+ meaningful sub-topics).</span>
-<span id="cb14-178"><a href="#cb14-178" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-179"><a href="#cb14-179" aria-hidden="true" tabindex="-1"></a>On its home court k-means wins by 0.077 NMI. On the away game it wins by 0.018. As we get into the remaining notebooks — Olivetti Faces (40 identities, 10 examples each, *very* non-convex in pixel space), CMU MoCap (continuous motion manifolds, no discrete labels at all) — that gap should continue to shrink or invert.</span>
-<span id="cb14-180"><a href="#cb14-180" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-181"><a href="#cb14-181" aria-hidden="true" tabindex="-1"></a><span class="fu">### Pros and cons recap</span></span>
-<span id="cb14-182"><a href="#cb14-182" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-183"><a href="#cb14-183" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span>                            <span class="pp">|</span> **DYF (parameter-free)**                                             | **K-means (oracle k=20)**                               <span class="pp">|</span></span>
-<span id="cb14-184"><a href="#cb14-184" aria-hidden="true" tabindex="-1"></a><span class="pp">|----------------------------|----------------------------------------------------------------------|---------------------------------------------------------|</span></span>
-<span id="cb14-185"><a href="#cb14-185" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Needs <span class="in">`k`</span>?                 <span class="pp">|</span> No.                                                                  <span class="pp">|</span> Yes — given 20 upfront.                                 <span class="pp">|</span></span>
-<span id="cb14-186"><a href="#cb14-186" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Behavior on curved manifolds <span class="pp">|</span> Follows density; can trace seams.                                  <span class="pp">|</span> Cuts straight Voronoi lines across them.                <span class="pp">|</span></span>
-<span id="cb14-187"><a href="#cb14-187" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Behavior when true structure is hierarchical <span class="pp">|</span> Finds sub-topics (34 vs 20), partially rewarded by NMI. <span class="pp">|</span> Forced to a flat 20-partition; can't express hierarchy. <span class="pp">|</span></span>
-<span id="cb14-188"><a href="#cb14-188" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Behavior when embedding noise is high <span class="pp">|</span> Tree leaves absorb some noise before Louvain merges. <span class="pp">|</span> Sensitive — outliers pull centroids.                    <span class="pp">|</span></span>
-<span id="cb14-189"><a href="#cb14-189" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Tree output                <span class="pp">|</span> Yes — can re-cut at coarser or finer resolution post-hoc.            <span class="pp">|</span> No — flat at exactly <span class="in">`k`</span>.                               <span class="pp">|</span></span>
-<span id="cb14-190"><a href="#cb14-190" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-191"><a href="#cb14-191" aria-hidden="true" tabindex="-1"></a><span class="fu">## What to take away</span></span>
-<span id="cb14-192"><a href="#cb14-192" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-193"><a href="#cb14-193" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**DYF essentially ties oracle k-means on text.** 0.018 NMI is well inside the run-to-run variance of either method.</span>
-<span id="cb14-194"><a href="#cb14-194" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**The "recovered 34" isn't over-partitioning, it's hierarchy.** The 20-class label is a human convenience; the semantic structure has more joints.</span>
-<span id="cb14-195"><a href="#cb14-195" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**HDBSCAN doesn't scale here.** 144 seconds and 84% discarded is a dealbreaker at 18K+ documents, which is small by real-world RAG standards.</span>
-<span id="cb14-196"><a href="#cb14-196" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Parameter-free is getting cheaper to justify.** On digits, the oracle gave k-means a 0.077 NMI edge. On 20NG, it bought k-means 0.018. The cost of parameter-free is dropping as the geometry gets harder — which is the regime you're in whenever you don't already know what's in your corpus.</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb16" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> "20 Newsgroups"</span></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a><span class="an">subtitle:</span><span class="co"> "18,846 posts, MiniLM-384d sentence embeddings, k=20 hierarchical topics."</span></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a><span class="an">order:</span><span class="co"> 4</span></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a><span class="an">image:</span><span class="co"> twenty-newsgroups_files/figure-html/fig-dyf-output-1.png</span></span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a><span class="an">categories:</span><span class="co"> [text, medium, embeddings, hierarchical]</span></span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a><span class="an">true-k:</span><span class="co"> 20</span></span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a><span class="an">format:</span></span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a><span class="co">  html:</span></span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a><span class="co">    code-fold: show</span></span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a><span class="co">    code-tools: true</span></span>
+<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a><span class="an">execute:</span></span>
+<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a><span class="co">  warning: false</span></span>
+<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a><span class="co">  message: false</span></span>
+<span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb16-16"><a href="#cb16-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-17"><a href="#cb16-17" aria-hidden="true" tabindex="-1"></a>If Digits was k-means's home court — ten roughly-convex blobs, exactly the geometry k-means was born to carve — 20 Newsgroups is an away game. Sentence embeddings produce *curved* topic manifolds that share vocabulary at their borders: <span class="in">`comp.sys.ibm.pc.hardware`</span> and <span class="in">`comp.sys.mac.hardware`</span> bleed into each other; <span class="in">`talk.politics.mideast`</span> and <span class="in">`talk.religion.misc`</span> share a substantial amount of language. K-means has to slice straight Voronoi lines through those seams. DYF can follow the curve.</span>
+<span id="cb16-18"><a href="#cb16-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-19"><a href="#cb16-19" aria-hidden="true" tabindex="-1"></a>That's the prediction. Let's see whether it pans out.</span>
+<span id="cb16-20"><a href="#cb16-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-21"><a href="#cb16-21" aria-hidden="true" tabindex="-1"></a><span class="fu">## Load 20 Newsgroups</span></span>
+<span id="cb16-22"><a href="#cb16-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-25"><a href="#cb16-25" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb16-26"><a href="#cb16-26" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: load</span></span>
+<span id="cb16-27"><a href="#cb16-27" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.datasets <span class="im">import</span> fetch_20newsgroups</span>
+<span id="cb16-28"><a href="#cb16-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-29"><a href="#cb16-29" aria-hidden="true" tabindex="-1"></a>data <span class="op">=</span> fetch_20newsgroups(</span>
+<span id="cb16-30"><a href="#cb16-30" aria-hidden="true" tabindex="-1"></a>    subset<span class="op">=</span><span class="st">"all"</span>,</span>
+<span id="cb16-31"><a href="#cb16-31" aria-hidden="true" tabindex="-1"></a>    remove<span class="op">=</span>(<span class="st">"headers"</span>, <span class="st">"footers"</span>, <span class="st">"quotes"</span>),  <span class="co"># strip boilerplate so the model scores on content</span></span>
+<span id="cb16-32"><a href="#cb16-32" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb16-33"><a href="#cb16-33" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span><span class="bu">len</span>(data.data)<span class="sc">:,}</span><span class="ss"> posts across </span><span class="sc">{</span><span class="bu">len</span>(data.target_names)<span class="sc">}</span><span class="ss"> classes"</span>)</span>
+<span id="cb16-34"><a href="#cb16-34" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Examples: </span><span class="sc">{</span>data<span class="sc">.</span>target_names[:<span class="dv">4</span>]<span class="sc">}</span><span class="ss"> ..."</span>)</span>
+<span id="cb16-35"><a href="#cb16-35" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-36"><a href="#cb16-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-37"><a href="#cb16-37" aria-hidden="true" tabindex="-1"></a><span class="fu">## Embed with MiniLM-L6-v2 (384d)</span></span>
+<span id="cb16-38"><a href="#cb16-38" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-39"><a href="#cb16-39" aria-hidden="true" tabindex="-1"></a>Sentence embeddings, not TF-IDF. This is the standard "turn text into semantic vectors" move and it's what downstream RAG / retrieval systems actually use. Cached to <span class="in">`/tmp`</span> on first run so re-renders are cheap.</span>
+<span id="cb16-40"><a href="#cb16-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-43"><a href="#cb16-43" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb16-44"><a href="#cb16-44" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: embed</span></span>
+<span id="cb16-45"><a href="#cb16-45" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> os</span>
+<span id="cb16-46"><a href="#cb16-46" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb16-47"><a href="#cb16-47" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time</span>
+<span id="cb16-48"><a href="#cb16-48" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-49"><a href="#cb16-49" aria-hidden="true" tabindex="-1"></a>CACHE <span class="op">=</span> <span class="st">"/tmp/twenty_ng_minilm.npz"</span></span>
+<span id="cb16-50"><a href="#cb16-50" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-51"><a href="#cb16-51" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> os.path.exists(CACHE):</span>
+<span id="cb16-52"><a href="#cb16-52" aria-hidden="true" tabindex="-1"></a>    z <span class="op">=</span> np.load(CACHE)</span>
+<span id="cb16-53"><a href="#cb16-53" aria-hidden="true" tabindex="-1"></a>    X, y <span class="op">=</span> z[<span class="st">"X"</span>], z[<span class="st">"y"</span>]</span>
+<span id="cb16-54"><a href="#cb16-54" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"Cache hit: </span><span class="sc">{</span>X<span class="sc">.</span>shape[<span class="dv">0</span>]<span class="sc">:,}</span><span class="ss"> × </span><span class="sc">{</span>X<span class="sc">.</span>shape[<span class="dv">1</span>]<span class="sc">}</span><span class="ss">d embeddings"</span>)</span>
+<span id="cb16-55"><a href="#cb16-55" aria-hidden="true" tabindex="-1"></a><span class="cf">else</span>:</span>
+<span id="cb16-56"><a href="#cb16-56" aria-hidden="true" tabindex="-1"></a>    <span class="im">from</span> sentence_transformers <span class="im">import</span> SentenceTransformer</span>
+<span id="cb16-57"><a href="#cb16-57" aria-hidden="true" tabindex="-1"></a>    model <span class="op">=</span> SentenceTransformer(<span class="st">"sentence-transformers/all-MiniLM-L6-v2"</span>)</span>
+<span id="cb16-58"><a href="#cb16-58" aria-hidden="true" tabindex="-1"></a>    t0 <span class="op">=</span> time.time()</span>
+<span id="cb16-59"><a href="#cb16-59" aria-hidden="true" tabindex="-1"></a>    X <span class="op">=</span> model.encode(data.data, show_progress_bar<span class="op">=</span><span class="va">False</span>, batch_size<span class="op">=</span><span class="dv">64</span>)</span>
+<span id="cb16-60"><a href="#cb16-60" aria-hidden="true" tabindex="-1"></a>    X <span class="op">=</span> np.ascontiguousarray(X, dtype<span class="op">=</span>np.float32)</span>
+<span id="cb16-61"><a href="#cb16-61" aria-hidden="true" tabindex="-1"></a>    y <span class="op">=</span> np.asarray(data.target)</span>
+<span id="cb16-62"><a href="#cb16-62" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"Embedded </span><span class="sc">{</span>X<span class="sc">.</span>shape[<span class="dv">0</span>]<span class="sc">:,}</span><span class="ss"> posts in </span><span class="sc">{</span>time<span class="sc">.</span>time() <span class="op">-</span> t0<span class="sc">:.1f}</span><span class="ss">s → </span><span class="sc">{</span>X<span class="sc">.</span>shape[<span class="dv">1</span>]<span class="sc">}</span><span class="ss">d"</span>)</span>
+<span id="cb16-63"><a href="#cb16-63" aria-hidden="true" tabindex="-1"></a>    np.savez(CACHE, X<span class="op">=</span>X, y<span class="op">=</span>y)</span>
+<span id="cb16-64"><a href="#cb16-64" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-65"><a href="#cb16-65" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-66"><a href="#cb16-66" aria-hidden="true" tabindex="-1"></a><span class="fu">## Run DYF (parameter-free)</span></span>
+<span id="cb16-67"><a href="#cb16-67" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-68"><a href="#cb16-68" aria-hidden="true" tabindex="-1"></a>Same call as every other notebook in this gallery — no arguments tuned for text.</span>
+<span id="cb16-69"><a href="#cb16-69" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-72"><a href="#cb16-72" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb16-73"><a href="#cb16-73" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: run-dyf</span></span>
+<span id="cb16-74"><a href="#cb16-74" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> sys</span>
+<span id="cb16-75"><a href="#cb16-75" aria-hidden="true" tabindex="-1"></a>sys.path.insert(<span class="dv">0</span>, <span class="st">"."</span>)</span>
+<span id="cb16-76"><a href="#cb16-76" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> _gallery <span class="im">import</span> run_dyf, run_kmeans, plot_single, metrics_table</span>
+<span id="cb16-77"><a href="#cb16-77" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-78"><a href="#cb16-78" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> run_dyf(X, y)</span>
+<span id="cb16-79"><a href="#cb16-79" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-80"><a href="#cb16-80" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Recovered k: </span><span class="sc">{</span>result<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">  (true k = </span><span class="sc">{</span>result<span class="sc">.</span>true_k<span class="sc">}</span><span class="ss">)"</span>)</span>
+<span id="cb16-81"><a href="#cb16-81" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"NMI:         </span><span class="sc">{</span>result<span class="sc">.</span>nmi<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb16-82"><a href="#cb16-82" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"ARI:         </span><span class="sc">{</span>result<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb16-83"><a href="#cb16-83" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-84"><a href="#cb16-84" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-85"><a href="#cb16-85" aria-hidden="true" tabindex="-1"></a><span class="fu">## Oracle k-means baseline</span></span>
+<span id="cb16-86"><a href="#cb16-86" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-89"><a href="#cb16-89" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb16-90"><a href="#cb16-90" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: kmeans</span></span>
+<span id="cb16-91"><a href="#cb16-91" aria-hidden="true" tabindex="-1"></a>kmeans <span class="op">=</span> run_kmeans(X, y)</span>
+<span id="cb16-92"><a href="#cb16-92" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"k-means NMI=</span><span class="sc">{</span>kmeans[<span class="st">'nmi'</span>]<span class="sc">:.3f}</span><span class="ss">, ARI=</span><span class="sc">{</span>kmeans[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss"> (told k=</span><span class="sc">{</span>result<span class="sc">.</span>true_k<span class="sc">}</span><span class="ss">)"</span>)</span>
+<span id="cb16-93"><a href="#cb16-93" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-94"><a href="#cb16-94" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-95"><a href="#cb16-95" aria-hidden="true" tabindex="-1"></a><span class="fu">## What about HDBSCAN?</span></span>
+<span id="cb16-96"><a href="#cb16-96" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-97"><a href="#cb16-97" aria-hidden="true" tabindex="-1"></a>Skipped here. On 18,846 × 384d, HDBSCAN's defaults take ~2.5 minutes of wall clock and then flag **84% of points as noise** — it's scoring NMI on only the 16% of posts it was willing to cluster. The comparison becomes unfair in the other direction (HDBSCAN is allowed to pick its battles), and the notebook render balloons by 2+ minutes for a mostly uninformative number. The digits notebook keeps HDBSCAN because the noise fraction is small there; here it's not a useful reference.</span>
+<span id="cb16-98"><a href="#cb16-98" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-99"><a href="#cb16-99" aria-hidden="true" tabindex="-1"></a><span class="fu">## Figures</span></span>
+<span id="cb16-100"><a href="#cb16-100" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-101"><a href="#cb16-101" aria-hidden="true" tabindex="-1"></a>Three views of the same UMAP layout: ground-truth classes, DYF's parameter-free partition, and k-means given the oracle <span class="in">`k=20`</span>.</span>
+<span id="cb16-102"><a href="#cb16-102" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-103"><a href="#cb16-103" aria-hidden="true" tabindex="-1"></a>::: {.gallery-fluid}</span>
+<span id="cb16-104"><a href="#cb16-104" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-107"><a href="#cb16-107" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb16-108"><a href="#cb16-108" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-truth</span></span>
+<span id="cb16-109"><a href="#cb16-109" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "Ground truth — 20 newsgroup classes."</span></span>
+<span id="cb16-110"><a href="#cb16-110" aria-hidden="true" tabindex="-1"></a>plot_single(result.umap_2d, y, title<span class="op">=</span><span class="ss">f"Ground truth (k=</span><span class="sc">{</span>result<span class="sc">.</span>true_k<span class="sc">}</span><span class="ss">)"</span>)</span>
+<span id="cb16-111"><a href="#cb16-111" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-112"><a href="#cb16-112" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-115"><a href="#cb16-115" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb16-116"><a href="#cb16-116" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-dyf</span></span>
+<span id="cb16-117"><a href="#cb16-117" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "DYF — parameter-free, no k supplied."</span></span>
+<span id="cb16-118"><a href="#cb16-118" aria-hidden="true" tabindex="-1"></a>plot_single(result.umap_2d, result.labels, title<span class="op">=</span><span class="ss">f"DYF (recovered k=</span><span class="sc">{</span>result<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">)"</span>)</span>
+<span id="cb16-119"><a href="#cb16-119" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-120"><a href="#cb16-120" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-123"><a href="#cb16-123" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb16-124"><a href="#cb16-124" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-kmeans</span></span>
+<span id="cb16-125"><a href="#cb16-125" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "K-means given the oracle k=20."</span></span>
+<span id="cb16-126"><a href="#cb16-126" aria-hidden="true" tabindex="-1"></a>plot_single(result.umap_2d, kmeans[<span class="st">"labels"</span>], title<span class="op">=</span><span class="ss">f"k-means (told k=</span><span class="sc">{</span>result<span class="sc">.</span>true_k<span class="sc">}</span><span class="ss">)"</span>)</span>
+<span id="cb16-127"><a href="#cb16-127" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-128"><a href="#cb16-128" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-129"><a href="#cb16-129" aria-hidden="true" tabindex="-1"></a>:::</span>
+<span id="cb16-130"><a href="#cb16-130" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-131"><a href="#cb16-131" aria-hidden="true" tabindex="-1"></a><span class="fu">## Metrics</span></span>
+<span id="cb16-132"><a href="#cb16-132" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-135"><a href="#cb16-135" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb16-136"><a href="#cb16-136" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: metrics</span></span>
+<span id="cb16-137"><a href="#cb16-137" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: asis</span></span>
+<span id="cb16-138"><a href="#cb16-138" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(metrics_table(result, kmeans, <span class="va">None</span>))</span>
+<span id="cb16-139"><a href="#cb16-139" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-140"><a href="#cb16-140" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-141"><a href="#cb16-141" aria-hidden="true" tabindex="-1"></a><span class="fu">## Ten communities for twenty classes — which twenty?</span></span>
+<span id="cb16-142"><a href="#cb16-142" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-143"><a href="#cb16-143" aria-hidden="true" tabindex="-1"></a>DYF stopped at 10. That is half the flat label's count, and it could mean two very different things: the community-detection stage under-resolved the leaf graph (as it does on <span class="co">[</span><span class="ot">Digits</span><span class="co">](digits.qmd)</span>, a much smaller dataset), or DYF landed on a *coarser real level* of the newsgroup hierarchy. 20 Newsgroups has seven top-level buckets — <span class="in">`alt`</span>, <span class="in">`comp`</span>, <span class="in">`misc`</span>, <span class="in">`rec`</span>, <span class="in">`sci`</span>, <span class="in">`soc`</span>, <span class="in">`talk`</span> — so the second reading is testable: score the same partition against the top-level label.</span>
+<span id="cb16-144"><a href="#cb16-144" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-147"><a href="#cb16-147" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb16-148"><a href="#cb16-148" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: top-level</span></span>
+<span id="cb16-149"><a href="#cb16-149" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.metrics <span class="im">import</span> adjusted_rand_score, normalized_mutual_info_score</span>
+<span id="cb16-150"><a href="#cb16-150" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-151"><a href="#cb16-151" aria-hidden="true" tabindex="-1"></a>top_names <span class="op">=</span> <span class="bu">sorted</span>({n.split(<span class="st">"."</span>)[<span class="dv">0</span>] <span class="cf">for</span> n <span class="kw">in</span> data.target_names})</span>
+<span id="cb16-152"><a href="#cb16-152" aria-hidden="true" tabindex="-1"></a>y_top <span class="op">=</span> np.asarray([top_names.index(data.target_names[t].split(<span class="st">"."</span>)[<span class="dv">0</span>]) <span class="cf">for</span> t <span class="kw">in</span> y])</span>
+<span id="cb16-153"><a href="#cb16-153" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-154"><a href="#cb16-154" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> score(lab):</span>
+<span id="cb16-155"><a href="#cb16-155" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> normalized_mutual_info_score(y_top, lab), adjusted_rand_score(y_top, lab)</span>
+<span id="cb16-156"><a href="#cb16-156" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-157"><a href="#cb16-157" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span><span class="bu">len</span>(top_names)<span class="sc">}</span><span class="ss"> top-level groups: </span><span class="sc">{</span>top_names<span class="sc">}</span><span class="ch">\n</span><span class="ss">"</span>)</span>
+<span id="cb16-158"><a href="#cb16-158" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span><span class="st">'partition'</span><span class="sc">:32s}</span><span class="ss">   NMI    ARI   (vs top-level label)"</span>)</span>
+<span id="cb16-159"><a href="#cb16-159" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> name, lab <span class="kw">in</span> [(<span class="ss">f"DYF raw (k=</span><span class="sc">{</span>result<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">)"</span>, result.labels),</span>
+<span id="cb16-160"><a href="#cb16-160" aria-hidden="true" tabindex="-1"></a>                  (<span class="st">"k-means (told k=20)"</span>, kmeans[<span class="st">"labels"</span>])]:</span>
+<span id="cb16-161"><a href="#cb16-161" aria-hidden="true" tabindex="-1"></a>    n_, a_ <span class="op">=</span> score(lab)</span>
+<span id="cb16-162"><a href="#cb16-162" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span>name<span class="sc">:32s}</span><span class="ss">  </span><span class="sc">{</span>n_<span class="sc">:.3f}</span><span class="ss">  </span><span class="sc">{</span>a_<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb16-163"><a href="#cb16-163" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-164"><a href="#cb16-164" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-165"><a href="#cb16-165" aria-hidden="true" tabindex="-1"></a>Compare the two rows to the same methods scored against the 20-class label above. The answer is *both readings at once*. DYF's ten communities keep the top-level structure better than k-means's twenty do — ARI 0.299 vs 0.214 against the seven buckets, NMI tied — and DYF's ARI is essentially the same whether you judge it by buckets (0.299) or by the 20 classes (0.301), which is what a partition sitting between two levels of a hierarchy looks like. But NMI 0.42 against seven buckets is not a clean seven-way split either. The ten communities are coarser than the leaves and finer than the branches, and they respect the branches about as well as anything here does.</span>
+<span id="cb16-166"><a href="#cb16-166" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-167"><a href="#cb16-167" aria-hidden="true" tabindex="-1"></a><span class="fu">## Walking down the hierarchy</span></span>
+<span id="cb16-168"><a href="#cb16-168" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-169"><a href="#cb16-169" aria-hidden="true" tabindex="-1"></a>Whatever the reading, DYF's 10 communities are the top of a partition hierarchy that can be collapsed further:</span>
+<span id="cb16-170"><a href="#cb16-170" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-173"><a href="#cb16-173" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb16-174"><a href="#cb16-174" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: merge-walk</span></span>
+<span id="cb16-175"><a href="#cb16-175" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: asis</span></span>
+<span id="cb16-176"><a href="#cb16-176" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> _gallery <span class="im">import</span> merge_walk, merge_walk_table</span>
+<span id="cb16-177"><a href="#cb16-177" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-178"><a href="#cb16-178" aria-hidden="true" tabindex="-1"></a>walk <span class="op">=</span> merge_walk(result, X, y, targets<span class="op">=</span>[<span class="dv">25</span>, <span class="dv">20</span>, <span class="dv">10</span>, <span class="dv">7</span>, <span class="dv">4</span>])</span>
+<span id="cb16-179"><a href="#cb16-179" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(merge_walk_table(walk, result))</span>
+<span id="cb16-180"><a href="#cb16-180" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-181"><a href="#cb16-181" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-182"><a href="#cb16-182" aria-hidden="true" tabindex="-1"></a>Targets above 10 are no-ops. <span class="in">`merge → 7`</span> is the interesting row: seven is the number of top-level newsgroup buckets. Collapsing to it costs 0.05 NMI and 0.08 ARI against the 20-class label — a real loss, but a smaller one than k-means's twenty clusters suffer when judged at the bucket level (ARI 0.345 → 0.214 in the cell above). The coarse structure is in the tree; it is just not the level DYF stopped at.</span>
+<span id="cb16-183"><a href="#cb16-183" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-184"><a href="#cb16-184" aria-hidden="true" tabindex="-1"></a><span class="fu">## How DYF and k-means disagree — and why</span></span>
+<span id="cb16-185"><a href="#cb16-185" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-186"><a href="#cb16-186" aria-hidden="true" tabindex="-1"></a>Compare this to the Digits notebook:</span>
+<span id="cb16-187"><a href="#cb16-187" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-188"><a href="#cb16-188" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Dataset  <span class="pp">|</span> k-means NMI <span class="pp">|</span> DYF NMI <span class="pp">|</span> Gap   <span class="pp">|</span></span>
+<span id="cb16-189"><a href="#cb16-189" aria-hidden="true" tabindex="-1"></a><span class="pp">|----------|------------:|--------:|------:|</span></span>
+<span id="cb16-190"><a href="#cb16-190" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Digits   <span class="pp">|</span> 0.773       <span class="pp">|</span> 0.627   <span class="pp">|</span> 0.146 <span class="pp">|</span></span>
+<span id="cb16-191"><a href="#cb16-191" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> **20 Newsgroups** | **0.505** | **0.472** | **0.033** <span class="pp">|</span></span>
+<span id="cb16-192"><a href="#cb16-192" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-193"><a href="#cb16-193" aria-hidden="true" tabindex="-1"></a>**The gap shrank by about three-quarters.** On text, oracle-tuned k-means is a few hundredths of NMI ahead of DYF-with-no-knobs, at half the cluster count. Two things changed between the notebooks:</span>
+<span id="cb16-194"><a href="#cb16-194" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-195"><a href="#cb16-195" aria-hidden="true" tabindex="-1"></a>**1. The manifold started to bend.**</span>
+<span id="cb16-196"><a href="#cb16-196" aria-hidden="true" tabindex="-1"></a>Sentence embeddings for <span class="in">`comp.sys.ibm.pc.hardware`</span> and <span class="in">`comp.sys.mac.hardware`</span> overlap — they share vocabulary ("driver", "boot", "RAM"), writing style, question types. In UMAP those classes don't sit as disjoint blobs; they bleed into each other along a curved seam. K-means has to plant a Voronoi boundary *somewhere* in that seam, and wherever it plants it, it misclassifies the items near the line. DYF's density-based cut can follow the seam instead of cutting straight across it.</span>
+<span id="cb16-197"><a href="#cb16-197" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-198"><a href="#cb16-198" aria-hidden="true" tabindex="-1"></a>**2. The tree is bigger.**</span>
+<span id="cb16-199"><a href="#cb16-199" aria-hidden="true" tabindex="-1"></a>Digits hands community detection ~170 leaf centroids and gets under-split to 7 for 10. Here the tree has several times as many leaves and DYF recovers 10 for 20 — still coarse, but the label it is coarse *against* is itself a two-level hierarchy, which is why the top-level cell above exists. On <span class="co">[</span><span class="ot">MNIST</span><span class="co">](mnist.qmd)</span> (70,000 points, thousands of leaves) the same code recovers 12 for 10. Leaf count, not sample count, is the axis to watch.</span>
+<span id="cb16-200"><a href="#cb16-200" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-201"><a href="#cb16-201" aria-hidden="true" tabindex="-1"></a><span class="fu">### The home-court / away-game framing, continued</span></span>
+<span id="cb16-202"><a href="#cb16-202" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-203"><a href="#cb16-203" aria-hidden="true" tabindex="-1"></a>K-means is a superb algorithm when the problem matches its inductive bias: *"minimize within-cluster Euclidean variance, and I'll tell you how many clusters there are."* Digits satisfies both conditions perfectly — ten convex blobs, k handed over. Text embeddings break both conditions at once: the geometry isn't convex, and the real number of semantic communities isn't even well-defined (there are 7 top-level topic groups, 20 flat labels, and a debatable number of sub-topics).</span>
+<span id="cb16-204"><a href="#cb16-204" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-205"><a href="#cb16-205" aria-hidden="true" tabindex="-1"></a>On its home court k-means wins by 0.146 NMI. On the away game it wins by 0.033. The remaining notebooks — Olivetti Faces (40 identities, 10 examples each, *very* non-convex in pixel space) and CMU MoCap (continuous motion manifolds, no single right <span class="in">`k`</span>) — push both methods into regimes where neither does well, for different reasons.</span>
+<span id="cb16-206"><a href="#cb16-206" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-207"><a href="#cb16-207" aria-hidden="true" tabindex="-1"></a><span class="fu">### Pros and cons recap</span></span>
+<span id="cb16-208"><a href="#cb16-208" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-209"><a href="#cb16-209" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span>                            <span class="pp">|</span> **DYF (parameter-free)**                                             | **K-means (oracle k=20)**                               <span class="pp">|</span></span>
+<span id="cb16-210"><a href="#cb16-210" aria-hidden="true" tabindex="-1"></a><span class="pp">|----------------------------|----------------------------------------------------------------------|---------------------------------------------------------|</span></span>
+<span id="cb16-211"><a href="#cb16-211" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Needs <span class="in">`k`</span>?                 <span class="pp">|</span> No.                                                                  <span class="pp">|</span> Yes — given 20 upfront.                                 <span class="pp">|</span></span>
+<span id="cb16-212"><a href="#cb16-212" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Behavior on curved manifolds <span class="pp">|</span> Follows density; can trace seams.                                  <span class="pp">|</span> Cuts straight Voronoi lines across them.                <span class="pp">|</span></span>
+<span id="cb16-213"><a href="#cb16-213" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Behavior when true structure is hierarchical <span class="pp">|</span> Stops at one level of it (10 here); the merge walk gives the coarser ones. <span class="pp">|</span> Forced to a flat 20-partition; can't express hierarchy. <span class="pp">|</span></span>
+<span id="cb16-214"><a href="#cb16-214" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Behavior when embedding noise is high <span class="pp">|</span> Tree leaves absorb some noise before Louvain merges. <span class="pp">|</span> Sensitive — outliers pull centroids.                    <span class="pp">|</span></span>
+<span id="cb16-215"><a href="#cb16-215" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Tree output                <span class="pp">|</span> Yes — can re-cut at coarser resolution post-hoc.                     <span class="pp">|</span> No — flat at exactly <span class="in">`k`</span>.                               <span class="pp">|</span></span>
+<span id="cb16-216"><a href="#cb16-216" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-217"><a href="#cb16-217" aria-hidden="true" tabindex="-1"></a><span class="fu">## What to take away</span></span>
+<span id="cb16-218"><a href="#cb16-218" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-219"><a href="#cb16-219" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**DYF comes within 0.03 NMI of oracle k-means on text**, without <span class="in">`k`</span> and with half the clusters.</span>
+<span id="cb16-220"><a href="#cb16-220" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**The recovered 10 is coarse against the 20-class label, and half-right against the 7-bucket one.** It keeps the top-level structure better than oracle k-means's twenty clusters (ARI 0.30 vs 0.21) without being a clean seven-way split. Read the two scores together; either alone tells a tidier, wrong story.</span>
+<span id="cb16-221"><a href="#cb16-221" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**HDBSCAN doesn't scale here.** 144 seconds and 84% discarded is a dealbreaker at 18K+ documents, which is small by real-world RAG standards.</span>
+<span id="cb16-222"><a href="#cb16-222" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Parameter-free is getting cheaper to justify.** On digits the oracle gave k-means a 0.146 NMI edge; here it bought 0.033. The cost of not knowing <span class="in">`k`</span> drops as the geometry gets harder — which is the regime you're in whenever you don't already know what's in your corpus.</span>
+<span id="cb16-223"><a href="#cb16-223" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Earlier versions of this page reported 23–34 communities** and read them as sub-topic hierarchy. That count came from a single-level Louvain in <span class="in">`dyf-rs`</span> before 0.12.0 that could not merge communities (dyf <span class="in">`KNOWN_ISSUES.md`</span>, issue 10); the numbers here are from the corrected optimiser.</span>
 </code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
 </div></div></div></div></div>
 </div> <!-- /content -->

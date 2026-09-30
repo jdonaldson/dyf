@@ -82,9 +82,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../site_libs/quarto-html/quarto-syntax-highlighting-1ed79dc1172df127c7d94f8abf7ffee9.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-fe61d81b2be1daba325453eee3df7579.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../site_libs/bootstrap/bootstrap-dark-c122dbc3143c92ed75df82cc48f880cb.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="../site_libs/bootstrap/bootstrap-fe61d81b2be1daba325453eee3df7579.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-077483bf2c889e981b53a146dc5bf4c0.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-cbc012ce124f2a4a088cd0732150ebc5.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../site_libs/bootstrap/bootstrap-077483bf2c889e981b53a146dc5bf4c0.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -356,7 +356,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
   <li><a href="#oracle-k-means-on-the-middle-granularity" id="toc-oracle-k-means-on-the-middle-granularity" class="nav-link" data-scroll-target="#oracle-k-means-on-the-middle-granularity">Oracle k-means on the middle granularity</a></li>
   <li><a href="#walking-down-the-hierarchy-against-each-ground-truth" id="toc-walking-down-the-hierarchy-against-each-ground-truth" class="nav-link" data-scroll-target="#walking-down-the-hierarchy-against-each-ground-truth">Walking down the hierarchy against each ground truth</a></li>
   <li><a href="#figures" id="toc-figures" class="nav-link" data-scroll-target="#figures">Figures</a></li>
-  <li><a href="#why-dyf-wins-on-ambiguous-k-data" id="toc-why-dyf-wins-on-ambiguous-k-data" class="nav-link" data-scroll-target="#why-dyf-wins-on-ambiguous-k-data">Why DYF wins on ambiguous-k data</a>
+  <li><a href="#why-frame-level-clustering-struggles-here" id="toc-why-frame-level-clustering-struggles-here" class="nav-link" data-scroll-target="#why-frame-level-clustering-struggles-here">Why frame-level clustering struggles here</a>
   <ul class="collapse">
   <li><a href="#the-sports-analogy-completed" id="toc-the-sports-analogy-completed" class="nav-link" data-scroll-target="#the-sports-analogy-completed">The sports analogy, completed</a></li>
   </ul></li>
@@ -397,7 +397,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 
 <p>Every other gallery notebook has a clean ground-truth <code>k</code> — 10 digits, 20 newsgroup topics, 40 identities. CMU Motion Capture breaks that convenience. The same frames are simultaneously labeled with <strong>7 motion types</strong> (walk, dance, climb, …), <strong>25 descriptions</strong> (slow walk, fast walk, salsa, …), and <strong>80 trial IDs</strong> (individual recording sessions). Which one is “true <code>k</code>”?</p>
 <p>None of them. Or all of them. A dance trial contains walking phases. Climbing involves reaching. Running and walking share gait dynamics at transitions. The label hierarchy is a human convenience layered over continuous motion that refuses to partition cleanly at any single granularity.</p>
-<p>This is DYF’s native regime — data where the question “how many clusters are there?” doesn’t have one right answer, and you shouldn’t pretend that it does.</p>
+<p>That makes this the gallery’s most honest notebook: a dataset where <em>no</em> frame-level clustering — DYF’s or k-means’s — scores well against the labels, and the reason is instructive.</p>
 <section id="load-the-data" class="level2">
 <h2 class="anchored" data-anchor-id="load-the-data">Load the data</h2>
 <p>Joint-angle features from the CMU Motion Capture Database — 62 channels per frame (31 joints × Euler ZYX angles), 120fps recordings across 80 trials. No embedding model. DYF operates directly on the physical signal.</p>
@@ -469,9 +469,9 @@ trial_id:    80 classes — individual recording sessions</code></pre>
 <span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"ARI vs description: </span><span class="sc">{</span>result<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stdout">
-<pre><code>Recovered k:       56
-NMI vs description: 0.412
-ARI vs description: 0.085</code></pre>
+<pre><code>Recovered k:       18
+NMI vs description: 0.290
+ARI vs description: 0.112</code></pre>
 </div>
 </div>
 </section>
@@ -495,12 +495,12 @@ ARI vs description: 0.085</code></pre>
 </details>
 <div class="cell-output cell-output-stdout">
 <pre><code>Ground truth               NMI     ARI
-motion_type (k=7)          0.362   0.084
-description (k=25)         0.412   0.085
-trial_id (k=80)            0.476   0.137</code></pre>
+motion_type (k=7)          0.243   0.109
+description (k=25)         0.290   0.112
+trial_id (k=80)            0.335   0.088</code></pre>
 </div>
 </div>
-<p>The alignment gets better as the label granularity matches DYF’s recovered resolution. DYF’s partition is <em>not</em> a single “true k” clustering — it’s a multi-resolution organization that aligns partially with every level of the label hierarchy.</p>
+<p>Low across the board, and the pattern is telling: NMI <em>rises</em> with label granularity (7 → 25 → 80 classes) while ARI barely moves. The partition shares information with the trial structure but does not reproduce any level of it as clusters.</p>
 </section>
 <section id="oracle-k-means-on-the-middle-granularity" class="level2">
 <h2 class="anchored" data-anchor-id="oracle-k-means-on-the-middle-granularity">Oracle k-means on the middle granularity</h2>
@@ -513,14 +513,14 @@ trial_id (k=80)            0.476   0.137</code></pre>
 </details>
 <div class="cell-output cell-output-stdout">
 <pre><code>K-means told k=25: NMI=0.348, ARI=0.103
-DYF (no k given):  NMI=0.412, ARI=0.085</code></pre>
+DYF (no k given):  NMI=0.290, ARI=0.112</code></pre>
 </div>
 </div>
-<p><strong>DYF beats oracle-tuned k-means on NMI against every one of the three ground truths.</strong> On motion-capture joint angles, the parameter-free method is the better tool even when k-means is handed the answer.</p>
+<p>DYF edges k-means on ARI and trails it on NMI, and both are far from good. Being handed <code>k=25</code> did not rescue k-means: the labels are not the kind of thing a frame-level partition can recover, whichever algorithm draws it.</p>
 </section>
 <section id="walking-down-the-hierarchy-against-each-ground-truth" class="level2">
 <h2 class="anchored" data-anchor-id="walking-down-the-hierarchy-against-each-ground-truth">Walking down the hierarchy against each ground truth</h2>
-<p>DYF’s recovered partition is multi-resolution by design — and CMU MoCap is the clearest place to see it, because there are three plausible “true k” values to aim at (<code>motion_type</code>=7, <code>description</code>=25, <code>trial_id</code>=80):</p>
+<p>DYF’s recovered partition is multi-resolution by design — and CMU MoCap has three plausible “true k” values to aim at (<code>motion_type</code>=7, <code>description</code>=25, <code>trial_id</code>=80):</p>
 <div id="merge-walk-gt" class="cell" data-execution_count="6">
 <details open="" class="code-fold">
 <summary>Code</summary>
@@ -546,33 +546,33 @@ DYF (no k given):  NMI=0.412, ARI=0.085</code></pre>
 <tbody>
 <tr class="odd">
 <td><strong>Raw DYF</strong></td>
-<td style="text-align: right;"><strong>56</strong></td>
-<td style="text-align: right;"><strong>0.412</strong></td>
-<td style="text-align: right;"><strong>0.085</strong></td>
+<td style="text-align: right;"><strong>18</strong></td>
+<td style="text-align: right;"><strong>0.290</strong></td>
+<td style="text-align: right;"><strong>0.112</strong></td>
 </tr>
 <tr class="even">
 <td>merge → 25</td>
-<td style="text-align: right;">25</td>
-<td style="text-align: right;">0.276</td>
-<td style="text-align: right;">0.123</td>
+<td style="text-align: right;">18</td>
+<td style="text-align: right;">0.243</td>
+<td style="text-align: right;">0.109</td>
 </tr>
 <tr class="odd">
 <td>merge → 10</td>
 <td style="text-align: right;">10</td>
-<td style="text-align: right;">0.253</td>
-<td style="text-align: right;">0.155</td>
+<td style="text-align: right;">0.257</td>
+<td style="text-align: right;">0.158</td>
 </tr>
 <tr class="even">
 <td>merge → 7</td>
 <td style="text-align: right;">7</td>
-<td style="text-align: right;">0.129</td>
-<td style="text-align: right;">0.034</td>
+<td style="text-align: right;">0.166</td>
+<td style="text-align: right;">0.097</td>
 </tr>
 <tr class="odd">
 <td>merge → 3</td>
 <td style="text-align: right;">3</td>
-<td style="text-align: right;">0.033</td>
-<td style="text-align: right;">-0.038</td>
+<td style="text-align: right;">0.115</td>
+<td style="text-align: right;">0.070</td>
 </tr>
 </tbody>
 </table>
@@ -589,33 +589,33 @@ DYF (no k given):  NMI=0.412, ARI=0.085</code></pre>
 <tbody>
 <tr class="odd">
 <td><strong>Raw DYF</strong></td>
-<td style="text-align: right;"><strong>56</strong></td>
-<td style="text-align: right;"><strong>0.412</strong></td>
-<td style="text-align: right;"><strong>0.085</strong></td>
+<td style="text-align: right;"><strong>18</strong></td>
+<td style="text-align: right;"><strong>0.290</strong></td>
+<td style="text-align: right;"><strong>0.112</strong></td>
 </tr>
 <tr class="even">
 <td>merge → 40</td>
-<td style="text-align: right;">40</td>
-<td style="text-align: right;">0.382</td>
+<td style="text-align: right;">18</td>
+<td style="text-align: right;">0.290</td>
 <td style="text-align: right;">0.112</td>
 </tr>
 <tr class="odd">
 <td>merge → 25</td>
-<td style="text-align: right;">25</td>
-<td style="text-align: right;">0.322</td>
-<td style="text-align: right;">0.128</td>
+<td style="text-align: right;">18</td>
+<td style="text-align: right;">0.290</td>
+<td style="text-align: right;">0.112</td>
 </tr>
 <tr class="even">
 <td>merge → 15</td>
 <td style="text-align: right;">15</td>
-<td style="text-align: right;">0.331</td>
-<td style="text-align: right;">0.179</td>
+<td style="text-align: right;">0.297</td>
+<td style="text-align: right;">0.151</td>
 </tr>
 <tr class="odd">
 <td>merge → 7</td>
 <td style="text-align: right;">7</td>
-<td style="text-align: right;">0.151</td>
-<td style="text-align: right;">0.012</td>
+<td style="text-align: right;">0.199</td>
+<td style="text-align: right;">0.082</td>
 </tr>
 </tbody>
 </table>
@@ -632,38 +632,38 @@ DYF (no k given):  NMI=0.412, ARI=0.085</code></pre>
 <tbody>
 <tr class="odd">
 <td><strong>Raw DYF</strong></td>
-<td style="text-align: right;"><strong>56</strong></td>
-<td style="text-align: right;"><strong>0.412</strong></td>
-<td style="text-align: right;"><strong>0.085</strong></td>
+<td style="text-align: right;"><strong>18</strong></td>
+<td style="text-align: right;"><strong>0.290</strong></td>
+<td style="text-align: right;"><strong>0.112</strong></td>
 </tr>
 <tr class="even">
 <td>merge → 60</td>
-<td style="text-align: right;">56</td>
-<td style="text-align: right;">0.476</td>
-<td style="text-align: right;">0.137</td>
+<td style="text-align: right;">18</td>
+<td style="text-align: right;">0.335</td>
+<td style="text-align: right;">0.088</td>
 </tr>
 <tr class="odd">
 <td>merge → 40</td>
-<td style="text-align: right;">40</td>
-<td style="text-align: right;">0.431</td>
-<td style="text-align: right;">0.121</td>
+<td style="text-align: right;">18</td>
+<td style="text-align: right;">0.335</td>
+<td style="text-align: right;">0.088</td>
 </tr>
 <tr class="even">
 <td>merge → 25</td>
-<td style="text-align: right;">25</td>
-<td style="text-align: right;">0.375</td>
-<td style="text-align: right;">0.107</td>
+<td style="text-align: right;">18</td>
+<td style="text-align: right;">0.335</td>
+<td style="text-align: right;">0.088</td>
 </tr>
 <tr class="odd">
 <td>merge → 10</td>
 <td style="text-align: right;">10</td>
-<td style="text-align: right;">0.302</td>
-<td style="text-align: right;">0.076</td>
+<td style="text-align: right;">0.304</td>
+<td style="text-align: right;">0.077</td>
 </tr>
 </tbody>
 </table>
 </div>
-<p>Read this vertically. DYF’s partition is the same across all three tables — only the <em>ground-truth target</em> changes. The best NMI/ARI for each ground truth sits near <em>that ground truth’s</em> cluster count, not at a fixed “DYF-recovered” k. The hierarchy is the same; the rulebook you score it against is what moves.</p>
+<p>Read this vertically. DYF’s partition is the same across all three tables — only the <em>ground-truth target</em> changes — and merging does not help against any of them: collapsing to 7 does not recover the 7 motion types, and the raw partition scores highest against the 80 trials. If the frames grouped into nested blobs at the label granularities, the merge walk would find them. It does not, because they don’t.</p>
 </section>
 <section id="figures" class="level2">
 <h2 class="anchored" data-anchor-id="figures">Figures</h2>
@@ -742,12 +742,13 @@ Figure&nbsp;4: K-means given the oracle k=25 (description granularity).
 </div>
 </div>
 </section>
-<section id="why-dyf-wins-on-ambiguous-k-data" class="level2">
-<h2 class="anchored" data-anchor-id="why-dyf-wins-on-ambiguous-k-data">Why DYF wins on ambiguous-k data</h2>
-<p>Three things are working <em>for</em> it here, exactly the opposite of the Olivetti setup:</p>
-<p><strong>1. Dense support.</strong> 28,167 frames across 25 descriptions is ~1,100 frames per description-class (and ~4,000 per motion_type). DYF’s tree has plenty of room to carve stable leaves. Unlike Olivetti, the density-per-latent-cluster condition is satisfied comfortably.</p>
-<p><strong>2. The “flat k” assumption is wrong, and DYF doesn’t make it.</strong> K-means has to commit to a single <code>k</code>. When you tell it 25, it builds 25 centroids — even though some natural clusters are more like 3 frames (a jumping-jack peak) and others are 2,000 frames (a steady walking cycle). DYF’s Louvain step lets community sizes vary naturally with the data’s density topology.</p>
-<p><strong>3. Motion manifolds are curved.</strong> Gait transitions, sub-phases within a dance move, reaching-then-grasping — these are smooth trajectories, not convex clouds. Voronoi cuts through a continuous cycle are always somewhat arbitrary. Density-based cuts can sit at the natural minima between sub-phases.</p>
+<section id="why-frame-level-clustering-struggles-here" class="level2">
+<h2 class="anchored" data-anchor-id="why-frame-level-clustering-struggles-here">Why frame-level clustering struggles here</h2>
+<p>Look at the ground-truth panels: a trial is not a blob, it is a <em>path</em>. A walking cycle sweeps through pose space and returns; a dance trial visits several regions in sequence. Two trials of the same description overlap where their paths cross and diverge where they don’t. Any method that partitions <em>frames</em> by <em>where they sit in pose space</em> — DYF’s leaves, k-means’s Voronoi cells — will group frames from different trials that happen to pass through the same pose, and split one trial across the regions its path visits. That is exactly the NMI-rises-with-granularity / ARI-stays-flat signature above.</p>
+<p>Three consequences:</p>
+<p><strong>1. The labels are about sequence; the features are about position.</strong> The natural signal for “which trial is this” is <em>adjacent-frame</em> structure — consecutive frames are nearly identical, and a trial boundary is a jump. The raw frame-to-frame step distance separates trial boundaries almost perfectly on this data; a frame-level partition throws that information away by construction. A time-aware model (HMM, sequence embedding) is the right tool for the label; this notebook is deliberately about frame-level structure only.</p>
+<p><strong>2. Being told <code>k</code> does not help.</strong> K-means at the oracle <code>k=25</code> lands in the same low range as DYF. When the label is not a partition of the feature space, the number of clusters is not the missing information.</p>
+<p><strong>3. What DYF’s 18 communities <em>are</em>.</strong> They are regions of pose space — standing poses, mid-stride poses, arms-raised poses — that several trials share. That is real structure, and for a retrieval task (“find frames that look like this one”) it is the right structure. It is simply not what the trial labels describe.</p>
 <section id="the-sports-analogy-completed" class="level3">
 <h3 class="anchored" data-anchor-id="the-sports-analogy-completed">The sports analogy, completed</h3>
 <p>Across the four notebooks we now have:</p>
@@ -767,43 +768,43 @@ Figure&nbsp;4: K-means given the oracle k=25 (description granularity).
 <tbody>
 <tr class="odd">
 <td>Digits</td>
-<td>Convex blobs, clean <code>k</code></td>
+<td>Convex blobs, clean <code>k</code>, tiny tree</td>
 <td>K-means wins (home court)</td>
 </tr>
 <tr class="even">
 <td>MNIST</td>
-<td>Convex-ish, but more data per class</td>
-<td>Mixed (NMI win / ARI loss)</td>
+<td>Convex-ish, 40× more data</td>
+<td>DYF wins on both metrics</td>
 </tr>
 <tr class="odd">
 <td>20 Newsgroups</td>
 <td>Curved, hierarchical</td>
-<td>Essentially tied</td>
+<td>K-means ahead by 0.03 NMI</td>
 </tr>
 <tr class="even">
 <td><strong>CMU MoCap</strong></td>
-<td><strong>Continuous motion, ambiguous k</strong></td>
-<td><strong>DYF wins</strong></td>
+<td><strong>Trajectories, ambiguous k</strong></td>
+<td><strong>Neither works; DYF edges ARI, trails NMI</strong></td>
 </tr>
 </tbody>
 </table>
-<p>The pattern isn’t about “DYF vs k-means.” It’s about <strong>how much the shape of the data matches the shape of k-means’s assumptions.</strong> When the data is convex blobs with a known <code>k</code>, k-means wins. When the data is curved with an ill-defined <code>k</code>, DYF wins. Most real-world data — RAG corpora, user behavior logs, sensor streams, documents on a moving topic — is closer to MoCap than to Digits.</p>
+<p>The pattern isn’t “DYF vs k-means.” It is <strong>whether the label is a partition of the feature space at all.</strong> When it is, and the tree has enough leaves, DYF recovers it without being told <code>k</code>. When it isn’t — as here — no frame-level method will, and the honest move is to say so and reach for a sequence model.</p>
 </section>
 </section>
 <section id="what-to-take-away" class="level2">
 <h2 class="anchored" data-anchor-id="what-to-take-away">What to take away</h2>
 <ul>
-<li><strong>“True k” is often a fiction.</strong> If a dataset has multiple plausible labelings at different granularities, your clustering algorithm shouldn’t demand you pick one upfront.</li>
+<li><strong>“True k” is often a fiction.</strong> If a dataset has multiple plausible labelings at different granularities, your clustering algorithm shouldn’t demand you pick one upfront — but it also cannot recover a label that is not a partition of the features.</li>
 <li><strong>DYF operates on raw features, no embedding required.</strong> Motion capture, tabular data, sensor readings — anywhere the raw features have meaningful geometry, DYF can go in direct.</li>
-<li><strong>The win margin depends on the data, not the method.</strong> Reporting “DYF wins by NMI 0.04” isn’t the point. The point is that DYF’s multi-resolution output is a better <em>match for the question being asked</em> when the question is “what structure is in this data?”</li>
+<li><strong>Read NMI and ARI together.</strong> NMI rising with label granularity while ARI stays flat is the fingerprint of shared information without shared clusters. On its own, either number would have told a different, wrong story.</li>
 </ul>
 </section>
 <section id="caveats" class="level2">
 <h2 class="anchored" data-anchor-id="caveats">Caveats</h2>
 <ul>
-<li><strong>Subsampled to 28,167 frames</strong> for the gallery render. The full 140,837-frame results (pre-computed in the DYF repo’s MoCap experiment) are similar in pattern with tighter metrics.</li>
-<li><strong>No temporal structure used.</strong> These are frame-level features — adjacent-frame similarity within a walk cycle isn’t exploited. A time-aware model (HMM, Transformer) would outperform both DYF and k-means on <em>sequence</em> tasks; this notebook is about <em>frame-level structure</em> only.</li>
-<li><strong>NMI is still a blunt metric</strong> for continuous-motion data. A proper evaluation would use cluster-purity against each ground truth at the matching granularity, plus a quantitative measure of hierarchy recovery.</li>
+<li><strong>Subsampled to 28,167 frames</strong> for the gallery render. The full 140,837-frame results show the same pattern.</li>
+<li><strong>No temporal structure used.</strong> These are frame-level features — adjacent-frame similarity within a walk cycle isn’t exploited. That is the whole diagnosis above, not a footnote to it.</li>
+<li><strong>Earlier versions of this page reported 56 communities and “DYF beats oracle k-means on NMI against every label.”</strong> The count came from a single-level Louvain in <code>dyf-rs</code> before 0.12.0 that could not merge communities (dyf <code>KNOWN_ISSUES.md</code>, issue 10), and the over-split partition inflated NMI against fine-grained labels. The numbers here are from the corrected optimiser.</li>
 </ul>
 
 
@@ -1296,7 +1297,7 @@ Figure&nbsp;4: K-means given the oracle k=25 (description granularity).
 <span id="cb16-18"><a href="#cb16-18" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb16-19"><a href="#cb16-19" aria-hidden="true" tabindex="-1"></a>None of them. Or all of them. A dance trial contains walking phases. Climbing involves reaching. Running and walking share gait dynamics at transitions. The label hierarchy is a human convenience layered over continuous motion that refuses to partition cleanly at any single granularity.</span>
 <span id="cb16-20"><a href="#cb16-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-21"><a href="#cb16-21" aria-hidden="true" tabindex="-1"></a>This is DYF's native regime — data where the question "how many clusters are there?" doesn't have one right answer, and you shouldn't pretend that it does.</span>
+<span id="cb16-21"><a href="#cb16-21" aria-hidden="true" tabindex="-1"></a>That makes this the gallery's most honest notebook: a dataset where *no* frame-level clustering — DYF's or k-means's — scores well against the labels, and the reason is instructive.</span>
 <span id="cb16-22"><a href="#cb16-22" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb16-23"><a href="#cb16-23" aria-hidden="true" tabindex="-1"></a><span class="fu">## Load the data</span></span>
 <span id="cb16-24"><a href="#cb16-24" aria-hidden="true" tabindex="-1"></a></span>
@@ -1375,7 +1376,7 @@ Figure&nbsp;4: K-means given the oracle k=25 (description granularity).
 <span id="cb16-105"><a href="#cb16-105" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span>name<span class="sc">:25s}</span><span class="ss">  </span><span class="sc">{</span>m_nmi<span class="sc">:.3f}</span><span class="ss">   </span><span class="sc">{</span>m_ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
 <span id="cb16-106"><a href="#cb16-106" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
 <span id="cb16-107"><a href="#cb16-107" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-108"><a href="#cb16-108" aria-hidden="true" tabindex="-1"></a>The alignment gets better as the label granularity matches DYF's recovered resolution. DYF's partition is *not* a single "true k" clustering — it's a multi-resolution organization that aligns partially with every level of the label hierarchy.</span>
+<span id="cb16-108"><a href="#cb16-108" aria-hidden="true" tabindex="-1"></a>Low across the board, and the pattern is telling: NMI *rises* with label granularity (7 → 25 → 80 classes) while ARI barely moves. The partition shares information with the trial structure but does not reproduce any level of it as clusters.</span>
 <span id="cb16-109"><a href="#cb16-109" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb16-110"><a href="#cb16-110" aria-hidden="true" tabindex="-1"></a><span class="fu">## Oracle k-means on the middle granularity</span></span>
 <span id="cb16-111"><a href="#cb16-111" aria-hidden="true" tabindex="-1"></a></span>
@@ -1386,11 +1387,11 @@ Figure&nbsp;4: K-means given the oracle k=25 (description granularity).
 <span id="cb16-118"><a href="#cb16-118" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"DYF (no k given):  NMI=</span><span class="sc">{</span>result<span class="sc">.</span>nmi<span class="sc">:.3f}</span><span class="ss">, ARI=</span><span class="sc">{</span>result<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
 <span id="cb16-119"><a href="#cb16-119" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
 <span id="cb16-120"><a href="#cb16-120" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-121"><a href="#cb16-121" aria-hidden="true" tabindex="-1"></a>**DYF beats oracle-tuned k-means on NMI against every one of the three ground truths.** On motion-capture joint angles, the parameter-free method is the better tool even when k-means is handed the answer.</span>
+<span id="cb16-121"><a href="#cb16-121" aria-hidden="true" tabindex="-1"></a>DYF edges k-means on ARI and trails it on NMI, and both are far from good. Being handed <span class="in">`k=25`</span> did not rescue k-means: the labels are not the kind of thing a frame-level partition can recover, whichever algorithm draws it.</span>
 <span id="cb16-122"><a href="#cb16-122" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb16-123"><a href="#cb16-123" aria-hidden="true" tabindex="-1"></a><span class="fu">## Walking down the hierarchy against each ground truth</span></span>
 <span id="cb16-124"><a href="#cb16-124" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-125"><a href="#cb16-125" aria-hidden="true" tabindex="-1"></a>DYF's recovered partition is multi-resolution by design — and CMU MoCap is the clearest place to see it, because there are three plausible "true k" values to aim at (<span class="in">`motion_type`</span>=7, <span class="in">`description`</span>=25, <span class="in">`trial_id`</span>=80):</span>
+<span id="cb16-125"><a href="#cb16-125" aria-hidden="true" tabindex="-1"></a>DYF's recovered partition is multi-resolution by design — and CMU MoCap has three plausible "true k" values to aim at (<span class="in">`motion_type`</span>=7, <span class="in">`description`</span>=25, <span class="in">`trial_id`</span>=80):</span>
 <span id="cb16-126"><a href="#cb16-126" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb16-129"><a href="#cb16-129" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
 <span id="cb16-130"><a href="#cb16-130" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: merge-walk-gt</span></span>
@@ -1405,7 +1406,7 @@ Figure&nbsp;4: K-means given the oracle k=25 (description granularity).
 <span id="cb16-139"><a href="#cb16-139" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(merge_walk_table(merge_walk(result, X, y_trial_idx, targets<span class="op">=</span>[<span class="dv">60</span>, <span class="dv">40</span>, <span class="dv">25</span>, <span class="dv">10</span>]), result))</span>
 <span id="cb16-140"><a href="#cb16-140" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
 <span id="cb16-141"><a href="#cb16-141" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-142"><a href="#cb16-142" aria-hidden="true" tabindex="-1"></a>Read this vertically. DYF's partition is the same across all three tables — only the *ground-truth target* changes. The best NMI/ARI for each ground truth sits near *that ground truth's* cluster count, not at a fixed "DYF-recovered" k. The hierarchy is the same; the rulebook you score it against is what moves.</span>
+<span id="cb16-142"><a href="#cb16-142" aria-hidden="true" tabindex="-1"></a>Read this vertically. DYF's partition is the same across all three tables — only the *ground-truth target* changes — and merging does not help against any of them: collapsing to 7 does not recover the 7 motion types, and the raw partition scores highest against the 80 trials. If the frames grouped into nested blobs at the label granularities, the merge walk would find them. It does not, because they don't.</span>
 <span id="cb16-143"><a href="#cb16-143" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb16-144"><a href="#cb16-144" aria-hidden="true" tabindex="-1"></a><span class="fu">## Figures</span></span>
 <span id="cb16-145"><a href="#cb16-145" aria-hidden="true" tabindex="-1"></a></span>
@@ -1437,43 +1438,45 @@ Figure&nbsp;4: K-means given the oracle k=25 (description granularity).
 <span id="cb16-179"><a href="#cb16-179" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb16-180"><a href="#cb16-180" aria-hidden="true" tabindex="-1"></a>:::</span>
 <span id="cb16-181"><a href="#cb16-181" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-182"><a href="#cb16-182" aria-hidden="true" tabindex="-1"></a><span class="fu">## Why DYF wins on ambiguous-k data</span></span>
+<span id="cb16-182"><a href="#cb16-182" aria-hidden="true" tabindex="-1"></a><span class="fu">## Why frame-level clustering struggles here</span></span>
 <span id="cb16-183"><a href="#cb16-183" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-184"><a href="#cb16-184" aria-hidden="true" tabindex="-1"></a>Three things are working *for* it here, exactly the opposite of the Olivetti setup:</span>
+<span id="cb16-184"><a href="#cb16-184" aria-hidden="true" tabindex="-1"></a>Look at the ground-truth panels: a trial is not a blob, it is a *path*. A walking cycle sweeps through pose space and returns; a dance trial visits several regions in sequence. Two trials of the same description overlap where their paths cross and diverge where they don't. Any method that partitions *frames* by *where they sit in pose space* — DYF's leaves, k-means's Voronoi cells — will group frames from different trials that happen to pass through the same pose, and split one trial across the regions its path visits. That is exactly the NMI-rises-with-granularity / ARI-stays-flat signature above.</span>
 <span id="cb16-185"><a href="#cb16-185" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-186"><a href="#cb16-186" aria-hidden="true" tabindex="-1"></a>**1. Dense support.**</span>
-<span id="cb16-187"><a href="#cb16-187" aria-hidden="true" tabindex="-1"></a>28,167 frames across 25 descriptions is ~1,100 frames per description-class (and ~4,000 per motion_type). DYF's tree has plenty of room to carve stable leaves. Unlike Olivetti, the density-per-latent-cluster condition is satisfied comfortably.</span>
-<span id="cb16-188"><a href="#cb16-188" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-189"><a href="#cb16-189" aria-hidden="true" tabindex="-1"></a>**2. The "flat k" assumption is wrong, and DYF doesn't make it.**</span>
-<span id="cb16-190"><a href="#cb16-190" aria-hidden="true" tabindex="-1"></a>K-means has to commit to a single <span class="in">`k`</span>. When you tell it 25, it builds 25 centroids — even though some natural clusters are more like 3 frames (a jumping-jack peak) and others are 2,000 frames (a steady walking cycle). DYF's Louvain step lets community sizes vary naturally with the data's density topology.</span>
-<span id="cb16-191"><a href="#cb16-191" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-192"><a href="#cb16-192" aria-hidden="true" tabindex="-1"></a>**3. Motion manifolds are curved.**</span>
-<span id="cb16-193"><a href="#cb16-193" aria-hidden="true" tabindex="-1"></a>Gait transitions, sub-phases within a dance move, reaching-then-grasping — these are smooth trajectories, not convex clouds. Voronoi cuts through a continuous cycle are always somewhat arbitrary. Density-based cuts can sit at the natural minima between sub-phases.</span>
-<span id="cb16-194"><a href="#cb16-194" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-195"><a href="#cb16-195" aria-hidden="true" tabindex="-1"></a><span class="fu">### The sports analogy, completed</span></span>
+<span id="cb16-186"><a href="#cb16-186" aria-hidden="true" tabindex="-1"></a>Three consequences:</span>
+<span id="cb16-187"><a href="#cb16-187" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-188"><a href="#cb16-188" aria-hidden="true" tabindex="-1"></a>**1. The labels are about sequence; the features are about position.**</span>
+<span id="cb16-189"><a href="#cb16-189" aria-hidden="true" tabindex="-1"></a>The natural signal for "which trial is this" is *adjacent-frame* structure — consecutive frames are nearly identical, and a trial boundary is a jump. The raw frame-to-frame step distance separates trial boundaries almost perfectly on this data; a frame-level partition throws that information away by construction. A time-aware model (HMM, sequence embedding) is the right tool for the label; this notebook is deliberately about frame-level structure only.</span>
+<span id="cb16-190"><a href="#cb16-190" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-191"><a href="#cb16-191" aria-hidden="true" tabindex="-1"></a>**2. Being told `k` does not help.**</span>
+<span id="cb16-192"><a href="#cb16-192" aria-hidden="true" tabindex="-1"></a>K-means at the oracle <span class="in">`k=25`</span> lands in the same low range as DYF. When the label is not a partition of the feature space, the number of clusters is not the missing information.</span>
+<span id="cb16-193"><a href="#cb16-193" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-194"><a href="#cb16-194" aria-hidden="true" tabindex="-1"></a>**3. What DYF's 18 communities *are*.**</span>
+<span id="cb16-195"><a href="#cb16-195" aria-hidden="true" tabindex="-1"></a>They are regions of pose space — standing poses, mid-stride poses, arms-raised poses — that several trials share. That is real structure, and for a retrieval task ("find frames that look like this one") it is the right structure. It is simply not what the trial labels describe.</span>
 <span id="cb16-196"><a href="#cb16-196" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-197"><a href="#cb16-197" aria-hidden="true" tabindex="-1"></a>Across the four notebooks we now have:</span>
+<span id="cb16-197"><a href="#cb16-197" aria-hidden="true" tabindex="-1"></a><span class="fu">### The sports analogy, completed</span></span>
 <span id="cb16-198"><a href="#cb16-198" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-199"><a href="#cb16-199" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Dataset <span class="pp">|</span> Geometry <span class="pp">|</span> DYF vs oracle k-means <span class="pp">|</span></span>
-<span id="cb16-200"><a href="#cb16-200" aria-hidden="true" tabindex="-1"></a><span class="pp">|---|---|---|</span></span>
-<span id="cb16-201"><a href="#cb16-201" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Digits <span class="pp">|</span> Convex blobs, clean <span class="in">`k`</span> <span class="pp">|</span> K-means wins (home court) <span class="pp">|</span></span>
-<span id="cb16-202"><a href="#cb16-202" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> MNIST <span class="pp">|</span> Convex-ish, but more data per class <span class="pp">|</span> Mixed (NMI win / ARI loss) <span class="pp">|</span></span>
-<span id="cb16-203"><a href="#cb16-203" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> 20 Newsgroups <span class="pp">|</span> Curved, hierarchical <span class="pp">|</span> Essentially tied <span class="pp">|</span></span>
-<span id="cb16-204"><a href="#cb16-204" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> **CMU MoCap** | **Continuous motion, ambiguous k** | **DYF wins** <span class="pp">|</span></span>
-<span id="cb16-205"><a href="#cb16-205" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-206"><a href="#cb16-206" aria-hidden="true" tabindex="-1"></a>The pattern isn't about "DYF vs k-means." It's about **how much the shape of the data matches the shape of k-means's assumptions.** When the data is convex blobs with a known <span class="in">`k`</span>, k-means wins. When the data is curved with an ill-defined <span class="in">`k`</span>, DYF wins. Most real-world data — RAG corpora, user behavior logs, sensor streams, documents on a moving topic — is closer to MoCap than to Digits.</span>
+<span id="cb16-199"><a href="#cb16-199" aria-hidden="true" tabindex="-1"></a>Across the four notebooks we now have:</span>
+<span id="cb16-200"><a href="#cb16-200" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-201"><a href="#cb16-201" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Dataset <span class="pp">|</span> Geometry <span class="pp">|</span> DYF vs oracle k-means <span class="pp">|</span></span>
+<span id="cb16-202"><a href="#cb16-202" aria-hidden="true" tabindex="-1"></a><span class="pp">|---|---|---|</span></span>
+<span id="cb16-203"><a href="#cb16-203" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Digits <span class="pp">|</span> Convex blobs, clean <span class="in">`k`</span>, tiny tree <span class="pp">|</span> K-means wins (home court) <span class="pp">|</span></span>
+<span id="cb16-204"><a href="#cb16-204" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> MNIST <span class="pp">|</span> Convex-ish, 40× more data <span class="pp">|</span> DYF wins on both metrics <span class="pp">|</span></span>
+<span id="cb16-205"><a href="#cb16-205" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> 20 Newsgroups <span class="pp">|</span> Curved, hierarchical <span class="pp">|</span> K-means ahead by 0.03 NMI <span class="pp">|</span></span>
+<span id="cb16-206"><a href="#cb16-206" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> **CMU MoCap** | **Trajectories, ambiguous k** | **Neither works; DYF edges ARI, trails NMI** <span class="pp">|</span></span>
 <span id="cb16-207"><a href="#cb16-207" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-208"><a href="#cb16-208" aria-hidden="true" tabindex="-1"></a><span class="fu">## What to take away</span></span>
+<span id="cb16-208"><a href="#cb16-208" aria-hidden="true" tabindex="-1"></a>The pattern isn't "DYF vs k-means." It is **whether the label is a partition of the feature space at all.** When it is, and the tree has enough leaves, DYF recovers it without being told <span class="in">`k`</span>. When it isn't — as here — no frame-level method will, and the honest move is to say so and reach for a sequence model.</span>
 <span id="cb16-209"><a href="#cb16-209" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-210"><a href="#cb16-210" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**"True k" is often a fiction.** If a dataset has multiple plausible labelings at different granularities, your clustering algorithm shouldn't demand you pick one upfront.</span>
-<span id="cb16-211"><a href="#cb16-211" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**DYF operates on raw features, no embedding required.** Motion capture, tabular data, sensor readings — anywhere the raw features have meaningful geometry, DYF can go in direct.</span>
-<span id="cb16-212"><a href="#cb16-212" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**The win margin depends on the data, not the method.** Reporting "DYF wins by NMI 0.04" isn't the point. The point is that DYF's multi-resolution output is a better *match for the question being asked* when the question is "what structure is in this data?"</span>
-<span id="cb16-213"><a href="#cb16-213" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-214"><a href="#cb16-214" aria-hidden="true" tabindex="-1"></a><span class="fu">## Caveats</span></span>
+<span id="cb16-210"><a href="#cb16-210" aria-hidden="true" tabindex="-1"></a><span class="fu">## What to take away</span></span>
+<span id="cb16-211"><a href="#cb16-211" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-212"><a href="#cb16-212" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**"True k" is often a fiction.** If a dataset has multiple plausible labelings at different granularities, your clustering algorithm shouldn't demand you pick one upfront — but it also cannot recover a label that is not a partition of the features.</span>
+<span id="cb16-213"><a href="#cb16-213" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**DYF operates on raw features, no embedding required.** Motion capture, tabular data, sensor readings — anywhere the raw features have meaningful geometry, DYF can go in direct.</span>
+<span id="cb16-214"><a href="#cb16-214" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Read NMI and ARI together.** NMI rising with label granularity while ARI stays flat is the fingerprint of shared information without shared clusters. On its own, either number would have told a different, wrong story.</span>
 <span id="cb16-215"><a href="#cb16-215" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-216"><a href="#cb16-216" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Subsampled to 28,167 frames** for the gallery render. The full 140,837-frame results (pre-computed in the DYF repo's MoCap experiment) are similar in pattern with tighter metrics.</span>
-<span id="cb16-217"><a href="#cb16-217" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**No temporal structure used.** These are frame-level features — adjacent-frame similarity within a walk cycle isn't exploited. A time-aware model (HMM, Transformer) would outperform both DYF and k-means on *sequence* tasks; this notebook is about *frame-level structure* only.</span>
-<span id="cb16-218"><a href="#cb16-218" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**NMI is still a blunt metric** for continuous-motion data. A proper evaluation would use cluster-purity against each ground truth at the matching granularity, plus a quantitative measure of hierarchy recovery.</span>
+<span id="cb16-216"><a href="#cb16-216" aria-hidden="true" tabindex="-1"></a><span class="fu">## Caveats</span></span>
+<span id="cb16-217"><a href="#cb16-217" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-218"><a href="#cb16-218" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Subsampled to 28,167 frames** for the gallery render. The full 140,837-frame results show the same pattern.</span>
+<span id="cb16-219"><a href="#cb16-219" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**No temporal structure used.** These are frame-level features — adjacent-frame similarity within a walk cycle isn't exploited. That is the whole diagnosis above, not a footnote to it.</span>
+<span id="cb16-220"><a href="#cb16-220" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Earlier versions of this page reported 56 communities and "DYF beats oracle k-means on NMI against every label."** The count came from a single-level Louvain in <span class="in">`dyf-rs`</span> before 0.12.0 that could not merge communities (dyf <span class="in">`KNOWN_ISSUES.md`</span>, issue 10), and the over-split partition inflated NMI against fine-grained labels. The numbers here are from the corrected optimiser.</span>
 </code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
 </div></div></div></div></div>
 </div> <!-- /content -->
