@@ -777,13 +777,35 @@ def _build_flatbuffer_index(
         builder.PrependUOffsetTRelative(off)
     batches_vec = builder.EndVector()
 
-    # BuildParams
-    bp = build_params or {}
+    # BuildParams. Precedence: caller's explicit build_params, then the params the tree
+    # recorded at build time, then a last-resort default.
+    #
+    # Those last-resort defaults used to be the ONLY fallback, which made the file assert
+    # things that were never measured: a caller who omitted `build_params=` got num_bits=3 /
+    # min_leaf_size=4 / seed=42 written as recorded fact. A 50k product index actually built
+    # with num_bits=2, min_leaf_size=64 reported 3 and 4, so rebuilding from the file's own
+    # params produced 19,974 leaves instead of 842. `build_dyf_tree` now records what it used;
+    # anything still falling through to a default is listed in the `build_params_inferred`
+    # metadata key so a reader can tell a measurement from a guess.
+    bp = dict(tree.get("build_params") or {})
+    bp.update({k: v for k, v in (build_params or {}).items() if v is not None})
+    _LAST_RESORT = {"max_depth": tree["depth"], "num_bits": 3, "min_leaf_size": 4, "seed": 42}
+    inferred = [k for k in ("max_depth", "num_bits", "min_leaf_size", "seed") if bp.get(k) is None]
+    for key in inferred:
+        bp[key] = _LAST_RESORT[key]
+    if inferred:
+        k_off = builder.CreateString("build_params_inferred")
+        v_off = builder.CreateString(",".join(inferred))
+        FBKeyValue.KeyValueStart(builder)
+        FBKeyValue.KeyValueAddKey(builder, k_off)
+        FBKeyValue.KeyValueAddValue(builder, v_off)
+        kv_offsets.append(FBKeyValue.KeyValueEnd(builder))
+
     FBBuildParams.BuildParamsStart(builder)
-    FBBuildParams.BuildParamsAddMaxDepth(builder, bp.get("max_depth", tree["depth"]))
-    FBBuildParams.BuildParamsAddNumBits(builder, bp.get("num_bits", 3))
-    FBBuildParams.BuildParamsAddMinLeafSize(builder, bp.get("min_leaf_size", 4))
-    FBBuildParams.BuildParamsAddSeed(builder, bp.get("seed", 42))
+    FBBuildParams.BuildParamsAddMaxDepth(builder, bp["max_depth"])
+    FBBuildParams.BuildParamsAddNumBits(builder, bp["num_bits"])
+    FBBuildParams.BuildParamsAddMinLeafSize(builder, bp["min_leaf_size"])
+    FBBuildParams.BuildParamsAddSeed(builder, bp["seed"])
     FBBuildParams.BuildParamsAddQuantization(builder, quant_off)
     FBBuildParams.BuildParamsAddCompression(builder, comp_off)
     bp_off = FBBuildParams.BuildParamsEnd(builder)

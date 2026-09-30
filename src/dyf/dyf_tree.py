@@ -198,11 +198,26 @@ def build_dyf_tree(embeddings, max_depth, num_bits=3, min_leaf_size=4, seed=42, 
                     (iterative quantization for tighter partitions).
 
     Returns:
-        Tree dict with keys: children, indices, depth, point_margin_map.
+        Tree dict with keys: children, indices, depth, point_margin_map, build_params.
+
+        ``build_params`` records the arguments this build actually used, so
+        ``write_lazy_index`` can store the truth instead of guessing. Before this was added,
+        a caller who omitted ``build_params=`` got ``num_bits=3, min_leaf_size=4, seed=42``
+        written into the file — this function's *defaults*, presented as recorded fact. A 50k
+        product index built with ``num_bits=2, min_leaf_size=64`` reported 3 and 4, so
+        rebuilding from the recorded params produced 19,974 leaves instead of 842.
     """
     embeddings = ensure_f32(embeddings)
     all_indices = np.arange(len(embeddings))
-    return _build_dyf_tree(embeddings, all_indices, max_depth, num_bits, min_leaf_size, seed, fit_method)
+    tree = _build_dyf_tree(embeddings, all_indices, max_depth, num_bits, min_leaf_size, seed, fit_method)
+    tree["build_params"] = {
+        "max_depth": max_depth,
+        "num_bits": num_bits,
+        "min_leaf_size": min_leaf_size,
+        "seed": seed,
+        "fit_method": fit_method,
+    }
+    return tree
 
 
 # ---------------------------------------------------------------------------

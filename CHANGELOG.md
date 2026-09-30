@@ -22,6 +22,15 @@ is a mechanism decision left for the bench (`KNOWN_ISSUES.md` #11). It logs a wa
 connectivity regime. The additive eigengap is deliberately not used: on a manifold the largest
 additive gap sits far up the spectrum (it picked k=14 on moons).
 
+One more field from the same eigenvalues, no extra cost. `intrinsic_dim` is a Weyl-law estimate
+of the dimension the leaves sample (eigenvalues grow like `k**(2/d)`): synthetic ring 0.9,
+path 0.8, the brain's large neuron clusters 3–4 and its cell-cycle cluster ~2 — the same
+"mostly 3-D, cell cycle is a 2-D sheet" picture the diagnostic stack reached from covariance
+spectra, now read off the graph. A ring detector (eigenvalue pairing) was measured on the same
+data and not shipped: it separates a synthetic ring from a path (0.14 vs 0.48) but on the brain
+the known cell-cycle cluster paired *less* than a column-shuffle null of itself, so it detects
+nothing real. The class docstring records the numbers.
+
 ### Changed
 
 **Community detection results change: `dyf-rs>=0.12.0` required, whose Louvain is now
@@ -49,6 +58,22 @@ Consequences worth knowing about:
 - Gallery pages were re-rendered against the fixed optimiser; their prose is being brought
   in line with the new numbers.
 
+### Fixed
+
+**`.dyf` recorded this library's *defaults* as though they were the build's parameters.**
+`_build_flatbuffer_index` fell back to `num_bits=3, min_leaf_size=4, seed=42` whenever a caller
+omitted `build_params=` — which the docstring called "auto-detected from tree", though only
+`max_depth` ever was. The consequence was silent: a 50,000-product index built with
+`num_bits=2, min_leaf_size=64` reported 3 and 4, so rebuilding from the file's own recorded
+parameters produced **19,974 leaves instead of 842** and tripled the file, with nothing raised.
+
+`build_dyf_tree` now returns its arguments in `tree["build_params"]`, and the writer prefers
+explicit `build_params=`, then the tree's own record, then a last-resort default. Anything still
+falling through to a default is listed in the `build_params_inferred` metadata key, so a reader
+can tell a measurement from a guess. `from_parquet` inherits the recorded parameters by default,
+which makes the round trip shape-preserving — verified on 50,000 × 384 real embeddings: 839
+leaves → 839 leaves, 1.01x size, vectors bit-identical at float16 storage precision.
+
 ## 0.15.0 — 2026-09-07
 
 ### Changed
@@ -68,15 +93,6 @@ when the FlatBuffers/Arrow stack is not, since the type depends on numpy alone.
 Every `dyf index-*` command now stamps provenance on the `.dyf` it writes, as
 `_provenance_level_0` — level 0 of the ladder dyfviz continues at 1, 2 and 3. The
 record carries the post-dedup item count, a hash over the input files, and every
-One more field from the same eigenvalues, no extra cost. `intrinsic_dim` is a Weyl-law estimate
-of the dimension the leaves sample (eigenvalues grow like `k**(2/d)`): synthetic ring 0.9,
-path 0.8, the brain's large neuron clusters 3–4 and its cell-cycle cluster ~2 — the same
-"mostly 3-D, cell cycle is a 2-D sheet" picture the diagnostic stack reached from covariance
-spectra, now read off the graph. A ring detector (eigenvalue pairing) was measured on the same
-data and not shipped: it separates a synthetic ring from a path (0.14 vs 0.48) but on the brain
-the known cell-cycle cluster paired *less* than a column-shuffle null of itself, so it detects
-nothing real. The class docstring records the numbers.
-
 parameter that shaped the bytes, including the embedding model. Until now nothing in
 dyf wrote provenance at all: `provenance.py` exported seven symbols with no in-package
 producer, `Pipeline` reported every ingested `.dyf` as `stale (no provenance)`, and
