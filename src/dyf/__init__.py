@@ -204,6 +204,11 @@ try:
         write_lazy_index,
     )
 
+    # Parquet round trip at the dataset boundary. Needs pyarrow, same as lazy_index, so it
+    # sits under the same guard. See PARQUET_NOTES.md for why Parquet is deliberately NOT the
+    # in-file payload encoding.
+    from .parquet_io import from_parquet, to_parquet
+
     _HAS_LAZY = True
 except ImportError:
     _HAS_LAZY = False
@@ -217,6 +222,8 @@ except ImportError:
     StoredFieldValue = None
     StoredFieldInput = None
     TreeNode = None
+    to_parquet = None
+    from_parquet = None
 
 # Fisher dimension weighting
 import logging
@@ -236,17 +243,17 @@ from ._api_map import API_GROUPS, overview
 
 # Tree-leaf agglomeration
 from .agglomerate import (
+    LeafGraphSpectrum,
     LeafGroupingResult,
     agglomerate_tree_leaves,
+    leaf_graph_spectrum,
     louvain_cluster_leaves,
     merge_to_max_k,
 )
 from .catalog import (
     CatalogConfig,
-    LeafGraphSpectrum,
     CatalogMatch,
     CatalogSpace,
-    leaf_graph_spectrum,
     CrossMapping,
     FittedCatalog,
     JointMatchResult,
@@ -417,6 +424,8 @@ __all__ = [
     "rewrite_lazy_index",
     "split_dyf3",
     "from_faiss",
+    "to_parquet",
+    "from_parquet",
     "SearchResult",
     "AdaptiveProbeConfig",
     "ExtractedData",
@@ -467,8 +476,10 @@ __all__ = [
     "derive_path_labels",
     "format_cluster_context",
     # Tree-leaf agglomeration
+    "LeafGraphSpectrum",
     "LeafGroupingResult",
     "agglomerate_tree_leaves",
+    "leaf_graph_spectrum",
     "louvain_cluster_leaves",
     "merge_to_max_k",
     # LouvainHierarchy — internal type, import directly from dyf.agglomerate
@@ -476,10 +487,8 @@ __all__ = [
     "spatial_rgb_map",
     "spatial_color_map",
     "tree_rgb_map",
-    "LeafGraphSpectrum",
     # Pipeline DAG runner — internal/experimental, import directly from dyf.pipeline
     # Provenance tracking
-    "leaf_graph_spectrum",
     "Provenance",
     "file_hash",
     "params_hash",

@@ -4,6 +4,34 @@
 
 ### Added
 
+**`to_parquet` / `from_parquet` — a Parquet round trip at the dataset boundary.**
+`dyf.to_parquet(index, "out.parquet")` exports an index to Parquet that polars and DuckDB read
+natively, with embeddings as `FixedSizeList<float32, dim>` (verified: polars 1.39.3 restores
+this as `pl.Array`, so no import-side cast is needed). `dyf.from_parquet("features/",
+"out.dyf")` builds an index back, carrying non-embedding columns through as stored fields.
+Design note and rejected alternatives: `PARQUET_NOTES.md`.
+
+Choices worth knowing about:
+
+- **Rows are written in leaf order with a `leaf_id` column, not Hive-partitioned.** Leaf
+  locality is worth preserving — a predicate correlated with semantics then touches fewer row
+  groups — but partitioning by leaf is a trap: `gudid_viz.dyf` has 5,938 leaves averaging 8
+  rows, so it would emit 5,938 directories. Sorting gets the same pruning from row-group
+  statistics in one file. `partition_by_leaf=True` exists and refuses when leaves average
+  under 64 rows.
+- **Parquet is deliberately *not* the in-file payload encoding.** Measured leaf sizes (p50 of 5
+  and 34 rows on two production indexes) sit far below Parquet's unit of benefit, so per-batch
+  footers would dominate the payload. `PARQUET_NOTES.md` records the ablation to run if anyone
+  wants to revisit it.
+- **A PQ index needs `allow_lossy=True` to export**, since stored codes only reconstruct
+  approximately; such an export is marked `dyf_embeddings_reconstructed=true`.
+- `item_index` cannot survive under its own name — the leaf schema owns it — so it is carried as
+  `source_item_index` rather than dropped, preserving the join back to the exporting index.
+  `leaf_id` / `node_id` are export-only and never re-imported: a leaf id from the old tree is
+  meaningless against a freshly fitted one.
+- Columns with no stored-field representation (structs, maps) are **skipped and reported** in
+  the return value rather than coerced to their repr.
+
 **`leaf_graph_spectrum` / `LeafGraphSpectrum` — a read-out of the graph Louvain ran on, now
 carried on `LeafGroupingResult.spectrum`.** `louvain_cluster_leaves` builds the leaf-centroid
 kNN graph once, hands the same edges to Louvain and to the spectrum, and reports the bottom of
