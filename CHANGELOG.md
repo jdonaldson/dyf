@@ -98,6 +98,17 @@ constructor logs one warning when row norms vary by more than 1% (`norm_spread` 
 instance), since varying norms are exactly the case where cosine throws something away. No
 new ranking mode was added: that is a separate decision from closing a documentation defect.
 
+**`select_orthogonal_anchors(k)` now returns exactly `k` anchors.** Seeds (super connectors
+by default) were prepended and never cut down, so with 60 super connectors `k=12` returned 60.
+When seeds exceed `k`, the `k` most spread of them are kept by the same farthest-point rule.
+The defect was invisible in tests because the function's own `global_num_bits=12` default
+found zero super connectors below ~8k points — issue 6's fixed-resolution bug surviving in
+two call sites the 2026-09 sweep missed. `select_orthogonal_anchors` and `get_kmeans_init`
+now derive the resolution from `n` (`_derive_num_bits`) exactly as `find_super_connectors`
+does; pass `global_num_bits` explicitly to pin it. `test_select_orthogonal_anchors_basic`
+asserted `len(result) <= k`, which the floor satisfied; the new tests assert equality for
+`k` below and above the seed count.
+
 **`.dyf` recorded this library's *defaults* as though they were the build's parameters.**
 `_build_flatbuffer_index` fell back to `num_bits=3, min_leaf_size=4, seed=42` whenever a caller
 omitted `build_params=` — which the docstring called "auto-detected from tree", though only

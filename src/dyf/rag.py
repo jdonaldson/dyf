@@ -739,38 +739,72 @@ def find_super_connectors(
     )
 
 
+def _farthest_point_subset(embeddings: np.ndarray, pool: list[int], k: int) -> list[int]:
+    """Greedy farthest-point selection of ``k`` indices from ``pool`` (cosine distance),
+    starting from the pool's first element. Used to cut a seed set down to ``k``."""
+    if k <= 0 or not pool:
+        return []
+    chosen = [pool[0]]
+    rest = pool[1:]
+    min_d = 1 - embeddings[rest] @ embeddings[pool[0]]
+    while len(chosen) < k and rest:
+        j = int(np.argmax(min_d))
+        chosen.append(rest[j])
+        rest.pop(j)
+        min_d = np.delete(min_d, j)
+        if rest:
+            min_d = np.minimum(min_d, 1 - embeddings[rest] @ embeddings[chosen[-1]])
+    return chosen
+
+
 def select_orthogonal_anchors(
     embeddings: np.ndarray,
     k: int,
     seed_indices: np.ndarray | None = None,
     candidate_indices: np.ndarray | None = None,
     use_bridges: bool = True,
-    global_num_bits: int = 12,
+    global_num_bits: int | None = None,
     seed: int = 42,
+    min_bucket_size: int = 20,
 ) -> OrthogonalAnchorResult:
     """
-    Select k maximally spread anchors using greedy farthest-point sampling.
+    Select exactly ``k`` maximally spread anchors using greedy farthest-point sampling.
 
     Achieves ~87% of full-bridge recall with ~22% of anchors by eliminating
     redundancy in anchor placement.
 
+    ``k`` is the total count. Seeds are included first; when there are more seeds than
+    ``k``, the same farthest-point rule picks ``k`` of them, so the result is always
+    ``min(k, available points)`` long. Until 2026-10-01 seeds were never reduced, so with
+    60 super connectors ``k=12`` returned 60 anchors — and the resolution used to find
+    those seeds was a fixed 12 bits, which finds none at all below ~8k points
+    (``KNOWN_ISSUES.md`` issue 6), so the defect was invisible on small corpora and the
+    function looked correct in tests.
+
     Args:
         embeddings: Normalized embeddings (n_points, dim)
-        k: Number of anchors to select
+        k: Number of anchors to select (exact)
         seed_indices: Initial seed points (default: super connectors)
         candidate_indices: Pool to select from (default: bridges or all points)
         use_bridges: If True and candidate_indices is None, use bridge points
-        global_num_bits: LSH bits for bridge detection
+        global_num_bits: LSH bits for seed and bridge detection. Default derives the
+            resolution from ``n_points`` (see :func:`_derive_num_bits`) exactly as
+            :func:`find_super_connectors` does.
         seed: Random seed
+        min_bucket_size: Dense-bucket gate used when deriving ``global_num_bits``.
 
     Returns:
         OrthogonalAnchorResult with selected indices
     """
     n_points, dim = embeddings.shape
+    if global_num_bits is None:
+        global_num_bits = _derive_num_bits(n_points, min_bucket_size)
 
     # Get seeds (default: super connectors, or start from scratch if none)
     if seed_indices is None:
-        sc_result = find_super_connectors(embeddings, global_num_bits=global_num_bits, seed=seed)
+        sc_result = find_super_connectors(
+            embeddings, global_num_bits=global_num_bits, min_bucket_size=min_bucket_size, seed=seed
+        )
         seed_indices = sc_result.indices
 
     # Get candidates
@@ -803,8 +837,12 @@ def select_orthogonal_anchors(
             candidate_indices = np.arange(n_points)
             candidate_source = "all"
 
-    # Initialize with seeds (if any)
-    selected = list(seed_indices) if len(seed_indices) > 0 else []
+    # Initialize with seeds (if any). More seeds than k: keep the k most spread of them,
+    # chosen by the same farthest-point rule, so k stays an exact count.
+    seed_list = [int(s) for s in seed_indices] if len(seed_indices) > 0 else []
+    if len(seed_list) > k:
+        seed_list = _farthest_point_subset(embeddings, seed_list, k)
+    selected = seed_list
     selected_set = set(selected)
     candidates = [c for c in candidate_indices if c not in selected_set]
 
@@ -1049,12 +1087,17 @@ def get_kmeans_init(
     use_stable_bridges: bool = True,
     num_stability_seeds: int = 5,
     stability_threshold: int = 3,
-    global_num_bits: int = 12,
+    global_num_bits: int | None = None,
     seed: int = 42,
     verbose: bool = False,
+    min_bucket_size: int = 20,
 ) -> np.ndarray:
     """
     Get bridge-seeded initial centroids for k-means/IVF index construction.
+
+    ``global_num_bits`` defaults to a resolution derived from the corpus size
+    (:func:`_derive_num_bits`); the old fixed 12 found no dense buckets below ~8k points
+    (issue 6), so bridge seeding silently fell back to random candidates there.
 
     Using orthogonal bridge points as k-means initialization provides:
     - +1% recall improvement over standard k-means++
@@ -1098,6 +1141,8 @@ def get_kmeans_init(
         instead, as all-points expansion provides better long-tail coverage.
     """
     n_points, dim = embeddings.shape
+    if global_num_bits is None:
+        global_num_bits = _derive_num_bits(n_points, min_bucket_size)
 
     # Normalize if needed
     norms = np.linalg.norm(embeddings, axis=1, keepdims=True)

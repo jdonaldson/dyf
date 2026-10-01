@@ -51,8 +51,14 @@ one-off measurements.
       the points furthest from their bucket centroid, i.e. the extremes that a
       max-orthogonality greedy selects anyway, so the candidate restriction is close to a
       no-op for this selector. Worth deciding whether `use_bridges` earns its existence.
-- [ ] `select_orthogonal_anchors(k=12)` returned **60** anchors — unexplained, unrelated to
-      the threshold work, noticed while verifying
+- [x] `select_orthogonal_anchors(k=12)` returned **60** anchors — explained and fixed
+      2026-10-01: seeds (the 60 super connectors) were prepended and never reduced, so `k`
+      was a floor. Now the `k` most spread seeds are kept (farthest-point). It hid in tests
+      because the function's own `global_num_bits=12` found **zero** super connectors below
+      ~8k points — issue 6's class in two call sites the sweep missed (`select_orthogonal_anchors`,
+      `get_kmeans_init`); both now derive the resolution from `n`. Reviewed and left:
+      `DensityClassifier.from_texts(num_bits=12)` is a classifier resolution, not the
+      dense-bucket gate — a different generator
 
 **P1 — shipped features that do not work**
 

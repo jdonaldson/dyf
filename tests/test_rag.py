@@ -182,7 +182,38 @@ class TestOrthogonalAnchors:
         result = select_orthogonal_anchors(sample_embeddings, k=50, use_bridges=False)
 
         assert result.candidate_source == "all"
-        assert len(result.indices) <= 50
+        assert len(result.indices) == 50
+
+    def test_k_is_exact_when_seeds_exceed_it(self, sample_embeddings):
+        """60 super connectors used to turn k=12 into 60 anchors: seeds were never cut down.
+        Now the k most spread seeds are kept (farthest-point), and k is the total."""
+        seeds = np.arange(0, 60)
+        result = select_orthogonal_anchors(sample_embeddings, k=12, seed_indices=seeds)
+        assert len(result.indices) == 12
+        assert set(result.indices.tolist()) <= set(seeds.tolist()), "anchors must come from the seeds"
+        assert len(set(result.indices.tolist())) == 12
+        # The kept seeds should be spread, not the first twelve by position.
+        assert result.indices.tolist() != seeds[:12].tolist()
+
+    def test_k_is_exact_for_every_k(self, sample_embeddings):
+        """Default seeds (super connectors at a resolution derived from n) and default
+        candidates: the count must equal k whether k is below or above the seed count."""
+        for k in (3, 12, 40):
+            result = select_orthogonal_anchors(sample_embeddings, k=k)
+            assert len(result.indices) == k, (k, len(result.indices), len(result.seed_indices))
+            assert len(set(result.indices.tolist())) == k
+
+    def test_default_resolution_derives_from_n(self, sample_embeddings):
+        """The fixed 12-bit default found zero super connectors below ~8k points (issue 6),
+        which hid the k-floor defect above. The derived resolution at n=500 is 3 bits; the
+        same call with 12 bits forced must behave as the old default did."""
+        from dyf.rag import _derive_num_bits
+
+        assert _derive_num_bits(len(sample_embeddings), 20) == 3
+        derived = select_orthogonal_anchors(sample_embeddings, k=5)
+        forced12 = select_orthogonal_anchors(sample_embeddings, k=5, global_num_bits=12)
+        assert len(forced12.seed_indices) == 0, "12 bits at n=500 should find no super connectors"
+        assert len(derived.indices) == 5 and len(forced12.indices) == 5
 
 
 @pytest.mark.skipif(not check_rust_available(), reason="Rust extension not available")
