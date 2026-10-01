@@ -88,6 +88,16 @@ Consequences worth knowing about:
 
 ### Fixed
 
+**`DenseSearchIndex` now says it ranks by cosine, and warns when that discards information.**
+The Rust kernel normalises the query and divides each candidate's dot product by the row's
+norm, so results were always cosine-ordered — for any input norms — but no docstring or
+README line said so. A caller holding Euclidean data (PCA coordinates) who assumed dot-product
+ranking measured recall@15 = 0.06 against true neighbours, every slot filled, no error
+(`KNOWN_ISSUES.md` #8). The class, `search()` and the README now name the metric, and the
+constructor logs one warning when row norms vary by more than 1% (`norm_spread` on the
+instance), since varying norms are exactly the case where cosine throws something away. No
+new ranking mode was added: that is a separate decision from closing a documentation defect.
+
 **`.dyf` recorded this library's *defaults* as though they were the build's parameters.**
 `_build_flatbuffer_index` fell back to `num_bits=3, min_leaf_size=4, seed=42` whenever a caller
 omitted `build_params=` — which the docstring called "auto-detected from tree", though only

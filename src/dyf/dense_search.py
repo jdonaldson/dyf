@@ -19,11 +19,30 @@ Usage::
 
 from __future__ import annotations
 
+import logging
+
 import dyf_rs
 import numpy as np
 
 from .dyf_tree import build_dyf_tree
 from .search_result import SearchResult
+
+logger = logging.getLogger(__name__)
+
+# Row-norm spread above which the constructor warns that cosine ranking discards magnitude.
+# Spread is max/min norm - 1, so 0.01 means norms within 1% of each other: unit-norm
+# embeddings with float32 rounding sit far below it; PCA coordinates sit far above.
+NORM_SPREAD_WARN = 0.01
+
+
+def _norm_spread(rows: np.ndarray) -> float:
+    """``max/min`` row norm minus one — 0.0 for exactly equal norms, undefined (inf) if a
+    row is all zeros."""
+    norms = np.linalg.norm(rows, axis=1)
+    lo = float(norms.min()) if norms.size else 0.0
+    if lo <= 0.0:
+        return float("inf")
+    return float(norms.max()) / lo - 1.0
 
 
 def flatten_tree(tree: dict) -> dict:
@@ -88,12 +107,27 @@ def flatten_tree(tree: dict) -> dict:
 
 
 class DenseSearchIndex:
-    """Dense multiprobe search over an in-memory embedding corpus.
+    """Dense multiprobe search over an in-memory embedding corpus, **ranked by cosine**.
+
+    The kernel L2-normalises the query and divides every candidate's dot product by that
+    row's norm, so results are ordered by cosine similarity whatever the input norms are;
+    rows do not have to be unit-norm. There is no dot-product or Euclidean mode. Routing
+    through the tree is by hyperplane sign, which is scale-invariant, so it agrees with the
+    ranking.
+
+    That matters when the magnitude of a row carries information. A caller holding
+    Euclidean data (PCA coordinates, the standard scRNA-seq input) who expected dot-product
+    ranking — e.g. via the exact-Euclidean augmentation ``x -> (x, -|x|^2/2)`` — measured
+    recall@15 = 0.06 against true neighbours here, with every slot filled and no error
+    (``KNOWN_ISSUES.md`` #8). So when the row norms vary, the constructor logs a warning
+    once; if your data is meant to be compared by angle, normalise it yourself and the
+    warning goes away.
 
     Parameters
     ----------
     embeddings : (n, dim) array
-        Row-vector corpus; kept resident as contiguous float32.
+        Row-vector corpus; kept resident as contiguous float32. Compared by cosine, see
+        above.
     tree : dict, optional
         Prebuilt ``build_dyf_tree`` dict. If omitted, one is built from ``embeddings``.
     max_depth, num_bits, min_leaf_size : tree build params (used only when tree is None).
@@ -104,6 +138,15 @@ class DenseSearchIndex:
         self, embeddings, *, tree: dict | None = None, max_depth: int = 16, num_bits: int = 3, min_leaf_size: int = 128
     ):
         self.embeddings = np.ascontiguousarray(embeddings, dtype=np.float32)
+        self.norm_spread = _norm_spread(self.embeddings)
+        if self.norm_spread > NORM_SPREAD_WARN:
+            logger.warning(
+                "DenseSearchIndex ranks by cosine, but these row norms vary "
+                "(spread %.3f: max/min norm ratio - 1). Magnitude is discarded, so dot-product "
+                "or Euclidean neighbours will differ from what search() returns. If angle is "
+                "the intended comparison, L2-normalise the rows to silence this.",
+                self.norm_spread,
+            )
         self.tree = (
             tree
             if tree is not None

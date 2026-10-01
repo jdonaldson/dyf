@@ -144,7 +144,10 @@ with LazyIndex("index.dyf") as idx:
 ```
 
 For a fully in-memory corpus, `DenseSearchIndex` builds the tree and searches via the
-same Rust kernel (batched queries supported):
+same Rust kernel (batched queries supported). Both indexes rank by **cosine similarity**
+— the kernel normalises the query and divides by each row's norm, so rows need not be
+unit-norm, but magnitude is discarded; `DenseSearchIndex` warns once if your row norms
+vary, because Euclidean or dot-product data will get confidently wrong neighbours:
 
 ```python
 from dyf import DenseSearchIndex

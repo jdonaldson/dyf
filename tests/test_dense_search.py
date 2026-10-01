@@ -113,3 +113,55 @@ class TestSearchBehaviour:
         for i in range(4):
             single = index.search(corpus[i], k=5, nprobe=64).indices
             assert np.array_equal(batch[i], single)
+
+
+class TestMetric:
+    """The index ranks by cosine and says so (KNOWN_ISSUES #8).
+
+    A Euclidean caller on 1.29M PCA rows got recall@15 = 0.06 with every slot filled and no
+    warning. These tests pin (a) that the ranking IS cosine even for non-unit rows, so the
+    documentation is true, and (b) that varying row norms produce a warning, so the next
+    Euclidean caller hears about it.
+    """
+
+    @pytest.fixture(scope="class")
+    def scaled(self):
+        """Unit directions with row norms spread over 1x–20x: cosine and dot-product
+        rankings disagree sharply on this corpus."""
+        rng = np.random.default_rng(1)
+        X = rng.standard_normal((600, 24)).astype(np.float32)
+        X /= np.linalg.norm(X, axis=1, keepdims=True)
+        X *= rng.uniform(1.0, 20.0, size=(600, 1)).astype(np.float32)
+        return np.ascontiguousarray(X)
+
+    def test_non_unit_rows_are_ranked_by_cosine(self, scaled):
+        import logging
+
+        logging.getLogger("dyf.dense_search").disabled = True
+        try:
+            idx = DenseSearchIndex(scaled, min_leaf_size=16)
+        finally:
+            logging.getLogger("dyf.dense_search").disabled = False
+        q = scaled[7] * 3.0  # scaling the query must not change the order
+        got = idx.search(q, k=10, nprobe=100_000).indices  # probe every leaf
+        normed = scaled / np.linalg.norm(scaled, axis=1, keepdims=True)
+        cos_rank = np.argsort(-(normed @ (q / np.linalg.norm(q))))[:10]
+        dot_rank = np.argsort(-(scaled @ q))[:10]
+        assert np.array_equal(got, cos_rank), "ranking is not exact cosine"
+        assert len(set(cos_rank) & set(dot_rank)) < 10, "fixture does not separate cosine from dot product"
+
+    def test_varying_norms_warn_once(self, scaled, caplog):
+        with caplog.at_level("WARNING", logger="dyf.dense_search"):
+            idx = DenseSearchIndex(scaled, min_leaf_size=16)
+        msgs = [r.getMessage() for r in caplog.records if "ranks by cosine" in r.getMessage()]
+        assert len(msgs) == 1, msgs
+        assert idx.norm_spread > 10  # 20x / 1x - 1, up to sampling
+
+    def test_unit_norm_rows_do_not_warn(self, corpus, caplog):
+        with caplog.at_level("WARNING", logger="dyf.dense_search"):
+            idx = DenseSearchIndex(corpus)
+        assert not [r for r in caplog.records if "ranks by cosine" in r.getMessage()]
+        assert idx.norm_spread < 1e-3
+
+    def test_docstring_names_the_metric(self):
+        assert "cosine" in (DenseSearchIndex.__doc__ or "").lower()

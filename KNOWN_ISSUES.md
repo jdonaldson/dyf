@@ -66,15 +66,15 @@ one-off measurements.
       *and* a probe range wider than 1–5
 - [ ] `analyze_bridges`'s own `bridge_threshold=0.5` default — cross-repo, `dyf-core/dyf-rs`
 - [ ] `connection_threshold=0.3` in the same function — also absolute, never audited
-- [ ] `DenseSearchIndex` ranks by cosine and the Python surface never says so — Euclidean
-      callers got recall@15 = 0.06 with no warning (issue 8). Documentation + a unit-norm
-      check, not a new mechanism
+- [x] `DenseSearchIndex` ranks by cosine and the Python surface never says so — Euclidean
+      callers got recall@15 = 0.06 with no warning (issue 8). Documented; warns once when
+      row norms vary (2026-10-01)
 - [ ] `auto_tune_tree_params` caps `max_depth` at 6, so `target_bucket_size` is inert above
       ~1M points — four settings, ~3,700 leaves each (issue 9). Issue 6's class, as a cap
-- [x] **`louvain_communities` has no aggregation phase** (issue 10) — fixed in the `dyf-core`
-      working tree 2026-09-27 (multilevel); brain shipped-path ARI 0.26 → 0.60 = incumbent.
-      ⚠ Unreleased: needs dyf-core release + `dyf-rs` pin bump here, then re-render the gallery
-      (every published number ran through the old optimiser) and re-validate the auto-tune (#9)
+- [x] **`louvain_communities` has no aggregation phase** (issue 10) — fixed (multilevel),
+      released as dyf-rs 0.12.0 on 2026-09-30, pinned here, gallery re-rendered and live;
+      brain shipped-path ARI 0.26 → 0.60 = incumbent. Open remainder: re-validate the auto-tune
+      (#9) against the new optimiser
 - [ ] **Every tree fit L2-normalises rows and nothing documents it** (issue 11). In 2-D the tree
       is an angular hash: circles leaf purity 0.525 = chance; a Euclidean-acting tree gets 1.000
       and connected components then recover the rings exactly. Document now; `normalize=False`
@@ -457,7 +457,18 @@ all passed a test named for it firing.
 
 ---
 
-## 8. `DenseSearchIndex` ranks by cosine and does not say so — OPEN
+## 8. `DenseSearchIndex` ranks by cosine and does not say so — FIXED (2026-10-01)
+
+**Fix:** the metric is named in the class docstring, `search()` and the README. One
+correction to the analysis below: the kernel's `dot_normed` divides by the *row* norm as well
+as normalising the query, so the ranking is cosine for any input norms — rows need not be
+unit-norm, and nothing is "normalised on the way in" that changes the data. What a non-unit
+corpus loses is magnitude, so the constructor now logs one warning when row norms vary by more
+than 1 % (`DenseSearchIndex.norm_spread`; unit-norm float32 sits at ~1e-6, PCA coordinates
+far above). Tests pin that non-unit rows rank identically to exact cosine and that the warning
+fires only when norms vary. No ranking mode was added.
+
+Original report:
 
 The batched kernel L2-normalises the query (`dyf-rs/src/dense_search.rs`, `l2_normalize`) and
 scores every candidate with `dot_normed(row, &qn)`, so results are ordered by **cosine
@@ -502,15 +513,16 @@ function of `n`; re-validate at 1.3M with the leaf-count actually varying. Measu
 
 ---
 
-## 10. `louvain_communities` is a single-level Louvain — it cannot merge, so `resolution` barely works — FIXED IN dyf-core (unreleased)
+## 10. `louvain_communities` is a single-level Louvain — it cannot merge, so `resolution` barely works — FIXED (dyf-rs 0.12.0, 2026-09-30)
 
-**Fix (2026-09-27):** `dyf-core/dyf-core/src/louvain.rs` is now the multilevel algorithm —
-local moves, collapse communities to super-nodes (summed weights, intra weight as self-loop so
-degrees and `m` are preserved), repeat until a level makes no merge. Public signature unchanged.
-Two tests added: γ=0.05 must merge two 0.5-bridged triangles (the crossover is γ=0.154); an
-8-triangle chain must be 8 at γ=1 and 1 at γ=0.01. Planted partition now matches igraph exactly
-(k=1 at γ≤0.1, 8 blocks / ARI 1.000 at γ=1). **Not yet committed, versioned or released** — dyf
-still pins `dyf-rs>=0.11.0`, which ships the old optimiser.
+**Fix (2026-09-27, released 2026-09-30 as dyf-rs 0.12.0; dyf pins `>=0.12.0` since `a4f6092`):**
+`dyf-core/dyf-core/src/louvain.rs` is now the multilevel algorithm — local moves, collapse
+communities to super-nodes (summed weights, intra weight as self-loop so degrees and `m` are
+preserved), repeat until a level makes no merge. Public signature unchanged. Two tests added:
+γ=0.05 must merge two 0.5-bridged triangles (the crossover is γ=0.154); an 8-triangle chain must
+be 8 at γ=1 and 1 at γ=0.01. Planted partition now matches igraph exactly (k=1 at γ≤0.1,
+8 blocks / ARI 1.000 at γ=1). Gallery re-rendered and live on dyf.io. Remaining follow-up is
+issue 9's re-validation, which this fix changes the baseline for.
 
 Effect with the Python side untouched (`/Volumes/Models/dyf_bench_2026-09-27/`): brain shipped
 path ARI **0.264 → 0.603** (incumbent 0.608) at 4.6 s vs 34 s; on identical centroid graphs
