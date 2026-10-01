@@ -495,7 +495,29 @@ when input rows are not unit-norm or document that non-unit input is normalised 
 Deciding whether to *offer* dot-product/Euclidean ranking is a separate question — do not add a
 mechanism to close a documentation defect.
 
-## 9. `auto_tune_tree_params(target_bucket_size)` is inert above ~1M points — OPEN
+## 9. `auto_tune_tree_params(target_bucket_size)` is inert above ~1M points — MEASURED 2026-10-01, fix pending a decision
+
+Re-validated against the multilevel Louvain on the seven-dataset bench through the shipped
+gallery pipeline (`/Volumes/Models/dyf_bench_2026-10-01/auto_tune_cap_revalidation_2026-10-01.md`),
+outcome variable and decision rule fixed first (beat the default on mean ARI **and** ≥ 5/7 wins):
+
+| config | mean ARI | wins vs default (3,4,20) |
+|---|---|---|
+| default (3,4,20) | **0.440** | — |
+| auto capped t20 (as shipped) | 0.412 | 2/7 |
+| auto uncapped t10 / t20 / t50 | 0.419 / 0.432 / 0.436 | 1 / 2 / 3 of 7 |
+| bits 3, depth scaled, t20 | 0.422 | 1/7 |
+
+Uncapping does what this issue predicted where the cap binds — brain 0.472 → 0.577 at 31k
+leaves — and still loses to the default (0.603) at 10× the wall time. The leaf oracle rises with
+every extra leaf on every dataset and the outcome does not follow: purer leaves are not the
+bottleneck, the centroid graph is. At equal leaf counts the default's 8-way shallow split beats
+the binary deep one by 0.13 ARI on brain. The docstring's "beats defaults on 6–7/9" (measured on
+the single-level Louvain) is retracted. **Recommended fix:** uncap the helper so the knob is
+honest, keep it for explicit use, and make the gallery default to `(3,4,20)` — which re-renders
+every page and should carry issue 12's label fix with it.
+
+Original report:
 
 `docs/gallery/_gallery.py::auto_tune_tree_params` caps `max_depth` at 6 with `num_bits=2`, so the
 tree can have at most 4⁶ = 4,096 leaves regardless of `n`. At 1.29M cells every leaf holds ~350
@@ -702,6 +724,23 @@ method). Whether to offer `normalize=False` — or to centre and not normalise f
 and whether to auto-switch objective on the flag are mechanism decisions that need the
 seven-dataset bench re-run under them; not made here. The gallery's "Metric: cosine" row on the index attributes the
 Moons failure to the metric; the cause is one level down, in the tree's input handling.
+
+---
+
+## 12. The gallery prints AMI and calls it NMI — OPEN
+
+`docs/gallery/_gallery.py` computes `adjusted_mutual_info_score` into a field named `nmi` in
+`run_dyf` (line ~143), `run_kmeans` (~179) and the HDBSCAN helper (~200); `GalleryResult.nmi`
+is documented as "normalized mutual information"; six pages (`mnist`, `digits`, `cmu-mocap`,
+`olivetti-faces`, `synthetic-shapes`, `twenty-newsgroups`) print it under the label **NMI**, and
+`index.qmd` maps `nmi: "NMI"` in its table. Every method on a page gets the same treatment, so
+within-page comparisons are fair, and AMI ≈ NMI at these sizes (brain: both 0.725) — but a
+reader comparing a gallery "NMI" against a paper's NMI is comparing different quantities, and
+the KNOWN_ISSUES #10 tables above mix the gallery's "NMI" (AMI) with true NMI from the bench
+scripts. Found 2026-10-01 while reusing `run_dyf` for the issue 9 re-validation.
+
+**Fix:** either compute both and label them honestly, or rename the field and the page labels
+to AMI. Either way the frozen pages re-render. Not done yet — it touches every gallery page.
 
 ---
 
