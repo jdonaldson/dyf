@@ -22,9 +22,11 @@ class GalleryResult:
     labels: np.ndarray  # (N,) int cluster ids from DYF
     recovered_k: int  # number of unique cluster ids
     true_k: int  # ground-truth class count
-    nmi: float  # normalized mutual information
+    ami: float  # adjusted mutual information (sklearn adjusted_mutual_info_score)
     ari: float  # adjusted rand index
     umap_2d: np.ndarray  # (N, 2) 2D layout for plotting
+    seconds: float  # wall time of tree build + index write + Louvain (UMAP excluded)
+    tree_params: dict  # the build_dyf_tree kwargs actually used
 
     def save(self, path: str) -> None:
         np.savez(
@@ -32,46 +34,65 @@ class GalleryResult:
             labels=self.labels,
             recovered_k=self.recovered_k,
             true_k=self.true_k,
-            nmi=self.nmi,
+            ami=self.ami,
             ari=self.ari,
             umap_2d=self.umap_2d,
+            seconds=self.seconds,
+            tree_params=np.array(
+                [
+                    self.tree_params["num_bits"],
+                    self.tree_params["max_depth"],
+                    self.tree_params["min_leaf_size"],
+                ]
+            ),
         )
 
     @classmethod
     def load(cls, path: str) -> GalleryResult:
+        """Raises ``KeyError`` on a cache written before the ``ami`` / ``seconds`` fields
+        existed, so ``run_dyf_cached`` recomputes instead of serving stale labels."""
         z = np.load(path)
+        nb, md, ml = (int(v) for v in z["tree_params"])
         return cls(
             labels=z["labels"],
             recovered_k=int(z["recovered_k"]),
             true_k=int(z["true_k"]),
-            nmi=float(z["nmi"]),
+            ami=float(z["ami"]),
             ari=float(z["ari"]),
             umap_2d=z["umap_2d"],
+            seconds=float(z["seconds"]),
+            tree_params=dict(num_bits=nb, max_depth=md, min_leaf_size=ml),
         )
+
+
+DYF_DEFAULT_TREE_PARAMS = dict(num_bits=3, max_depth=4, min_leaf_size=20)
+"""The library defaults every gallery page runs with (``build_dyf_tree``'s own)."""
 
 
 def auto_tune_tree_params(n: int, target_bucket_size: int = 20) -> dict:
     """Pick tree parameters from N + a single externalized knob.
 
-    Was validated across 9 gallery datasets as beating DYF's documented defaults
-    (num_bits=3, max_depth=4, min_leaf=20) on 6-7/9 by mean +0.05 ARI — but that
-    validation ran on the single-level Louvain fixed in dyf-rs 0.12.0 (dyf
-    KNOWN_ISSUES #10). Re-measured 2026-09-27 on seven labelled datasets with the
-    fixed optimiser the two configs split 2/3, so treat the claim as unvalidated
-    until redone. Also: ``max_depth`` is capped at 6, so above ~1M points the
-    ``target_bucket_size`` knob is inert (KNOWN_ISSUES #9).
+    ⚠ **Measured not to beat the library defaults.** On the seven labelled
+    gallery datasets, scored through this module's shipped pipeline with the
+    multilevel Louvain (dyf-rs ≥ 0.12.0), the defaults ``(num_bits=3,
+    max_depth=4, min_leaf_size=20)`` have mean ARI 0.440; this rule's best
+    setting has 0.436 and wins on 3 of 7 (dyf ``KNOWN_ISSUES.md`` #9,
+    2026-10-01). Purer leaves do not translate into better communities —
+    the centroid graph is the bottleneck — so the gallery no longer calls
+    this by default. It is kept for explicit experiments.
 
-    The single knob ``target_bucket_size`` is roughly the smallest natural
-    cluster you want to detect. Default 20 is reasonable; drop to 5-10 for
-    high-k small-n data (Olivetti at 10 samples/class), raise to 30-50 for
-    clean cluster structure with many samples per cluster.
+    The knob ``target_bucket_size`` is roughly the smallest natural cluster
+    you want to detect. The depth is derived from ``n / target_bucket_size``
+    with no cap (an earlier cap at 6 made the knob inert above ~1M points).
+    At 1.3M points that means ~31k leaves and a Louvain stage roughly 10×
+    slower than the defaults, for a lower ARI.
 
     Returns dict ready for ``build_dyf_tree(**params)``.
     """
     import math
 
     target_leaves = max(4, n // target_bucket_size)
-    max_depth = max(2, min(6, math.ceil(math.log(target_leaves) / math.log(4))))
+    max_depth = max(2, math.ceil(math.log(target_leaves) / math.log(4)))
     return dict(
         num_bits=2,
         max_depth=max_depth,
@@ -86,18 +107,22 @@ def run_dyf(
     max_depth: int | None = None,
     num_bits: int | None = None,
     min_leaf_size: int | None = None,
-    target_bucket_size: int = 20,
+    target_bucket_size: int | None = None,
     seed: int = 42,
 ) -> GalleryResult:
-    """Run DYF clustering end-to-end with auto-tuned tree parameters.
+    """Run DYF clustering end-to-end with the library's default tree parameters.
 
-    Tree parameters are auto-tuned via ``auto_tune_tree_params(n,
-    target_bucket_size)`` by default. Explicit ``max_depth`` / ``num_bits`` /
-    ``min_leaf_size`` override the auto-tune individually if supplied.
+    By default the tree is built with ``DYF_DEFAULT_TREE_PARAMS`` — the same
+    ``(3, 4, 20)`` that ``build_dyf_tree`` uses when told nothing. Pass
+    ``target_bucket_size`` to use ``auto_tune_tree_params`` instead (measured
+    to lose to the defaults; see its docstring), and/or explicit
+    ``max_depth`` / ``num_bits`` / ``min_leaf_size`` to override a knob.
 
-    The auto-tune was empirically validated across 9 gallery datasets to beat
-    DYF's documented defaults. Pass any explicit override to opt out per-knob.
+    ``seconds`` on the result is the wall time of tree build + index write +
+    Louvain. The 2-D UMAP layout is for the figure only and is not timed.
     """
+    import time
+
     from sklearn.metrics import adjusted_mutual_info_score, adjusted_rand_score
 
     from dyf import LazyIndex, build_dyf_tree, write_lazy_index
@@ -105,21 +130,25 @@ def run_dyf(
 
     embeddings = np.ascontiguousarray(embeddings, dtype=np.float32)
 
-    auto = auto_tune_tree_params(len(embeddings), target_bucket_size)
+    base = (
+        DYF_DEFAULT_TREE_PARAMS
+        if target_bucket_size is None
+        else auto_tune_tree_params(len(embeddings), target_bucket_size)
+    )
     final_params = {
-        "max_depth": auto["max_depth"] if max_depth is None else max_depth,
-        "num_bits": auto["num_bits"] if num_bits is None else num_bits,
-        "min_leaf_size": auto["min_leaf_size"] if min_leaf_size is None else min_leaf_size,
+        "max_depth": base["max_depth"] if max_depth is None else max_depth,
+        "num_bits": base["num_bits"] if num_bits is None else num_bits,
+        "min_leaf_size": base["min_leaf_size"] if min_leaf_size is None else min_leaf_size,
     }
 
+    umap_2d = _umap(embeddings, seed=seed)
+
+    t0 = time.perf_counter()
     tree = build_dyf_tree(
         embeddings,
         seed=seed,
         **final_params,
     )
-
-    umap_2d = _umap(embeddings, seed=seed)
-
     with tempfile.TemporaryDirectory() as td:
         path = Path(td) / "gallery.dyf"
         write_lazy_index(
@@ -131,6 +160,7 @@ def run_dyf(
         )
         with LazyIndex(str(path)) as idx:
             point_labels, *_ = louvain_cluster_leaves(idx, umap_2d, embeddings)
+    seconds = time.perf_counter() - t0
 
     labels = np.asarray(point_labels, dtype=np.int64)
     recovered_k = int(len(np.unique(labels)))
@@ -140,9 +170,11 @@ def run_dyf(
         labels=labels,
         recovered_k=recovered_k,
         true_k=true_k,
-        nmi=float(adjusted_mutual_info_score(y_true, labels)),
+        ami=float(adjusted_mutual_info_score(y_true, labels)),
         ari=float(adjusted_rand_score(y_true, labels)),
         umap_2d=umap_2d,
+        seconds=seconds,
+        tree_params=final_params,
     )
 
 
@@ -158,8 +190,11 @@ def run_dyf_cached(
     import os
 
     if os.path.exists(cache_path):
-        cached = GalleryResult.load(cache_path)
-        if cached.labels.shape[0] == embeddings.shape[0]:
+        try:
+            cached = GalleryResult.load(cache_path)
+        except KeyError:
+            cached = None  # written by an older _gallery.py; recompute
+        if cached is not None and cached.labels.shape[0] == embeddings.shape[0]:
             return cached
     result = run_dyf(embeddings, y_true, **kwargs)
     result.save(cache_path)
@@ -168,16 +203,21 @@ def run_dyf_cached(
 
 def run_kmeans(embeddings: np.ndarray, y_true: np.ndarray, *, seed: int = 42) -> dict[str, Any]:
     """K-means with the oracle's k. Unfair ceiling baseline."""
+    import time
+
     from sklearn.cluster import KMeans
     from sklearn.metrics import adjusted_mutual_info_score, adjusted_rand_score
 
     true_k = int(len(np.unique(y_true)))
+    t0 = time.perf_counter()
     labels = KMeans(n_clusters=true_k, n_init="auto", random_state=seed).fit_predict(embeddings)
+    seconds = time.perf_counter() - t0
     return {
         "labels": labels,
         "recovered_k": true_k,
-        "nmi": float(adjusted_mutual_info_score(y_true, labels)),
+        "ami": float(adjusted_mutual_info_score(y_true, labels)),
         "ari": float(adjusted_rand_score(y_true, labels)),
+        "seconds": seconds,
     }
 
 
@@ -187,19 +227,31 @@ def run_hdbscan(embeddings: np.ndarray, y_true: np.ndarray) -> dict[str, Any] | 
         import hdbscan  # type: ignore
     except ImportError:
         return None
+    import time
+
     from sklearn.metrics import adjusted_mutual_info_score, adjusted_rand_score
 
+    t0 = time.perf_counter()
     labels = hdbscan.HDBSCAN().fit_predict(embeddings)
+    seconds = time.perf_counter() - t0
     mask = labels >= 0
     noise_frac = float((~mask).mean())
     if mask.sum() < 2:
-        return {"labels": labels, "recovered_k": 0, "nmi": 0.0, "ari": 0.0, "noise_frac": noise_frac}
+        return {
+            "labels": labels,
+            "recovered_k": 0,
+            "ami": 0.0,
+            "ari": 0.0,
+            "noise_frac": noise_frac,
+            "seconds": seconds,
+        }
     return {
         "labels": labels,
         "recovered_k": int(len(np.unique(labels[mask]))),
-        "nmi": float(adjusted_mutual_info_score(y_true[mask], labels[mask])),
+        "ami": float(adjusted_mutual_info_score(y_true[mask], labels[mask])),
         "ari": float(adjusted_rand_score(y_true[mask], labels[mask])),
         "noise_frac": noise_frac,
+        "seconds": seconds,
     }
 
 
@@ -256,7 +308,7 @@ def hierarchy_slider(
 
     Pre-computes ``merge_to_max_k`` at each requested k, stacks one WebGL
     scatter trace per k on the UMAP layout, and wires a slider to toggle which
-    trace is visible. NMI / ARI vs ``y_true`` appear in the title as the slider
+    trace is visible. AMI / ARI vs ``y_true`` appear in the title as the slider
     moves. ``k_values`` higher than ``result.recovered_k`` collapse to the raw
     partition (nothing to merge up). Uses Turbo colorscale.
     """
@@ -311,7 +363,7 @@ def hierarchy_slider(
                 "k": actual_k,
                 "labels": merged,
                 "colors": color_points_at(merged),
-                "nmi": float(adjusted_mutual_info_score(y_true, merged)),
+                "ami": float(adjusted_mutual_info_score(y_true, merged)),
                 "ari": float(adjusted_rand_score(y_true, merged)),
             }
         )
@@ -394,7 +446,7 @@ def hierarchy_slider(
     # Slider — toggles DYF trace visibility only; ground-truth trace stays on.
     steps = []
     for i, p in enumerate(partitions):
-        title = f"{title_prefix} k={p['k']} — NMI={p['nmi']:.3f}, ARI={p['ari']:.3f}"
+        title = f"{title_prefix} k={p['k']} — AMI={p['ami']:.3f}, ARI={p['ari']:.3f}"
         if show_ground_truth:
             visible = [False] * len(fig.data)  # type: ignore[arg-type]
             visible[dyf_trace_indices[i]] = True
@@ -424,7 +476,7 @@ def hierarchy_slider(
 
     layout_kwargs: dict[str, Any] = dict(
         title=dict(
-            text=f"{title_prefix} k={p0['k']} — NMI={p0['nmi']:.3f}, ARI={p0['ari']:.3f}",
+            text=f"{title_prefix} k={p0['k']} — AMI={p0['ami']:.3f}, ARI={p0['ari']:.3f}",
             x=0.5,
             xanchor="center",
         ),
@@ -488,7 +540,7 @@ def merge_walk(
     """Walk DYF's partition hierarchy to coarser resolutions.
 
     Calls ``dyf.agglomerate.merge_to_max_k`` at each target k, scores the
-    resulting partition against ``y_true`` with NMI and ARI, and returns a
+    resulting partition against ``y_true`` with AMI and ARI, and returns a
     list of rows. Targets larger than the raw recovered_k are returned as the
     raw result (nothing to merge up). Targets smaller merge to that count.
     """
@@ -505,43 +557,69 @@ def merge_walk(
             {
                 "target": target,
                 "actual_k": k,
-                "nmi": float(adjusted_mutual_info_score(y_true, merged)),
+                "ami": float(adjusted_mutual_info_score(y_true, merged)),
                 "ari": float(adjusted_rand_score(y_true, merged)),
             }
         )
     return rows
 
 
-def merge_walk_table(rows: list[dict[str, Any]], raw: GalleryResult) -> str:
-    """Markdown table showing the merge walk — raw DYF + merged resolutions."""
+def merge_walk_table(rows: list[dict[str, Any]], raw: GalleryResult, y_true: np.ndarray | None = None) -> str:
+    """Markdown table showing the merge walk — raw DYF + merged resolutions.
+
+    Pass ``y_true`` when the walk was scored against a label other than the one
+    ``raw.ami`` / ``raw.ari`` were computed on, so the raw row is scored against
+    the same label as the merged rows (CMU MoCap scores three labels).
+    """
+    if y_true is None:
+        raw_ami, raw_ari = raw.ami, raw.ari
+    else:
+        from sklearn.metrics import adjusted_mutual_info_score, adjusted_rand_score
+
+        raw_ami = float(adjusted_mutual_info_score(y_true, raw.labels))
+        raw_ari = float(adjusted_rand_score(y_true, raw.labels))
     lines = [
-        "| Resolution     | Actual k | NMI   | ARI   |",
+        "| Resolution     | Actual k | AMI   | ARI   |",
         "|----------------|---------:|------:|------:|",
-        f"| **Raw DYF**    | **{raw.recovered_k}** | **{raw.nmi:.3f}** | **{raw.ari:.3f}** |",
+        f"| **Raw DYF**    | **{raw.recovered_k}** | **{raw_ami:.3f}** | **{raw_ari:.3f}** |",
     ]
     for r in rows:
-        lines.append(f"| merge → {r['target']:<4d}  | {r['actual_k']:>4d}     | {r['nmi']:.3f} | {r['ari']:.3f} |")
+        lines.append(f"| merge → {r['target']:<4d}  | {r['actual_k']:>4d}     | {r['ami']:.3f} | {r['ari']:.3f} |")
     return "\n".join(lines)
 
 
 def metrics_table(dyf: GalleryResult, kmeans: dict | None, hdbscan_: dict | None) -> str:
-    """Markdown table for the bottom-of-notebook comparison."""
+    """Markdown table for the bottom-of-notebook comparison.
+
+    ``wall`` is the clustering time only: for DYF, tree build + index write +
+    Louvain; for k-means, ``fit_predict`` with the oracle k; for HDBSCAN,
+    ``fit_predict`` with defaults. The shared UMAP layout is excluded.
+    """
     lines = [
-        "| Method | Recovered k | NMI | ARI | % discarded |",
-        "|--------|------------:|----:|----:|------------:|",
-        f"| **DYF** (parameter-free) | {dyf.recovered_k} | {dyf.nmi:.3f} | {dyf.ari:.3f} | 0% |",
+        "| Method | Recovered k | AMI | ARI | % discarded | wall (s) |",
+        "|--------|------------:|----:|----:|------------:|---------:|",
+        f"| **DYF** (parameter-free) | {dyf.recovered_k} | {dyf.ami:.3f} | {dyf.ari:.3f} | 0% | {dyf.seconds:.2f} |",
     ]
     if kmeans is not None:
         lines.append(
             f"| k-means (oracle k={dyf.true_k}) | {kmeans['recovered_k']} | "
-            f"{kmeans['nmi']:.3f} | {kmeans['ari']:.3f} | 0% |"
+            f"{kmeans['ami']:.3f} | {kmeans['ari']:.3f} | 0% | {kmeans['seconds']:.2f} |"
         )
     if hdbscan_ is not None:
         noise = hdbscan_.get("noise_frac", 0.0)
         lines.append(
             f"| HDBSCAN (defaults) | {hdbscan_['recovered_k']} | "
-            f"{hdbscan_['nmi']:.3f} | {hdbscan_['ari']:.3f} | {noise:.0%} |"
+            f"{hdbscan_['ami']:.3f} | {hdbscan_['ari']:.3f} | {noise:.0%} | {hdbscan_['seconds']:.2f} |"
         )
+    if kmeans is not None and kmeans["seconds"] > 0:
+        ratio = dyf.seconds / kmeans["seconds"]
+        who = f"DYF {ratio:.1f}× slower" if ratio >= 1 else f"DYF {1 / ratio:.1f}× faster"
+        lines += [
+            "",
+            f"*Wall time: DYF {dyf.seconds:.2f} s (tree build + index write + Louvain) vs "
+            f"k-means {kmeans['seconds']:.2f} s (one k-means++ init at the oracle k) — {who} here. "
+            "The shared UMAP layout is not counted for either.*",
+        ]
     return "\n".join(lines)
 
 

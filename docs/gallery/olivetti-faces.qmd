@@ -42,7 +42,7 @@ from _gallery import run_dyf, run_kmeans, plot_single, metrics_table
 
 result = run_dyf(X, y)
 print(f"Recovered k: {result.recovered_k}  (true k = {result.true_k})")
-print(f"NMI:         {result.nmi:.3f}")
+print(f"AMI:         {result.ami:.3f}")
 print(f"ARI:         {result.ari:.3f}")
 ```
 
@@ -53,7 +53,7 @@ That's a blowout. DYF recovered a small handful of clusters where the ground tru
 ```{python}
 #| label: kmeans
 kmeans = run_kmeans(X, y)
-print(f"k-means NMI={kmeans['nmi']:.3f}, ARI={kmeans['ari']:.3f} (told k={result.true_k})")
+print(f"k-means AMI={kmeans['ami']:.3f}, ARI={kmeans['ari']:.3f} (told k={result.true_k})")
 ```
 
 ## Figures
@@ -105,7 +105,7 @@ Even with unlimited photos per person, identity manifolds in raw pixel space are
 
 ### What the oracle gets you
 
-K-means with `k=40` handed over hits NMI 0.629, ARI 0.430. It's a respectable number despite all the challenges — because with the oracle, k-means just has to find 40 centers. It doesn't have to discover that there *are* 40 centers. That discovery is the hard part, and it's what DYF is being asked to do unaided.
+K-means with `k=40` handed over hits AMI 0.629, ARI 0.430. It's a respectable number despite all the challenges — because with the oracle, k-means just has to find 40 centers. It doesn't have to discover that there *are* 40 centers. That discovery is the hard part, and it's what DYF is being asked to do unaided.
 
 ### Would anything fix DYF here?
 
@@ -122,7 +122,8 @@ If Digits was k-means's home court and 20 Newsgroups was an away game, Olivetti 
 ## What to take away
 
 - **DYF has a floor condition: density per latent cluster.** When your data has fewer than ~`min_leaf_size × 2` samples per class, DYF will under-partition. That's the pragmatic rule.
-- **High-k / low-n is the hardest regime** for any unsupervised method. Even k-means with the oracle only hits NMI 0.63 here; without the oracle it would do worse.
+- **High-k / low-n is the hardest regime** for any unsupervised method. Even k-means with the oracle only hits AMI 0.63 here; without the oracle it would do worse.
+- **DYF is also the slower tool here** (`wall (s)` above): the tree fits a PCA per node over 4,096-d rows, and that costs more than one k-means++ init across 400 points. Low-n / high-d loses on both axes.
 - **Dimensionality by itself isn't the problem** — 20 Newsgroups was 384d with 18K points and DYF tied k-means. `n / d` ratio and density per cluster are what matter.
 - **If you can pre-embed with a model trained on your identity axis**, the problem transforms into a geometry DYF handles well. That's the right engineering move, and it's what the DYF ecosystem is designed to compose with.
 

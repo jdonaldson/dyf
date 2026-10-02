@@ -75,7 +75,7 @@ from _gallery import run_dyf_cached, run_kmeans, plot_single
 # Score against the middle-granularity label (description, k=25) for the main run.
 result = run_dyf_cached(X, y_desc_idx, cache_path="/tmp/gallery_mocap_dyf.npz")
 print(f"Recovered k:       {result.recovered_k}")
-print(f"NMI vs description: {result.nmi:.3f}")
+print(f"AMI vs description: {result.ami:.3f}")
 print(f"ARI vs description: {result.ari:.3f}")
 ```
 
@@ -83,32 +83,32 @@ print(f"ARI vs description: {result.ari:.3f}")
 
 ```{python}
 #| label: multi-gt
-from sklearn.metrics import adjusted_mutual_info_score as nmi
+from sklearn.metrics import adjusted_mutual_info_score as ami
 from sklearn.metrics import adjusted_rand_score as ari
 
 rows = []
 for name, y_idx in [("motion_type (k=7)",   y_motion_idx),
                     ("description (k=25)",  y_desc_idx),
                     ("trial_id (k=80)",     y_trial_idx)]:
-    rows.append((name, nmi(y_idx, result.labels), ari(y_idx, result.labels)))
+    rows.append((name, ami(y_idx, result.labels), ari(y_idx, result.labels)))
 
-print(f"{'Ground truth':25s}  NMI     ARI")
-for name, m_nmi, m_ari in rows:
-    print(f"{name:25s}  {m_nmi:.3f}   {m_ari:.3f}")
+print(f"{'Ground truth':25s}  AMI     ARI")
+for name, m_ami, m_ari in rows:
+    print(f"{name:25s}  {m_ami:.3f}   {m_ari:.3f}")
 ```
 
-Low across the board, and the pattern is telling: NMI *rises* with label granularity (7 → 25 → 80 classes) while ARI barely moves. The partition shares information with the trial structure but does not reproduce any level of it as clusters.
+Low across the board, and the pattern is telling: AMI *rises* with label granularity (7 → 25 → 80 classes) while ARI barely moves. The partition shares information with the trial structure but does not reproduce any level of it as clusters.
 
 ## Oracle k-means on the middle granularity
 
 ```{python}
 #| label: kmeans
 kmeans = run_kmeans(X, y_desc_idx)
-print(f"K-means told k=25: NMI={kmeans['nmi']:.3f}, ARI={kmeans['ari']:.3f}")
-print(f"DYF (no k given):  NMI={result.nmi:.3f}, ARI={result.ari:.3f}")
+print(f"K-means told k=25: AMI={kmeans['ami']:.3f}, ARI={kmeans['ari']:.3f}  wall={kmeans['seconds']:.1f}s")
+print(f"DYF (no k given):  AMI={result.ami:.3f}, ARI={result.ari:.3f}  wall={result.seconds:.1f}s")
 ```
 
-DYF edges k-means on ARI and trails it on NMI, and both are far from good. Being handed `k=25` did not rescue k-means: the labels are not the kind of thing a frame-level partition can recover, whichever algorithm draws it.
+DYF edges k-means on ARI and trails it on AMI, and both are far from good. Being handed `k=25` did not rescue k-means: the labels are not the kind of thing a frame-level partition can recover, whichever algorithm draws it.
 
 ## Walking down the hierarchy against each ground truth
 
@@ -120,11 +120,11 @@ DYF's recovered partition is multi-resolution by design — and CMU MoCap has th
 from _gallery import merge_walk, merge_walk_table
 
 print("**Against `motion_type` (k=7):**\n")
-print(merge_walk_table(merge_walk(result, X, y_motion_idx, targets=[25, 10, 7, 3]), result))
+print(merge_walk_table(merge_walk(result, X, y_motion_idx, targets=[25, 10, 7, 3]), result, y_true=y_motion_idx))
 print("\n\n**Against `description` (k=25):**\n")
-print(merge_walk_table(merge_walk(result, X, y_desc_idx, targets=[40, 25, 15, 7]), result))
+print(merge_walk_table(merge_walk(result, X, y_desc_idx, targets=[40, 25, 15, 7]), result, y_true=y_desc_idx))
 print("\n\n**Against `trial_id` (k=80):**\n")
-print(merge_walk_table(merge_walk(result, X, y_trial_idx, targets=[60, 40, 25, 10]), result))
+print(merge_walk_table(merge_walk(result, X, y_trial_idx, targets=[60, 40, 25, 10]), result, y_true=y_trial_idx))
 ```
 
 Read this vertically. DYF's partition is the same across all three tables — only the *ground-truth target* changes — and merging does not help against any of them: collapsing to 7 does not recover the 7 motion types, and the raw partition scores highest against the 80 trials. If the frames grouped into nested blobs at the label granularities, the merge walk would find them. It does not, because they don't.
@@ -161,7 +161,7 @@ plot_single(result.umap_2d, kmeans["labels"], title="k-means (told k=25)")
 
 ## Why frame-level clustering struggles here
 
-Look at the ground-truth panels: a trial is not a blob, it is a *path*. A walking cycle sweeps through pose space and returns; a dance trial visits several regions in sequence. Two trials of the same description overlap where their paths cross and diverge where they don't. Any method that partitions *frames* by *where they sit in pose space* — DYF's leaves, k-means's Voronoi cells — will group frames from different trials that happen to pass through the same pose, and split one trial across the regions its path visits. That is exactly the NMI-rises-with-granularity / ARI-stays-flat signature above.
+Look at the ground-truth panels: a trial is not a blob, it is a *path*. A walking cycle sweeps through pose space and returns; a dance trial visits several regions in sequence. Two trials of the same description overlap where their paths cross and diverge where they don't. Any method that partitions *frames* by *where they sit in pose space* — DYF's leaves, k-means's Voronoi cells — will group frames from different trials that happen to pass through the same pose, and split one trial across the regions its path visits. That is exactly the AMI-rises-with-granularity / ARI-stays-flat signature above.
 
 Three consequences:
 
@@ -171,7 +171,7 @@ The natural signal for "which trial is this" is *adjacent-frame* structure — c
 **2. Being told `k` does not help.**
 K-means at the oracle `k=25` lands in the same low range as DYF. When the label is not a partition of the feature space, the number of clusters is not the missing information.
 
-**3. What DYF's 18 communities *are*.**
+**3. What DYF's 15 communities *are*.**
 They are regions of pose space — standing poses, mid-stride poses, arms-raised poses — that several trials share. That is real structure, and for a retrieval task ("find frames that look like this one") it is the right structure. It is simply not what the trial labels describe.
 
 ### The sports analogy, completed
@@ -182,8 +182,8 @@ Across the four notebooks we now have:
 |---|---|---|
 | Digits | Convex blobs, clean `k`, tiny tree | K-means wins (home court) |
 | MNIST | Convex-ish, 40× more data | DYF wins on both metrics |
-| 20 Newsgroups | Curved, hierarchical | K-means ahead by 0.03 NMI |
-| **CMU MoCap** | **Trajectories, ambiguous k** | **Neither works; DYF edges ARI, trails NMI** |
+| 20 Newsgroups | Curved, hierarchical | K-means ahead by 0.01 AMI |
+| **CMU MoCap** | **Trajectories, ambiguous k** | **Neither works; DYF edges ARI, trails AMI** |
 
 The pattern isn't "DYF vs k-means." It is **whether the label is a partition of the feature space at all.** When it is, and the tree has enough leaves, DYF recovers it without being told `k`. When it isn't — as here — no frame-level method will, and the honest move is to say so and reach for a sequence model.
 
@@ -191,10 +191,10 @@ The pattern isn't "DYF vs k-means." It is **whether the label is a partition of 
 
 - **"True k" is often a fiction.** If a dataset has multiple plausible labelings at different granularities, your clustering algorithm shouldn't demand you pick one upfront — but it also cannot recover a label that is not a partition of the features.
 - **DYF operates on raw features, no embedding required.** Motion capture, tabular data, sensor readings — anywhere the raw features have meaningful geometry, DYF can go in direct.
-- **Read NMI and ARI together.** NMI rising with label granularity while ARI stays flat is the fingerprint of shared information without shared clusters. On its own, either number would have told a different, wrong story.
+- **Read AMI and ARI together.** AMI rising with label granularity while ARI stays flat is the fingerprint of shared information without shared clusters. On its own, either number would have told a different, wrong story.
 
 ## Caveats
 
 - **Subsampled to 28,167 frames** for the gallery render. The full 140,837-frame results show the same pattern.
 - **No temporal structure used.** These are frame-level features — adjacent-frame similarity within a walk cycle isn't exploited. That is the whole diagnosis above, not a footnote to it.
-- **Earlier versions of this page reported 56 communities and "DYF beats oracle k-means on NMI against every label."** The count came from a single-level Louvain in `dyf-rs` before 0.12.0 that could not merge communities (dyf `KNOWN_ISSUES.md`, issue 10), and the over-split partition inflated NMI against fine-grained labels. The numbers here are from the corrected optimiser.
+- **Earlier versions of this page reported 56 communities and "DYF beats oracle k-means on AMI against every label."** The count came from a single-level Louvain in `dyf-rs` before 0.12.0 that could not merge communities (dyf `KNOWN_ISSUES.md`, issue 10), and the over-split partition inflated AMI against fine-grained labels. The numbers here are from the corrected optimiser.

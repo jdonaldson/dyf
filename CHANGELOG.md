@@ -61,6 +61,19 @@ nothing real. The class docstring records the numbers.
 
 ### Changed
 
+**Gallery: library defaults, honest metric names, and wall time per method.** Every page in
+`docs/gallery/` now builds its tree with `build_dyf_tree`'s own defaults `(num_bits=3,
+max_depth=4, min_leaf_size=20)`. The `auto_tune_tree_params(n)` rule that used to be the
+gallery default was re-measured on the seven labelled datasets with the multilevel Louvain and
+loses to the defaults (mean ARI 0.436 vs 0.440, 3 of 7 wins); its `max_depth` cap, which made
+`target_bucket_size` inert above ~1M points, is gone, and the helper is kept for explicit
+experiments only (`KNOWN_ISSUES.md` #9). The metric the gallery had been printing as "NMI" was
+sklearn's *adjusted* mutual information all along; it is now named `ami` everywhere
+(`KNOWN_ISSUES.md` #12). Each result also carries `seconds` — tree build + index write +
+Louvain for DYF, `fit_predict` for k-means and HDBSCAN, the shared UMAP layout excluded — and
+`metrics_table` has a `wall (s)` column, so a page says how long each method took as well as
+how well it scored.
+
 **Community detection results change: `dyf-rs>=0.12.0` required, whose Louvain is now
 multilevel.** The Rust `louvain_communities` behind `louvain_from_centroids` /
 `louvain_cluster_leaves` / every gallery page was a *single-level* optimiser (local node moves

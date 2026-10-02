@@ -36,9 +36,9 @@ r_moons   = run_dyf(X, y)
 km_moons  = run_kmeans(X, y)
 hdb_moons = run_hdbscan(X, y)
 
-print(f"DYF       k={r_moons.recovered_k}       NMI={r_moons.nmi:.3f} ARI={r_moons.ari:.3f}")
-print(f"k-means   told k=2  NMI={km_moons['nmi']:.3f} ARI={km_moons['ari']:.3f}")
-print(f"HDBSCAN   k={hdb_moons['recovered_k']} noise={hdb_moons['noise_frac']:.1%}  NMI={hdb_moons['nmi']:.3f} ARI={hdb_moons['ari']:.3f}")
+print(f"DYF       k={r_moons.recovered_k}       AMI={r_moons.ami:.3f} ARI={r_moons.ari:.3f}  wall={r_moons.seconds:.2f}s")
+print(f"k-means   told k=2  AMI={km_moons['ami']:.3f} ARI={km_moons['ari']:.3f}  wall={km_moons['seconds']:.2f}s")
+print(f"HDBSCAN   k={hdb_moons['recovered_k']} noise={hdb_moons['noise_frac']:.1%}  AMI={hdb_moons['ami']:.3f} ARI={hdb_moons['ari']:.3f}  wall={hdb_moons['seconds']:.2f}s")
 ```
 
 ::: {.gallery-fluid}
@@ -69,7 +69,7 @@ plot_single(X, km_moons["labels"], title="Moons: k-means (told k=2)")
 
 :::
 
-**HDBSCAN nails this perfectly (NMI=ARI=1.000).** DYF modestly beats k-means but splits one crescent into two clusters — a crosstab against ground truth shows DYF's largest cluster is 83% moon-1, a middle cluster is 97% moon-0, and the third is 76% moon-0 with bleeder points. It's not "following the crescents" — it's doing LSH hyperplane splits that happen to correlate with the ground truth.
+**HDBSCAN nails this perfectly (AMI=ARI=1.000).** DYF modestly beats k-means but splits one crescent into two clusters — a crosstab against ground truth shows DYF's largest cluster is 83% moon-1, a middle cluster is 97% moon-0, and the third is 76% moon-0 with bleeder points. It's not "following the crescents" — it's doing LSH hyperplane splits that happen to correlate with the ground truth.
 
 Why does HDBSCAN beat DYF here? HDBSCAN uses *mutual reachability* distances — it literally follows density ridges through the data, tracking connected-density regions. That's the right tool for a curved 2D manifold. DYF's mechanism is different: recursive LSH splits → leaf centroids → Louvain on the centroid KNN graph. That's designed for *scale*, not *shape*. The 2D regime is HDBSCAN's turf.
 
@@ -84,7 +84,7 @@ from _gallery import merge_walk, merge_walk_table
 print(merge_walk_table(merge_walk(r_moons, X, y, targets=[2]), r_moons))
 ```
 
-NMI *decreases* from 0.323 to 0.258. The merge walk assumes the raw over-partition contains the coarser structure as a sub-partition — when it doesn't (because the original LSH cuts went *across* the ground truth), merging just averages the wrong fragments together. **Merging walks hierarchy; it doesn't fix geometry.** This is the honest failure mode to contrast against MNIST, where merging from 81 → 20 roughly doubled ARI while barely moving NMI.
+AMI *decreases* from 0.323 to 0.258. The merge walk assumes the raw over-partition contains the coarser structure as a sub-partition — when it doesn't (because the original LSH cuts went *across* the ground truth), merging just averages the wrong fragments together. **Merging walks hierarchy; it doesn't fix geometry.** This is the honest failure mode to contrast against MNIST, where the raw 12-way partition is already the best point on the walk and every merge costs a little on both metrics.
 
 ## Shape 2: Concentric circles
 
@@ -100,9 +100,9 @@ r_circ   = run_dyf(X, y)
 km_circ  = run_kmeans(X, y)
 hdb_circ = run_hdbscan(X, y)
 
-print(f"DYF       k={r_circ.recovered_k}       NMI={r_circ.nmi:.3f} ARI={r_circ.ari:.3f}")
-print(f"k-means   told k=2  NMI={km_circ['nmi']:.3f} ARI={km_circ['ari']:.3f}")
-print(f"HDBSCAN   k={hdb_circ['recovered_k']} noise={hdb_circ['noise_frac']:.1%}  NMI={hdb_circ['nmi']:.3f} ARI={hdb_circ['ari']:.3f}")
+print(f"DYF       k={r_circ.recovered_k}       AMI={r_circ.ami:.3f} ARI={r_circ.ari:.3f}  wall={r_circ.seconds:.2f}s")
+print(f"k-means   told k=2  AMI={km_circ['ami']:.3f} ARI={km_circ['ari']:.3f}  wall={km_circ['seconds']:.2f}s")
+print(f"HDBSCAN   k={hdb_circ['recovered_k']} noise={hdb_circ['noise_frac']:.1%}  AMI={hdb_circ['ami']:.3f} ARI={hdb_circ['ari']:.3f}  wall={hdb_circ['seconds']:.2f}s")
 ```
 
 ::: {.gallery-fluid}
@@ -133,7 +133,7 @@ plot_single(X, km_circ["labels"], title="Circles: k-means (told k=2)")
 
 :::
 
-**Both DYF and k-means score NMI ≈ 0. HDBSCAN scores NMI=1.000.** The conventional wisdom — *"concentric rings require spectral clustering"* — turns out to be overstated. HDBSCAN handles them because the *gap between the rings* is a density valley, and HDBSCAN's mutual-reachability metric picks that gap up as a cluster boundary. DYF, which cuts by LSH hyperplane rather than by density valley, cannot see the gap.
+**Both DYF and k-means score AMI ≈ 0. HDBSCAN scores AMI=1.000.** The conventional wisdom — *"concentric rings require spectral clustering"* — turns out to be overstated. HDBSCAN handles them because the *gap between the rings* is a density valley, and HDBSCAN's mutual-reachability metric picks that gap up as a cluster boundary. DYF, which cuts by LSH hyperplane rather than by density valley, cannot see the gap.
 
 ## Shape 3: Varied-density blobs
 
@@ -154,9 +154,9 @@ r_blobs   = run_dyf(X, y)
 km_blobs  = run_kmeans(X, y)
 hdb_blobs = run_hdbscan(X, y)
 
-print(f"DYF       k={r_blobs.recovered_k}       NMI={r_blobs.nmi:.3f} ARI={r_blobs.ari:.3f}")
-print(f"k-means   told k=5  NMI={km_blobs['nmi']:.3f} ARI={km_blobs['ari']:.3f}")
-print(f"HDBSCAN   k={hdb_blobs['recovered_k']} noise={hdb_blobs['noise_frac']:.1%}  NMI={hdb_blobs['nmi']:.3f} ARI={hdb_blobs['ari']:.3f}")
+print(f"DYF       k={r_blobs.recovered_k}       AMI={r_blobs.ami:.3f} ARI={r_blobs.ari:.3f}  wall={r_blobs.seconds:.2f}s")
+print(f"k-means   told k=5  AMI={km_blobs['ami']:.3f} ARI={km_blobs['ari']:.3f}  wall={km_blobs['seconds']:.2f}s")
+print(f"HDBSCAN   k={hdb_blobs['recovered_k']} noise={hdb_blobs['noise_frac']:.1%}  AMI={hdb_blobs['ami']:.3f} ARI={hdb_blobs['ari']:.3f}  wall={hdb_blobs['seconds']:.2f}s")
 ```
 
 ::: {.gallery-fluid}
@@ -187,14 +187,14 @@ plot_single(X, km_blobs["labels"], title="Blobs: k-means (told k=5)")
 
 :::
 
-HDBSCAN again wins — 5 clusters with 2.5% noise, NMI=0.853. DYF under-partitions to 3 clusters. The metric tradeoff between under- and over-partitioning is still worth noting:
+HDBSCAN again wins — 5 clusters with 2.5% noise, AMI=0.853. DYF under-partitions to 3 clusters. The metric tradeoff between under- and over-partitioning is still worth noting:
 
-| Dataset | DYF recovered_k | vs true | DYF NMI vs kmeans | DYF ARI vs kmeans |
+| Dataset | DYF recovered_k | vs true | DYF AMI vs kmeans | DYF ARI vs kmeans |
 |---------|----------------:|---------|------------------:|------------------:|
-| MNIST   | 81              | 8× over | DYF +0.061        | DYF **−0.186**    |
+| MNIST   | 12              | 20% over | DYF +0.055       | DYF +0.061        |
 | Blobs   | 3               | 40% under | DYF **−0.102**  | DYF +0.091        |
 
-**Under-partitioning flips the signs** — NMI loses, ARI wins. Over-partitioning on MNIST produced the mirror image. The two metrics disagree predictably about which direction of error they prefer.
+**Under-partitioning splits the metrics** — against k-means, DYF loses AMI and wins ARI on Blobs. (An earlier version of this page set that against a mirror image on MNIST, where an 81-cluster over-partition won AMI and lost ARI; that count was the single-level Louvain artifact of dyf `KNOWN_ISSUES.md` #10, and the corrected optimiser's 12 clusters win both.) AMI and ARI still weigh the two directions of error differently; read them together.
 
 ## Summary
 
@@ -210,7 +210,7 @@ HDBSCAN wins cleanly on all three. So why is DYF in the gallery at all?
 
 Because HDBSCAN's synthetic-shape performance doesn't generalize. On the real-world notebooks — [Digits](digits.qmd), [20 Newsgroups](twenty-newsgroups.qmd), [CIFAR-10 + CLIP](cifar10-clip.qmd), [CMU MoCap](cmu-mocap.qmd) — HDBSCAN starts to break:
 
-- **Digits (1,797 × 64d)**: HDBSCAN labels most points as noise. Its 0.935 NMI is computed on only the 40% of points it was willing to cluster; the other 60% got `-1`. That's not an honest apples-to-apples comparison with methods that partition every point.
+- **Digits (1,797 × 64d)**: HDBSCAN labels most points as noise. Its 0.935 AMI is computed on only the 40% of points it was willing to cluster; the other 60% got `-1`. That's not an honest apples-to-apples comparison with methods that partition every point.
 - **20 Newsgroups (18,846 × 384d)**: HDBSCAN takes 144 seconds of wall clock and discards 84% of posts as noise. The real-world notebook documents this and omits HDBSCAN from the comparison because it's not usable at that scale.
 - **CIFAR-10 (10,000 × 512d)** and **MNIST (70,000 × 784d)**: HDBSCAN's runtime and noise fractions scale badly with both sample count and dimensionality. It can technically run, but the output is a small clustered subset plus a large "I don't know" bucket.
 
@@ -227,7 +227,7 @@ If [Digits](digits.qmd) was k-means's home court (convex blobs, oracle k), **syn
 - **DYF is not the best parameter-free clustering method for every regime.** On clean low-dimensional toy shapes, HDBSCAN wins decisively.
 - **The right question is not "which method is best?"** It's "which method stays useful as n and d grow?" DYF's answer to that is better than HDBSCAN's, which is why it earns its place downstream.
 - **If your data is 2D, clean, and has clear density valleys**, use HDBSCAN. It will beat DYF and it will beat k-means. The gallery's other notebooks show what happens when it isn't.
-- **NMI and ARI still disagree predictably** about over- vs under-partitioning. That observation holds whatever clustering method you use.
+- **AMI and ARI weigh under-partitioning differently** — on Blobs DYF loses one and wins the other against k-means. Read them together, whatever clustering method you use.
 
 ## Caveats
 

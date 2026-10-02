@@ -75,16 +75,19 @@ one-off measurements.
 - [x] `DenseSearchIndex` ranks by cosine and the Python surface never says so — Euclidean
       callers got recall@15 = 0.06 with no warning (issue 8). Documented; warns once when
       row norms vary (2026-10-01)
-- [ ] `auto_tune_tree_params` caps `max_depth` at 6, so `target_bucket_size` is inert above
-      ~1M points — four settings, ~3,700 leaves each (issue 9). Issue 6's class, as a cap
+- [x] `auto_tune_tree_params` caps `max_depth` at 6, so `target_bucket_size` is inert above
+      ~1M points — four settings, ~3,700 leaves each (issue 9). Issue 6's class, as a cap.
+      Uncapped 2026-10-01; measured to lose to the library defaults either way, so the
+      gallery now runs `(3, 4, 20)` and the helper is kept for explicit experiments only
 - [x] **`louvain_communities` has no aggregation phase** (issue 10) — fixed (multilevel),
       released as dyf-rs 0.12.0 on 2026-09-30, pinned here, gallery re-rendered and live;
       brain shipped-path ARI 0.26 → 0.60 = incumbent. Open remainder: re-validate the auto-tune
       (#9) against the new optimiser
-- [ ] **Every tree fit L2-normalises rows and nothing documents it** (issue 11). In 2-D the tree
+- [x] **Every tree fit L2-normalises rows and nothing documents it** (issue 11). In 2-D the tree
       is an angular hash: circles leaf purity 0.525 = chance; a Euclidean-acting tree gets 1.000
-      and connected components then recover the rings exactly. Document now; `normalize=False`
-      is a mechanism decision for after the bench
+      and connected components then recover the rings exactly. Documented 2026-09-27
+      (`build_dyf_tree` docstring, README); `normalize=False` was measured and refused — see
+      the issue's Decision paragraph
 
 **P2 — sweep the rest of the pattern (see the rule at the end of issue 5)**
 
@@ -495,7 +498,7 @@ when input rows are not unit-norm or document that non-unit input is normalised 
 Deciding whether to *offer* dot-product/Euclidean ranking is a separate question — do not add a
 mechanism to close a documentation defect.
 
-## 9. `auto_tune_tree_params(target_bucket_size)` is inert above ~1M points — MEASURED 2026-10-01, fix pending a decision
+## 9. `auto_tune_tree_params(target_bucket_size)` is inert above ~1M points — FIXED (2026-10-01)
 
 Re-validated against the multilevel Louvain on the seven-dataset bench through the shipped
 gallery pipeline (`/Volumes/Models/dyf_bench_2026-10-01/auto_tune_cap_revalidation_2026-10-01.md`),
@@ -513,9 +516,13 @@ leaves — and still loses to the default (0.603) at 10× the wall time. The lea
 every extra leaf on every dataset and the outcome does not follow: purer leaves are not the
 bottleneck, the centroid graph is. At equal leaf counts the default's 8-way shallow split beats
 the binary deep one by 0.13 ARI on brain. The docstring's "beats defaults on 6–7/9" (measured on
-the single-level Louvain) is retracted. **Recommended fix:** uncap the helper so the knob is
-honest, keep it for explicit use, and make the gallery default to `(3,4,20)` — which re-renders
-every page and should carry issue 12's label fix with it.
+the single-level Louvain) is retracted. **Fixed 2026-10-01:** the helper's
+`max_depth` cap is gone (at 1.29M points it now returns depth 8, ~31k leaves), its docstring
+states the measurement above instead of the retracted claim, and `_gallery.run_dyf` builds
+with `build_dyf_tree`'s own defaults `(3, 4, 20)` unless `target_bucket_size` is passed
+explicitly. Every gallery page was re-rendered under the defaults, carrying issue 12's label
+fix and a per-method wall-time column with it. The index's parameter table now documents the
+fixed depth and why it is not the bottleneck.
 
 Original report:
 
@@ -727,7 +734,7 @@ Moons failure to the metric; the cause is one level down, in the tree's input ha
 
 ---
 
-## 12. The gallery prints AMI and calls it NMI — OPEN
+## 12. The gallery prints AMI and calls it NMI — FIXED (2026-10-01)
 
 `docs/gallery/_gallery.py` computes `adjusted_mutual_info_score` into a field named `nmi` in
 `run_dyf` (line ~143), `run_kmeans` (~179) and the HDBSCAN helper (~200); `GalleryResult.nmi`
@@ -739,8 +746,14 @@ reader comparing a gallery "NMI" against a paper's NMI is comparing different qu
 the KNOWN_ISSUES #10 tables above mix the gallery's "NMI" (AMI) with true NMI from the bench
 scripts. Found 2026-10-01 while reusing `run_dyf` for the issue 9 re-validation.
 
-**Fix:** either compute both and label them honestly, or rename the field and the page labels
-to AMI. Either way the frozen pages re-render. Not done yet — it touches every gallery page.
+**Fixed 2026-10-01:** renamed rather than computing both — `GalleryResult.ami`, the
+`run_kmeans` / `run_hdbscan` / `merge_walk` dicts, the slider titles, both markdown tables
+and every page's labels and prose now say AMI. The same render added `seconds` (wall time of
+tree build + index write + Louvain for DYF; `fit_predict` for k-means and HDBSCAN; the shared
+UMAP layout excluded) to each result and a `wall (s)` column to `metrics_table`, so the
+pages state how long each method took instead of only how well it scored. ⚠ The #10 tables
+above still mix the gallery's "NMI" (AMI) with true NMI from the bench scripts; read their
+gallery columns as AMI.
 
 ---
 

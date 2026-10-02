@@ -16,7 +16,7 @@ execute:
 
 The scaled-up version of [Digits](digits.qmd). Same domain, same task, same `k=10` — but 40× more samples and 12× higher pixel dimensionality. Does DYF's parameter-free story survive the jump in scale, or does it fall apart under a heavier load?
 
-Short answer, as we'll see: it gets *better* with scale. On Digits, oracle k-means beat DYF on both metrics. On MNIST, DYF — told nothing — recovers 12 communities for 10 classes and beats oracle k-means on both NMI and ARI. The reason is worth understanding, because it is the same reason DYF under-performs on the small dataset.
+Short answer, as we'll see: it gets *better* with scale. On Digits, oracle k-means beat DYF on both metrics. On MNIST, DYF — told nothing — recovers 12 communities for 10 classes and beats oracle k-means on both AMI and ARI. The reason is worth understanding, because it is the same reason DYF under-performs on the small dataset.
 
 ## Load MNIST
 
@@ -49,7 +49,7 @@ from _gallery import run_dyf_cached, run_kmeans, plot_single, metrics_table
 
 result = run_dyf_cached(X, y, cache_path="/tmp/gallery_mnist_dyf.npz")
 print(f"Recovered k: {result.recovered_k}  (true k = {result.true_k})")
-print(f"NMI:         {result.nmi:.3f}")
+print(f"AMI:         {result.ami:.3f}")
 print(f"ARI:         {result.ari:.3f}")
 ```
 
@@ -58,7 +58,7 @@ print(f"ARI:         {result.ari:.3f}")
 ```{python}
 #| label: kmeans
 kmeans = run_kmeans(X, y)
-print(f"k-means NMI={kmeans['nmi']:.3f}, ARI={kmeans['ari']:.3f} (told k={result.true_k})")
+print(f"k-means AMI={kmeans['ami']:.3f}, ARI={kmeans['ari']:.3f} (told k={result.true_k})")
 ```
 
 ## Figures
@@ -92,6 +92,8 @@ plot_single(result.umap_2d, kmeans["labels"], title=f"k-means (told k={result.tr
 #| output: asis
 print(metrics_table(result, kmeans, None))
 ```
+
+This is also the first page where the `wall (s)` column matters. DYF is the slower tool: a tree over 70,000 × 784 rows, a written index and a Louvain pass cost several times one k-means++ init at `k=10`. What that time buys is in the next two sections — a partition that beats the oracle, and a hierarchy under it that k-means cannot produce at any `k`. The regime where DYF is the *faster* tool is a different comparison: at 1.3M cells it matches a kNN-graph + Leiden pipeline's partition in a fraction of the time (dyf `KNOWN_ISSUES.md` #10), and that pipeline, not k-means, is what people run at that scale.
 
 ## Deep dive: where do DYF's 12 clusters come from?
 
@@ -212,7 +214,7 @@ idx = np.where(km_labels == best_cid)[0]
 image_grid(X, idx, title=f"k-means cluster {best_cid} (n={len(idx):,}, {best_count:,} are 7s)")
 ```
 
-Read the title: the fraction of this cluster that is actually a 7. The rest are other digits — mostly 4s, 9s and 5s — that share a prominent diagonal stroke in pixel space. Committing to exactly ten Voronoi cells forced k-means to draw a boundary somewhere, and "things with a diagonal stroke" was the cleanest cut available. DYF spent its budget differently: it kept the digit classes apart and used two extra clusters on a style split. That is why it wins ARI here as well as NMI.
+Read the title: the fraction of this cluster that is actually a 7. The rest are other digits — mostly 4s, 9s and 5s — that share a prominent diagonal stroke in pixel space. Committing to exactly ten Voronoi cells forced k-means to draw a boundary somewhere, and "things with a diagonal stroke" was the cleanest cut available. DYF spent its budget differently: it kept the digit classes apart and used two extra clusters on a style split. That is why it wins ARI here as well as AMI.
 
 ### Why this matters
 
@@ -241,16 +243,16 @@ Targets above 12 are no-ops — there is nothing to merge. Merging to exactly 10
 
 The two datasets tell opposite stories, and the comparison is the most instructive table in the gallery:
 
-| Dataset   | DYF k  | k-means NMI | DYF NMI   | DYF − k-means NMI | DYF ARI   | k-means ARI |
+| Dataset   | DYF k  | k-means AMI | DYF AMI   | DYF − k-means AMI | DYF ARI   | k-means ARI |
 |-----------|-------:|------------:|----------:|------------------:|----------:|------------:|
-| Digits    | 7      | 0.773       | 0.627     | −0.146            | 0.475     | 0.726       |
-| **MNIST** | **12** | **0.491**   | **0.550** | **+0.059**        | **0.429** | **0.361**   |
+| Digits    | 8      | 0.773       | 0.668     | −0.105            | 0.536     | 0.726       |
+| **MNIST** | **12** | **0.491**   | **0.546** | **+0.055**        | **0.422** | **0.361**   |
 
-On 1,797 digits DYF *under*-splits (7 communities for 10 classes) and loses on both metrics. On 70,000 it lands at 12 and wins on both. Same code, same defaults.
+On 1,797 digits DYF *under*-splits (8 communities for 10 classes) and loses on both metrics. On 70,000 it lands at 12 and wins on both. Same code, same defaults.
 
 ### Why does scale help?
 
-DYF clusters leaf centroids, not points. On Digits the tree has around 170 leaves; a modularity optimiser on a graph that small hits its resolution limit and merges genuine classes — the well-known failure of modularity on small graphs, not a property of the digits. On MNIST the tree has thousands of leaves, the community graph is rich enough to resolve ten-plus communities, and the partition snaps to the label. The [Digits](digits.qmd) notebook shows the other side of this: raising the Louvain `resolution` to 2 recovers 11 communities there and beats the default on both metrics.
+DYF clusters leaf centroids, not points. On Digits the tree has around 190 leaves; a modularity optimiser on a graph that small hits its resolution limit and merges genuine classes — the well-known failure of modularity on small graphs, not a property of the digits. On MNIST the tree has about 3,200 leaves, the community graph is rich enough to resolve ten-plus communities, and the partition snaps to the label. The [Digits](digits.qmd) notebook shows the other side of this: raising the Louvain `resolution` to 2 recovers 10 communities there and beats the default on both metrics.
 
 So the axis that matters is not sample count as such but **leaf count** — how many super-points the tree hands to community detection. Below a few hundred, expect under-splitting at the default resolution.
 

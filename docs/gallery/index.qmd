@@ -18,11 +18,11 @@ listing:
   type: grid
   grid-columns: 3
   sort: "order"
-  fields: [image, title, subtitle, categories, true-k, recovered-k, nmi]
+  fields: [image, title, subtitle, categories, true-k, recovered-k, ami]
   field-display-names:
     true-k: "True k"
     recovered-k: "Recovered k"
-    nmi: "NMI"
+    ami: "AMI"
   filter-ui: [categories]
   sort-ui: false
 ---
@@ -38,8 +38,8 @@ DYF's pitch is different. **Build the tree once, and you get the whole hierarchy
 Each notebook below runs the same three lines of DYF against a dataset with known class structure. The metric columns that matter are:
 
 - **Recovered k** — the finest-resolution partition DYF finds from the data.
-- **Merge walk** — how NMI and ARI evolve as you collapse that partition to coarser `k` values.
-- **NMI / ARI at matched granularity** — how closely DYF's partition aligns with the ground truth at the *resolution* the label is expressed at.
+- **Merge walk** — how AMI and ARI evolve as you collapse that partition to coarser `k` values.
+- **AMI / ARI at matched granularity** — how closely DYF's partition aligns with the ground truth at the *resolution* the label is expressed at.
 
 Each notebook also scores k-means (told the oracle `k`) as a ceiling, and HDBSCAN (parameter-light, but not parameter-free) as a second baseline. Where DYF loses, the notebook says so.
 
@@ -59,13 +59,19 @@ The gallery's cross-notebook findings cluster into four patterns:
 | Cluster *shape*  | Low-dim curved / topologically nested (HDBSCAN wins — [see Moons](synthetic-shapes.qmd)) | Convex or hierarchical clusters in medium-to-high dim |
 | Data *scale*     | Very small n, very high d ([Olivetti](olivetti-faces.qmd) 400 × 4096 breaks it) | Medium-to-large n, moderate d — where HDBSCAN's O(n²) breaks |
 
-**Recovered k tracks the label once the tree has enough leaves.** On [MNIST](mnist.qmd) DYF finds 12 communities for 10 classes and on [CIFAR-10 + CLIP](cifar10-clip.qmd) exactly 10 for 10 — in both cases beating oracle k-means on ARI without being told `k`. The failure mode runs the other way on small data: [Digits](digits.qmd) (1,797 points, ~170 leaves) recovers 7 for 10 and [20 Newsgroups](twenty-newsgroups.qmd) 10 for 20, because a modularity optimiser on a graph of a few hundred leaf centroids hits its resolution limit and merges real classes. Raising Louvain `resolution` fixes that (Digits at `resolution=2`: 11 communities, better on both metrics); the default is left at 1.0 because no single value won across the gallery.
+**Recovered k tracks the label once the tree has enough leaves.** On [MNIST](mnist.qmd) DYF finds 12 communities for 10 classes and on [CIFAR-10 + CLIP](cifar10-clip.qmd) 11 for 10 — in both cases beating oracle k-means on ARI without being told `k`. The failure mode runs the other way on small data: [Digits](digits.qmd) (1,797 points, ~190 leaves) recovers 8 for 10 and [20 Newsgroups](twenty-newsgroups.qmd) 12 for 20, because a modularity optimiser on a graph of a few hundred leaf centroids hits its resolution limit and merges real classes. Raising Louvain `resolution` fixes that (Digits at `resolution=2`: 10 communities, better on both metrics); the default is left at 1.0 because no single value won across the gallery.
 
 *(Earlier versions of this page said the opposite — "over-partitioning is often a feature", citing 81 MNIST communities. That count came from a single-level Louvain in `dyf-rs` before 0.12.0 that could not merge communities; see dyf's `KNOWN_ISSUES.md`, issue 10.)*
 
-**Merging walks hierarchy; it can't fix bad geometry.** On [Moons](synthetic-shapes.qmd) merging 3 → 2 *decreases* NMI. That's diagnostic: the raw over-partition must contain the coarser structure as a sub-partition for the merge to help.
+**Merging walks hierarchy; it can't fix bad geometry.** On [Moons](synthetic-shapes.qmd) merging 3 → 2 *decreases* AMI. That's diagnostic: the raw over-partition must contain the coarser structure as a sub-partition for the merge to help.
 
-**"True k" is frequently a fiction.** [CMU MoCap](cmu-mocap.qmd) has three plausible ground-truth labels at different granularities (7 / 25 / 80 classes). DYF recovers 18 communities and edges oracle k-means on ARI against the 25-class label (0.112 vs 0.103) while trailing it on NMI (0.290 vs 0.348) — and both are far from the leaf-level ceiling, because trial labels describe *trajectories* through pose space, not blobs in it. Frame-level clustering is the wrong tool for that label at any `k`; the notebook says so.
+**"True k" is frequently a fiction.** [CMU MoCap](cmu-mocap.qmd) has three plausible ground-truth labels at different granularities (7 / 25 / 80 classes). DYF recovers 15 communities and edges oracle k-means on ARI against the 25-class label (0.116 vs 0.103) while trailing it on AMI (0.292 vs 0.348) — and both are far from the leaf-level ceiling, because trial labels describe *trajectories* through pose space, not blobs in it. Frame-level clustering is the wrong tool for that label at any `k`; the notebook says so.
+
+## What about speed?
+
+Every page's metrics table has a `wall (s)` column: DYF's tree build + index write + Louvain against one k-means++ init at the oracle `k` (the shared UMAP layout is excluded from both). The honest reading at gallery scale — 400 to 70,000 points — is that **DYF is the slower tool on every page**, by a factor that ranges from noise on Digits to roughly an order of magnitude on Olivetti and CIFAR-10. That is not a surprise: k-means with `k` handed to it and a single init is close to the cheapest partition there is, and DYF is paying for an on-disk index and a hierarchy that k-means does not produce at any `k`.
+
+The comparison where DYF is the faster tool is a different one. At 1.3M cells the shipped pipeline matches a kNN-graph + Leiden partition (ARI 0.603 vs 0.608 against scanpy's labels) in roughly a seventh of the wall time — dyf `KNOWN_ISSUES.md` #10 has the measurement — and at that scale a graph pipeline, not k-means, is what people actually run. The gallery does not include a dataset that size, so it does not make that claim on its own evidence.
 
 ## Who should be in your toolbox?
 
@@ -91,16 +97,16 @@ Not needing `k` or `eps` is the real claim DYF makes. The ones below are structu
 
 ### Parameters DYF fixes at defaults
 
-Every notebook uses **the same rule** — `auto_tune_tree_params(n)` in `_gallery.py`, which sets the tree parameters from the sample count alone. Nothing is tuned per dataset against the labels. Where the rule breaks, the relevant notebook says so honestly.
+Every notebook uses **the library's own defaults** — `build_dyf_tree(num_bits=3, max_depth=4, min_leaf_size=20)`, which `_gallery.run_dyf` passes unchanged. Nothing is tuned per dataset against the labels. (`_gallery.auto_tune_tree_params(n)`, a rule that derives the depth from the sample count, used to be the default here; measured on the seven labelled datasets with the multilevel Louvain it loses to the fixed defaults — mean ARI 0.436 vs 0.440, winning 3 of 7 — so it is kept only for explicit experiments. dyf `KNOWN_ISSUES.md` #9.) Where the defaults break, the relevant notebook says so honestly.
 
 | Parameter | Default | What it does | Known failure mode |
 |---|---:|---|---|
-| `max_depth` | ⌈log₄(n/20)⌉, capped at 6 | Tree depth (→ ≤ 4⁶ = 4,096 leaves) | The cap makes the leaf count stop growing above ~80K points, so `target_bucket_size` is inert at 1M+ (dyf `KNOWN_ISSUES.md` #9) |
-| `num_bits` | 2 | Branching factor (4-way splits) | Alternatives untested at gallery scale |
-| `min_leaf_size` | 10 | Leaves must contain ≥10 points | Breaks below ~10 points per latent class ([Olivetti](olivetti-faces.qmd)) |
+| `num_bits` | 3 | Branching factor (8-way splits per level) | Alternatives (2 bits, deeper trees) measured and not better |
+| `max_depth` | 4 | Tree depth (→ ≤ 8⁴ = 4,096 leaves) | Fixed regardless of `n`; at 1.3M points leaves average ~350 points and the partition still matches the incumbent, because the centroid graph, not leaf purity, is the bottleneck |
+| `min_leaf_size` | 20 | Leaves must contain ≥20 points | Breaks below ~10 points per latent class ([Olivetti](olivetti-faces.qmd)) |
 | Louvain `resolution` | 1.0 | Modularity granularity | Under-splits small leaf graphs (≲ a few hundred leaves — [Digits](digits.qmd), [20 Newsgroups](twenty-newsgroups.qmd)); `resolution=2` fixes Digits |
 | Louvain `leaf_k` | 10 | kNN on leaf centroids | No observed failure mode |
-| Metric | cosine | Implicit in LSH tree construction | Wrong for low-dim Euclidean ([Moons](synthetic-shapes.qmd) partial failure) |
+| Row normalisation | always | Every tree fit L2-normalises rows first, so the tree partitions *directions* (dyf `KNOWN_ISSUES.md` #11) | Erases the norm — fatal when the norm *is* the structure, as in low-d raw coordinates ([Moons / Circles](synthetic-shapes.qmd)); harmless for embeddings, which live on the sphere anyway |
 | `seed` | 42 | Reproducibility | Run-to-run variance uncharacterized |
 
 ### Parameters the reader *does* supply
