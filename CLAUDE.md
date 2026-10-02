@@ -81,6 +81,24 @@ real execution path is mute. It runs real invocations instead.
 
 Open queue with priorities: `KNOWN_ISSUES.md`.
 
+### Parked: sequence key / leaf Markov state model (2026-10-01)
+
+One day of pre-registered probes asked whether dyf can read non-linear structure (cycles,
+gradients, direction). Result: the tree does not destroy cycles, it pools over them — leaves are
+phase slices, so centroid-level topology sees only polygons. The structure lives in the *order* of
+points, which dyf does not model. A sequence layer (two fields `seq_id`/`seq_pos`, a tree-node
+symbol string per sequence, a transition count matrix) recovered the MoCap gait period from the
+complex eigenvalue of the leaf transition matrix (65 vs 59 frames; dance null), found shared
+transition poses via egress entropy, and read direction via entry/exit mutual information. On
+sec10quant the embedding carries no fiscal cycle (probe at chance), so no consumer has data that
+needs it yet.
+
+**Justin's call: not compelling enough to pursue now.** Do not build it into dyf or start a
+package without a consumer question. If it is picked up, it is a downstream package (dyfviz
+pattern), dyf core unchanged. Everything needed to resume is in
+`/Volumes/Models/dyf_bench_2026-10-01/` (`leaf_msm_*`, `sequence_key_layer_*`, the plans, and
+`nonlinear-structure-under-the-dyf-tree.qmd`) and in memory `project_leaf_graph_cycles_probe_2026_10`.
+
 ## Release Workflow
 
 When adding features or making API changes:
