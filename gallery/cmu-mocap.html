@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.10.18">
+<meta name="generator" content="quarto-1.10.19">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -77,9 +77,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-1ed79dc1172df127c7d94f8abf7ffee9.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-c22d5dff81f50d6ca627b6188dc743b9.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-1ed79dc1172df127c7d94f8abf7ffee9.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-2253679dd5a56ef632de4277f35d5a2c.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-99131190c761fa326849492283a1b6ed.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-2253679dd5a56ef632de4277f35d5a2c.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
 <link href="../site_libs/bootstrap/bootstrap-077483bf2c889e981b53a146dc5bf4c0.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
@@ -465,13 +465,13 @@ trial_id:    80 classes — individual recording sessions</code></pre>
 <span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Score against the middle-granularity label (description, k=25) for the main run.</span></span>
 <span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> run_dyf_cached(X, y_desc_idx, cache_path<span class="op">=</span><span class="st">"/tmp/gallery_mocap_dyf.npz"</span>)</span>
 <span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Recovered k:       </span><span class="sc">{</span>result<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"NMI vs description: </span><span class="sc">{</span>result<span class="sc">.</span>nmi<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"AMI vs description: </span><span class="sc">{</span>result<span class="sc">.</span>ami<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
 <span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"ARI vs description: </span><span class="sc">{</span>result<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stdout">
-<pre><code>Recovered k:       18
-NMI vs description: 0.290
-ARI vs description: 0.112</code></pre>
+<pre><code>Recovered k:       15
+AMI vs description: 0.292
+ARI vs description: 0.116</code></pre>
 </div>
 </div>
 </section>
@@ -480,27 +480,27 @@ ARI vs description: 0.112</code></pre>
 <div id="multi-gt" class="cell" data-execution_count="4">
 <details open="" class="code-fold">
 <summary>Code</summary>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.metrics <span class="im">import</span> adjusted_mutual_info_score <span class="im">as</span> nmi</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.metrics <span class="im">import</span> adjusted_mutual_info_score <span class="im">as</span> ami</span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.metrics <span class="im">import</span> adjusted_rand_score <span class="im">as</span> ari</span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>rows <span class="op">=</span> []</span>
 <span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> name, y_idx <span class="kw">in</span> [(<span class="st">"motion_type (k=7)"</span>,   y_motion_idx),</span>
 <span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>                    (<span class="st">"description (k=25)"</span>,  y_desc_idx),</span>
 <span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>                    (<span class="st">"trial_id (k=80)"</span>,     y_trial_idx)]:</span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>    rows.append((name, nmi(y_idx, result.labels), ari(y_idx, result.labels)))</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>    rows.append((name, ami(y_idx, result.labels), ari(y_idx, result.labels)))</span>
 <span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span><span class="st">'Ground truth'</span><span class="sc">:25s}</span><span class="ss">  NMI     ARI"</span>)</span>
-<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> name, m_nmi, m_ari <span class="kw">in</span> rows:</span>
-<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span>name<span class="sc">:25s}</span><span class="ss">  </span><span class="sc">{</span>m_nmi<span class="sc">:.3f}</span><span class="ss">   </span><span class="sc">{</span>m_ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span><span class="st">'Ground truth'</span><span class="sc">:25s}</span><span class="ss">  AMI     ARI"</span>)</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> name, m_ami, m_ari <span class="kw">in</span> rows:</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span>name<span class="sc">:25s}</span><span class="ss">  </span><span class="sc">{</span>m_ami<span class="sc">:.3f}</span><span class="ss">   </span><span class="sc">{</span>m_ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stdout">
-<pre><code>Ground truth               NMI     ARI
-motion_type (k=7)          0.243   0.109
-description (k=25)         0.290   0.112
-trial_id (k=80)            0.335   0.088</code></pre>
+<pre><code>Ground truth               AMI     ARI
+motion_type (k=7)          0.247   0.114
+description (k=25)         0.292   0.116
+trial_id (k=80)            0.332   0.088</code></pre>
 </div>
 </div>
-<p>Low across the board, and the pattern is telling: NMI <em>rises</em> with label granularity (7 → 25 → 80 classes) while ARI barely moves. The partition shares information with the trial structure but does not reproduce any level of it as clusters.</p>
+<p>Low across the board, and the pattern is telling: AMI <em>rises</em> with label granularity (7 → 25 → 80 classes) while ARI barely moves. The partition shares information with the trial structure but does not reproduce any level of it as clusters.</p>
 </section>
 <section id="oracle-k-means-on-the-middle-granularity" class="level2">
 <h2 class="anchored" data-anchor-id="oracle-k-means-on-the-middle-granularity">Oracle k-means on the middle granularity</h2>
@@ -508,15 +508,15 @@ trial_id (k=80)            0.335   0.088</code></pre>
 <details open="" class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>kmeans <span class="op">=</span> run_kmeans(X, y_desc_idx)</span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"K-means told k=25: NMI=</span><span class="sc">{</span>kmeans[<span class="st">'nmi'</span>]<span class="sc">:.3f}</span><span class="ss">, ARI=</span><span class="sc">{</span>kmeans[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
-<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"DYF (no k given):  NMI=</span><span class="sc">{</span>result<span class="sc">.</span>nmi<span class="sc">:.3f}</span><span class="ss">, ARI=</span><span class="sc">{</span>result<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"K-means told k=25: AMI=</span><span class="sc">{</span>kmeans[<span class="st">'ami'</span>]<span class="sc">:.3f}</span><span class="ss">, ARI=</span><span class="sc">{</span>kmeans[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">  wall=</span><span class="sc">{</span>kmeans[<span class="st">'seconds'</span>]<span class="sc">:.1f}</span><span class="ss">s"</span>)</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"DYF (no k given):  AMI=</span><span class="sc">{</span>result<span class="sc">.</span>ami<span class="sc">:.3f}</span><span class="ss">, ARI=</span><span class="sc">{</span>result<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">  wall=</span><span class="sc">{</span>result<span class="sc">.</span>seconds<span class="sc">:.1f}</span><span class="ss">s"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stdout">
-<pre><code>K-means told k=25: NMI=0.348, ARI=0.103
-DYF (no k given):  NMI=0.290, ARI=0.112</code></pre>
+<pre><code>K-means told k=25: AMI=0.348, ARI=0.103  wall=0.1s
+DYF (no k given):  AMI=0.292, ARI=0.116  wall=0.3s</code></pre>
 </div>
 </div>
-<p>DYF edges k-means on ARI and trails it on NMI, and both are far from good. Being handed <code>k=25</code> did not rescue k-means: the labels are not the kind of thing a frame-level partition can recover, whichever algorithm draws it.</p>
+<p>DYF edges k-means on ARI and trails it on AMI, and both are far from good. Being handed <code>k=25</code> did not rescue k-means: the labels are not the kind of thing a frame-level partition can recover, whichever algorithm draws it.</p>
 </section>
 <section id="walking-down-the-hierarchy-against-each-ground-truth" class="level2">
 <h2 class="anchored" data-anchor-id="walking-down-the-hierarchy-against-each-ground-truth">Walking down the hierarchy against each ground truth</h2>
@@ -527,11 +527,11 @@ DYF (no k given):  NMI=0.290, ARI=0.112</code></pre>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> _gallery <span class="im">import</span> merge_walk, merge_walk_table</span>
 <span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"**Against `motion_type` (k=7):**</span><span class="ch">\n</span><span class="st">"</span>)</span>
-<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(merge_walk_table(merge_walk(result, X, y_motion_idx, targets<span class="op">=</span>[<span class="dv">25</span>, <span class="dv">10</span>, <span class="dv">7</span>, <span class="dv">3</span>]), result))</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(merge_walk_table(merge_walk(result, X, y_motion_idx, targets<span class="op">=</span>[<span class="dv">25</span>, <span class="dv">10</span>, <span class="dv">7</span>, <span class="dv">3</span>]), result, y_true<span class="op">=</span>y_motion_idx))</span>
 <span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"</span><span class="ch">\n\n</span><span class="st">**Against `description` (k=25):**</span><span class="ch">\n</span><span class="st">"</span>)</span>
-<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(merge_walk_table(merge_walk(result, X, y_desc_idx, targets<span class="op">=</span>[<span class="dv">40</span>, <span class="dv">25</span>, <span class="dv">15</span>, <span class="dv">7</span>]), result))</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(merge_walk_table(merge_walk(result, X, y_desc_idx, targets<span class="op">=</span>[<span class="dv">40</span>, <span class="dv">25</span>, <span class="dv">15</span>, <span class="dv">7</span>]), result, y_true<span class="op">=</span>y_desc_idx))</span>
 <span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"</span><span class="ch">\n\n</span><span class="st">**Against `trial_id` (k=80):**</span><span class="ch">\n</span><span class="st">"</span>)</span>
-<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(merge_walk_table(merge_walk(result, X, y_trial_idx, targets<span class="op">=</span>[<span class="dv">60</span>, <span class="dv">40</span>, <span class="dv">25</span>, <span class="dv">10</span>]), result))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(merge_walk_table(merge_walk(result, X, y_trial_idx, targets<span class="op">=</span>[<span class="dv">60</span>, <span class="dv">40</span>, <span class="dv">25</span>, <span class="dv">10</span>]), result, y_true<span class="op">=</span>y_trial_idx))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <p><strong>Against <code>motion_type</code> (k=7):</strong></p>
 <table class="caption-top table table-sm table-striped small">
@@ -539,40 +539,40 @@ DYF (no k given):  NMI=0.290, ARI=0.112</code></pre>
 <tr class="header">
 <th>Resolution</th>
 <th style="text-align: right;">Actual k</th>
-<th style="text-align: right;">NMI</th>
+<th style="text-align: right;">AMI</th>
 <th style="text-align: right;">ARI</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td><strong>Raw DYF</strong></td>
-<td style="text-align: right;"><strong>18</strong></td>
-<td style="text-align: right;"><strong>0.290</strong></td>
-<td style="text-align: right;"><strong>0.112</strong></td>
+<td style="text-align: right;"><strong>15</strong></td>
+<td style="text-align: right;"><strong>0.247</strong></td>
+<td style="text-align: right;"><strong>0.114</strong></td>
 </tr>
 <tr class="even">
 <td>merge → 25</td>
-<td style="text-align: right;">18</td>
-<td style="text-align: right;">0.243</td>
-<td style="text-align: right;">0.109</td>
+<td style="text-align: right;">15</td>
+<td style="text-align: right;">0.247</td>
+<td style="text-align: right;">0.114</td>
 </tr>
 <tr class="odd">
 <td>merge → 10</td>
 <td style="text-align: right;">10</td>
-<td style="text-align: right;">0.257</td>
-<td style="text-align: right;">0.158</td>
+<td style="text-align: right;">0.267</td>
+<td style="text-align: right;">0.172</td>
 </tr>
 <tr class="even">
 <td>merge → 7</td>
 <td style="text-align: right;">7</td>
-<td style="text-align: right;">0.166</td>
-<td style="text-align: right;">0.097</td>
+<td style="text-align: right;">0.151</td>
+<td style="text-align: right;">0.054</td>
 </tr>
 <tr class="odd">
 <td>merge → 3</td>
 <td style="text-align: right;">3</td>
-<td style="text-align: right;">0.115</td>
-<td style="text-align: right;">0.070</td>
+<td style="text-align: right;">0.033</td>
+<td style="text-align: right;">-0.039</td>
 </tr>
 </tbody>
 </table>
@@ -582,40 +582,40 @@ DYF (no k given):  NMI=0.290, ARI=0.112</code></pre>
 <tr class="header">
 <th>Resolution</th>
 <th style="text-align: right;">Actual k</th>
-<th style="text-align: right;">NMI</th>
+<th style="text-align: right;">AMI</th>
 <th style="text-align: right;">ARI</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td><strong>Raw DYF</strong></td>
-<td style="text-align: right;"><strong>18</strong></td>
-<td style="text-align: right;"><strong>0.290</strong></td>
-<td style="text-align: right;"><strong>0.112</strong></td>
+<td style="text-align: right;"><strong>15</strong></td>
+<td style="text-align: right;"><strong>0.292</strong></td>
+<td style="text-align: right;"><strong>0.116</strong></td>
 </tr>
 <tr class="even">
 <td>merge → 40</td>
-<td style="text-align: right;">18</td>
-<td style="text-align: right;">0.290</td>
-<td style="text-align: right;">0.112</td>
+<td style="text-align: right;">15</td>
+<td style="text-align: right;">0.292</td>
+<td style="text-align: right;">0.116</td>
 </tr>
 <tr class="odd">
 <td>merge → 25</td>
-<td style="text-align: right;">18</td>
-<td style="text-align: right;">0.290</td>
-<td style="text-align: right;">0.112</td>
+<td style="text-align: right;">15</td>
+<td style="text-align: right;">0.292</td>
+<td style="text-align: right;">0.116</td>
 </tr>
 <tr class="even">
 <td>merge → 15</td>
 <td style="text-align: right;">15</td>
-<td style="text-align: right;">0.297</td>
-<td style="text-align: right;">0.151</td>
+<td style="text-align: right;">0.292</td>
+<td style="text-align: right;">0.116</td>
 </tr>
 <tr class="odd">
 <td>merge → 7</td>
 <td style="text-align: right;">7</td>
-<td style="text-align: right;">0.199</td>
-<td style="text-align: right;">0.082</td>
+<td style="text-align: right;">0.179</td>
+<td style="text-align: right;">0.033</td>
 </tr>
 </tbody>
 </table>
@@ -625,40 +625,40 @@ DYF (no k given):  NMI=0.290, ARI=0.112</code></pre>
 <tr class="header">
 <th>Resolution</th>
 <th style="text-align: right;">Actual k</th>
-<th style="text-align: right;">NMI</th>
+<th style="text-align: right;">AMI</th>
 <th style="text-align: right;">ARI</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td><strong>Raw DYF</strong></td>
-<td style="text-align: right;"><strong>18</strong></td>
-<td style="text-align: right;"><strong>0.290</strong></td>
-<td style="text-align: right;"><strong>0.112</strong></td>
+<td style="text-align: right;"><strong>15</strong></td>
+<td style="text-align: right;"><strong>0.332</strong></td>
+<td style="text-align: right;"><strong>0.088</strong></td>
 </tr>
 <tr class="even">
 <td>merge → 60</td>
-<td style="text-align: right;">18</td>
-<td style="text-align: right;">0.335</td>
+<td style="text-align: right;">15</td>
+<td style="text-align: right;">0.332</td>
 <td style="text-align: right;">0.088</td>
 </tr>
 <tr class="odd">
 <td>merge → 40</td>
-<td style="text-align: right;">18</td>
-<td style="text-align: right;">0.335</td>
+<td style="text-align: right;">15</td>
+<td style="text-align: right;">0.332</td>
 <td style="text-align: right;">0.088</td>
 </tr>
 <tr class="even">
 <td>merge → 25</td>
-<td style="text-align: right;">18</td>
-<td style="text-align: right;">0.335</td>
+<td style="text-align: right;">15</td>
+<td style="text-align: right;">0.332</td>
 <td style="text-align: right;">0.088</td>
 </tr>
 <tr class="odd">
 <td>merge → 10</td>
 <td style="text-align: right;">10</td>
-<td style="text-align: right;">0.304</td>
-<td style="text-align: right;">0.077</td>
+<td style="text-align: right;">0.316</td>
+<td style="text-align: right;">0.086</td>
 </tr>
 </tbody>
 </table>
@@ -744,11 +744,11 @@ Figure&nbsp;4: K-means given the oracle k=25 (description granularity).
 </section>
 <section id="why-frame-level-clustering-struggles-here" class="level2">
 <h2 class="anchored" data-anchor-id="why-frame-level-clustering-struggles-here">Why frame-level clustering struggles here</h2>
-<p>Look at the ground-truth panels: a trial is not a blob, it is a <em>path</em>. A walking cycle sweeps through pose space and returns; a dance trial visits several regions in sequence. Two trials of the same description overlap where their paths cross and diverge where they don’t. Any method that partitions <em>frames</em> by <em>where they sit in pose space</em> — DYF’s leaves, k-means’s Voronoi cells — will group frames from different trials that happen to pass through the same pose, and split one trial across the regions its path visits. That is exactly the NMI-rises-with-granularity / ARI-stays-flat signature above.</p>
+<p>Look at the ground-truth panels: a trial is not a blob, it is a <em>path</em>. A walking cycle sweeps through pose space and returns; a dance trial visits several regions in sequence. Two trials of the same description overlap where their paths cross and diverge where they don’t. Any method that partitions <em>frames</em> by <em>where they sit in pose space</em> — DYF’s leaves, k-means’s Voronoi cells — will group frames from different trials that happen to pass through the same pose, and split one trial across the regions its path visits. That is exactly the AMI-rises-with-granularity / ARI-stays-flat signature above.</p>
 <p>Three consequences:</p>
 <p><strong>1. The labels are about sequence; the features are about position.</strong> The natural signal for “which trial is this” is <em>adjacent-frame</em> structure — consecutive frames are nearly identical, and a trial boundary is a jump. The raw frame-to-frame step distance separates trial boundaries almost perfectly on this data; a frame-level partition throws that information away by construction. A time-aware model (HMM, sequence embedding) is the right tool for the label; this notebook is deliberately about frame-level structure only.</p>
 <p><strong>2. Being told <code>k</code> does not help.</strong> K-means at the oracle <code>k=25</code> lands in the same low range as DYF. When the label is not a partition of the feature space, the number of clusters is not the missing information.</p>
-<p><strong>3. What DYF’s 18 communities <em>are</em>.</strong> They are regions of pose space — standing poses, mid-stride poses, arms-raised poses — that several trials share. That is real structure, and for a retrieval task (“find frames that look like this one”) it is the right structure. It is simply not what the trial labels describe.</p>
+<p><strong>3. What DYF’s 15 communities <em>are</em>.</strong> They are regions of pose space — standing poses, mid-stride poses, arms-raised poses — that several trials share. That is real structure, and for a retrieval task (“find frames that look like this one”) it is the right structure. It is simply not what the trial labels describe.</p>
 <section id="the-sports-analogy-completed" class="level3">
 <h3 class="anchored" data-anchor-id="the-sports-analogy-completed">The sports analogy, completed</h3>
 <p>Across the four notebooks we now have:</p>
@@ -779,12 +779,12 @@ Figure&nbsp;4: K-means given the oracle k=25 (description granularity).
 <tr class="odd">
 <td>20 Newsgroups</td>
 <td>Curved, hierarchical</td>
-<td>K-means ahead by 0.03 NMI</td>
+<td>K-means ahead by 0.01 AMI</td>
 </tr>
 <tr class="even">
 <td><strong>CMU MoCap</strong></td>
 <td><strong>Trajectories, ambiguous k</strong></td>
-<td><strong>Neither works; DYF edges ARI, trails NMI</strong></td>
+<td><strong>Neither works; DYF edges ARI, trails AMI</strong></td>
 </tr>
 </tbody>
 </table>
@@ -796,7 +796,7 @@ Figure&nbsp;4: K-means given the oracle k=25 (description granularity).
 <ul>
 <li><strong>“True k” is often a fiction.</strong> If a dataset has multiple plausible labelings at different granularities, your clustering algorithm shouldn’t demand you pick one upfront — but it also cannot recover a label that is not a partition of the features.</li>
 <li><strong>DYF operates on raw features, no embedding required.</strong> Motion capture, tabular data, sensor readings — anywhere the raw features have meaningful geometry, DYF can go in direct.</li>
-<li><strong>Read NMI and ARI together.</strong> NMI rising with label granularity while ARI stays flat is the fingerprint of shared information without shared clusters. On its own, either number would have told a different, wrong story.</li>
+<li><strong>Read AMI and ARI together.</strong> AMI rising with label granularity while ARI stays flat is the fingerprint of shared information without shared clusters. On its own, either number would have told a different, wrong story.</li>
 </ul>
 </section>
 <section id="caveats" class="level2">
@@ -804,7 +804,7 @@ Figure&nbsp;4: K-means given the oracle k=25 (description granularity).
 <ul>
 <li><strong>Subsampled to 28,167 frames</strong> for the gallery render. The full 140,837-frame results show the same pattern.</li>
 <li><strong>No temporal structure used.</strong> These are frame-level features — adjacent-frame similarity within a walk cycle isn’t exploited. That is the whole diagnosis above, not a footnote to it.</li>
-<li><strong>Earlier versions of this page reported 56 communities and “DYF beats oracle k-means on NMI against every label.”</strong> The count came from a single-level Louvain in <code>dyf-rs</code> before 0.12.0 that could not merge communities (dyf <code>KNOWN_ISSUES.md</code>, issue 10), and the over-split partition inflated NMI against fine-grained labels. The numbers here are from the corrected optimiser.</li>
+<li><strong>Earlier versions of this page reported 56 communities and “DYF beats oracle k-means on AMI against every label.”</strong> The count came from a single-level Louvain in <code>dyf-rs</code> before 0.12.0 that could not merge communities (dyf <code>KNOWN_ISSUES.md</code>, issue 10), and the over-split partition inflated AMI against fine-grained labels. The numbers here are from the corrected optimiser.</li>
 </ul>
 
 
@@ -1354,7 +1354,7 @@ Figure&nbsp;4: K-means given the oracle k=25 (description granularity).
 <span id="cb16-81"><a href="#cb16-81" aria-hidden="true" tabindex="-1"></a><span class="co"># Score against the middle-granularity label (description, k=25) for the main run.</span></span>
 <span id="cb16-82"><a href="#cb16-82" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> run_dyf_cached(X, y_desc_idx, cache_path<span class="op">=</span><span class="st">"/tmp/gallery_mocap_dyf.npz"</span>)</span>
 <span id="cb16-83"><a href="#cb16-83" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Recovered k:       </span><span class="sc">{</span>result<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb16-84"><a href="#cb16-84" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"NMI vs description: </span><span class="sc">{</span>result<span class="sc">.</span>nmi<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb16-84"><a href="#cb16-84" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"AMI vs description: </span><span class="sc">{</span>result<span class="sc">.</span>ami<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
 <span id="cb16-85"><a href="#cb16-85" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"ARI vs description: </span><span class="sc">{</span>result<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
 <span id="cb16-86"><a href="#cb16-86" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
 <span id="cb16-87"><a href="#cb16-87" aria-hidden="true" tabindex="-1"></a></span>
@@ -1362,32 +1362,32 @@ Figure&nbsp;4: K-means given the oracle k=25 (description granularity).
 <span id="cb16-89"><a href="#cb16-89" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb16-92"><a href="#cb16-92" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
 <span id="cb16-93"><a href="#cb16-93" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: multi-gt</span></span>
-<span id="cb16-94"><a href="#cb16-94" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.metrics <span class="im">import</span> adjusted_mutual_info_score <span class="im">as</span> nmi</span>
+<span id="cb16-94"><a href="#cb16-94" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.metrics <span class="im">import</span> adjusted_mutual_info_score <span class="im">as</span> ami</span>
 <span id="cb16-95"><a href="#cb16-95" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.metrics <span class="im">import</span> adjusted_rand_score <span class="im">as</span> ari</span>
 <span id="cb16-96"><a href="#cb16-96" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb16-97"><a href="#cb16-97" aria-hidden="true" tabindex="-1"></a>rows <span class="op">=</span> []</span>
 <span id="cb16-98"><a href="#cb16-98" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> name, y_idx <span class="kw">in</span> [(<span class="st">"motion_type (k=7)"</span>,   y_motion_idx),</span>
 <span id="cb16-99"><a href="#cb16-99" aria-hidden="true" tabindex="-1"></a>                    (<span class="st">"description (k=25)"</span>,  y_desc_idx),</span>
 <span id="cb16-100"><a href="#cb16-100" aria-hidden="true" tabindex="-1"></a>                    (<span class="st">"trial_id (k=80)"</span>,     y_trial_idx)]:</span>
-<span id="cb16-101"><a href="#cb16-101" aria-hidden="true" tabindex="-1"></a>    rows.append((name, nmi(y_idx, result.labels), ari(y_idx, result.labels)))</span>
+<span id="cb16-101"><a href="#cb16-101" aria-hidden="true" tabindex="-1"></a>    rows.append((name, ami(y_idx, result.labels), ari(y_idx, result.labels)))</span>
 <span id="cb16-102"><a href="#cb16-102" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-103"><a href="#cb16-103" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span><span class="st">'Ground truth'</span><span class="sc">:25s}</span><span class="ss">  NMI     ARI"</span>)</span>
-<span id="cb16-104"><a href="#cb16-104" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> name, m_nmi, m_ari <span class="kw">in</span> rows:</span>
-<span id="cb16-105"><a href="#cb16-105" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span>name<span class="sc">:25s}</span><span class="ss">  </span><span class="sc">{</span>m_nmi<span class="sc">:.3f}</span><span class="ss">   </span><span class="sc">{</span>m_ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb16-103"><a href="#cb16-103" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span><span class="st">'Ground truth'</span><span class="sc">:25s}</span><span class="ss">  AMI     ARI"</span>)</span>
+<span id="cb16-104"><a href="#cb16-104" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> name, m_ami, m_ari <span class="kw">in</span> rows:</span>
+<span id="cb16-105"><a href="#cb16-105" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span>name<span class="sc">:25s}</span><span class="ss">  </span><span class="sc">{</span>m_ami<span class="sc">:.3f}</span><span class="ss">   </span><span class="sc">{</span>m_ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
 <span id="cb16-106"><a href="#cb16-106" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
 <span id="cb16-107"><a href="#cb16-107" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-108"><a href="#cb16-108" aria-hidden="true" tabindex="-1"></a>Low across the board, and the pattern is telling: NMI *rises* with label granularity (7 → 25 → 80 classes) while ARI barely moves. The partition shares information with the trial structure but does not reproduce any level of it as clusters.</span>
+<span id="cb16-108"><a href="#cb16-108" aria-hidden="true" tabindex="-1"></a>Low across the board, and the pattern is telling: AMI *rises* with label granularity (7 → 25 → 80 classes) while ARI barely moves. The partition shares information with the trial structure but does not reproduce any level of it as clusters.</span>
 <span id="cb16-109"><a href="#cb16-109" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb16-110"><a href="#cb16-110" aria-hidden="true" tabindex="-1"></a><span class="fu">## Oracle k-means on the middle granularity</span></span>
 <span id="cb16-111"><a href="#cb16-111" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb16-114"><a href="#cb16-114" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
 <span id="cb16-115"><a href="#cb16-115" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: kmeans</span></span>
 <span id="cb16-116"><a href="#cb16-116" aria-hidden="true" tabindex="-1"></a>kmeans <span class="op">=</span> run_kmeans(X, y_desc_idx)</span>
-<span id="cb16-117"><a href="#cb16-117" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"K-means told k=25: NMI=</span><span class="sc">{</span>kmeans[<span class="st">'nmi'</span>]<span class="sc">:.3f}</span><span class="ss">, ARI=</span><span class="sc">{</span>kmeans[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
-<span id="cb16-118"><a href="#cb16-118" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"DYF (no k given):  NMI=</span><span class="sc">{</span>result<span class="sc">.</span>nmi<span class="sc">:.3f}</span><span class="ss">, ARI=</span><span class="sc">{</span>result<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb16-117"><a href="#cb16-117" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"K-means told k=25: AMI=</span><span class="sc">{</span>kmeans[<span class="st">'ami'</span>]<span class="sc">:.3f}</span><span class="ss">, ARI=</span><span class="sc">{</span>kmeans[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">  wall=</span><span class="sc">{</span>kmeans[<span class="st">'seconds'</span>]<span class="sc">:.1f}</span><span class="ss">s"</span>)</span>
+<span id="cb16-118"><a href="#cb16-118" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"DYF (no k given):  AMI=</span><span class="sc">{</span>result<span class="sc">.</span>ami<span class="sc">:.3f}</span><span class="ss">, ARI=</span><span class="sc">{</span>result<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">  wall=</span><span class="sc">{</span>result<span class="sc">.</span>seconds<span class="sc">:.1f}</span><span class="ss">s"</span>)</span>
 <span id="cb16-119"><a href="#cb16-119" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
 <span id="cb16-120"><a href="#cb16-120" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-121"><a href="#cb16-121" aria-hidden="true" tabindex="-1"></a>DYF edges k-means on ARI and trails it on NMI, and both are far from good. Being handed <span class="in">`k=25`</span> did not rescue k-means: the labels are not the kind of thing a frame-level partition can recover, whichever algorithm draws it.</span>
+<span id="cb16-121"><a href="#cb16-121" aria-hidden="true" tabindex="-1"></a>DYF edges k-means on ARI and trails it on AMI, and both are far from good. Being handed <span class="in">`k=25`</span> did not rescue k-means: the labels are not the kind of thing a frame-level partition can recover, whichever algorithm draws it.</span>
 <span id="cb16-122"><a href="#cb16-122" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb16-123"><a href="#cb16-123" aria-hidden="true" tabindex="-1"></a><span class="fu">## Walking down the hierarchy against each ground truth</span></span>
 <span id="cb16-124"><a href="#cb16-124" aria-hidden="true" tabindex="-1"></a></span>
@@ -1399,11 +1399,11 @@ Figure&nbsp;4: K-means given the oracle k=25 (description granularity).
 <span id="cb16-132"><a href="#cb16-132" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> _gallery <span class="im">import</span> merge_walk, merge_walk_table</span>
 <span id="cb16-133"><a href="#cb16-133" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb16-134"><a href="#cb16-134" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"**Against `motion_type` (k=7):**</span><span class="ch">\n</span><span class="st">"</span>)</span>
-<span id="cb16-135"><a href="#cb16-135" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(merge_walk_table(merge_walk(result, X, y_motion_idx, targets<span class="op">=</span>[<span class="dv">25</span>, <span class="dv">10</span>, <span class="dv">7</span>, <span class="dv">3</span>]), result))</span>
+<span id="cb16-135"><a href="#cb16-135" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(merge_walk_table(merge_walk(result, X, y_motion_idx, targets<span class="op">=</span>[<span class="dv">25</span>, <span class="dv">10</span>, <span class="dv">7</span>, <span class="dv">3</span>]), result, y_true<span class="op">=</span>y_motion_idx))</span>
 <span id="cb16-136"><a href="#cb16-136" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"</span><span class="ch">\n\n</span><span class="st">**Against `description` (k=25):**</span><span class="ch">\n</span><span class="st">"</span>)</span>
-<span id="cb16-137"><a href="#cb16-137" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(merge_walk_table(merge_walk(result, X, y_desc_idx, targets<span class="op">=</span>[<span class="dv">40</span>, <span class="dv">25</span>, <span class="dv">15</span>, <span class="dv">7</span>]), result))</span>
+<span id="cb16-137"><a href="#cb16-137" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(merge_walk_table(merge_walk(result, X, y_desc_idx, targets<span class="op">=</span>[<span class="dv">40</span>, <span class="dv">25</span>, <span class="dv">15</span>, <span class="dv">7</span>]), result, y_true<span class="op">=</span>y_desc_idx))</span>
 <span id="cb16-138"><a href="#cb16-138" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"</span><span class="ch">\n\n</span><span class="st">**Against `trial_id` (k=80):**</span><span class="ch">\n</span><span class="st">"</span>)</span>
-<span id="cb16-139"><a href="#cb16-139" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(merge_walk_table(merge_walk(result, X, y_trial_idx, targets<span class="op">=</span>[<span class="dv">60</span>, <span class="dv">40</span>, <span class="dv">25</span>, <span class="dv">10</span>]), result))</span>
+<span id="cb16-139"><a href="#cb16-139" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(merge_walk_table(merge_walk(result, X, y_trial_idx, targets<span class="op">=</span>[<span class="dv">60</span>, <span class="dv">40</span>, <span class="dv">25</span>, <span class="dv">10</span>]), result, y_true<span class="op">=</span>y_trial_idx))</span>
 <span id="cb16-140"><a href="#cb16-140" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
 <span id="cb16-141"><a href="#cb16-141" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb16-142"><a href="#cb16-142" aria-hidden="true" tabindex="-1"></a>Read this vertically. DYF's partition is the same across all three tables — only the *ground-truth target* changes — and merging does not help against any of them: collapsing to 7 does not recover the 7 motion types, and the raw partition scores highest against the 80 trials. If the frames grouped into nested blobs at the label granularities, the merge walk would find them. It does not, because they don't.</span>
@@ -1440,7 +1440,7 @@ Figure&nbsp;4: K-means given the oracle k=25 (description granularity).
 <span id="cb16-181"><a href="#cb16-181" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb16-182"><a href="#cb16-182" aria-hidden="true" tabindex="-1"></a><span class="fu">## Why frame-level clustering struggles here</span></span>
 <span id="cb16-183"><a href="#cb16-183" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-184"><a href="#cb16-184" aria-hidden="true" tabindex="-1"></a>Look at the ground-truth panels: a trial is not a blob, it is a *path*. A walking cycle sweeps through pose space and returns; a dance trial visits several regions in sequence. Two trials of the same description overlap where their paths cross and diverge where they don't. Any method that partitions *frames* by *where they sit in pose space* — DYF's leaves, k-means's Voronoi cells — will group frames from different trials that happen to pass through the same pose, and split one trial across the regions its path visits. That is exactly the NMI-rises-with-granularity / ARI-stays-flat signature above.</span>
+<span id="cb16-184"><a href="#cb16-184" aria-hidden="true" tabindex="-1"></a>Look at the ground-truth panels: a trial is not a blob, it is a *path*. A walking cycle sweeps through pose space and returns; a dance trial visits several regions in sequence. Two trials of the same description overlap where their paths cross and diverge where they don't. Any method that partitions *frames* by *where they sit in pose space* — DYF's leaves, k-means's Voronoi cells — will group frames from different trials that happen to pass through the same pose, and split one trial across the regions its path visits. That is exactly the AMI-rises-with-granularity / ARI-stays-flat signature above.</span>
 <span id="cb16-185"><a href="#cb16-185" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb16-186"><a href="#cb16-186" aria-hidden="true" tabindex="-1"></a>Three consequences:</span>
 <span id="cb16-187"><a href="#cb16-187" aria-hidden="true" tabindex="-1"></a></span>
@@ -1450,7 +1450,7 @@ Figure&nbsp;4: K-means given the oracle k=25 (description granularity).
 <span id="cb16-191"><a href="#cb16-191" aria-hidden="true" tabindex="-1"></a>**2. Being told `k` does not help.**</span>
 <span id="cb16-192"><a href="#cb16-192" aria-hidden="true" tabindex="-1"></a>K-means at the oracle <span class="in">`k=25`</span> lands in the same low range as DYF. When the label is not a partition of the feature space, the number of clusters is not the missing information.</span>
 <span id="cb16-193"><a href="#cb16-193" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-194"><a href="#cb16-194" aria-hidden="true" tabindex="-1"></a>**3. What DYF's 18 communities *are*.**</span>
+<span id="cb16-194"><a href="#cb16-194" aria-hidden="true" tabindex="-1"></a>**3. What DYF's 15 communities *are*.**</span>
 <span id="cb16-195"><a href="#cb16-195" aria-hidden="true" tabindex="-1"></a>They are regions of pose space — standing poses, mid-stride poses, arms-raised poses — that several trials share. That is real structure, and for a retrieval task ("find frames that look like this one") it is the right structure. It is simply not what the trial labels describe.</span>
 <span id="cb16-196"><a href="#cb16-196" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb16-197"><a href="#cb16-197" aria-hidden="true" tabindex="-1"></a><span class="fu">### The sports analogy, completed</span></span>
@@ -1461,8 +1461,8 @@ Figure&nbsp;4: K-means given the oracle k=25 (description granularity).
 <span id="cb16-202"><a href="#cb16-202" aria-hidden="true" tabindex="-1"></a><span class="pp">|---|---|---|</span></span>
 <span id="cb16-203"><a href="#cb16-203" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Digits <span class="pp">|</span> Convex blobs, clean <span class="in">`k`</span>, tiny tree <span class="pp">|</span> K-means wins (home court) <span class="pp">|</span></span>
 <span id="cb16-204"><a href="#cb16-204" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> MNIST <span class="pp">|</span> Convex-ish, 40× more data <span class="pp">|</span> DYF wins on both metrics <span class="pp">|</span></span>
-<span id="cb16-205"><a href="#cb16-205" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> 20 Newsgroups <span class="pp">|</span> Curved, hierarchical <span class="pp">|</span> K-means ahead by 0.03 NMI <span class="pp">|</span></span>
-<span id="cb16-206"><a href="#cb16-206" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> **CMU MoCap** | **Trajectories, ambiguous k** | **Neither works; DYF edges ARI, trails NMI** <span class="pp">|</span></span>
+<span id="cb16-205"><a href="#cb16-205" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> 20 Newsgroups <span class="pp">|</span> Curved, hierarchical <span class="pp">|</span> K-means ahead by 0.01 AMI <span class="pp">|</span></span>
+<span id="cb16-206"><a href="#cb16-206" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> **CMU MoCap** | **Trajectories, ambiguous k** | **Neither works; DYF edges ARI, trails AMI** <span class="pp">|</span></span>
 <span id="cb16-207"><a href="#cb16-207" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb16-208"><a href="#cb16-208" aria-hidden="true" tabindex="-1"></a>The pattern isn't "DYF vs k-means." It is **whether the label is a partition of the feature space at all.** When it is, and the tree has enough leaves, DYF recovers it without being told <span class="in">`k`</span>. When it isn't — as here — no frame-level method will, and the honest move is to say so and reach for a sequence model.</span>
 <span id="cb16-209"><a href="#cb16-209" aria-hidden="true" tabindex="-1"></a></span>
@@ -1470,13 +1470,13 @@ Figure&nbsp;4: K-means given the oracle k=25 (description granularity).
 <span id="cb16-211"><a href="#cb16-211" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb16-212"><a href="#cb16-212" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**"True k" is often a fiction.** If a dataset has multiple plausible labelings at different granularities, your clustering algorithm shouldn't demand you pick one upfront — but it also cannot recover a label that is not a partition of the features.</span>
 <span id="cb16-213"><a href="#cb16-213" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**DYF operates on raw features, no embedding required.** Motion capture, tabular data, sensor readings — anywhere the raw features have meaningful geometry, DYF can go in direct.</span>
-<span id="cb16-214"><a href="#cb16-214" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Read NMI and ARI together.** NMI rising with label granularity while ARI stays flat is the fingerprint of shared information without shared clusters. On its own, either number would have told a different, wrong story.</span>
+<span id="cb16-214"><a href="#cb16-214" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Read AMI and ARI together.** AMI rising with label granularity while ARI stays flat is the fingerprint of shared information without shared clusters. On its own, either number would have told a different, wrong story.</span>
 <span id="cb16-215"><a href="#cb16-215" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb16-216"><a href="#cb16-216" aria-hidden="true" tabindex="-1"></a><span class="fu">## Caveats</span></span>
 <span id="cb16-217"><a href="#cb16-217" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb16-218"><a href="#cb16-218" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Subsampled to 28,167 frames** for the gallery render. The full 140,837-frame results show the same pattern.</span>
 <span id="cb16-219"><a href="#cb16-219" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**No temporal structure used.** These are frame-level features — adjacent-frame similarity within a walk cycle isn't exploited. That is the whole diagnosis above, not a footnote to it.</span>
-<span id="cb16-220"><a href="#cb16-220" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Earlier versions of this page reported 56 communities and "DYF beats oracle k-means on NMI against every label."** The count came from a single-level Louvain in <span class="in">`dyf-rs`</span> before 0.12.0 that could not merge communities (dyf <span class="in">`KNOWN_ISSUES.md`</span>, issue 10), and the over-split partition inflated NMI against fine-grained labels. The numbers here are from the corrected optimiser.</span>
+<span id="cb16-220"><a href="#cb16-220" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Earlier versions of this page reported 56 communities and "DYF beats oracle k-means on AMI against every label."** The count came from a single-level Louvain in <span class="in">`dyf-rs`</span> before 0.12.0 that could not merge communities (dyf <span class="in">`KNOWN_ISSUES.md`</span>, issue 10), and the over-split partition inflated AMI against fine-grained labels. The numbers here are from the corrected optimiser.</span>
 </code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
 </div></div></div></div></div>
 </div> <!-- /content -->

@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.10.18">
+<meta name="generator" content="quarto-1.10.19">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -77,9 +77,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-1ed79dc1172df127c7d94f8abf7ffee9.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-c22d5dff81f50d6ca627b6188dc743b9.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-1ed79dc1172df127c7d94f8abf7ffee9.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-2253679dd5a56ef632de4277f35d5a2c.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-99131190c761fa326849492283a1b6ed.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-2253679dd5a56ef632de4277f35d5a2c.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
 <link href="../site_libs/bootstrap/bootstrap-077483bf2c889e981b53a146dc5bf4c0.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
@@ -402,7 +402,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 
 
 <p>The scaled-up version of <a href="../gallery/digits.html">Digits</a>. Same domain, same task, same <code>k=10</code> — but 40× more samples and 12× higher pixel dimensionality. Does DYF’s parameter-free story survive the jump in scale, or does it fall apart under a heavier load?</p>
-<p>Short answer, as we’ll see: it gets <em>better</em> with scale. On Digits, oracle k-means beat DYF on both metrics. On MNIST, DYF — told nothing — recovers 12 communities for 10 classes and beats oracle k-means on both NMI and ARI. The reason is worth understanding, because it is the same reason DYF under-performs on the small dataset.</p>
+<p>Short answer, as we’ll see: it gets <em>better</em> with scale. On Digits, oracle k-means beat DYF on both metrics. On MNIST, DYF — told nothing — recovers 12 communities for 10 classes and beats oracle k-means on both AMI and ARI. The reason is worth understanding, because it is the same reason DYF under-performs on the small dataset.</p>
 <section id="load-mnist" class="level2">
 <h2 class="anchored" data-anchor-id="load-mnist">Load MNIST</h2>
 <div id="load" class="cell" data-execution_count="1">
@@ -440,13 +440,13 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 <span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> run_dyf_cached(X, y, cache_path<span class="op">=</span><span class="st">"/tmp/gallery_mnist_dyf.npz"</span>)</span>
 <span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Recovered k: </span><span class="sc">{</span>result<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">  (true k = </span><span class="sc">{</span>result<span class="sc">.</span>true_k<span class="sc">}</span><span class="ss">)"</span>)</span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"NMI:         </span><span class="sc">{</span>result<span class="sc">.</span>nmi<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"AMI:         </span><span class="sc">{</span>result<span class="sc">.</span>ami<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
 <span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"ARI:         </span><span class="sc">{</span>result<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stdout">
 <pre><code>Recovered k: 12  (true k = 10)
-NMI:         0.550
-ARI:         0.429</code></pre>
+AMI:         0.546
+ARI:         0.422</code></pre>
 </div>
 </div>
 </section>
@@ -456,10 +456,10 @@ ARI:         0.429</code></pre>
 <details open="" class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>kmeans <span class="op">=</span> run_kmeans(X, y)</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"k-means NMI=</span><span class="sc">{</span>kmeans[<span class="st">'nmi'</span>]<span class="sc">:.3f}</span><span class="ss">, ARI=</span><span class="sc">{</span>kmeans[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss"> (told k=</span><span class="sc">{</span>result<span class="sc">.</span>true_k<span class="sc">}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"k-means AMI=</span><span class="sc">{</span>kmeans[<span class="st">'ami'</span>]<span class="sc">:.3f}</span><span class="ss">, ARI=</span><span class="sc">{</span>kmeans[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss"> (told k=</span><span class="sc">{</span>result<span class="sc">.</span>true_k<span class="sc">}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stdout">
-<pre><code>k-means NMI=0.491, ARI=0.361 (told k=10)</code></pre>
+<pre><code>k-means AMI=0.491, ARI=0.361 (told k=10)</code></pre>
 </div>
 </div>
 </section>
@@ -534,18 +534,20 @@ Figure&nbsp;3: K-means given the oracle k=10.
 <tr class="header">
 <th>Method</th>
 <th style="text-align: right;">Recovered k</th>
-<th style="text-align: right;">NMI</th>
+<th style="text-align: right;">AMI</th>
 <th style="text-align: right;">ARI</th>
 <th style="text-align: right;">% discarded</th>
+<th style="text-align: right;">wall (s)</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td><strong>DYF</strong> (parameter-free)</td>
 <td style="text-align: right;">12</td>
-<td style="text-align: right;">0.550</td>
-<td style="text-align: right;">0.429</td>
+<td style="text-align: right;">0.546</td>
+<td style="text-align: right;">0.422</td>
 <td style="text-align: right;">0%</td>
+<td style="text-align: right;">8.19</td>
 </tr>
 <tr class="even">
 <td>k-means (oracle k=10)</td>
@@ -553,10 +555,13 @@ Figure&nbsp;3: K-means given the oracle k=10.
 <td style="text-align: right;">0.491</td>
 <td style="text-align: right;">0.361</td>
 <td style="text-align: right;">0%</td>
+<td style="text-align: right;">1.22</td>
 </tr>
 </tbody>
 </table>
+<p><em>Wall time: DYF 8.19 s (tree build + index write + Louvain) vs k-means 1.22 s (one k-means++ init at the oracle k) — DYF 6.7× slower here. The shared UMAP layout is not counted for either.</em></p>
 </div>
+<p>This is also the first page where the <code>wall (s)</code> column matters. DYF is the slower tool: a tree over 70,000 × 784 rows, a written index and a Louvain pass cost several times one k-means++ init at <code>k=10</code>. What that time buys is in the next two sections — a partition that beats the oracle, and a hierarchy under it that k-means cannot produce at any <code>k</code>. The regime where DYF is the <em>faster</em> tool is a different comparison: at 1.3M cells it matches a kNN-graph + Leiden pipeline’s partition in a fraction of the time (dyf <code>KNOWN_ISSUES.md</code> #10), and that pipeline, not k-means, is what people run at that scale.</p>
 </section>
 <section id="deep-dive-where-do-dyfs-12-clusters-come-from" class="level2">
 <h2 class="anchored" data-anchor-id="deep-dive-where-do-dyfs-12-clusters-come-from">Deep dive: where do DYF’s 12 clusters come from?</h2>
@@ -595,9 +600,9 @@ Figure&nbsp;3: K-means given the oracle k=10.
 <span id="cb11-26"><a href="#cb11-26" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"- </span><span class="sc">{</span>r95<span class="sc">}</span><span class="ss">/</span><span class="sc">{</span><span class="bu">len</span>(rows)<span class="sc">}</span><span class="ss"> are &gt;95% pure</span><span class="ch">\n</span><span class="ss">"</span>)</span>
 <span id="cb11-27"><a href="#cb11-27" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"- Clusters per digit: </span><span class="sc">{</span>per_digit<span class="sc">}</span><span class="ch">\n</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
-<p><strong>12 DYF clusters. Weighted purity: 0.654.</strong></p>
+<p><strong>12 DYF clusters. Weighted purity: 0.643.</strong></p>
 <ul>
-<li><p>5/12 clusters are &gt;80% pure (dominated by one digit)</p></li>
+<li><p>4/12 clusters are &gt;80% pure (dominated by one digit)</p></li>
 <li><p>2/12 are &gt;90% pure</p></li>
 <li><p>0/12 are &gt;95% pure</p></li>
 <li><p>Clusters per digit: 0×1, 1×1, 2×1, 3×2, 4×1, 5×1, 6×2, 7×1, 8×1, 9×1</p></li>
@@ -633,16 +638,16 @@ Figure&nbsp;3: K-means given the oracle k=10.
 </details>
 <p><strong>Digits split across more than one DYF cluster:</strong> 3, 6</p>
 <ul>
-<li><p>digit 3: cluster 1 (n=6,281, 41% 3s); cluster 8 (n=5,759, 63% 3s)</p></li>
-<li><p>digit 6: cluster 11 (n=4,143, 79% 6s); cluster 6 (n=3,987, 81% 6s)</p></li>
+<li><p>digit 3: cluster 9 (n=5,968, 38% 3s); cluster 2 (n=5,813, 66% 3s)</p></li>
+<li><p>digit 6: cluster 8 (n=4,643, 80% 6s); cluster 11 (n=3,899, 71% 6s)</p></li>
 </ul>
 <p><strong>Clusters with no dominant digit (purity &lt; 60%):</strong> 5</p>
 <ul>
-<li><p>cluster 2 (n=8,294): 4 40%, 9 39%, 7 11%</p></li>
-<li><p>cluster 9 (n=6,928): 9 41%, 4 39%, 7 14%</p></li>
-<li><p>cluster 3 (n=6,773): 8 53%, 1 26%, 2 8%</p></li>
-<li><p>cluster 1 (n=6,281): 3 41%, 5 28%, 8 22%</p></li>
-<li><p>cluster 4 (n=4,357): 5 56%, 0 23%, 8 10%</p></li>
+<li><p>cluster 1 (n=8,160): 4 44%, 9 42%, 7 5%</p></li>
+<li><p>cluster 3 (n=7,496): 9 34%, 7 32%, 4 28%</p></li>
+<li><p>cluster 5 (n=6,696): 8 53%, 1 27%, 2 8%</p></li>
+<li><p>cluster 9 (n=5,968): 3 38%, 5 29%, 8 24%</p></li>
+<li><p>cluster 4 (n=4,722): 5 56%, 0 21%, 8 10%</p></li>
 </ul>
 </div>
 <p>Read the two lists together. The two “extra” clusters are the digit 6 split into two near-equal halves, each about 80% pure — that is the split the pictures below examine. The digit 3 is also split, but one of its halves is really a 3/5/8 mixture. And the impurity has one dominant source: <strong>4 and 9 are never separated</strong> — they share two clusters, each roughly 40% fours and 40% nines — with 8-with-1 and 5-with-0 as smaller confusions. In pixel space a closed-top 4 and a 9 are a few pixels apart, so this is the classic MNIST confusion showing up as a merge rather than as misclassification. Nothing here is a class fragmented into arbitrary pieces; every decision is one the flat label cannot express, and the pictures decide whether the one clean split is sensible.</p>
@@ -727,7 +732,7 @@ Figure&nbsp;6: The k-means cluster that contains the most 7s.
 </div>
 </div>
 </div>
-<p>Read the title: the fraction of this cluster that is actually a 7. The rest are other digits — mostly 4s, 9s and 5s — that share a prominent diagonal stroke in pixel space. Committing to exactly ten Voronoi cells forced k-means to draw a boundary somewhere, and “things with a diagonal stroke” was the cleanest cut available. DYF spent its budget differently: it kept the digit classes apart and used two extra clusters on a style split. That is why it wins ARI here as well as NMI.</p>
+<p>Read the title: the fraction of this cluster that is actually a 7. The rest are other digits — mostly 4s, 9s and 5s — that share a prominent diagonal stroke in pixel space. Committing to exactly ten Voronoi cells forced k-means to draw a boundary somewhere, and “things with a diagonal stroke” was the cleanest cut available. DYF spent its budget differently: it kept the digit classes apart and used two extra clusters on a style split. That is why it wins ARI here as well as AMI.</p>
 </section>
 <section id="why-this-matters" class="level3">
 <h3 class="anchored" data-anchor-id="why-this-matters">Why this matters</h3>
@@ -752,7 +757,7 @@ Figure&nbsp;6: The k-means cluster that contains the most 7s.
 <tr class="header">
 <th>Resolution</th>
 <th style="text-align: right;">Actual k</th>
-<th style="text-align: right;">NMI</th>
+<th style="text-align: right;">AMI</th>
 <th style="text-align: right;">ARI</th>
 </tr>
 </thead>
@@ -760,32 +765,32 @@ Figure&nbsp;6: The k-means cluster that contains the most 7s.
 <tr class="odd">
 <td><strong>Raw DYF</strong></td>
 <td style="text-align: right;"><strong>12</strong></td>
-<td style="text-align: right;"><strong>0.550</strong></td>
-<td style="text-align: right;"><strong>0.429</strong></td>
+<td style="text-align: right;"><strong>0.546</strong></td>
+<td style="text-align: right;"><strong>0.422</strong></td>
 </tr>
 <tr class="even">
 <td>merge → 40</td>
 <td style="text-align: right;">12</td>
-<td style="text-align: right;">0.550</td>
-<td style="text-align: right;">0.429</td>
+<td style="text-align: right;">0.546</td>
+<td style="text-align: right;">0.422</td>
 </tr>
 <tr class="odd">
 <td>merge → 20</td>
 <td style="text-align: right;">12</td>
-<td style="text-align: right;">0.550</td>
-<td style="text-align: right;">0.429</td>
+<td style="text-align: right;">0.546</td>
+<td style="text-align: right;">0.422</td>
 </tr>
 <tr class="even">
 <td>merge → 10</td>
 <td style="text-align: right;">10</td>
-<td style="text-align: right;">0.504</td>
-<td style="text-align: right;">0.369</td>
+<td style="text-align: right;">0.500</td>
+<td style="text-align: right;">0.363</td>
 </tr>
 <tr class="odd">
 <td>merge → 5</td>
 <td style="text-align: right;">5</td>
-<td style="text-align: right;">0.391</td>
-<td style="text-align: right;">0.269</td>
+<td style="text-align: right;">0.399</td>
+<td style="text-align: right;">0.275</td>
 </tr>
 </tbody>
 </table>
@@ -809,9 +814,9 @@ Figure&nbsp;6: The k-means cluster that contains the most 7s.
 <tr class="header">
 <th>Dataset</th>
 <th style="text-align: right;">DYF k</th>
-<th style="text-align: right;">k-means NMI</th>
-<th style="text-align: right;">DYF NMI</th>
-<th style="text-align: right;">DYF − k-means NMI</th>
+<th style="text-align: right;">k-means AMI</th>
+<th style="text-align: right;">DYF AMI</th>
+<th style="text-align: right;">DYF − k-means AMI</th>
 <th style="text-align: right;">DYF ARI</th>
 <th style="text-align: right;">k-means ARI</th>
 </tr>
@@ -819,28 +824,28 @@ Figure&nbsp;6: The k-means cluster that contains the most 7s.
 <tbody>
 <tr class="odd">
 <td>Digits</td>
-<td style="text-align: right;">7</td>
+<td style="text-align: right;">8</td>
 <td style="text-align: right;">0.773</td>
-<td style="text-align: right;">0.627</td>
-<td style="text-align: right;">−0.146</td>
-<td style="text-align: right;">0.475</td>
+<td style="text-align: right;">0.668</td>
+<td style="text-align: right;">−0.105</td>
+<td style="text-align: right;">0.536</td>
 <td style="text-align: right;">0.726</td>
 </tr>
 <tr class="even">
 <td><strong>MNIST</strong></td>
 <td style="text-align: right;"><strong>12</strong></td>
 <td style="text-align: right;"><strong>0.491</strong></td>
-<td style="text-align: right;"><strong>0.550</strong></td>
-<td style="text-align: right;"><strong>+0.059</strong></td>
-<td style="text-align: right;"><strong>0.429</strong></td>
+<td style="text-align: right;"><strong>0.546</strong></td>
+<td style="text-align: right;"><strong>+0.055</strong></td>
+<td style="text-align: right;"><strong>0.422</strong></td>
 <td style="text-align: right;"><strong>0.361</strong></td>
 </tr>
 </tbody>
 </table>
-<p>On 1,797 digits DYF <em>under</em>-splits (7 communities for 10 classes) and loses on both metrics. On 70,000 it lands at 12 and wins on both. Same code, same defaults.</p>
+<p>On 1,797 digits DYF <em>under</em>-splits (8 communities for 10 classes) and loses on both metrics. On 70,000 it lands at 12 and wins on both. Same code, same defaults.</p>
 <section id="why-does-scale-help" class="level3">
 <h3 class="anchored" data-anchor-id="why-does-scale-help">Why does scale help?</h3>
-<p>DYF clusters leaf centroids, not points. On Digits the tree has around 170 leaves; a modularity optimiser on a graph that small hits its resolution limit and merges genuine classes — the well-known failure of modularity on small graphs, not a property of the digits. On MNIST the tree has thousands of leaves, the community graph is rich enough to resolve ten-plus communities, and the partition snaps to the label. The <a href="../gallery/digits.html">Digits</a> notebook shows the other side of this: raising the Louvain <code>resolution</code> to 2 recovers 11 communities there and beats the default on both metrics.</p>
+<p>DYF clusters leaf centroids, not points. On Digits the tree has around 190 leaves; a modularity optimiser on a graph that small hits its resolution limit and merges genuine classes — the well-known failure of modularity on small graphs, not a property of the digits. On MNIST the tree has about 3,200 leaves, the community graph is rich enough to resolve ten-plus communities, and the partition snaps to the label. The <a href="../gallery/digits.html">Digits</a> notebook shows the other side of this: raising the Louvain <code>resolution</code> to 2 recovers 10 communities there and beats the default on both metrics.</p>
 <p>So the axis that matters is not sample count as such but <strong>leaf count</strong> — how many super-points the tree hands to community detection. Below a few hundred, expect under-splitting at the default resolution.</p>
 </section>
 <section id="the-sports-analogy-update" class="level3">
@@ -1346,7 +1351,7 @@ Figure&nbsp;6: The k-means cluster that contains the most 7s.
 <span id="cb17-16"><a href="#cb17-16" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb17-17"><a href="#cb17-17" aria-hidden="true" tabindex="-1"></a>The scaled-up version of <span class="co">[</span><span class="ot">Digits</span><span class="co">](digits.qmd)</span>. Same domain, same task, same <span class="in">`k=10`</span> — but 40× more samples and 12× higher pixel dimensionality. Does DYF's parameter-free story survive the jump in scale, or does it fall apart under a heavier load?</span>
 <span id="cb17-18"><a href="#cb17-18" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-19"><a href="#cb17-19" aria-hidden="true" tabindex="-1"></a>Short answer, as we'll see: it gets *better* with scale. On Digits, oracle k-means beat DYF on both metrics. On MNIST, DYF — told nothing — recovers 12 communities for 10 classes and beats oracle k-means on both NMI and ARI. The reason is worth understanding, because it is the same reason DYF under-performs on the small dataset.</span>
+<span id="cb17-19"><a href="#cb17-19" aria-hidden="true" tabindex="-1"></a>Short answer, as we'll see: it gets *better* with scale. On Digits, oracle k-means beat DYF on both metrics. On MNIST, DYF — told nothing — recovers 12 communities for 10 classes and beats oracle k-means on both AMI and ARI. The reason is worth understanding, because it is the same reason DYF under-performs on the small dataset.</span>
 <span id="cb17-20"><a href="#cb17-20" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb17-21"><a href="#cb17-21" aria-hidden="true" tabindex="-1"></a><span class="fu">## Load MNIST</span></span>
 <span id="cb17-22"><a href="#cb17-22" aria-hidden="true" tabindex="-1"></a></span>
@@ -1379,7 +1384,7 @@ Figure&nbsp;6: The k-means cluster that contains the most 7s.
 <span id="cb17-53"><a href="#cb17-53" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb17-54"><a href="#cb17-54" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> run_dyf_cached(X, y, cache_path<span class="op">=</span><span class="st">"/tmp/gallery_mnist_dyf.npz"</span>)</span>
 <span id="cb17-55"><a href="#cb17-55" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Recovered k: </span><span class="sc">{</span>result<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">  (true k = </span><span class="sc">{</span>result<span class="sc">.</span>true_k<span class="sc">}</span><span class="ss">)"</span>)</span>
-<span id="cb17-56"><a href="#cb17-56" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"NMI:         </span><span class="sc">{</span>result<span class="sc">.</span>nmi<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb17-56"><a href="#cb17-56" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"AMI:         </span><span class="sc">{</span>result<span class="sc">.</span>ami<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
 <span id="cb17-57"><a href="#cb17-57" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"ARI:         </span><span class="sc">{</span>result<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
 <span id="cb17-58"><a href="#cb17-58" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
 <span id="cb17-59"><a href="#cb17-59" aria-hidden="true" tabindex="-1"></a></span>
@@ -1388,7 +1393,7 @@ Figure&nbsp;6: The k-means cluster that contains the most 7s.
 <span id="cb17-64"><a href="#cb17-64" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
 <span id="cb17-65"><a href="#cb17-65" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: kmeans</span></span>
 <span id="cb17-66"><a href="#cb17-66" aria-hidden="true" tabindex="-1"></a>kmeans <span class="op">=</span> run_kmeans(X, y)</span>
-<span id="cb17-67"><a href="#cb17-67" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"k-means NMI=</span><span class="sc">{</span>kmeans[<span class="st">'nmi'</span>]<span class="sc">:.3f}</span><span class="ss">, ARI=</span><span class="sc">{</span>kmeans[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss"> (told k=</span><span class="sc">{</span>result<span class="sc">.</span>true_k<span class="sc">}</span><span class="ss">)"</span>)</span>
+<span id="cb17-67"><a href="#cb17-67" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"k-means AMI=</span><span class="sc">{</span>kmeans[<span class="st">'ami'</span>]<span class="sc">:.3f}</span><span class="ss">, ARI=</span><span class="sc">{</span>kmeans[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss"> (told k=</span><span class="sc">{</span>result<span class="sc">.</span>true_k<span class="sc">}</span><span class="ss">)"</span>)</span>
 <span id="cb17-68"><a href="#cb17-68" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
 <span id="cb17-69"><a href="#cb17-69" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb17-70"><a href="#cb17-70" aria-hidden="true" tabindex="-1"></a><span class="fu">## Figures</span></span>
@@ -1423,179 +1428,181 @@ Figure&nbsp;6: The k-means cluster that contains the most 7s.
 <span id="cb17-107"><a href="#cb17-107" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(metrics_table(result, kmeans, <span class="va">None</span>))</span>
 <span id="cb17-108"><a href="#cb17-108" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
 <span id="cb17-109"><a href="#cb17-109" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-110"><a href="#cb17-110" aria-hidden="true" tabindex="-1"></a><span class="fu">## Deep dive: where do DYF's 12 clusters come from?</span></span>
+<span id="cb17-110"><a href="#cb17-110" aria-hidden="true" tabindex="-1"></a>This is also the first page where the <span class="in">`wall (s)`</span> column matters. DYF is the slower tool: a tree over 70,000 × 784 rows, a written index and a Louvain pass cost several times one k-means++ init at <span class="in">`k=10`</span>. What that time buys is in the next two sections — a partition that beats the oracle, and a hierarchy under it that k-means cannot produce at any <span class="in">`k`</span>. The regime where DYF is the *faster* tool is a different comparison: at 1.3M cells it matches a kNN-graph + Leiden pipeline's partition in a fraction of the time (dyf <span class="in">`KNOWN_ISSUES.md`</span> #10), and that pipeline, not k-means, is what people run at that scale.</span>
 <span id="cb17-111"><a href="#cb17-111" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-112"><a href="#cb17-112" aria-hidden="true" tabindex="-1"></a>Twelve clusters for ten digits is close enough to the label's own granularity that the interesting question is no longer "why so many?" but "which two digits got split, and did anything get merged?" This section answers both from the partition itself.</span>
+<span id="cb17-112"><a href="#cb17-112" aria-hidden="true" tabindex="-1"></a><span class="fu">## Deep dive: where do DYF's 12 clusters come from?</span></span>
 <span id="cb17-113"><a href="#cb17-113" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-114"><a href="#cb17-114" aria-hidden="true" tabindex="-1"></a><span class="fu">### First, the statistical audit</span></span>
+<span id="cb17-114"><a href="#cb17-114" aria-hidden="true" tabindex="-1"></a>Twelve clusters for ten digits is close enough to the label's own granularity that the interesting question is no longer "why so many?" but "which two digits got split, and did anything get merged?" This section answers both from the partition itself.</span>
 <span id="cb17-115"><a href="#cb17-115" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-116"><a href="#cb17-116" aria-hidden="true" tabindex="-1"></a>If DYF's clusters track the digit classes, each should be dominated by one digit. Mixed bags are the signature of classes being merged.</span>
+<span id="cb17-116"><a href="#cb17-116" aria-hidden="true" tabindex="-1"></a><span class="fu">### First, the statistical audit</span></span>
 <span id="cb17-117"><a href="#cb17-117" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-120"><a href="#cb17-120" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
-<span id="cb17-121"><a href="#cb17-121" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: purity-audit</span></span>
-<span id="cb17-122"><a href="#cb17-122" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: asis</span></span>
-<span id="cb17-123"><a href="#cb17-123" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
-<span id="cb17-124"><a href="#cb17-124" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> collections <span class="im">import</span> Counter</span>
-<span id="cb17-125"><a href="#cb17-125" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-126"><a href="#cb17-126" aria-hidden="true" tabindex="-1"></a>labels <span class="op">=</span> result.labels</span>
-<span id="cb17-127"><a href="#cb17-127" aria-hidden="true" tabindex="-1"></a>rows <span class="op">=</span> []</span>
-<span id="cb17-128"><a href="#cb17-128" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> cid <span class="kw">in</span> <span class="bu">sorted</span>(<span class="bu">set</span>(labels)):</span>
-<span id="cb17-129"><a href="#cb17-129" aria-hidden="true" tabindex="-1"></a>    mask <span class="op">=</span> labels <span class="op">==</span> cid</span>
-<span id="cb17-130"><a href="#cb17-130" aria-hidden="true" tabindex="-1"></a>    n <span class="op">=</span> <span class="bu">int</span>(mask.<span class="bu">sum</span>())</span>
-<span id="cb17-131"><a href="#cb17-131" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> n <span class="op">==</span> <span class="dv">0</span>:</span>
-<span id="cb17-132"><a href="#cb17-132" aria-hidden="true" tabindex="-1"></a>        <span class="cf">continue</span></span>
-<span id="cb17-133"><a href="#cb17-133" aria-hidden="true" tabindex="-1"></a>    vals, cnts <span class="op">=</span> np.unique(y[mask], return_counts<span class="op">=</span><span class="va">True</span>)</span>
-<span id="cb17-134"><a href="#cb17-134" aria-hidden="true" tabindex="-1"></a>    rows.append({<span class="st">"cid"</span>: cid, <span class="st">"n"</span>: n, <span class="st">"dominant"</span>: <span class="bu">int</span>(vals[np.argmax(cnts)]),</span>
-<span id="cb17-135"><a href="#cb17-135" aria-hidden="true" tabindex="-1"></a>                 <span class="st">"purity"</span>: cnts.<span class="bu">max</span>() <span class="op">/</span> n})</span>
-<span id="cb17-136"><a href="#cb17-136" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-137"><a href="#cb17-137" aria-hidden="true" tabindex="-1"></a>r80 <span class="op">=</span> <span class="bu">sum</span>(<span class="dv">1</span> <span class="cf">for</span> r <span class="kw">in</span> rows <span class="cf">if</span> r[<span class="st">"purity"</span>] <span class="op">&gt;</span> <span class="fl">0.80</span>)</span>
-<span id="cb17-138"><a href="#cb17-138" aria-hidden="true" tabindex="-1"></a>r90 <span class="op">=</span> <span class="bu">sum</span>(<span class="dv">1</span> <span class="cf">for</span> r <span class="kw">in</span> rows <span class="cf">if</span> r[<span class="st">"purity"</span>] <span class="op">&gt;</span> <span class="fl">0.90</span>)</span>
-<span id="cb17-139"><a href="#cb17-139" aria-hidden="true" tabindex="-1"></a>r95 <span class="op">=</span> <span class="bu">sum</span>(<span class="dv">1</span> <span class="cf">for</span> r <span class="kw">in</span> rows <span class="cf">if</span> r[<span class="st">"purity"</span>] <span class="op">&gt;</span> <span class="fl">0.95</span>)</span>
-<span id="cb17-140"><a href="#cb17-140" aria-hidden="true" tabindex="-1"></a>weighted <span class="op">=</span> <span class="bu">sum</span>(r[<span class="st">"purity"</span>] <span class="op">*</span> r[<span class="st">"n"</span>] <span class="cf">for</span> r <span class="kw">in</span> rows) <span class="op">/</span> <span class="bu">sum</span>(r[<span class="st">"n"</span>] <span class="cf">for</span> r <span class="kw">in</span> rows)</span>
-<span id="cb17-141"><a href="#cb17-141" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-142"><a href="#cb17-142" aria-hidden="true" tabindex="-1"></a>digit_counts <span class="op">=</span> Counter(r[<span class="st">"dominant"</span>] <span class="cf">for</span> r <span class="kw">in</span> rows)</span>
-<span id="cb17-143"><a href="#cb17-143" aria-hidden="true" tabindex="-1"></a>per_digit <span class="op">=</span> <span class="st">", "</span>.join(<span class="ss">f"</span><span class="sc">{</span>d<span class="sc">}</span><span class="ss">×</span><span class="sc">{</span>n<span class="sc">}</span><span class="ss">"</span> <span class="cf">for</span> d, n <span class="kw">in</span> <span class="bu">sorted</span>(digit_counts.items()))</span>
-<span id="cb17-144"><a href="#cb17-144" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-145"><a href="#cb17-145" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"**</span><span class="sc">{</span><span class="bu">len</span>(rows)<span class="sc">}</span><span class="ss"> DYF clusters. Weighted purity: </span><span class="sc">{</span>weighted<span class="sc">:.3f}</span><span class="ss">.**</span><span class="ch">\n</span><span class="ss">"</span>)</span>
-<span id="cb17-146"><a href="#cb17-146" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"- </span><span class="sc">{</span>r80<span class="sc">}</span><span class="ss">/</span><span class="sc">{</span><span class="bu">len</span>(rows)<span class="sc">}</span><span class="ss"> clusters are &gt;80% pure (dominated by one digit)</span><span class="ch">\n</span><span class="ss">"</span>)</span>
-<span id="cb17-147"><a href="#cb17-147" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"- </span><span class="sc">{</span>r90<span class="sc">}</span><span class="ss">/</span><span class="sc">{</span><span class="bu">len</span>(rows)<span class="sc">}</span><span class="ss"> are &gt;90% pure</span><span class="ch">\n</span><span class="ss">"</span>)</span>
-<span id="cb17-148"><a href="#cb17-148" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"- </span><span class="sc">{</span>r95<span class="sc">}</span><span class="ss">/</span><span class="sc">{</span><span class="bu">len</span>(rows)<span class="sc">}</span><span class="ss"> are &gt;95% pure</span><span class="ch">\n</span><span class="ss">"</span>)</span>
-<span id="cb17-149"><a href="#cb17-149" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"- Clusters per digit: </span><span class="sc">{</span>per_digit<span class="sc">}</span><span class="ch">\n</span><span class="ss">"</span>)</span>
-<span id="cb17-150"><a href="#cb17-150" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb17-151"><a href="#cb17-151" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-152"><a href="#cb17-152" aria-hidden="true" tabindex="-1"></a>Every digit has at least one cluster where it is the majority, so nothing was lost outright. But a weighted purity around two-thirds says several clusters are shared between digits. The next cell names them.</span>
+<span id="cb17-118"><a href="#cb17-118" aria-hidden="true" tabindex="-1"></a>If DYF's clusters track the digit classes, each should be dominated by one digit. Mixed bags are the signature of classes being merged.</span>
+<span id="cb17-119"><a href="#cb17-119" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-122"><a href="#cb17-122" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb17-123"><a href="#cb17-123" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: purity-audit</span></span>
+<span id="cb17-124"><a href="#cb17-124" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: asis</span></span>
+<span id="cb17-125"><a href="#cb17-125" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb17-126"><a href="#cb17-126" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> collections <span class="im">import</span> Counter</span>
+<span id="cb17-127"><a href="#cb17-127" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-128"><a href="#cb17-128" aria-hidden="true" tabindex="-1"></a>labels <span class="op">=</span> result.labels</span>
+<span id="cb17-129"><a href="#cb17-129" aria-hidden="true" tabindex="-1"></a>rows <span class="op">=</span> []</span>
+<span id="cb17-130"><a href="#cb17-130" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> cid <span class="kw">in</span> <span class="bu">sorted</span>(<span class="bu">set</span>(labels)):</span>
+<span id="cb17-131"><a href="#cb17-131" aria-hidden="true" tabindex="-1"></a>    mask <span class="op">=</span> labels <span class="op">==</span> cid</span>
+<span id="cb17-132"><a href="#cb17-132" aria-hidden="true" tabindex="-1"></a>    n <span class="op">=</span> <span class="bu">int</span>(mask.<span class="bu">sum</span>())</span>
+<span id="cb17-133"><a href="#cb17-133" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> n <span class="op">==</span> <span class="dv">0</span>:</span>
+<span id="cb17-134"><a href="#cb17-134" aria-hidden="true" tabindex="-1"></a>        <span class="cf">continue</span></span>
+<span id="cb17-135"><a href="#cb17-135" aria-hidden="true" tabindex="-1"></a>    vals, cnts <span class="op">=</span> np.unique(y[mask], return_counts<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb17-136"><a href="#cb17-136" aria-hidden="true" tabindex="-1"></a>    rows.append({<span class="st">"cid"</span>: cid, <span class="st">"n"</span>: n, <span class="st">"dominant"</span>: <span class="bu">int</span>(vals[np.argmax(cnts)]),</span>
+<span id="cb17-137"><a href="#cb17-137" aria-hidden="true" tabindex="-1"></a>                 <span class="st">"purity"</span>: cnts.<span class="bu">max</span>() <span class="op">/</span> n})</span>
+<span id="cb17-138"><a href="#cb17-138" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-139"><a href="#cb17-139" aria-hidden="true" tabindex="-1"></a>r80 <span class="op">=</span> <span class="bu">sum</span>(<span class="dv">1</span> <span class="cf">for</span> r <span class="kw">in</span> rows <span class="cf">if</span> r[<span class="st">"purity"</span>] <span class="op">&gt;</span> <span class="fl">0.80</span>)</span>
+<span id="cb17-140"><a href="#cb17-140" aria-hidden="true" tabindex="-1"></a>r90 <span class="op">=</span> <span class="bu">sum</span>(<span class="dv">1</span> <span class="cf">for</span> r <span class="kw">in</span> rows <span class="cf">if</span> r[<span class="st">"purity"</span>] <span class="op">&gt;</span> <span class="fl">0.90</span>)</span>
+<span id="cb17-141"><a href="#cb17-141" aria-hidden="true" tabindex="-1"></a>r95 <span class="op">=</span> <span class="bu">sum</span>(<span class="dv">1</span> <span class="cf">for</span> r <span class="kw">in</span> rows <span class="cf">if</span> r[<span class="st">"purity"</span>] <span class="op">&gt;</span> <span class="fl">0.95</span>)</span>
+<span id="cb17-142"><a href="#cb17-142" aria-hidden="true" tabindex="-1"></a>weighted <span class="op">=</span> <span class="bu">sum</span>(r[<span class="st">"purity"</span>] <span class="op">*</span> r[<span class="st">"n"</span>] <span class="cf">for</span> r <span class="kw">in</span> rows) <span class="op">/</span> <span class="bu">sum</span>(r[<span class="st">"n"</span>] <span class="cf">for</span> r <span class="kw">in</span> rows)</span>
+<span id="cb17-143"><a href="#cb17-143" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-144"><a href="#cb17-144" aria-hidden="true" tabindex="-1"></a>digit_counts <span class="op">=</span> Counter(r[<span class="st">"dominant"</span>] <span class="cf">for</span> r <span class="kw">in</span> rows)</span>
+<span id="cb17-145"><a href="#cb17-145" aria-hidden="true" tabindex="-1"></a>per_digit <span class="op">=</span> <span class="st">", "</span>.join(<span class="ss">f"</span><span class="sc">{</span>d<span class="sc">}</span><span class="ss">×</span><span class="sc">{</span>n<span class="sc">}</span><span class="ss">"</span> <span class="cf">for</span> d, n <span class="kw">in</span> <span class="bu">sorted</span>(digit_counts.items()))</span>
+<span id="cb17-146"><a href="#cb17-146" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-147"><a href="#cb17-147" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"**</span><span class="sc">{</span><span class="bu">len</span>(rows)<span class="sc">}</span><span class="ss"> DYF clusters. Weighted purity: </span><span class="sc">{</span>weighted<span class="sc">:.3f}</span><span class="ss">.**</span><span class="ch">\n</span><span class="ss">"</span>)</span>
+<span id="cb17-148"><a href="#cb17-148" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"- </span><span class="sc">{</span>r80<span class="sc">}</span><span class="ss">/</span><span class="sc">{</span><span class="bu">len</span>(rows)<span class="sc">}</span><span class="ss"> clusters are &gt;80% pure (dominated by one digit)</span><span class="ch">\n</span><span class="ss">"</span>)</span>
+<span id="cb17-149"><a href="#cb17-149" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"- </span><span class="sc">{</span>r90<span class="sc">}</span><span class="ss">/</span><span class="sc">{</span><span class="bu">len</span>(rows)<span class="sc">}</span><span class="ss"> are &gt;90% pure</span><span class="ch">\n</span><span class="ss">"</span>)</span>
+<span id="cb17-150"><a href="#cb17-150" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"- </span><span class="sc">{</span>r95<span class="sc">}</span><span class="ss">/</span><span class="sc">{</span><span class="bu">len</span>(rows)<span class="sc">}</span><span class="ss"> are &gt;95% pure</span><span class="ch">\n</span><span class="ss">"</span>)</span>
+<span id="cb17-151"><a href="#cb17-151" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"- Clusters per digit: </span><span class="sc">{</span>per_digit<span class="sc">}</span><span class="ch">\n</span><span class="ss">"</span>)</span>
+<span id="cb17-152"><a href="#cb17-152" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
 <span id="cb17-153"><a href="#cb17-153" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-154"><a href="#cb17-154" aria-hidden="true" tabindex="-1"></a><span class="fu">### Split digits and merged digits</span></span>
+<span id="cb17-154"><a href="#cb17-154" aria-hidden="true" tabindex="-1"></a>Every digit has at least one cluster where it is the majority, so nothing was lost outright. But a weighted purity around two-thirds says several clusters are shared between digits. The next cell names them.</span>
 <span id="cb17-155"><a href="#cb17-155" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-158"><a href="#cb17-158" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
-<span id="cb17-159"><a href="#cb17-159" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: split-merged</span></span>
-<span id="cb17-160"><a href="#cb17-160" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: asis</span></span>
-<span id="cb17-161"><a href="#cb17-161" aria-hidden="true" tabindex="-1"></a>by_digit <span class="op">=</span> {}</span>
-<span id="cb17-162"><a href="#cb17-162" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> r <span class="kw">in</span> rows:</span>
-<span id="cb17-163"><a href="#cb17-163" aria-hidden="true" tabindex="-1"></a>    by_digit.setdefault(r[<span class="st">"dominant"</span>], []).append(r)</span>
-<span id="cb17-164"><a href="#cb17-164" aria-hidden="true" tabindex="-1"></a>split <span class="op">=</span> {d: <span class="bu">sorted</span>(rs, key<span class="op">=</span><span class="kw">lambda</span> r: <span class="op">-</span>r[<span class="st">"n"</span>]) <span class="cf">for</span> d, rs <span class="kw">in</span> by_digit.items() <span class="cf">if</span> <span class="bu">len</span>(rs) <span class="op">&gt;</span> <span class="dv">1</span>}</span>
-<span id="cb17-165"><a href="#cb17-165" aria-hidden="true" tabindex="-1"></a>mixed <span class="op">=</span> <span class="bu">sorted</span>([r <span class="cf">for</span> r <span class="kw">in</span> rows <span class="cf">if</span> r[<span class="st">"purity"</span>] <span class="op">&lt;</span> <span class="fl">0.6</span>], key<span class="op">=</span><span class="kw">lambda</span> r: <span class="op">-</span>r[<span class="st">"n"</span>])</span>
-<span id="cb17-166"><a href="#cb17-166" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-167"><a href="#cb17-167" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"**Digits split across more than one DYF cluster:** </span><span class="sc">{</span><span class="st">', '</span><span class="sc">.</span>join(<span class="bu">str</span>(d) <span class="cf">for</span> d <span class="kw">in</span> <span class="bu">sorted</span>(split)) <span class="kw">or</span> <span class="st">'none'</span><span class="sc">}</span><span class="ch">\n</span><span class="ss">"</span>)</span>
-<span id="cb17-168"><a href="#cb17-168" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> d, rs <span class="kw">in</span> <span class="bu">sorted</span>(split.items()):</span>
-<span id="cb17-169"><a href="#cb17-169" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"- digit </span><span class="sc">{</span>d<span class="sc">}</span><span class="ss">: "</span> <span class="op">+</span> <span class="st">"; "</span>.join(<span class="ss">f"cluster </span><span class="sc">{</span>r[<span class="st">'cid'</span>]<span class="sc">}</span><span class="ss"> (n=</span><span class="sc">{</span>r[<span class="st">'n'</span>]<span class="sc">:,}</span><span class="ss">, </span><span class="sc">{</span>r[<span class="st">'purity'</span>]<span class="sc">:.0%}</span><span class="ss"> </span><span class="sc">{</span>d<span class="sc">}</span><span class="ss">s)"</span> <span class="cf">for</span> r <span class="kw">in</span> rs) <span class="op">+</span> <span class="st">"</span><span class="ch">\n</span><span class="st">"</span>)</span>
-<span id="cb17-170"><a href="#cb17-170" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-171"><a href="#cb17-171" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">**Clusters with no dominant digit (purity &lt; 60%):** </span><span class="sc">{</span><span class="bu">len</span>(mixed)<span class="sc">}</span><span class="ch">\n</span><span class="ss">"</span>)</span>
-<span id="cb17-172"><a href="#cb17-172" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> r <span class="kw">in</span> mixed:</span>
-<span id="cb17-173"><a href="#cb17-173" aria-hidden="true" tabindex="-1"></a>    mask <span class="op">=</span> labels <span class="op">==</span> r[<span class="st">"cid"</span>]</span>
-<span id="cb17-174"><a href="#cb17-174" aria-hidden="true" tabindex="-1"></a>    vals, cnts <span class="op">=</span> np.unique(y[mask], return_counts<span class="op">=</span><span class="va">True</span>)</span>
-<span id="cb17-175"><a href="#cb17-175" aria-hidden="true" tabindex="-1"></a>    order <span class="op">=</span> np.argsort(<span class="op">-</span>cnts)[:<span class="dv">3</span>]</span>
-<span id="cb17-176"><a href="#cb17-176" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"- cluster </span><span class="sc">{</span>r[<span class="st">'cid'</span>]<span class="sc">}</span><span class="ss"> (n=</span><span class="sc">{</span>r[<span class="st">'n'</span>]<span class="sc">:,}</span><span class="ss">): "</span> <span class="op">+</span> <span class="st">", "</span>.join(<span class="ss">f"</span><span class="sc">{</span><span class="bu">int</span>(vals[i])<span class="sc">}</span><span class="ss"> </span><span class="sc">{</span>cnts[i] <span class="op">/</span> r[<span class="st">'n'</span>]<span class="sc">:.0%}</span><span class="ss">"</span> <span class="cf">for</span> i <span class="kw">in</span> order) <span class="op">+</span> <span class="st">"</span><span class="ch">\n</span><span class="st">"</span>)</span>
-<span id="cb17-177"><a href="#cb17-177" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-178"><a href="#cb17-178" aria-hidden="true" tabindex="-1"></a><span class="co"># For the image grids below: the split digit whose two largest sub-clusters are purest.</span></span>
-<span id="cb17-179"><a href="#cb17-179" aria-hidden="true" tabindex="-1"></a>show_digit <span class="op">=</span> <span class="bu">max</span>(split, key<span class="op">=</span><span class="kw">lambda</span> d: <span class="bu">min</span>(r[<span class="st">"purity"</span>] <span class="cf">for</span> r <span class="kw">in</span> split[d][:<span class="dv">2</span>])) <span class="cf">if</span> split <span class="cf">else</span> <span class="va">None</span></span>
-<span id="cb17-180"><a href="#cb17-180" aria-hidden="true" tabindex="-1"></a>show_subs <span class="op">=</span> split[show_digit][:<span class="dv">2</span>] <span class="cf">if</span> show_digit <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="cf">else</span> []</span>
-<span id="cb17-181"><a href="#cb17-181" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb17-182"><a href="#cb17-182" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-183"><a href="#cb17-183" aria-hidden="true" tabindex="-1"></a>Read the two lists together. The two "extra" clusters are the digit 6 split into two near-equal halves, each about 80% pure — that is the split the pictures below examine. The digit 3 is also split, but one of its halves is really a 3/5/8 mixture. And the impurity has one dominant source: **4 and 9 are never separated** — they share two clusters, each roughly 40% fours and 40% nines — with 8-with-1 and 5-with-0 as smaller confusions. In pixel space a closed-top 4 and a 9 are a few pixels apart, so this is the classic MNIST confusion showing up as a merge rather than as misclassification. Nothing here is a class fragmented into arbitrary pieces; every decision is one the flat label cannot express, and the pictures decide whether the one clean split is sensible.</span>
+<span id="cb17-156"><a href="#cb17-156" aria-hidden="true" tabindex="-1"></a><span class="fu">### Split digits and merged digits</span></span>
+<span id="cb17-157"><a href="#cb17-157" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-160"><a href="#cb17-160" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb17-161"><a href="#cb17-161" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: split-merged</span></span>
+<span id="cb17-162"><a href="#cb17-162" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: asis</span></span>
+<span id="cb17-163"><a href="#cb17-163" aria-hidden="true" tabindex="-1"></a>by_digit <span class="op">=</span> {}</span>
+<span id="cb17-164"><a href="#cb17-164" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> r <span class="kw">in</span> rows:</span>
+<span id="cb17-165"><a href="#cb17-165" aria-hidden="true" tabindex="-1"></a>    by_digit.setdefault(r[<span class="st">"dominant"</span>], []).append(r)</span>
+<span id="cb17-166"><a href="#cb17-166" aria-hidden="true" tabindex="-1"></a>split <span class="op">=</span> {d: <span class="bu">sorted</span>(rs, key<span class="op">=</span><span class="kw">lambda</span> r: <span class="op">-</span>r[<span class="st">"n"</span>]) <span class="cf">for</span> d, rs <span class="kw">in</span> by_digit.items() <span class="cf">if</span> <span class="bu">len</span>(rs) <span class="op">&gt;</span> <span class="dv">1</span>}</span>
+<span id="cb17-167"><a href="#cb17-167" aria-hidden="true" tabindex="-1"></a>mixed <span class="op">=</span> <span class="bu">sorted</span>([r <span class="cf">for</span> r <span class="kw">in</span> rows <span class="cf">if</span> r[<span class="st">"purity"</span>] <span class="op">&lt;</span> <span class="fl">0.6</span>], key<span class="op">=</span><span class="kw">lambda</span> r: <span class="op">-</span>r[<span class="st">"n"</span>])</span>
+<span id="cb17-168"><a href="#cb17-168" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-169"><a href="#cb17-169" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"**Digits split across more than one DYF cluster:** </span><span class="sc">{</span><span class="st">', '</span><span class="sc">.</span>join(<span class="bu">str</span>(d) <span class="cf">for</span> d <span class="kw">in</span> <span class="bu">sorted</span>(split)) <span class="kw">or</span> <span class="st">'none'</span><span class="sc">}</span><span class="ch">\n</span><span class="ss">"</span>)</span>
+<span id="cb17-170"><a href="#cb17-170" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> d, rs <span class="kw">in</span> <span class="bu">sorted</span>(split.items()):</span>
+<span id="cb17-171"><a href="#cb17-171" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"- digit </span><span class="sc">{</span>d<span class="sc">}</span><span class="ss">: "</span> <span class="op">+</span> <span class="st">"; "</span>.join(<span class="ss">f"cluster </span><span class="sc">{</span>r[<span class="st">'cid'</span>]<span class="sc">}</span><span class="ss"> (n=</span><span class="sc">{</span>r[<span class="st">'n'</span>]<span class="sc">:,}</span><span class="ss">, </span><span class="sc">{</span>r[<span class="st">'purity'</span>]<span class="sc">:.0%}</span><span class="ss"> </span><span class="sc">{</span>d<span class="sc">}</span><span class="ss">s)"</span> <span class="cf">for</span> r <span class="kw">in</span> rs) <span class="op">+</span> <span class="st">"</span><span class="ch">\n</span><span class="st">"</span>)</span>
+<span id="cb17-172"><a href="#cb17-172" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-173"><a href="#cb17-173" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">**Clusters with no dominant digit (purity &lt; 60%):** </span><span class="sc">{</span><span class="bu">len</span>(mixed)<span class="sc">}</span><span class="ch">\n</span><span class="ss">"</span>)</span>
+<span id="cb17-174"><a href="#cb17-174" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> r <span class="kw">in</span> mixed:</span>
+<span id="cb17-175"><a href="#cb17-175" aria-hidden="true" tabindex="-1"></a>    mask <span class="op">=</span> labels <span class="op">==</span> r[<span class="st">"cid"</span>]</span>
+<span id="cb17-176"><a href="#cb17-176" aria-hidden="true" tabindex="-1"></a>    vals, cnts <span class="op">=</span> np.unique(y[mask], return_counts<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb17-177"><a href="#cb17-177" aria-hidden="true" tabindex="-1"></a>    order <span class="op">=</span> np.argsort(<span class="op">-</span>cnts)[:<span class="dv">3</span>]</span>
+<span id="cb17-178"><a href="#cb17-178" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"- cluster </span><span class="sc">{</span>r[<span class="st">'cid'</span>]<span class="sc">}</span><span class="ss"> (n=</span><span class="sc">{</span>r[<span class="st">'n'</span>]<span class="sc">:,}</span><span class="ss">): "</span> <span class="op">+</span> <span class="st">", "</span>.join(<span class="ss">f"</span><span class="sc">{</span><span class="bu">int</span>(vals[i])<span class="sc">}</span><span class="ss"> </span><span class="sc">{</span>cnts[i] <span class="op">/</span> r[<span class="st">'n'</span>]<span class="sc">:.0%}</span><span class="ss">"</span> <span class="cf">for</span> i <span class="kw">in</span> order) <span class="op">+</span> <span class="st">"</span><span class="ch">\n</span><span class="st">"</span>)</span>
+<span id="cb17-179"><a href="#cb17-179" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-180"><a href="#cb17-180" aria-hidden="true" tabindex="-1"></a><span class="co"># For the image grids below: the split digit whose two largest sub-clusters are purest.</span></span>
+<span id="cb17-181"><a href="#cb17-181" aria-hidden="true" tabindex="-1"></a>show_digit <span class="op">=</span> <span class="bu">max</span>(split, key<span class="op">=</span><span class="kw">lambda</span> d: <span class="bu">min</span>(r[<span class="st">"purity"</span>] <span class="cf">for</span> r <span class="kw">in</span> split[d][:<span class="dv">2</span>])) <span class="cf">if</span> split <span class="cf">else</span> <span class="va">None</span></span>
+<span id="cb17-182"><a href="#cb17-182" aria-hidden="true" tabindex="-1"></a>show_subs <span class="op">=</span> split[show_digit][:<span class="dv">2</span>] <span class="cf">if</span> show_digit <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="cf">else</span> []</span>
+<span id="cb17-183"><a href="#cb17-183" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
 <span id="cb17-184"><a href="#cb17-184" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-185"><a href="#cb17-185" aria-hidden="true" tabindex="-1"></a><span class="fu">### The split digit, as images</span></span>
+<span id="cb17-185"><a href="#cb17-185" aria-hidden="true" tabindex="-1"></a>Read the two lists together. The two "extra" clusters are the digit 6 split into two near-equal halves, each about 80% pure — that is the split the pictures below examine. The digit 3 is also split, but one of its halves is really a 3/5/8 mixture. And the impurity has one dominant source: **4 and 9 are never separated** — they share two clusters, each roughly 40% fours and 40% nines — with 8-with-1 and 5-with-0 as smaller confusions. In pixel space a closed-top 4 and a 9 are a few pixels apart, so this is the classic MNIST confusion showing up as a merge rather than as misclassification. Nothing here is a class fragmented into arbitrary pieces; every decision is one the flat label cannot express, and the pictures decide whether the one clean split is sensible.</span>
 <span id="cb17-186"><a href="#cb17-186" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-187"><a href="#cb17-187" aria-hidden="true" tabindex="-1"></a>The digit below is the one DYF divided most cleanly into two communities. Each grid is a random sample from one of them:</span>
+<span id="cb17-187"><a href="#cb17-187" aria-hidden="true" tabindex="-1"></a><span class="fu">### The split digit, as images</span></span>
 <span id="cb17-188"><a href="#cb17-188" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-189"><a href="#cb17-189" aria-hidden="true" tabindex="-1"></a>::: {.gallery-fluid}</span>
+<span id="cb17-189"><a href="#cb17-189" aria-hidden="true" tabindex="-1"></a>The digit below is the one DYF divided most cleanly into two communities. Each grid is a random sample from one of them:</span>
 <span id="cb17-190"><a href="#cb17-190" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-193"><a href="#cb17-193" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
-<span id="cb17-194"><a href="#cb17-194" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-split-a</span></span>
-<span id="cb17-195"><a href="#cb17-195" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "DYF sub-cluster A of the split digit — random sample."</span></span>
-<span id="cb17-196"><a href="#cb17-196" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> _gallery <span class="im">import</span> image_grid</span>
-<span id="cb17-197"><a href="#cb17-197" aria-hidden="true" tabindex="-1"></a>fig_a <span class="op">=</span> <span class="va">None</span></span>
-<span id="cb17-198"><a href="#cb17-198" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="bu">len</span>(show_subs) <span class="op">&gt;=</span> <span class="dv">1</span>:</span>
-<span id="cb17-199"><a href="#cb17-199" aria-hidden="true" tabindex="-1"></a>    idx <span class="op">=</span> np.where(result.labels <span class="op">==</span> show_subs[<span class="dv">0</span>][<span class="st">"cid"</span>])[<span class="dv">0</span>]</span>
-<span id="cb17-200"><a href="#cb17-200" aria-hidden="true" tabindex="-1"></a>    fig_a <span class="op">=</span> image_grid(X, idx, title<span class="op">=</span><span class="ss">f"digit </span><span class="sc">{</span>show_digit<span class="sc">}</span><span class="ss">, DYF cluster </span><span class="sc">{</span>show_subs[<span class="dv">0</span>][<span class="st">'cid'</span>]<span class="sc">}</span><span class="ss"> (n=</span><span class="sc">{</span>show_subs[<span class="dv">0</span>][<span class="st">'n'</span>]<span class="sc">:,}</span><span class="ss">)"</span>)</span>
-<span id="cb17-201"><a href="#cb17-201" aria-hidden="true" tabindex="-1"></a>fig_a  <span class="co"># a bare expression displays; a call inside the `if` would not</span></span>
-<span id="cb17-202"><a href="#cb17-202" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb17-203"><a href="#cb17-203" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-206"><a href="#cb17-206" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
-<span id="cb17-207"><a href="#cb17-207" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-split-b</span></span>
-<span id="cb17-208"><a href="#cb17-208" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "DYF sub-cluster B of the same digit — random sample."</span></span>
-<span id="cb17-209"><a href="#cb17-209" aria-hidden="true" tabindex="-1"></a>fig_b <span class="op">=</span> <span class="va">None</span></span>
-<span id="cb17-210"><a href="#cb17-210" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="bu">len</span>(show_subs) <span class="op">&gt;=</span> <span class="dv">2</span>:</span>
-<span id="cb17-211"><a href="#cb17-211" aria-hidden="true" tabindex="-1"></a>    idx <span class="op">=</span> np.where(result.labels <span class="op">==</span> show_subs[<span class="dv">1</span>][<span class="st">"cid"</span>])[<span class="dv">0</span>]</span>
-<span id="cb17-212"><a href="#cb17-212" aria-hidden="true" tabindex="-1"></a>    fig_b <span class="op">=</span> image_grid(X, idx, title<span class="op">=</span><span class="ss">f"digit </span><span class="sc">{</span>show_digit<span class="sc">}</span><span class="ss">, DYF cluster </span><span class="sc">{</span>show_subs[<span class="dv">1</span>][<span class="st">'cid'</span>]<span class="sc">}</span><span class="ss"> (n=</span><span class="sc">{</span>show_subs[<span class="dv">1</span>][<span class="st">'n'</span>]<span class="sc">:,}</span><span class="ss">)"</span>)</span>
-<span id="cb17-213"><a href="#cb17-213" aria-hidden="true" tabindex="-1"></a>fig_b</span>
-<span id="cb17-214"><a href="#cb17-214" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb17-215"><a href="#cb17-215" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-216"><a href="#cb17-216" aria-hidden="true" tabindex="-1"></a>:::</span>
+<span id="cb17-191"><a href="#cb17-191" aria-hidden="true" tabindex="-1"></a>::: {.gallery-fluid}</span>
+<span id="cb17-192"><a href="#cb17-192" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-195"><a href="#cb17-195" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb17-196"><a href="#cb17-196" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-split-a</span></span>
+<span id="cb17-197"><a href="#cb17-197" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "DYF sub-cluster A of the split digit — random sample."</span></span>
+<span id="cb17-198"><a href="#cb17-198" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> _gallery <span class="im">import</span> image_grid</span>
+<span id="cb17-199"><a href="#cb17-199" aria-hidden="true" tabindex="-1"></a>fig_a <span class="op">=</span> <span class="va">None</span></span>
+<span id="cb17-200"><a href="#cb17-200" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="bu">len</span>(show_subs) <span class="op">&gt;=</span> <span class="dv">1</span>:</span>
+<span id="cb17-201"><a href="#cb17-201" aria-hidden="true" tabindex="-1"></a>    idx <span class="op">=</span> np.where(result.labels <span class="op">==</span> show_subs[<span class="dv">0</span>][<span class="st">"cid"</span>])[<span class="dv">0</span>]</span>
+<span id="cb17-202"><a href="#cb17-202" aria-hidden="true" tabindex="-1"></a>    fig_a <span class="op">=</span> image_grid(X, idx, title<span class="op">=</span><span class="ss">f"digit </span><span class="sc">{</span>show_digit<span class="sc">}</span><span class="ss">, DYF cluster </span><span class="sc">{</span>show_subs[<span class="dv">0</span>][<span class="st">'cid'</span>]<span class="sc">}</span><span class="ss"> (n=</span><span class="sc">{</span>show_subs[<span class="dv">0</span>][<span class="st">'n'</span>]<span class="sc">:,}</span><span class="ss">)"</span>)</span>
+<span id="cb17-203"><a href="#cb17-203" aria-hidden="true" tabindex="-1"></a>fig_a  <span class="co"># a bare expression displays; a call inside the `if` would not</span></span>
+<span id="cb17-204"><a href="#cb17-204" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb17-205"><a href="#cb17-205" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-208"><a href="#cb17-208" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb17-209"><a href="#cb17-209" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-split-b</span></span>
+<span id="cb17-210"><a href="#cb17-210" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "DYF sub-cluster B of the same digit — random sample."</span></span>
+<span id="cb17-211"><a href="#cb17-211" aria-hidden="true" tabindex="-1"></a>fig_b <span class="op">=</span> <span class="va">None</span></span>
+<span id="cb17-212"><a href="#cb17-212" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="bu">len</span>(show_subs) <span class="op">&gt;=</span> <span class="dv">2</span>:</span>
+<span id="cb17-213"><a href="#cb17-213" aria-hidden="true" tabindex="-1"></a>    idx <span class="op">=</span> np.where(result.labels <span class="op">==</span> show_subs[<span class="dv">1</span>][<span class="st">"cid"</span>])[<span class="dv">0</span>]</span>
+<span id="cb17-214"><a href="#cb17-214" aria-hidden="true" tabindex="-1"></a>    fig_b <span class="op">=</span> image_grid(X, idx, title<span class="op">=</span><span class="ss">f"digit </span><span class="sc">{</span>show_digit<span class="sc">}</span><span class="ss">, DYF cluster </span><span class="sc">{</span>show_subs[<span class="dv">1</span>][<span class="st">'cid'</span>]<span class="sc">}</span><span class="ss"> (n=</span><span class="sc">{</span>show_subs[<span class="dv">1</span>][<span class="st">'n'</span>]<span class="sc">:,}</span><span class="ss">)"</span>)</span>
+<span id="cb17-215"><a href="#cb17-215" aria-hidden="true" tabindex="-1"></a>fig_b</span>
+<span id="cb17-216"><a href="#cb17-216" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
 <span id="cb17-217"><a href="#cb17-217" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-218"><a href="#cb17-218" aria-hidden="true" tabindex="-1"></a>Two ways of writing a 6. The first grid's sixes have a small, tight loop on a long stem, mostly thin and slanted; the second grid's have a large round loop and heavier strokes — and its impurities are 0s, which is what a big-looped 6 turns into when the stem shortens. It is a difference of loop size and stroke weight rather than two unmistakably different populations, so read it as a stylistic sub-community the ten-way label has no room for: modest, visible, and the kind of split a retrieval task would want kept. The caveats say how we'd test that properly.</span>
+<span id="cb17-218"><a href="#cb17-218" aria-hidden="true" tabindex="-1"></a>:::</span>
 <span id="cb17-219"><a href="#cb17-219" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-220"><a href="#cb17-220" aria-hidden="true" tabindex="-1"></a><span class="fu">### The same digit, from k-means</span></span>
+<span id="cb17-220"><a href="#cb17-220" aria-hidden="true" tabindex="-1"></a>Two ways of writing a 6. The first grid's sixes have a small, tight loop on a long stem, mostly thin and slanted; the second grid's have a large round loop and heavier strokes — and its impurities are 0s, which is what a big-looped 6 turns into when the stem shortens. It is a difference of loop size and stroke weight rather than two unmistakably different populations, so read it as a stylistic sub-community the ten-way label has no room for: modest, visible, and the kind of split a retrieval task would want kept. The caveats say how we'd test that properly.</span>
 <span id="cb17-221"><a href="#cb17-221" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-222"><a href="#cb17-222" aria-hidden="true" tabindex="-1"></a>K-means was told <span class="in">`k=10`</span>, so it gave us exactly ten clusters. Here's a random sample from the cluster that contains the most 7s:</span>
+<span id="cb17-222"><a href="#cb17-222" aria-hidden="true" tabindex="-1"></a><span class="fu">### The same digit, from k-means</span></span>
 <span id="cb17-223"><a href="#cb17-223" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-226"><a href="#cb17-226" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
-<span id="cb17-227"><a href="#cb17-227" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-kmeans-sevens</span></span>
-<span id="cb17-228"><a href="#cb17-228" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "The k-means cluster that contains the most 7s."</span></span>
-<span id="cb17-229"><a href="#cb17-229" aria-hidden="true" tabindex="-1"></a>km_labels <span class="op">=</span> kmeans[<span class="st">"labels"</span>]</span>
-<span id="cb17-230"><a href="#cb17-230" aria-hidden="true" tabindex="-1"></a>best_cid, best_count <span class="op">=</span> <span class="op">-</span><span class="dv">1</span>, <span class="dv">0</span></span>
-<span id="cb17-231"><a href="#cb17-231" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> cid <span class="kw">in</span> np.unique(km_labels):</span>
-<span id="cb17-232"><a href="#cb17-232" aria-hidden="true" tabindex="-1"></a>    cnt <span class="op">=</span> <span class="bu">int</span>(((km_labels <span class="op">==</span> cid) <span class="op">&amp;</span> (y <span class="op">==</span> <span class="dv">7</span>)).<span class="bu">sum</span>())</span>
-<span id="cb17-233"><a href="#cb17-233" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> cnt <span class="op">&gt;</span> best_count:</span>
-<span id="cb17-234"><a href="#cb17-234" aria-hidden="true" tabindex="-1"></a>        best_count, best_cid <span class="op">=</span> cnt, <span class="bu">int</span>(cid)</span>
-<span id="cb17-235"><a href="#cb17-235" aria-hidden="true" tabindex="-1"></a>idx <span class="op">=</span> np.where(km_labels <span class="op">==</span> best_cid)[<span class="dv">0</span>]</span>
-<span id="cb17-236"><a href="#cb17-236" aria-hidden="true" tabindex="-1"></a>image_grid(X, idx, title<span class="op">=</span><span class="ss">f"k-means cluster </span><span class="sc">{</span>best_cid<span class="sc">}</span><span class="ss"> (n=</span><span class="sc">{</span><span class="bu">len</span>(idx)<span class="sc">:,}</span><span class="ss">, </span><span class="sc">{</span>best_count<span class="sc">:,}</span><span class="ss"> are 7s)"</span>)</span>
-<span id="cb17-237"><a href="#cb17-237" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb17-238"><a href="#cb17-238" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-239"><a href="#cb17-239" aria-hidden="true" tabindex="-1"></a>Read the title: the fraction of this cluster that is actually a 7. The rest are other digits — mostly 4s, 9s and 5s — that share a prominent diagonal stroke in pixel space. Committing to exactly ten Voronoi cells forced k-means to draw a boundary somewhere, and "things with a diagonal stroke" was the cleanest cut available. DYF spent its budget differently: it kept the digit classes apart and used two extra clusters on a style split. That is why it wins ARI here as well as NMI.</span>
+<span id="cb17-224"><a href="#cb17-224" aria-hidden="true" tabindex="-1"></a>K-means was told <span class="in">`k=10`</span>, so it gave us exactly ten clusters. Here's a random sample from the cluster that contains the most 7s:</span>
+<span id="cb17-225"><a href="#cb17-225" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-228"><a href="#cb17-228" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb17-229"><a href="#cb17-229" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-kmeans-sevens</span></span>
+<span id="cb17-230"><a href="#cb17-230" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "The k-means cluster that contains the most 7s."</span></span>
+<span id="cb17-231"><a href="#cb17-231" aria-hidden="true" tabindex="-1"></a>km_labels <span class="op">=</span> kmeans[<span class="st">"labels"</span>]</span>
+<span id="cb17-232"><a href="#cb17-232" aria-hidden="true" tabindex="-1"></a>best_cid, best_count <span class="op">=</span> <span class="op">-</span><span class="dv">1</span>, <span class="dv">0</span></span>
+<span id="cb17-233"><a href="#cb17-233" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> cid <span class="kw">in</span> np.unique(km_labels):</span>
+<span id="cb17-234"><a href="#cb17-234" aria-hidden="true" tabindex="-1"></a>    cnt <span class="op">=</span> <span class="bu">int</span>(((km_labels <span class="op">==</span> cid) <span class="op">&amp;</span> (y <span class="op">==</span> <span class="dv">7</span>)).<span class="bu">sum</span>())</span>
+<span id="cb17-235"><a href="#cb17-235" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> cnt <span class="op">&gt;</span> best_count:</span>
+<span id="cb17-236"><a href="#cb17-236" aria-hidden="true" tabindex="-1"></a>        best_count, best_cid <span class="op">=</span> cnt, <span class="bu">int</span>(cid)</span>
+<span id="cb17-237"><a href="#cb17-237" aria-hidden="true" tabindex="-1"></a>idx <span class="op">=</span> np.where(km_labels <span class="op">==</span> best_cid)[<span class="dv">0</span>]</span>
+<span id="cb17-238"><a href="#cb17-238" aria-hidden="true" tabindex="-1"></a>image_grid(X, idx, title<span class="op">=</span><span class="ss">f"k-means cluster </span><span class="sc">{</span>best_cid<span class="sc">}</span><span class="ss"> (n=</span><span class="sc">{</span><span class="bu">len</span>(idx)<span class="sc">:,}</span><span class="ss">, </span><span class="sc">{</span>best_count<span class="sc">:,}</span><span class="ss"> are 7s)"</span>)</span>
+<span id="cb17-239"><a href="#cb17-239" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
 <span id="cb17-240"><a href="#cb17-240" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-241"><a href="#cb17-241" aria-hidden="true" tabindex="-1"></a><span class="fu">### Why this matters</span></span>
+<span id="cb17-241"><a href="#cb17-241" aria-hidden="true" tabindex="-1"></a>Read the title: the fraction of this cluster that is actually a 7. The rest are other digits — mostly 4s, 9s and 5s — that share a prominent diagonal stroke in pixel space. Committing to exactly ten Voronoi cells forced k-means to draw a boundary somewhere, and "things with a diagonal stroke" was the cleanest cut available. DYF spent its budget differently: it kept the digit classes apart and used two extra clusters on a style split. That is why it wins ARI here as well as AMI.</span>
 <span id="cb17-242"><a href="#cb17-242" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-243"><a href="#cb17-243" aria-hidden="true" tabindex="-1"></a>If your downstream task is **classification** (given a new image, predict 0–9), you want a ten-way partition — and on MNIST the one DYF finds without being told <span class="in">`k`</span> is closer to the labels than the one k-means finds with it.</span>
+<span id="cb17-243"><a href="#cb17-243" aria-hidden="true" tabindex="-1"></a><span class="fu">### Why this matters</span></span>
 <span id="cb17-244"><a href="#cb17-244" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-245"><a href="#cb17-245" aria-hidden="true" tabindex="-1"></a>If your downstream task is **retrieval** (given a user's handwriting, find visually similar samples), the style split is the feature you want kept.</span>
+<span id="cb17-245"><a href="#cb17-245" aria-hidden="true" tabindex="-1"></a>If your downstream task is **classification** (given a new image, predict 0–9), you want a ten-way partition — and on MNIST the one DYF finds without being told <span class="in">`k`</span> is closer to the labels than the one k-means finds with it.</span>
 <span id="cb17-246"><a href="#cb17-246" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-247"><a href="#cb17-247" aria-hidden="true" tabindex="-1"></a>If your downstream task is **exploration** (what's in this corpus?), you want the hierarchy: start at the 12 communities, then walk down to 10 or 5 to see how they merge, without refitting.</span>
+<span id="cb17-247"><a href="#cb17-247" aria-hidden="true" tabindex="-1"></a>If your downstream task is **retrieval** (given a user's handwriting, find visually similar samples), the style split is the feature you want kept.</span>
 <span id="cb17-248"><a href="#cb17-248" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-249"><a href="#cb17-249" aria-hidden="true" tabindex="-1"></a><span class="fu">## Walking down the hierarchy</span></span>
+<span id="cb17-249"><a href="#cb17-249" aria-hidden="true" tabindex="-1"></a>If your downstream task is **exploration** (what's in this corpus?), you want the hierarchy: start at the 12 communities, then walk down to 10 or 5 to see how they merge, without refitting.</span>
 <span id="cb17-250"><a href="#cb17-250" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-251"><a href="#cb17-251" aria-hidden="true" tabindex="-1"></a>DYF's 12 communities sit at the top of a partition hierarchy. <span class="in">`merge_to_max_k`</span> collapses them to coarser granularities:</span>
+<span id="cb17-251"><a href="#cb17-251" aria-hidden="true" tabindex="-1"></a><span class="fu">## Walking down the hierarchy</span></span>
 <span id="cb17-252"><a href="#cb17-252" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-255"><a href="#cb17-255" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
-<span id="cb17-256"><a href="#cb17-256" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: merge-walk</span></span>
-<span id="cb17-257"><a href="#cb17-257" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: asis</span></span>
-<span id="cb17-258"><a href="#cb17-258" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> _gallery <span class="im">import</span> merge_walk, merge_walk_table</span>
-<span id="cb17-259"><a href="#cb17-259" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-260"><a href="#cb17-260" aria-hidden="true" tabindex="-1"></a>walk <span class="op">=</span> merge_walk(result, X, y, targets<span class="op">=</span>[<span class="dv">40</span>, <span class="dv">20</span>, <span class="dv">10</span>, <span class="dv">5</span>])</span>
-<span id="cb17-261"><a href="#cb17-261" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(merge_walk_table(walk, result))</span>
-<span id="cb17-262"><a href="#cb17-262" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb17-263"><a href="#cb17-263" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-264"><a href="#cb17-264" aria-hidden="true" tabindex="-1"></a>Targets above 12 are no-ops — there is nothing to merge. Merging to exactly 10 *costs* a little on both metrics, because the two extra clusters were a real split and forcing them back together is the wrong merge for this label. The raw partition is the best point on the walk. That is what "recover <span class="in">`k`</span> from the data" looks like when it works: the finest natural partition is already at the label's granularity, and the walk is there for the tasks that want something coarser.</span>
+<span id="cb17-253"><a href="#cb17-253" aria-hidden="true" tabindex="-1"></a>DYF's 12 communities sit at the top of a partition hierarchy. <span class="in">`merge_to_max_k`</span> collapses them to coarser granularities:</span>
+<span id="cb17-254"><a href="#cb17-254" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-257"><a href="#cb17-257" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb17-258"><a href="#cb17-258" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: merge-walk</span></span>
+<span id="cb17-259"><a href="#cb17-259" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: asis</span></span>
+<span id="cb17-260"><a href="#cb17-260" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> _gallery <span class="im">import</span> merge_walk, merge_walk_table</span>
+<span id="cb17-261"><a href="#cb17-261" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-262"><a href="#cb17-262" aria-hidden="true" tabindex="-1"></a>walk <span class="op">=</span> merge_walk(result, X, y, targets<span class="op">=</span>[<span class="dv">40</span>, <span class="dv">20</span>, <span class="dv">10</span>, <span class="dv">5</span>])</span>
+<span id="cb17-263"><a href="#cb17-263" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(merge_walk_table(walk, result))</span>
+<span id="cb17-264"><a href="#cb17-264" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
 <span id="cb17-265"><a href="#cb17-265" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-266"><a href="#cb17-266" aria-hidden="true" tabindex="-1"></a><span class="fu">## What happened to the Digits story?</span></span>
+<span id="cb17-266"><a href="#cb17-266" aria-hidden="true" tabindex="-1"></a>Targets above 12 are no-ops — there is nothing to merge. Merging to exactly 10 *costs* a little on both metrics, because the two extra clusters were a real split and forcing them back together is the wrong merge for this label. The raw partition is the best point on the walk. That is what "recover <span class="in">`k`</span> from the data" looks like when it works: the finest natural partition is already at the label's granularity, and the walk is there for the tasks that want something coarser.</span>
 <span id="cb17-267"><a href="#cb17-267" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-268"><a href="#cb17-268" aria-hidden="true" tabindex="-1"></a>The two datasets tell opposite stories, and the comparison is the most instructive table in the gallery:</span>
+<span id="cb17-268"><a href="#cb17-268" aria-hidden="true" tabindex="-1"></a><span class="fu">## What happened to the Digits story?</span></span>
 <span id="cb17-269"><a href="#cb17-269" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-270"><a href="#cb17-270" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Dataset   <span class="pp">|</span> DYF k  <span class="pp">|</span> k-means NMI <span class="pp">|</span> DYF NMI   <span class="pp">|</span> DYF − k-means NMI <span class="pp">|</span> DYF ARI   <span class="pp">|</span> k-means ARI <span class="pp">|</span></span>
-<span id="cb17-271"><a href="#cb17-271" aria-hidden="true" tabindex="-1"></a><span class="pp">|-----------|-------:|------------:|----------:|------------------:|----------:|------------:|</span></span>
-<span id="cb17-272"><a href="#cb17-272" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Digits    <span class="pp">|</span> 7      <span class="pp">|</span> 0.773       <span class="pp">|</span> 0.627     <span class="pp">|</span> −0.146            <span class="pp">|</span> 0.475     <span class="pp">|</span> 0.726       <span class="pp">|</span></span>
-<span id="cb17-273"><a href="#cb17-273" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> **MNIST** | **12** | **0.491**   | **0.550** | **+0.059**        | **0.429** | **0.361**   <span class="pp">|</span></span>
-<span id="cb17-274"><a href="#cb17-274" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-275"><a href="#cb17-275" aria-hidden="true" tabindex="-1"></a>On 1,797 digits DYF *under*-splits (7 communities for 10 classes) and loses on both metrics. On 70,000 it lands at 12 and wins on both. Same code, same defaults.</span>
+<span id="cb17-270"><a href="#cb17-270" aria-hidden="true" tabindex="-1"></a>The two datasets tell opposite stories, and the comparison is the most instructive table in the gallery:</span>
+<span id="cb17-271"><a href="#cb17-271" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-272"><a href="#cb17-272" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Dataset   <span class="pp">|</span> DYF k  <span class="pp">|</span> k-means AMI <span class="pp">|</span> DYF AMI   <span class="pp">|</span> DYF − k-means AMI <span class="pp">|</span> DYF ARI   <span class="pp">|</span> k-means ARI <span class="pp">|</span></span>
+<span id="cb17-273"><a href="#cb17-273" aria-hidden="true" tabindex="-1"></a><span class="pp">|-----------|-------:|------------:|----------:|------------------:|----------:|------------:|</span></span>
+<span id="cb17-274"><a href="#cb17-274" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Digits    <span class="pp">|</span> 8      <span class="pp">|</span> 0.773       <span class="pp">|</span> 0.668     <span class="pp">|</span> −0.105            <span class="pp">|</span> 0.536     <span class="pp">|</span> 0.726       <span class="pp">|</span></span>
+<span id="cb17-275"><a href="#cb17-275" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> **MNIST** | **12** | **0.491**   | **0.546** | **+0.055**        | **0.422** | **0.361**   <span class="pp">|</span></span>
 <span id="cb17-276"><a href="#cb17-276" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-277"><a href="#cb17-277" aria-hidden="true" tabindex="-1"></a><span class="fu">### Why does scale help?</span></span>
+<span id="cb17-277"><a href="#cb17-277" aria-hidden="true" tabindex="-1"></a>On 1,797 digits DYF *under*-splits (8 communities for 10 classes) and loses on both metrics. On 70,000 it lands at 12 and wins on both. Same code, same defaults.</span>
 <span id="cb17-278"><a href="#cb17-278" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-279"><a href="#cb17-279" aria-hidden="true" tabindex="-1"></a>DYF clusters leaf centroids, not points. On Digits the tree has around 170 leaves; a modularity optimiser on a graph that small hits its resolution limit and merges genuine classes — the well-known failure of modularity on small graphs, not a property of the digits. On MNIST the tree has thousands of leaves, the community graph is rich enough to resolve ten-plus communities, and the partition snaps to the label. The <span class="co">[</span><span class="ot">Digits</span><span class="co">](digits.qmd)</span> notebook shows the other side of this: raising the Louvain <span class="in">`resolution`</span> to 2 recovers 11 communities there and beats the default on both metrics.</span>
+<span id="cb17-279"><a href="#cb17-279" aria-hidden="true" tabindex="-1"></a><span class="fu">### Why does scale help?</span></span>
 <span id="cb17-280"><a href="#cb17-280" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-281"><a href="#cb17-281" aria-hidden="true" tabindex="-1"></a>So the axis that matters is not sample count as such but **leaf count** — how many super-points the tree hands to community detection. Below a few hundred, expect under-splitting at the default resolution.</span>
+<span id="cb17-281"><a href="#cb17-281" aria-hidden="true" tabindex="-1"></a>DYF clusters leaf centroids, not points. On Digits the tree has around 190 leaves; a modularity optimiser on a graph that small hits its resolution limit and merges genuine classes — the well-known failure of modularity on small graphs, not a property of the digits. On MNIST the tree has about 3,200 leaves, the community graph is rich enough to resolve ten-plus communities, and the partition snaps to the label. The <span class="co">[</span><span class="ot">Digits</span><span class="co">](digits.qmd)</span> notebook shows the other side of this: raising the Louvain <span class="in">`resolution`</span> to 2 recovers 10 communities there and beats the default on both metrics.</span>
 <span id="cb17-282"><a href="#cb17-282" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-283"><a href="#cb17-283" aria-hidden="true" tabindex="-1"></a><span class="fu">### The sports analogy update</span></span>
+<span id="cb17-283"><a href="#cb17-283" aria-hidden="true" tabindex="-1"></a>So the axis that matters is not sample count as such but **leaf count** — how many super-points the tree hands to community detection. Below a few hundred, expect under-splitting at the default resolution.</span>
 <span id="cb17-284"><a href="#cb17-284" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-285"><a href="#cb17-285" aria-hidden="true" tabindex="-1"></a>Digits was k-means's home court — convex blobs, small <span class="in">`k`</span>, oracle-provided, and a DYF that could not field enough players. It won cleanly.</span>
+<span id="cb17-285"><a href="#cb17-285" aria-hidden="true" tabindex="-1"></a><span class="fu">### The sports analogy update</span></span>
 <span id="cb17-286"><a href="#cb17-286" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-287"><a href="#cb17-287" aria-hidden="true" tabindex="-1"></a>MNIST is the away game with a full roster. K-means still had the oracle, and still lost on both scoreboards — because knowing <span class="in">`k=10`</span> does not tell you *where* to cut, and pixel space rewarded the cut that keeps digit classes apart over the one that hits exactly ten centers.</span>
+<span id="cb17-287"><a href="#cb17-287" aria-hidden="true" tabindex="-1"></a>Digits was k-means's home court — convex blobs, small <span class="in">`k`</span>, oracle-provided, and a DYF that could not field enough players. It won cleanly.</span>
 <span id="cb17-288"><a href="#cb17-288" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-289"><a href="#cb17-289" aria-hidden="true" tabindex="-1"></a><span class="fu">## Caveats</span></span>
+<span id="cb17-289"><a href="#cb17-289" aria-hidden="true" tabindex="-1"></a>MNIST is the away game with a full roster. K-means still had the oracle, and still lost on both scoreboards — because knowing <span class="in">`k=10`</span> does not tell you *where* to cut, and pixel space rewarded the cut that keeps digit classes apart over the one that hits exactly ten centers.</span>
 <span id="cb17-290"><a href="#cb17-290" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-291"><a href="#cb17-291" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**The two extra clusters need a look, not a number.** The grids above are the evidence. Our reading is that the split is stylistic (reading (a)); a rigorous version would test it by holding out the split digit and checking whether the two sub-clusters predict, say, writer identity or stroke width. The gallery skips that to keep the notebook readable.</span>
-<span id="cb17-292"><a href="#cb17-292" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Earlier versions of this page reported 81–86 DYF clusters** and built an "over-partitioning is hierarchy" argument on them. That count was an artifact: the Louvain optimiser in <span class="in">`dyf-rs`</span> before 0.12.0 ran a single level with no aggregation phase and could not merge communities once formed. The fix is documented in dyf's <span class="in">`KNOWN_ISSUES.md`</span> (issue 10); the numbers on this page are from the corrected optimiser.</span>
-<span id="cb17-293"><a href="#cb17-293" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**UMAP is a projection, not the cluster space.** When DYF's and k-means's partitions look visually different in the UMAP panel, some of that is true clustering difference and some is UMAP's 2D compression of decisions made in 784d. Don't read the UMAP too literally.</span>
-<span id="cb17-294"><a href="#cb17-294" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Cache is in `/tmp`.** Dumped on reboot, which is fine for the gallery — real applications should use a durable cache.</span>
+<span id="cb17-291"><a href="#cb17-291" aria-hidden="true" tabindex="-1"></a><span class="fu">## Caveats</span></span>
+<span id="cb17-292"><a href="#cb17-292" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-293"><a href="#cb17-293" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**The two extra clusters need a look, not a number.** The grids above are the evidence. Our reading is that the split is stylistic (reading (a)); a rigorous version would test it by holding out the split digit and checking whether the two sub-clusters predict, say, writer identity or stroke width. The gallery skips that to keep the notebook readable.</span>
+<span id="cb17-294"><a href="#cb17-294" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Earlier versions of this page reported 81–86 DYF clusters** and built an "over-partitioning is hierarchy" argument on them. That count was an artifact: the Louvain optimiser in <span class="in">`dyf-rs`</span> before 0.12.0 ran a single level with no aggregation phase and could not merge communities once formed. The fix is documented in dyf's <span class="in">`KNOWN_ISSUES.md`</span> (issue 10); the numbers on this page are from the corrected optimiser.</span>
+<span id="cb17-295"><a href="#cb17-295" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**UMAP is a projection, not the cluster space.** When DYF's and k-means's partitions look visually different in the UMAP panel, some of that is true clustering difference and some is UMAP's 2D compression of decisions made in 784d. Don't read the UMAP too literally.</span>
+<span id="cb17-296"><a href="#cb17-296" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Cache is in `/tmp`.** Dumped on reboot, which is fine for the gallery — real applications should use a durable cache.</span>
 </code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
 </div></div></div></div></div>
 </div> <!-- /content -->

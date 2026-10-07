@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.10.18">
+<meta name="generator" content="quarto-1.10.19">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -44,9 +44,9 @@ ul.task-list li input[type="checkbox"] {
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-1ed79dc1172df127c7d94f8abf7ffee9.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-c22d5dff81f50d6ca627b6188dc743b9.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-1ed79dc1172df127c7d94f8abf7ffee9.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-2253679dd5a56ef632de4277f35d5a2c.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-99131190c761fa326849492283a1b6ed.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-2253679dd5a56ef632de4277f35d5a2c.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
 <link href="../site_libs/bootstrap/bootstrap-077483bf2c889e981b53a146dc5bf4c0.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
@@ -89,7 +89,7 @@ ul.task-list li input[type="checkbox"] {
     }
 
     const options = {
-      valueNames: ['listing-image','listing-title','listing-subtitle','listing-categories','listing-true-k','listing-recovered-k','listing-nmi',{ data: ['index'] },{ data: ['categories'] },{ data: ['listing-date-sort'] },{ data: ['listing-file-modified-sort'] }],
+      valueNames: ['listing-image','listing-title','listing-subtitle','listing-categories','listing-true-k','listing-recovered-k','listing-ami',{ data: ['index'] },{ data: ['categories'] },{ data: ['listing-date-sort'] },{ data: ['listing-file-modified-sort'] }],
       
       searchColumns: ["listing-categories"],
     };
@@ -377,6 +377,7 @@ window.Quarto = {
   <li><a href="#what-the-gallery-shows" id="toc-what-the-gallery-shows" class="nav-link active" data-scroll-target="#what-the-gallery-shows">What the gallery shows</a></li>
   <li><a href="#the-notebooks" id="toc-the-notebooks" class="nav-link" data-scroll-target="#the-notebooks">The notebooks</a></li>
   <li><a href="#how-to-read-the-results" id="toc-how-to-read-the-results" class="nav-link" data-scroll-target="#how-to-read-the-results">How to read the results</a></li>
+  <li><a href="#what-about-speed" id="toc-what-about-speed" class="nav-link" data-scroll-target="#what-about-speed">What about speed?</a></li>
   <li><a href="#who-should-be-in-your-toolbox" id="toc-who-should-be-in-your-toolbox" class="nav-link" data-scroll-target="#who-should-be-in-your-toolbox">Who should be in your toolbox?</a></li>
   <li><a href="#what-parameter-free-actually-means-here" id="toc-what-parameter-free-actually-means-here" class="nav-link" data-scroll-target="#what-parameter-free-actually-means-here">What “parameter-free” actually means here</a>
   <ul class="collapse">
@@ -420,8 +421,8 @@ window.Quarto = {
 <p>Each notebook below runs the same three lines of DYF against a dataset with known class structure. The metric columns that matter are:</p>
 <ul>
 <li><strong>Recovered k</strong> — the finest-resolution partition DYF finds from the data.</li>
-<li><strong>Merge walk</strong> — how NMI and ARI evolve as you collapse that partition to coarser <code>k</code> values.</li>
-<li><strong>NMI / ARI at matched granularity</strong> — how closely DYF’s partition aligns with the ground truth at the <em>resolution</em> the label is expressed at.</li>
+<li><strong>Merge walk</strong> — how AMI and ARI evolve as you collapse that partition to coarser <code>k</code> values.</li>
+<li><strong>AMI / ARI at matched granularity</strong> — how closely DYF’s partition aligns with the ground truth at the <em>resolution</em> the label is expressed at.</li>
 </ul>
 <p>Each notebook also scores k-means (told the oracle <code>k</code>) as a ceiling, and HDBSCAN (parameter-light, but not parameter-free) as a second baseline. Where DYF loses, the notebook says so.</p>
 </section>
@@ -435,7 +436,7 @@ window.Quarto = {
     </div>
 </div>
 <div class="list grid quarto-listing-cols-3">
-<div class="g-col-1" data-index="0" data-categories="ZGlhZ25vc3RpYyUyQ21ldGhvZG9sb2d5JTJDbXVsdGktZG9tYWlu" data-listing-file-modified-sort="1790819808766" data-listing-reading-time-sort="43" data-listing-word-count-sort="8548">
+<div class="g-col-1" data-index="0" data-categories="ZGlhZ25vc3RpYyUyQ21ldGhvZG9sb2d5JTJDbXVsdGktZG9tYWlu" data-listing-file-modified-sort="1791332245774" data-listing-reading-time-sort="43" data-listing-word-count-sort="8548">
 <a href="../gallery/diagnostic-stack.html" class="quarto-grid-link">
 <div class="quarto-grid-item card h-100 card-left">
 <p class="card-img-top">
@@ -479,9 +480,9 @@ Recovered k
 
 <tr>
 <td>
-NMI
+AMI
 </td>
-<td class="nmi">
+<td class="ami">
 &nbsp;
 </td>
 </tr>
@@ -490,7 +491,7 @@ NMI
 </div>
 </div></a>
 </div>
-<div class="g-col-1" data-index="1" data-categories="c3ludGhldGljJTJDMmQlMkNwZWRhZ29naWNhbA==" data-listing-file-modified-sort="1790819808766" data-listing-reading-time-sort="9" data-listing-word-count-sort="1613">
+<div class="g-col-1" data-index="1" data-categories="c3ludGhldGljJTJDMmQlMkNwZWRhZ29naWNhbA==" data-listing-file-modified-sort="1791332245774" data-listing-reading-time-sort="9" data-listing-word-count-sort="1694">
 <a href="../gallery/synthetic-shapes.html" class="quarto-grid-link">
 <div class="quarto-grid-item card h-100 card-left">
 <p class="card-img-top">
@@ -534,9 +535,9 @@ Recovered k
 
 <tr>
 <td>
-NMI
+AMI
 </td>
-<td class="nmi">
+<td class="ami">
 &nbsp;
 </td>
 </tr>
@@ -545,7 +546,7 @@ NMI
 </div>
 </div></a>
 </div>
-<div class="g-col-1" data-index="2" data-categories="aW1hZ2VzJTJDc21hbGwlMkNwaXhlbHM=" data-listing-file-modified-sort="1790819808766" data-listing-reading-time-sort="10" data-listing-word-count-sort="1827">
+<div class="g-col-1" data-index="2" data-categories="aW1hZ2VzJTJDc21hbGwlMkNwaXhlbHM=" data-listing-file-modified-sort="1791332245774" data-listing-reading-time-sort="10" data-listing-word-count-sort="1878">
 <a href="../gallery/digits.html" class="quarto-grid-link">
 <div class="quarto-grid-item card h-100 card-left">
 <p class="card-img-top">
@@ -589,9 +590,9 @@ Recovered k
 
 <tr>
 <td>
-NMI
+AMI
 </td>
-<td class="nmi">
+<td class="ami">
 &nbsp;
 </td>
 </tr>
@@ -600,7 +601,7 @@ NMI
 </div>
 </div></a>
 </div>
-<div class="g-col-1" data-index="3" data-categories="aW1hZ2VzJTJDbGFyZ2UlMkNwaXhlbHM=" data-listing-file-modified-sort="1790819808766" data-listing-reading-time-sort="11" data-listing-word-count-sort="2037">
+<div class="g-col-1" data-index="3" data-categories="aW1hZ2VzJTJDbGFyZ2UlMkNwaXhlbHM=" data-listing-file-modified-sort="1791332245774" data-listing-reading-time-sort="11" data-listing-word-count-sort="2148">
 <a href="../gallery/mnist.html" class="quarto-grid-link">
 <div class="quarto-grid-item card h-100 card-left">
 <p class="card-img-top">
@@ -644,9 +645,9 @@ Recovered k
 
 <tr>
 <td>
-NMI
+AMI
 </td>
-<td class="nmi">
+<td class="ami">
 &nbsp;
 </td>
 </tr>
@@ -655,7 +656,7 @@ NMI
 </div>
 </div></a>
 </div>
-<div class="g-col-1" data-index="4" data-categories="aW1hZ2VzJTJDbWVkaXVtJTJDZW1iZWRkaW5ncyUyQ2ludGVyYWN0aXZl" data-listing-file-modified-sort="1790819808759" data-listing-reading-time-sort="7" data-listing-word-count-sort="1241">
+<div class="g-col-1" data-index="4" data-categories="aW1hZ2VzJTJDbWVkaXVtJTJDZW1iZWRkaW5ncyUyQ2ludGVyYWN0aXZl" data-listing-file-modified-sort="1791332245766" data-listing-reading-time-sort="7" data-listing-word-count-sort="1305">
 <a href="../gallery/cifar10-clip.html" class="quarto-grid-link">
 <div class="quarto-grid-item card h-100 card-left">
 <p class="card-img-top">
@@ -701,9 +702,9 @@ Recovered k
 
 <tr>
 <td>
-NMI
+AMI
 </td>
-<td class="nmi">
+<td class="ami">
 &nbsp;
 </td>
 </tr>
@@ -712,7 +713,7 @@ NMI
 </div>
 </div></a>
 </div>
-<div class="g-col-1" data-index="5" data-categories="dGV4dCUyQ21lZGl1bSUyQ2VtYmVkZGluZ3MlMkNoaWVyYXJjaGljYWw=" data-listing-file-modified-sort="1790819808766" data-listing-reading-time-sort="10" data-listing-word-count-sort="1862">
+<div class="g-col-1" data-index="5" data-categories="dGV4dCUyQ21lZGl1bSUyQ2VtYmVkZGluZ3MlMkNoaWVyYXJjaGljYWw=" data-listing-file-modified-sort="1791332245774" data-listing-reading-time-sort="10" data-listing-word-count-sort="1908">
 <a href="../gallery/twenty-newsgroups.html" class="quarto-grid-link">
 <div class="quarto-grid-item card h-100 card-left">
 <p class="card-img-top">
@@ -758,9 +759,9 @@ Recovered k
 
 <tr>
 <td>
-NMI
+AMI
 </td>
-<td class="nmi">
+<td class="ami">
 &nbsp;
 </td>
 </tr>
@@ -769,7 +770,7 @@ NMI
 </div>
 </div></a>
 </div>
-<div class="g-col-1" data-index="6" data-categories="aW1hZ2VzJTJDZW1iZWRkaW5ncyUyQ2ludGVyYWN0aXZl" data-listing-file-modified-sort="1790819808759" data-listing-reading-time-sort="1" data-listing-word-count-sort="148">
+<div class="g-col-1" data-index="6" data-categories="aW1hZ2VzJTJDZW1iZWRkaW5ncyUyQ2ludGVyYWN0aXZl" data-listing-file-modified-sort="1791332245766" data-listing-reading-time-sort="1" data-listing-word-count-sort="148">
 <a href="../gallery/cifar100-deck.html" class="quarto-grid-link">
 <div class="quarto-grid-item card h-100 card-left">
 <p class="card-img-top">
@@ -813,9 +814,9 @@ Recovered k
 
 <tr>
 <td>
-NMI
+AMI
 </td>
-<td class="nmi">
+<td class="ami">
 &nbsp;
 </td>
 </tr>
@@ -824,7 +825,7 @@ NMI
 </div>
 </div></a>
 </div>
-<div class="g-col-1" data-index="7" data-categories="aW1hZ2VzJTJDc21hbGwlMkNwaXhlbHMlMkNoaWdoLWs=" data-listing-file-modified-sort="1790819808766" data-listing-reading-time-sort="5" data-listing-word-count-sort="865">
+<div class="g-col-1" data-index="7" data-categories="aW1hZ2VzJTJDc21hbGwlMkNwaXhlbHMlMkNoaWdoLWs=" data-listing-file-modified-sort="1791332245774" data-listing-reading-time-sort="5" data-listing-word-count-sort="903">
 <a href="../gallery/olivetti-faces.html" class="quarto-grid-link">
 <div class="quarto-grid-item card h-100 card-left">
 <p class="card-img-top">
@@ -870,9 +871,9 @@ Recovered k
 
 <tr>
 <td>
-NMI
+AMI
 </td>
-<td class="nmi">
+<td class="ami">
 &nbsp;
 </td>
 </tr>
@@ -881,7 +882,7 @@ NMI
 </div>
 </div></a>
 </div>
-<div class="g-col-1" data-index="8" data-categories="bW90aW9uJTJDbGFyZ2UlMkNwaHlzaWNhbCUyQ25vLWVtYmVkZGluZw==" data-listing-file-modified-sort="1790819808765" data-listing-reading-time-sort="7" data-listing-word-count-sort="1356">
+<div class="g-col-1" data-index="8" data-categories="bW90aW9uJTJDbGFyZ2UlMkNwaHlzaWNhbCUyQ25vLWVtYmVkZGluZw==" data-listing-file-modified-sort="1791332245774" data-listing-reading-time-sort="7" data-listing-word-count-sort="1363">
 <a href="../gallery/cmu-mocap.html" class="quarto-grid-link">
 <div class="quarto-grid-item card h-100 card-left">
 <p class="card-img-top">
@@ -927,9 +928,9 @@ Recovered k
 
 <tr>
 <td>
-NMI
+AMI
 </td>
-<td class="nmi">
+<td class="ami">
 &nbsp;
 </td>
 </tr>
@@ -967,10 +968,15 @@ NMI
 </tr>
 </tbody>
 </table>
-<p><strong>Recovered k tracks the label once the tree has enough leaves.</strong> On <a href="../gallery/mnist.html">MNIST</a> DYF finds 12 communities for 10 classes and on <a href="../gallery/cifar10-clip.html">CIFAR-10 + CLIP</a> exactly 10 for 10 — in both cases beating oracle k-means on ARI without being told <code>k</code>. The failure mode runs the other way on small data: <a href="../gallery/digits.html">Digits</a> (1,797 points, ~170 leaves) recovers 7 for 10 and <a href="../gallery/twenty-newsgroups.html">20 Newsgroups</a> 10 for 20, because a modularity optimiser on a graph of a few hundred leaf centroids hits its resolution limit and merges real classes. Raising Louvain <code>resolution</code> fixes that (Digits at <code>resolution=2</code>: 11 communities, better on both metrics); the default is left at 1.0 because no single value won across the gallery.</p>
+<p><strong>Recovered k tracks the label once the tree has enough leaves.</strong> On <a href="../gallery/mnist.html">MNIST</a> DYF finds 12 communities for 10 classes and on <a href="../gallery/cifar10-clip.html">CIFAR-10 + CLIP</a> 11 for 10 — in both cases beating oracle k-means on ARI without being told <code>k</code>. The failure mode runs the other way on small data: <a href="../gallery/digits.html">Digits</a> (1,797 points, ~190 leaves) recovers 8 for 10 and <a href="../gallery/twenty-newsgroups.html">20 Newsgroups</a> 12 for 20, because a modularity optimiser on a graph of a few hundred leaf centroids hits its resolution limit and merges real classes. Raising Louvain <code>resolution</code> fixes that (Digits at <code>resolution=2</code>: 10 communities, better on both metrics); the default is left at 1.0 because no single value won across the gallery.</p>
 <p><em>(Earlier versions of this page said the opposite — “over-partitioning is often a feature”, citing 81 MNIST communities. That count came from a single-level Louvain in <code>dyf-rs</code> before 0.12.0 that could not merge communities; see dyf’s <code>KNOWN_ISSUES.md</code>, issue 10.)</em></p>
-<p><strong>Merging walks hierarchy; it can’t fix bad geometry.</strong> On <a href="../gallery/synthetic-shapes.html">Moons</a> merging 3 → 2 <em>decreases</em> NMI. That’s diagnostic: the raw over-partition must contain the coarser structure as a sub-partition for the merge to help.</p>
-<p><strong>“True k” is frequently a fiction.</strong> <a href="../gallery/cmu-mocap.html">CMU MoCap</a> has three plausible ground-truth labels at different granularities (7 / 25 / 80 classes). DYF recovers 18 communities and edges oracle k-means on ARI against the 25-class label (0.112 vs 0.103) while trailing it on NMI (0.290 vs 0.348) — and both are far from the leaf-level ceiling, because trial labels describe <em>trajectories</em> through pose space, not blobs in it. Frame-level clustering is the wrong tool for that label at any <code>k</code>; the notebook says so.</p>
+<p><strong>Merging walks hierarchy; it can’t fix bad geometry.</strong> On <a href="../gallery/synthetic-shapes.html">Moons</a> merging 3 → 2 <em>decreases</em> AMI. That’s diagnostic: the raw over-partition must contain the coarser structure as a sub-partition for the merge to help.</p>
+<p><strong>“True k” is frequently a fiction.</strong> <a href="../gallery/cmu-mocap.html">CMU MoCap</a> has three plausible ground-truth labels at different granularities (7 / 25 / 80 classes). DYF recovers 15 communities and edges oracle k-means on ARI against the 25-class label (0.116 vs 0.103) while trailing it on AMI (0.292 vs 0.348) — and both are far from the leaf-level ceiling, because trial labels describe <em>trajectories</em> through pose space, not blobs in it. Frame-level clustering is the wrong tool for that label at any <code>k</code>; the notebook says so.</p>
+</section>
+<section id="what-about-speed" class="level2">
+<h2 class="anchored" data-anchor-id="what-about-speed">What about speed?</h2>
+<p>Every page’s metrics table has a <code>wall (s)</code> column: DYF’s tree build + index write + Louvain against one k-means++ init at the oracle <code>k</code> (the shared UMAP layout is excluded from both). The honest reading at gallery scale — 400 to 70,000 points — is that <strong>DYF is the slower tool on every page</strong>, by a factor that ranges from noise on Digits to roughly an order of magnitude on Olivetti and CIFAR-10. That is not a surprise: k-means with <code>k</code> handed to it and a single init is close to the cheapest partition there is, and DYF is paying for an on-disk index and a hierarchy that k-means does not produce at any <code>k</code>.</p>
+<p>The comparison where DYF is the faster tool is a different one. At 1.3M cells the shipped pipeline matches a kNN-graph + Leiden partition (ARI 0.603 vs 0.608 against scanpy’s labels) in roughly a seventh of the wall time — dyf <code>KNOWN_ISSUES.md</code> #10 has the measurement — and at that scale a graph pipeline, not k-means, is what people actually run. The gallery does not include a dataset that size, so it does not make that claim on its own evidence.</p>
 </section>
 <section id="who-should-be-in-your-toolbox" class="level2">
 <h2 class="anchored" data-anchor-id="who-should-be-in-your-toolbox">Who should be in your toolbox?</h2>
@@ -996,7 +1002,7 @@ NMI
 </section>
 <section id="parameters-dyf-fixes-at-defaults" class="level3">
 <h3 class="anchored" data-anchor-id="parameters-dyf-fixes-at-defaults">Parameters DYF fixes at defaults</h3>
-<p>Every notebook uses <strong>the same rule</strong> — <code>auto_tune_tree_params(n)</code> in <code>_gallery.py</code>, which sets the tree parameters from the sample count alone. Nothing is tuned per dataset against the labels. Where the rule breaks, the relevant notebook says so honestly.</p>
+<p>Every notebook uses <strong>the library’s own defaults</strong> — <code>build_dyf_tree(num_bits=3, max_depth=4, min_leaf_size=20)</code>, which <code>_gallery.run_dyf</code> passes unchanged. Nothing is tuned per dataset against the labels. (<code>_gallery.auto_tune_tree_params(n)</code>, a rule that derives the depth from the sample count, used to be the default here; measured on the seven labelled datasets with the multilevel Louvain it loses to the fixed defaults — mean ARI 0.436 vs 0.440, winning 3 of 7 — so it is kept only for explicit experiments. dyf <code>KNOWN_ISSUES.md</code> #9.) Where the defaults break, the relevant notebook says so honestly.</p>
 <table class="caption-top table">
 <thead>
 <tr class="header">
@@ -1008,21 +1014,21 @@ NMI
 </thead>
 <tbody>
 <tr class="odd">
-<td><code>max_depth</code></td>
-<td style="text-align: right;">⌈log₄(n/20)⌉, capped at 6</td>
-<td>Tree depth (→ ≤ 4⁶ = 4,096 leaves)</td>
-<td>The cap makes the leaf count stop growing above ~80K points, so <code>target_bucket_size</code> is inert at 1M+ (dyf <code>KNOWN_ISSUES.md</code> #9)</td>
+<td><code>num_bits</code></td>
+<td style="text-align: right;">3</td>
+<td>Branching factor (8-way splits per level)</td>
+<td>Alternatives (2 bits, deeper trees) measured and not better</td>
 </tr>
 <tr class="even">
-<td><code>num_bits</code></td>
-<td style="text-align: right;">2</td>
-<td>Branching factor (4-way splits)</td>
-<td>Alternatives untested at gallery scale</td>
+<td><code>max_depth</code></td>
+<td style="text-align: right;">4</td>
+<td>Tree depth (→ ≤ 8⁴ = 4,096 leaves)</td>
+<td>Fixed regardless of <code>n</code>; at 1.3M points leaves average ~350 points and the partition still matches the incumbent, because the centroid graph, not leaf purity, is the bottleneck</td>
 </tr>
 <tr class="odd">
 <td><code>min_leaf_size</code></td>
-<td style="text-align: right;">10</td>
-<td>Leaves must contain ≥10 points</td>
+<td style="text-align: right;">20</td>
+<td>Leaves must contain ≥20 points</td>
 <td>Breaks below ~10 points per latent class (<a href="../gallery/olivetti-faces.html">Olivetti</a>)</td>
 </tr>
 <tr class="even">
@@ -1038,10 +1044,10 @@ NMI
 <td>No observed failure mode</td>
 </tr>
 <tr class="even">
-<td>Metric</td>
-<td style="text-align: right;">cosine</td>
-<td>Implicit in LSH tree construction</td>
-<td>Wrong for low-dim Euclidean (<a href="../gallery/synthetic-shapes.html">Moons</a> partial failure)</td>
+<td>Row normalisation</td>
+<td style="text-align: right;">always</td>
+<td>Every tree fit L2-normalises rows first, so the tree partitions <em>directions</em> (dyf <code>KNOWN_ISSUES.md</code> #11)</td>
+<td>Erases the norm — fatal when the norm <em>is</em> the structure, as in low-d raw coordinates (<a href="../gallery/synthetic-shapes.html">Moons / Circles</a>); harmless for embeddings, which live on the sphere anyway</td>
 </tr>
 <tr class="odd">
 <td><code>seed</code></td>

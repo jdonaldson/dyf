@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.10.18">
+<meta name="generator" content="quarto-1.10.19">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -77,9 +77,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-1ed79dc1172df127c7d94f8abf7ffee9.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-c22d5dff81f50d6ca627b6188dc743b9.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-1ed79dc1172df127c7d94f8abf7ffee9.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-2253679dd5a56ef632de4277f35d5a2c.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-99131190c761fa326849492283a1b6ed.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-2253679dd5a56ef632de4277f35d5a2c.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
 <link href="../site_libs/bootstrap/bootstrap-077483bf2c889e981b53a146dc5bf4c0.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
@@ -414,14 +414,14 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 <span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>km_moons  <span class="op">=</span> run_kmeans(X, y)</span>
 <span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>hdb_moons <span class="op">=</span> run_hdbscan(X, y)</span>
 <span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"DYF       k=</span><span class="sc">{</span>r_moons<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">       NMI=</span><span class="sc">{</span>r_moons<span class="sc">.</span>nmi<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>r_moons<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
-<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"k-means   told k=2  NMI=</span><span class="sc">{</span>km_moons[<span class="st">'nmi'</span>]<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>km_moons[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
-<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"HDBSCAN   k=</span><span class="sc">{</span>hdb_moons[<span class="st">'recovered_k'</span>]<span class="sc">}</span><span class="ss"> noise=</span><span class="sc">{</span>hdb_moons[<span class="st">'noise_frac'</span>]<span class="sc">:.1%}</span><span class="ss">  NMI=</span><span class="sc">{</span>hdb_moons[<span class="st">'nmi'</span>]<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>hdb_moons[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"DYF       k=</span><span class="sc">{</span>r_moons<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">       AMI=</span><span class="sc">{</span>r_moons<span class="sc">.</span>ami<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>r_moons<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">  wall=</span><span class="sc">{</span>r_moons<span class="sc">.</span>seconds<span class="sc">:.2f}</span><span class="ss">s"</span>)</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"k-means   told k=2  AMI=</span><span class="sc">{</span>km_moons[<span class="st">'ami'</span>]<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>km_moons[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">  wall=</span><span class="sc">{</span>km_moons[<span class="st">'seconds'</span>]<span class="sc">:.2f}</span><span class="ss">s"</span>)</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"HDBSCAN   k=</span><span class="sc">{</span>hdb_moons[<span class="st">'recovered_k'</span>]<span class="sc">}</span><span class="ss"> noise=</span><span class="sc">{</span>hdb_moons[<span class="st">'noise_frac'</span>]<span class="sc">:.1%}</span><span class="ss">  AMI=</span><span class="sc">{</span>hdb_moons[<span class="st">'ami'</span>]<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>hdb_moons[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">  wall=</span><span class="sc">{</span>hdb_moons[<span class="st">'seconds'</span>]<span class="sc">:.2f}</span><span class="ss">s"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stdout">
-<pre><code>DYF       k=3       NMI=0.328 ARI=0.359
-k-means   told k=2  NMI=0.192 ARI=0.254
-HDBSCAN   k=2 noise=0.2%  NMI=1.000 ARI=1.000</code></pre>
+<pre><code>DYF       k=3       AMI=0.323 ARI=0.350  wall=0.02s
+k-means   told k=2  AMI=0.192 ARI=0.254  wall=0.03s
+HDBSCAN   k=2 noise=0.2%  AMI=1.000 ARI=1.000  wall=0.02s</code></pre>
 </div>
 </div>
 <div class="gallery-fluid">
@@ -498,7 +498,7 @@ Figure&nbsp;4: K-means — straight-line cut bisects both crescents.
 </div>
 </div>
 </div>
-<p><strong>HDBSCAN nails this perfectly (NMI=ARI=1.000).</strong> DYF modestly beats k-means but splits one crescent into two clusters — a crosstab against ground truth shows DYF’s largest cluster is 83% moon-1, a middle cluster is 97% moon-0, and the third is 76% moon-0 with bleeder points. It’s not “following the crescents” — it’s doing LSH hyperplane splits that happen to correlate with the ground truth.</p>
+<p><strong>HDBSCAN nails this perfectly (AMI=ARI=1.000).</strong> DYF modestly beats k-means but splits one crescent into two clusters — a crosstab against ground truth shows DYF’s largest cluster is 83% moon-1, a middle cluster is 97% moon-0, and the third is 76% moon-0 with bleeder points. It’s not “following the crescents” — it’s doing LSH hyperplane splits that happen to correlate with the ground truth.</p>
 <p>Why does HDBSCAN beat DYF here? HDBSCAN uses <em>mutual reachability</em> distances — it literally follows density ridges through the data, tracking connected-density regions. That’s the right tool for a curved 2D manifold. DYF’s mechanism is different: recursive LSH splits → leaf centroids → Louvain on the centroid KNN graph. That’s designed for <em>scale</em>, not <em>shape</em>. The 2D regime is HDBSCAN’s turf.</p>
 <section id="and-the-merge-walk-cant-rescue-it" class="level3">
 <h3 class="anchored" data-anchor-id="and-the-merge-walk-cant-rescue-it">And the merge walk can’t rescue it</h3>
@@ -514,7 +514,7 @@ Figure&nbsp;4: K-means — straight-line cut bisects both crescents.
 <tr class="header">
 <th>Resolution</th>
 <th style="text-align: right;">Actual k</th>
-<th style="text-align: right;">NMI</th>
+<th style="text-align: right;">AMI</th>
 <th style="text-align: right;">ARI</th>
 </tr>
 </thead>
@@ -522,8 +522,8 @@ Figure&nbsp;4: K-means — straight-line cut bisects both crescents.
 <tr class="odd">
 <td><strong>Raw DYF</strong></td>
 <td style="text-align: right;"><strong>3</strong></td>
-<td style="text-align: right;"><strong>0.328</strong></td>
-<td style="text-align: right;"><strong>0.359</strong></td>
+<td style="text-align: right;"><strong>0.323</strong></td>
+<td style="text-align: right;"><strong>0.350</strong></td>
 </tr>
 <tr class="even">
 <td>merge → 2</td>
@@ -534,7 +534,7 @@ Figure&nbsp;4: K-means — straight-line cut bisects both crescents.
 </tbody>
 </table>
 </div>
-<p>NMI <em>decreases</em> from 0.323 to 0.258. The merge walk assumes the raw over-partition contains the coarser structure as a sub-partition — when it doesn’t (because the original LSH cuts went <em>across</em> the ground truth), merging just averages the wrong fragments together. <strong>Merging walks hierarchy; it doesn’t fix geometry.</strong> This is the honest failure mode to contrast against MNIST, where merging from 81 → 20 roughly doubled ARI while barely moving NMI.</p>
+<p>AMI <em>decreases</em> from 0.323 to 0.258. The merge walk assumes the raw over-partition contains the coarser structure as a sub-partition — when it doesn’t (because the original LSH cuts went <em>across</em> the ground truth), merging just averages the wrong fragments together. <strong>Merging walks hierarchy; it doesn’t fix geometry.</strong> This is the honest failure mode to contrast against MNIST, where the raw 12-way partition is already the best point on the walk and every merge costs a little on both metrics.</p>
 </section>
 </section>
 <section id="shape-2-concentric-circles" class="level2">
@@ -551,14 +551,14 @@ Figure&nbsp;4: K-means — straight-line cut bisects both crescents.
 <span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>km_circ  <span class="op">=</span> run_kmeans(X, y)</span>
 <span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>hdb_circ <span class="op">=</span> run_hdbscan(X, y)</span>
 <span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"DYF       k=</span><span class="sc">{</span>r_circ<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">       NMI=</span><span class="sc">{</span>r_circ<span class="sc">.</span>nmi<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>r_circ<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
-<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"k-means   told k=2  NMI=</span><span class="sc">{</span>km_circ[<span class="st">'nmi'</span>]<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>km_circ[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
-<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"HDBSCAN   k=</span><span class="sc">{</span>hdb_circ[<span class="st">'recovered_k'</span>]<span class="sc">}</span><span class="ss"> noise=</span><span class="sc">{</span>hdb_circ[<span class="st">'noise_frac'</span>]<span class="sc">:.1%}</span><span class="ss">  NMI=</span><span class="sc">{</span>hdb_circ[<span class="st">'nmi'</span>]<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>hdb_circ[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"DYF       k=</span><span class="sc">{</span>r_circ<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">       AMI=</span><span class="sc">{</span>r_circ<span class="sc">.</span>ami<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>r_circ<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">  wall=</span><span class="sc">{</span>r_circ<span class="sc">.</span>seconds<span class="sc">:.2f}</span><span class="ss">s"</span>)</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"k-means   told k=2  AMI=</span><span class="sc">{</span>km_circ[<span class="st">'ami'</span>]<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>km_circ[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">  wall=</span><span class="sc">{</span>km_circ[<span class="st">'seconds'</span>]<span class="sc">:.2f}</span><span class="ss">s"</span>)</span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"HDBSCAN   k=</span><span class="sc">{</span>hdb_circ[<span class="st">'recovered_k'</span>]<span class="sc">}</span><span class="ss"> noise=</span><span class="sc">{</span>hdb_circ[<span class="st">'noise_frac'</span>]<span class="sc">:.1%}</span><span class="ss">  AMI=</span><span class="sc">{</span>hdb_circ[<span class="st">'ami'</span>]<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>hdb_circ[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">  wall=</span><span class="sc">{</span>hdb_circ[<span class="st">'seconds'</span>]<span class="sc">:.2f}</span><span class="ss">s"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stdout">
-<pre><code>DYF       k=3       NMI=-0.000 ARI=-0.000
-k-means   told k=2  NMI=-0.000 ARI=-0.000
-HDBSCAN   k=2 noise=0.0%  NMI=1.000 ARI=1.000</code></pre>
+<pre><code>DYF       k=3       AMI=-0.000 ARI=-0.000  wall=0.02s
+k-means   told k=2  AMI=-0.000 ARI=-0.000  wall=0.00s
+HDBSCAN   k=2 noise=0.0%  AMI=1.000 ARI=1.000  wall=0.02s</code></pre>
 </div>
 </div>
 <div class="gallery-fluid">
@@ -635,7 +635,7 @@ Figure&nbsp;8: K-means — same angular failure as DYF.
 </div>
 </div>
 </div>
-<p><strong>Both DYF and k-means score NMI ≈ 0. HDBSCAN scores NMI=1.000.</strong> The conventional wisdom — <em>“concentric rings require spectral clustering”</em> — turns out to be overstated. HDBSCAN handles them because the <em>gap between the rings</em> is a density valley, and HDBSCAN’s mutual-reachability metric picks that gap up as a cluster boundary. DYF, which cuts by LSH hyperplane rather than by density valley, cannot see the gap.</p>
+<p><strong>Both DYF and k-means score AMI ≈ 0. HDBSCAN scores AMI=1.000.</strong> The conventional wisdom — <em>“concentric rings require spectral clustering”</em> — turns out to be overstated. HDBSCAN handles them because the <em>gap between the rings</em> is a density valley, and HDBSCAN’s mutual-reachability metric picks that gap up as a cluster boundary. DYF, which cuts by LSH hyperplane rather than by density valley, cannot see the gap.</p>
 </section>
 <section id="shape-3-varied-density-blobs" class="level2">
 <h2 class="anchored" data-anchor-id="shape-3-varied-density-blobs">Shape 3: Varied-density blobs</h2>
@@ -656,14 +656,14 @@ Figure&nbsp;8: K-means — same angular failure as DYF.
 <span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>km_blobs  <span class="op">=</span> run_kmeans(X, y)</span>
 <span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>hdb_blobs <span class="op">=</span> run_hdbscan(X, y)</span>
 <span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"DYF       k=</span><span class="sc">{</span>r_blobs<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">       NMI=</span><span class="sc">{</span>r_blobs<span class="sc">.</span>nmi<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>r_blobs<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
-<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"k-means   told k=5  NMI=</span><span class="sc">{</span>km_blobs[<span class="st">'nmi'</span>]<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>km_blobs[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
-<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"HDBSCAN   k=</span><span class="sc">{</span>hdb_blobs[<span class="st">'recovered_k'</span>]<span class="sc">}</span><span class="ss"> noise=</span><span class="sc">{</span>hdb_blobs[<span class="st">'noise_frac'</span>]<span class="sc">:.1%}</span><span class="ss">  NMI=</span><span class="sc">{</span>hdb_blobs[<span class="st">'nmi'</span>]<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>hdb_blobs[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"DYF       k=</span><span class="sc">{</span>r_blobs<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">       AMI=</span><span class="sc">{</span>r_blobs<span class="sc">.</span>ami<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>r_blobs<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">  wall=</span><span class="sc">{</span>r_blobs<span class="sc">.</span>seconds<span class="sc">:.2f}</span><span class="ss">s"</span>)</span>
+<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"k-means   told k=5  AMI=</span><span class="sc">{</span>km_blobs[<span class="st">'ami'</span>]<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>km_blobs[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">  wall=</span><span class="sc">{</span>km_blobs[<span class="st">'seconds'</span>]<span class="sc">:.2f}</span><span class="ss">s"</span>)</span>
+<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"HDBSCAN   k=</span><span class="sc">{</span>hdb_blobs[<span class="st">'recovered_k'</span>]<span class="sc">}</span><span class="ss"> noise=</span><span class="sc">{</span>hdb_blobs[<span class="st">'noise_frac'</span>]<span class="sc">:.1%}</span><span class="ss">  AMI=</span><span class="sc">{</span>hdb_blobs[<span class="st">'ami'</span>]<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>hdb_blobs[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">  wall=</span><span class="sc">{</span>hdb_blobs[<span class="st">'seconds'</span>]<span class="sc">:.2f}</span><span class="ss">s"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stdout">
-<pre><code>DYF       k=3       NMI=0.524 ARI=0.444
-k-means   told k=5  NMI=0.626 ARI=0.353
-HDBSCAN   k=5 noise=2.5%  NMI=0.853 ARI=0.785</code></pre>
+<pre><code>DYF       k=3       AMI=0.524 ARI=0.444  wall=0.02s
+k-means   told k=5  AMI=0.626 ARI=0.353  wall=0.01s
+HDBSCAN   k=5 noise=2.5%  AMI=0.853 ARI=0.785  wall=0.04s</code></pre>
 </div>
 </div>
 <div class="gallery-fluid">
@@ -740,7 +740,7 @@ Figure&nbsp;12: K-means — correct k, noisy borders between tight and diffuse b
 </div>
 </div>
 </div>
-<p>HDBSCAN again wins — 5 clusters with 2.5% noise, NMI=0.853. DYF under-partitions to 3 clusters. The metric tradeoff between under- and over-partitioning is still worth noting:</p>
+<p>HDBSCAN again wins — 5 clusters with 2.5% noise, AMI=0.853. DYF under-partitions to 3 clusters. The metric tradeoff between under- and over-partitioning is still worth noting:</p>
 <table class="caption-top table">
 <colgroup>
 <col style="width: 12%">
@@ -754,17 +754,17 @@ Figure&nbsp;12: K-means — correct k, noisy borders between tight and diffuse b
 <th>Dataset</th>
 <th style="text-align: right;">DYF recovered_k</th>
 <th>vs true</th>
-<th style="text-align: right;">DYF NMI vs kmeans</th>
+<th style="text-align: right;">DYF AMI vs kmeans</th>
 <th style="text-align: right;">DYF ARI vs kmeans</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td>MNIST</td>
-<td style="text-align: right;">81</td>
-<td>8× over</td>
+<td style="text-align: right;">12</td>
+<td>20% over</td>
+<td style="text-align: right;">DYF +0.055</td>
 <td style="text-align: right;">DYF +0.061</td>
-<td style="text-align: right;">DYF <strong>−0.186</strong></td>
 </tr>
 <tr class="even">
 <td>Blobs</td>
@@ -775,7 +775,7 @@ Figure&nbsp;12: K-means — correct k, noisy borders between tight and diffuse b
 </tr>
 </tbody>
 </table>
-<p><strong>Under-partitioning flips the signs</strong> — NMI loses, ARI wins. Over-partitioning on MNIST produced the mirror image. The two metrics disagree predictably about which direction of error they prefer.</p>
+<p><strong>Under-partitioning splits the metrics</strong> — against k-means, DYF loses AMI and wins ARI on Blobs. (An earlier version of this page set that against a mirror image on MNIST, where an 81-cluster over-partition won AMI and lost ARI; that count was the single-level Louvain artifact of dyf <code>KNOWN_ISSUES.md</code> #10, and the corrected optimiser’s 12 clusters win both.) AMI and ARI still weigh the two directions of error differently; read them together.</p>
 </section>
 <section id="summary" class="level2">
 <h2 class="anchored" data-anchor-id="summary">Summary</h2>
@@ -826,7 +826,7 @@ Figure&nbsp;12: K-means — correct k, noisy borders between tight and diffuse b
 <h2 class="anchored" data-anchor-id="why-hdbscan-isnt-in-every-other-notebook">Why HDBSCAN isn’t in every other notebook</h2>
 <p>Because HDBSCAN’s synthetic-shape performance doesn’t generalize. On the real-world notebooks — <a href="../gallery/digits.html">Digits</a>, <a href="../gallery/twenty-newsgroups.html">20 Newsgroups</a>, <a href="../gallery/cifar10-clip.html">CIFAR-10 + CLIP</a>, <a href="../gallery/cmu-mocap.html">CMU MoCap</a> — HDBSCAN starts to break:</p>
 <ul>
-<li><strong>Digits (1,797 × 64d)</strong>: HDBSCAN labels most points as noise. Its 0.935 NMI is computed on only the 40% of points it was willing to cluster; the other 60% got <code>-1</code>. That’s not an honest apples-to-apples comparison with methods that partition every point.</li>
+<li><strong>Digits (1,797 × 64d)</strong>: HDBSCAN labels most points as noise. Its 0.935 AMI is computed on only the 40% of points it was willing to cluster; the other 60% got <code>-1</code>. That’s not an honest apples-to-apples comparison with methods that partition every point.</li>
 <li><strong>20 Newsgroups (18,846 × 384d)</strong>: HDBSCAN takes 144 seconds of wall clock and discards 84% of posts as noise. The real-world notebook documents this and omits HDBSCAN from the comparison because it’s not usable at that scale.</li>
 <li><strong>CIFAR-10 (10,000 × 512d)</strong> and <strong>MNIST (70,000 × 784d)</strong>: HDBSCAN’s runtime and noise fractions scale badly with both sample count and dimensionality. It can technically run, but the output is a small clustered subset plus a large “I don’t know” bucket.</li>
 </ul>
@@ -843,7 +843,7 @@ Figure&nbsp;12: K-means — correct k, noisy borders between tight and diffuse b
 <li><strong>DYF is not the best parameter-free clustering method for every regime.</strong> On clean low-dimensional toy shapes, HDBSCAN wins decisively.</li>
 <li><strong>The right question is not “which method is best?”</strong> It’s “which method stays useful as n and d grow?” DYF’s answer to that is better than HDBSCAN’s, which is why it earns its place downstream.</li>
 <li><strong>If your data is 2D, clean, and has clear density valleys</strong>, use HDBSCAN. It will beat DYF and it will beat k-means. The gallery’s other notebooks show what happens when it isn’t.</li>
-<li><strong>NMI and ARI still disagree predictably</strong> about over- vs under-partitioning. That observation holds whatever clustering method you use.</li>
+<li><strong>AMI and ARI weigh under-partitioning differently</strong> — on Blobs DYF loses one and wins the other against k-means. Read them together, whatever clustering method you use.</li>
 </ul>
 </section>
 <section id="caveats" class="level2">
@@ -1362,9 +1362,9 @@ Figure&nbsp;12: K-means — correct k, noisy borders between tight and diffuse b
 <span id="cb20-38"><a href="#cb20-38" aria-hidden="true" tabindex="-1"></a>km_moons  <span class="op">=</span> run_kmeans(X, y)</span>
 <span id="cb20-39"><a href="#cb20-39" aria-hidden="true" tabindex="-1"></a>hdb_moons <span class="op">=</span> run_hdbscan(X, y)</span>
 <span id="cb20-40"><a href="#cb20-40" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb20-41"><a href="#cb20-41" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"DYF       k=</span><span class="sc">{</span>r_moons<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">       NMI=</span><span class="sc">{</span>r_moons<span class="sc">.</span>nmi<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>r_moons<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
-<span id="cb20-42"><a href="#cb20-42" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"k-means   told k=2  NMI=</span><span class="sc">{</span>km_moons[<span class="st">'nmi'</span>]<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>km_moons[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
-<span id="cb20-43"><a href="#cb20-43" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"HDBSCAN   k=</span><span class="sc">{</span>hdb_moons[<span class="st">'recovered_k'</span>]<span class="sc">}</span><span class="ss"> noise=</span><span class="sc">{</span>hdb_moons[<span class="st">'noise_frac'</span>]<span class="sc">:.1%}</span><span class="ss">  NMI=</span><span class="sc">{</span>hdb_moons[<span class="st">'nmi'</span>]<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>hdb_moons[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb20-41"><a href="#cb20-41" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"DYF       k=</span><span class="sc">{</span>r_moons<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">       AMI=</span><span class="sc">{</span>r_moons<span class="sc">.</span>ami<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>r_moons<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">  wall=</span><span class="sc">{</span>r_moons<span class="sc">.</span>seconds<span class="sc">:.2f}</span><span class="ss">s"</span>)</span>
+<span id="cb20-42"><a href="#cb20-42" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"k-means   told k=2  AMI=</span><span class="sc">{</span>km_moons[<span class="st">'ami'</span>]<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>km_moons[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">  wall=</span><span class="sc">{</span>km_moons[<span class="st">'seconds'</span>]<span class="sc">:.2f}</span><span class="ss">s"</span>)</span>
+<span id="cb20-43"><a href="#cb20-43" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"HDBSCAN   k=</span><span class="sc">{</span>hdb_moons[<span class="st">'recovered_k'</span>]<span class="sc">}</span><span class="ss"> noise=</span><span class="sc">{</span>hdb_moons[<span class="st">'noise_frac'</span>]<span class="sc">:.1%}</span><span class="ss">  AMI=</span><span class="sc">{</span>hdb_moons[<span class="st">'ami'</span>]<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>hdb_moons[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">  wall=</span><span class="sc">{</span>hdb_moons[<span class="st">'seconds'</span>]<span class="sc">:.2f}</span><span class="ss">s"</span>)</span>
 <span id="cb20-44"><a href="#cb20-44" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
 <span id="cb20-45"><a href="#cb20-45" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb20-46"><a href="#cb20-46" aria-hidden="true" tabindex="-1"></a>::: {.gallery-fluid}</span>
@@ -1395,7 +1395,7 @@ Figure&nbsp;12: K-means — correct k, noisy borders between tight and diffuse b
 <span id="cb20-79"><a href="#cb20-79" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb20-80"><a href="#cb20-80" aria-hidden="true" tabindex="-1"></a>:::</span>
 <span id="cb20-81"><a href="#cb20-81" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb20-82"><a href="#cb20-82" aria-hidden="true" tabindex="-1"></a>**HDBSCAN nails this perfectly (NMI=ARI=1.000).** DYF modestly beats k-means but splits one crescent into two clusters — a crosstab against ground truth shows DYF's largest cluster is 83% moon-1, a middle cluster is 97% moon-0, and the third is 76% moon-0 with bleeder points. It's not "following the crescents" — it's doing LSH hyperplane splits that happen to correlate with the ground truth.</span>
+<span id="cb20-82"><a href="#cb20-82" aria-hidden="true" tabindex="-1"></a>**HDBSCAN nails this perfectly (AMI=ARI=1.000).** DYF modestly beats k-means but splits one crescent into two clusters — a crosstab against ground truth shows DYF's largest cluster is 83% moon-1, a middle cluster is 97% moon-0, and the third is 76% moon-0 with bleeder points. It's not "following the crescents" — it's doing LSH hyperplane splits that happen to correlate with the ground truth.</span>
 <span id="cb20-83"><a href="#cb20-83" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb20-84"><a href="#cb20-84" aria-hidden="true" tabindex="-1"></a>Why does HDBSCAN beat DYF here? HDBSCAN uses *mutual reachability* distances — it literally follows density ridges through the data, tracking connected-density regions. That's the right tool for a curved 2D manifold. DYF's mechanism is different: recursive LSH splits → leaf centroids → Louvain on the centroid KNN graph. That's designed for *scale*, not *shape*. The 2D regime is HDBSCAN's turf.</span>
 <span id="cb20-85"><a href="#cb20-85" aria-hidden="true" tabindex="-1"></a></span>
@@ -1410,7 +1410,7 @@ Figure&nbsp;12: K-means — correct k, noisy borders between tight and diffuse b
 <span id="cb20-96"><a href="#cb20-96" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(merge_walk_table(merge_walk(r_moons, X, y, targets<span class="op">=</span>[<span class="dv">2</span>]), r_moons))</span>
 <span id="cb20-97"><a href="#cb20-97" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
 <span id="cb20-98"><a href="#cb20-98" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb20-99"><a href="#cb20-99" aria-hidden="true" tabindex="-1"></a>NMI *decreases* from 0.323 to 0.258. The merge walk assumes the raw over-partition contains the coarser structure as a sub-partition — when it doesn't (because the original LSH cuts went *across* the ground truth), merging just averages the wrong fragments together. **Merging walks hierarchy; it doesn't fix geometry.** This is the honest failure mode to contrast against MNIST, where merging from 81 → 20 roughly doubled ARI while barely moving NMI.</span>
+<span id="cb20-99"><a href="#cb20-99" aria-hidden="true" tabindex="-1"></a>AMI *decreases* from 0.323 to 0.258. The merge walk assumes the raw over-partition contains the coarser structure as a sub-partition — when it doesn't (because the original LSH cuts went *across* the ground truth), merging just averages the wrong fragments together. **Merging walks hierarchy; it doesn't fix geometry.** This is the honest failure mode to contrast against MNIST, where the raw 12-way partition is already the best point on the walk and every merge costs a little on both metrics.</span>
 <span id="cb20-100"><a href="#cb20-100" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb20-101"><a href="#cb20-101" aria-hidden="true" tabindex="-1"></a><span class="fu">## Shape 2: Concentric circles</span></span>
 <span id="cb20-102"><a href="#cb20-102" aria-hidden="true" tabindex="-1"></a></span>
@@ -1426,9 +1426,9 @@ Figure&nbsp;12: K-means — correct k, noisy borders between tight and diffuse b
 <span id="cb20-114"><a href="#cb20-114" aria-hidden="true" tabindex="-1"></a>km_circ  <span class="op">=</span> run_kmeans(X, y)</span>
 <span id="cb20-115"><a href="#cb20-115" aria-hidden="true" tabindex="-1"></a>hdb_circ <span class="op">=</span> run_hdbscan(X, y)</span>
 <span id="cb20-116"><a href="#cb20-116" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb20-117"><a href="#cb20-117" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"DYF       k=</span><span class="sc">{</span>r_circ<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">       NMI=</span><span class="sc">{</span>r_circ<span class="sc">.</span>nmi<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>r_circ<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
-<span id="cb20-118"><a href="#cb20-118" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"k-means   told k=2  NMI=</span><span class="sc">{</span>km_circ[<span class="st">'nmi'</span>]<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>km_circ[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
-<span id="cb20-119"><a href="#cb20-119" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"HDBSCAN   k=</span><span class="sc">{</span>hdb_circ[<span class="st">'recovered_k'</span>]<span class="sc">}</span><span class="ss"> noise=</span><span class="sc">{</span>hdb_circ[<span class="st">'noise_frac'</span>]<span class="sc">:.1%}</span><span class="ss">  NMI=</span><span class="sc">{</span>hdb_circ[<span class="st">'nmi'</span>]<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>hdb_circ[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb20-117"><a href="#cb20-117" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"DYF       k=</span><span class="sc">{</span>r_circ<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">       AMI=</span><span class="sc">{</span>r_circ<span class="sc">.</span>ami<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>r_circ<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">  wall=</span><span class="sc">{</span>r_circ<span class="sc">.</span>seconds<span class="sc">:.2f}</span><span class="ss">s"</span>)</span>
+<span id="cb20-118"><a href="#cb20-118" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"k-means   told k=2  AMI=</span><span class="sc">{</span>km_circ[<span class="st">'ami'</span>]<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>km_circ[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">  wall=</span><span class="sc">{</span>km_circ[<span class="st">'seconds'</span>]<span class="sc">:.2f}</span><span class="ss">s"</span>)</span>
+<span id="cb20-119"><a href="#cb20-119" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"HDBSCAN   k=</span><span class="sc">{</span>hdb_circ[<span class="st">'recovered_k'</span>]<span class="sc">}</span><span class="ss"> noise=</span><span class="sc">{</span>hdb_circ[<span class="st">'noise_frac'</span>]<span class="sc">:.1%}</span><span class="ss">  AMI=</span><span class="sc">{</span>hdb_circ[<span class="st">'ami'</span>]<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>hdb_circ[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">  wall=</span><span class="sc">{</span>hdb_circ[<span class="st">'seconds'</span>]<span class="sc">:.2f}</span><span class="ss">s"</span>)</span>
 <span id="cb20-120"><a href="#cb20-120" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
 <span id="cb20-121"><a href="#cb20-121" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb20-122"><a href="#cb20-122" aria-hidden="true" tabindex="-1"></a>::: {.gallery-fluid}</span>
@@ -1459,7 +1459,7 @@ Figure&nbsp;12: K-means — correct k, noisy borders between tight and diffuse b
 <span id="cb20-155"><a href="#cb20-155" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb20-156"><a href="#cb20-156" aria-hidden="true" tabindex="-1"></a>:::</span>
 <span id="cb20-157"><a href="#cb20-157" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb20-158"><a href="#cb20-158" aria-hidden="true" tabindex="-1"></a>**Both DYF and k-means score NMI ≈ 0. HDBSCAN scores NMI=1.000.** The conventional wisdom — *"concentric rings require spectral clustering"* — turns out to be overstated. HDBSCAN handles them because the *gap between the rings* is a density valley, and HDBSCAN's mutual-reachability metric picks that gap up as a cluster boundary. DYF, which cuts by LSH hyperplane rather than by density valley, cannot see the gap.</span>
+<span id="cb20-158"><a href="#cb20-158" aria-hidden="true" tabindex="-1"></a>**Both DYF and k-means score AMI ≈ 0. HDBSCAN scores AMI=1.000.** The conventional wisdom — *"concentric rings require spectral clustering"* — turns out to be overstated. HDBSCAN handles them because the *gap between the rings* is a density valley, and HDBSCAN's mutual-reachability metric picks that gap up as a cluster boundary. DYF, which cuts by LSH hyperplane rather than by density valley, cannot see the gap.</span>
 <span id="cb20-159"><a href="#cb20-159" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb20-160"><a href="#cb20-160" aria-hidden="true" tabindex="-1"></a><span class="fu">## Shape 3: Varied-density blobs</span></span>
 <span id="cb20-161"><a href="#cb20-161" aria-hidden="true" tabindex="-1"></a></span>
@@ -1480,9 +1480,9 @@ Figure&nbsp;12: K-means — correct k, noisy borders between tight and diffuse b
 <span id="cb20-178"><a href="#cb20-178" aria-hidden="true" tabindex="-1"></a>km_blobs  <span class="op">=</span> run_kmeans(X, y)</span>
 <span id="cb20-179"><a href="#cb20-179" aria-hidden="true" tabindex="-1"></a>hdb_blobs <span class="op">=</span> run_hdbscan(X, y)</span>
 <span id="cb20-180"><a href="#cb20-180" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb20-181"><a href="#cb20-181" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"DYF       k=</span><span class="sc">{</span>r_blobs<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">       NMI=</span><span class="sc">{</span>r_blobs<span class="sc">.</span>nmi<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>r_blobs<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
-<span id="cb20-182"><a href="#cb20-182" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"k-means   told k=5  NMI=</span><span class="sc">{</span>km_blobs[<span class="st">'nmi'</span>]<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>km_blobs[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
-<span id="cb20-183"><a href="#cb20-183" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"HDBSCAN   k=</span><span class="sc">{</span>hdb_blobs[<span class="st">'recovered_k'</span>]<span class="sc">}</span><span class="ss"> noise=</span><span class="sc">{</span>hdb_blobs[<span class="st">'noise_frac'</span>]<span class="sc">:.1%}</span><span class="ss">  NMI=</span><span class="sc">{</span>hdb_blobs[<span class="st">'nmi'</span>]<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>hdb_blobs[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb20-181"><a href="#cb20-181" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"DYF       k=</span><span class="sc">{</span>r_blobs<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">       AMI=</span><span class="sc">{</span>r_blobs<span class="sc">.</span>ami<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>r_blobs<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">  wall=</span><span class="sc">{</span>r_blobs<span class="sc">.</span>seconds<span class="sc">:.2f}</span><span class="ss">s"</span>)</span>
+<span id="cb20-182"><a href="#cb20-182" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"k-means   told k=5  AMI=</span><span class="sc">{</span>km_blobs[<span class="st">'ami'</span>]<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>km_blobs[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">  wall=</span><span class="sc">{</span>km_blobs[<span class="st">'seconds'</span>]<span class="sc">:.2f}</span><span class="ss">s"</span>)</span>
+<span id="cb20-183"><a href="#cb20-183" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"HDBSCAN   k=</span><span class="sc">{</span>hdb_blobs[<span class="st">'recovered_k'</span>]<span class="sc">}</span><span class="ss"> noise=</span><span class="sc">{</span>hdb_blobs[<span class="st">'noise_frac'</span>]<span class="sc">:.1%}</span><span class="ss">  AMI=</span><span class="sc">{</span>hdb_blobs[<span class="st">'ami'</span>]<span class="sc">:.3f}</span><span class="ss"> ARI=</span><span class="sc">{</span>hdb_blobs[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss">  wall=</span><span class="sc">{</span>hdb_blobs[<span class="st">'seconds'</span>]<span class="sc">:.2f}</span><span class="ss">s"</span>)</span>
 <span id="cb20-184"><a href="#cb20-184" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
 <span id="cb20-185"><a href="#cb20-185" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb20-186"><a href="#cb20-186" aria-hidden="true" tabindex="-1"></a>::: {.gallery-fluid}</span>
@@ -1513,14 +1513,14 @@ Figure&nbsp;12: K-means — correct k, noisy borders between tight and diffuse b
 <span id="cb20-219"><a href="#cb20-219" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb20-220"><a href="#cb20-220" aria-hidden="true" tabindex="-1"></a>:::</span>
 <span id="cb20-221"><a href="#cb20-221" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb20-222"><a href="#cb20-222" aria-hidden="true" tabindex="-1"></a>HDBSCAN again wins — 5 clusters with 2.5% noise, NMI=0.853. DYF under-partitions to 3 clusters. The metric tradeoff between under- and over-partitioning is still worth noting:</span>
+<span id="cb20-222"><a href="#cb20-222" aria-hidden="true" tabindex="-1"></a>HDBSCAN again wins — 5 clusters with 2.5% noise, AMI=0.853. DYF under-partitions to 3 clusters. The metric tradeoff between under- and over-partitioning is still worth noting:</span>
 <span id="cb20-223"><a href="#cb20-223" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb20-224"><a href="#cb20-224" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Dataset <span class="pp">|</span> DYF recovered_k <span class="pp">|</span> vs true <span class="pp">|</span> DYF NMI vs kmeans <span class="pp">|</span> DYF ARI vs kmeans <span class="pp">|</span></span>
+<span id="cb20-224"><a href="#cb20-224" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Dataset <span class="pp">|</span> DYF recovered_k <span class="pp">|</span> vs true <span class="pp">|</span> DYF AMI vs kmeans <span class="pp">|</span> DYF ARI vs kmeans <span class="pp">|</span></span>
 <span id="cb20-225"><a href="#cb20-225" aria-hidden="true" tabindex="-1"></a><span class="pp">|---------|----------------:|---------|------------------:|------------------:|</span></span>
-<span id="cb20-226"><a href="#cb20-226" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> MNIST   <span class="pp">|</span> 81              <span class="pp">|</span> 8× over <span class="pp">|</span> DYF +0.061        <span class="pp">|</span> DYF **−0.186**    <span class="pp">|</span></span>
+<span id="cb20-226"><a href="#cb20-226" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> MNIST   <span class="pp">|</span> 12              <span class="pp">|</span> 20% over <span class="pp">|</span> DYF +0.055       <span class="pp">|</span> DYF +0.061        <span class="pp">|</span></span>
 <span id="cb20-227"><a href="#cb20-227" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Blobs   <span class="pp">|</span> 3               <span class="pp">|</span> 40% under <span class="pp">|</span> DYF **−0.102**  <span class="pp">|</span> DYF +0.091        <span class="pp">|</span></span>
 <span id="cb20-228"><a href="#cb20-228" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb20-229"><a href="#cb20-229" aria-hidden="true" tabindex="-1"></a>**Under-partitioning flips the signs** — NMI loses, ARI wins. Over-partitioning on MNIST produced the mirror image. The two metrics disagree predictably about which direction of error they prefer.</span>
+<span id="cb20-229"><a href="#cb20-229" aria-hidden="true" tabindex="-1"></a>**Under-partitioning splits the metrics** — against k-means, DYF loses AMI and wins ARI on Blobs. (An earlier version of this page set that against a mirror image on MNIST, where an 81-cluster over-partition won AMI and lost ARI; that count was the single-level Louvain artifact of dyf <span class="in">`KNOWN_ISSUES.md`</span> #10, and the corrected optimiser's 12 clusters win both.) AMI and ARI still weigh the two directions of error differently; read them together.</span>
 <span id="cb20-230"><a href="#cb20-230" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb20-231"><a href="#cb20-231" aria-hidden="true" tabindex="-1"></a><span class="fu">## Summary</span></span>
 <span id="cb20-232"><a href="#cb20-232" aria-hidden="true" tabindex="-1"></a></span>
@@ -1536,7 +1536,7 @@ Figure&nbsp;12: K-means — correct k, noisy borders between tight and diffuse b
 <span id="cb20-242"><a href="#cb20-242" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb20-243"><a href="#cb20-243" aria-hidden="true" tabindex="-1"></a>Because HDBSCAN's synthetic-shape performance doesn't generalize. On the real-world notebooks — <span class="co">[</span><span class="ot">Digits</span><span class="co">](digits.qmd)</span>, <span class="co">[</span><span class="ot">20 Newsgroups</span><span class="co">](twenty-newsgroups.qmd)</span>, <span class="co">[</span><span class="ot">CIFAR-10 + CLIP</span><span class="co">](cifar10-clip.qmd)</span>, <span class="co">[</span><span class="ot">CMU MoCap</span><span class="co">](cmu-mocap.qmd)</span> — HDBSCAN starts to break:</span>
 <span id="cb20-244"><a href="#cb20-244" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb20-245"><a href="#cb20-245" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Digits (1,797 × 64d)**: HDBSCAN labels most points as noise. Its 0.935 NMI is computed on only the 40% of points it was willing to cluster; the other 60% got <span class="in">`-1`</span>. That's not an honest apples-to-apples comparison with methods that partition every point.</span>
+<span id="cb20-245"><a href="#cb20-245" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Digits (1,797 × 64d)**: HDBSCAN labels most points as noise. Its 0.935 AMI is computed on only the 40% of points it was willing to cluster; the other 60% got <span class="in">`-1`</span>. That's not an honest apples-to-apples comparison with methods that partition every point.</span>
 <span id="cb20-246"><a href="#cb20-246" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**20 Newsgroups (18,846 × 384d)**: HDBSCAN takes 144 seconds of wall clock and discards 84% of posts as noise. The real-world notebook documents this and omits HDBSCAN from the comparison because it's not usable at that scale.</span>
 <span id="cb20-247"><a href="#cb20-247" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**CIFAR-10 (10,000 × 512d)** and **MNIST (70,000 × 784d)**: HDBSCAN's runtime and noise fractions scale badly with both sample count and dimensionality. It can technically run, but the output is a small clustered subset plus a large "I don't know" bucket.</span>
 <span id="cb20-248"><a href="#cb20-248" aria-hidden="true" tabindex="-1"></a></span>
@@ -1553,7 +1553,7 @@ Figure&nbsp;12: K-means — correct k, noisy borders between tight and diffuse b
 <span id="cb20-259"><a href="#cb20-259" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**DYF is not the best parameter-free clustering method for every regime.** On clean low-dimensional toy shapes, HDBSCAN wins decisively.</span>
 <span id="cb20-260"><a href="#cb20-260" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**The right question is not "which method is best?"** It's "which method stays useful as n and d grow?" DYF's answer to that is better than HDBSCAN's, which is why it earns its place downstream.</span>
 <span id="cb20-261"><a href="#cb20-261" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**If your data is 2D, clean, and has clear density valleys**, use HDBSCAN. It will beat DYF and it will beat k-means. The gallery's other notebooks show what happens when it isn't.</span>
-<span id="cb20-262"><a href="#cb20-262" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**NMI and ARI still disagree predictably** about over- vs under-partitioning. That observation holds whatever clustering method you use.</span>
+<span id="cb20-262"><a href="#cb20-262" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**AMI and ARI weigh under-partitioning differently** — on Blobs DYF loses one and wins the other against k-means. Read them together, whatever clustering method you use.</span>
 <span id="cb20-263"><a href="#cb20-263" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb20-264"><a href="#cb20-264" aria-hidden="true" tabindex="-1"></a><span class="fu">## Caveats</span></span>
 <span id="cb20-265"><a href="#cb20-265" aria-hidden="true" tabindex="-1"></a></span>

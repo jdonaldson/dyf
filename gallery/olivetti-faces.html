@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.10.18">
+<meta name="generator" content="quarto-1.10.19">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -77,9 +77,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-1ed79dc1172df127c7d94f8abf7ffee9.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-c22d5dff81f50d6ca627b6188dc743b9.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-1ed79dc1172df127c7d94f8abf7ffee9.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-2253679dd5a56ef632de4277f35d5a2c.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-99131190c761fa326849492283a1b6ed.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-2253679dd5a56ef632de4277f35d5a2c.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
 <link href="../site_libs/bootstrap/bootstrap-077483bf2c889e981b53a146dc5bf4c0.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
@@ -428,13 +428,13 @@ Examples per class: 10</code></pre>
 <span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> run_dyf(X, y)</span>
 <span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Recovered k: </span><span class="sc">{</span>result<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">  (true k = </span><span class="sc">{</span>result<span class="sc">.</span>true_k<span class="sc">}</span><span class="ss">)"</span>)</span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"NMI:         </span><span class="sc">{</span>result<span class="sc">.</span>nmi<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"AMI:         </span><span class="sc">{</span>result<span class="sc">.</span>ami<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
 <span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"ARI:         </span><span class="sc">{</span>result<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stdout">
-<pre><code>Recovered k: 3  (true k = 40)
-NMI:         0.199
-ARI:         0.037</code></pre>
+<pre><code>Recovered k: 4  (true k = 40)
+AMI:         0.258
+ARI:         0.055</code></pre>
 </div>
 </div>
 <p>That’s a blowout. DYF recovered a small handful of clusters where the ground truth has 40.</p>
@@ -445,10 +445,10 @@ ARI:         0.037</code></pre>
 <details open="" class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>kmeans <span class="op">=</span> run_kmeans(X, y)</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"k-means NMI=</span><span class="sc">{</span>kmeans[<span class="st">'nmi'</span>]<span class="sc">:.3f}</span><span class="ss">, ARI=</span><span class="sc">{</span>kmeans[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss"> (told k=</span><span class="sc">{</span>result<span class="sc">.</span>true_k<span class="sc">}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"k-means AMI=</span><span class="sc">{</span>kmeans[<span class="st">'ami'</span>]<span class="sc">:.3f}</span><span class="ss">, ARI=</span><span class="sc">{</span>kmeans[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss"> (told k=</span><span class="sc">{</span>result<span class="sc">.</span>true_k<span class="sc">}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stdout">
-<pre><code>k-means NMI=0.629, ARI=0.430 (told k=40)</code></pre>
+<pre><code>k-means AMI=0.629, ARI=0.430 (told k=40)</code></pre>
 </div>
 </div>
 </section>
@@ -523,18 +523,20 @@ Figure&nbsp;3: K-means given the oracle k=40.
 <tr class="header">
 <th>Method</th>
 <th style="text-align: right;">Recovered k</th>
-<th style="text-align: right;">NMI</th>
+<th style="text-align: right;">AMI</th>
 <th style="text-align: right;">ARI</th>
 <th style="text-align: right;">% discarded</th>
+<th style="text-align: right;">wall (s)</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td><strong>DYF</strong> (parameter-free)</td>
-<td style="text-align: right;">3</td>
-<td style="text-align: right;">0.199</td>
-<td style="text-align: right;">0.037</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">0.258</td>
+<td style="text-align: right;">0.055</td>
 <td style="text-align: right;">0%</td>
+<td style="text-align: right;">1.15</td>
 </tr>
 <tr class="even">
 <td>k-means (oracle k=40)</td>
@@ -542,9 +544,11 @@ Figure&nbsp;3: K-means given the oracle k=40.
 <td style="text-align: right;">0.629</td>
 <td style="text-align: right;">0.430</td>
 <td style="text-align: right;">0%</td>
+<td style="text-align: right;">0.10</td>
 </tr>
 </tbody>
 </table>
+<p><em>Wall time: DYF 1.15 s (tree build + index write + Louvain) vs k-means 0.10 s (one k-means++ init at the oracle k) — DYF 11.8× slower here. The shared UMAP layout is not counted for either.</em></p>
 </div>
 </section>
 <section id="why-dyf-fails-here" class="level2">
@@ -556,7 +560,7 @@ Figure&nbsp;3: K-means given the oracle k=40.
 <p><strong>3. Face-identity is a curved manifold, not a density cluster.</strong> Even with unlimited photos per person, identity manifolds in raw pixel space are narrow and curved — lighting, pose, expression all move you along the manifold without changing identity. Density-based methods look for dense blobs surrounded by empty space; identity manifolds don’t look like that.</p>
 <section id="what-the-oracle-gets-you" class="level3">
 <h3 class="anchored" data-anchor-id="what-the-oracle-gets-you">What the oracle gets you</h3>
-<p>K-means with <code>k=40</code> handed over hits NMI 0.629, ARI 0.430. It’s a respectable number despite all the challenges — because with the oracle, k-means just has to find 40 centers. It doesn’t have to discover that there <em>are</em> 40 centers. That discovery is the hard part, and it’s what DYF is being asked to do unaided.</p>
+<p>K-means with <code>k=40</code> handed over hits AMI 0.629, ARI 0.430. It’s a respectable number despite all the challenges — because with the oracle, k-means just has to find 40 centers. It doesn’t have to discover that there <em>are</em> 40 centers. That discovery is the hard part, and it’s what DYF is being asked to do unaided.</p>
 </section>
 <section id="would-anything-fix-dyf-here" class="level3">
 <h3 class="anchored" data-anchor-id="would-anything-fix-dyf-here">Would anything fix DYF here?</h3>
@@ -576,7 +580,8 @@ Figure&nbsp;3: K-means given the oracle k=40.
 <h2 class="anchored" data-anchor-id="what-to-take-away">What to take away</h2>
 <ul>
 <li><strong>DYF has a floor condition: density per latent cluster.</strong> When your data has fewer than ~<code>min_leaf_size × 2</code> samples per class, DYF will under-partition. That’s the pragmatic rule.</li>
-<li><strong>High-k / low-n is the hardest regime</strong> for any unsupervised method. Even k-means with the oracle only hits NMI 0.63 here; without the oracle it would do worse.</li>
+<li><strong>High-k / low-n is the hardest regime</strong> for any unsupervised method. Even k-means with the oracle only hits AMI 0.63 here; without the oracle it would do worse.</li>
+<li><strong>DYF is also the slower tool here</strong> (<code>wall (s)</code> above): the tree fits a PCA per node over 4,096-d rows, and that costs more than one k-means++ init across 400 points. Low-n / high-d loses on both axes.</li>
 <li><strong>Dimensionality by itself isn’t the problem</strong> — 20 Newsgroups was 384d with 18K points and DYF tied k-means. <code>n / d</code> ratio and density per cluster are what matter.</li>
 <li><strong>If you can pre-embed with a model trained on your identity axis</strong>, the problem transforms into a geometry DYF handles well. That’s the right engineering move, and it’s what the DYF ecosystem is designed to compose with.</li>
 </ul>
@@ -1102,7 +1107,7 @@ Figure&nbsp;3: K-means given the oracle k=40.
 <span id="cb11-46"><a href="#cb11-46" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb11-47"><a href="#cb11-47" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> run_dyf(X, y)</span>
 <span id="cb11-48"><a href="#cb11-48" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Recovered k: </span><span class="sc">{</span>result<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">  (true k = </span><span class="sc">{</span>result<span class="sc">.</span>true_k<span class="sc">}</span><span class="ss">)"</span>)</span>
-<span id="cb11-49"><a href="#cb11-49" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"NMI:         </span><span class="sc">{</span>result<span class="sc">.</span>nmi<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb11-49"><a href="#cb11-49" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"AMI:         </span><span class="sc">{</span>result<span class="sc">.</span>ami<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
 <span id="cb11-50"><a href="#cb11-50" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"ARI:         </span><span class="sc">{</span>result<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
 <span id="cb11-51"><a href="#cb11-51" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
 <span id="cb11-52"><a href="#cb11-52" aria-hidden="true" tabindex="-1"></a></span>
@@ -1113,7 +1118,7 @@ Figure&nbsp;3: K-means given the oracle k=40.
 <span id="cb11-59"><a href="#cb11-59" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
 <span id="cb11-60"><a href="#cb11-60" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: kmeans</span></span>
 <span id="cb11-61"><a href="#cb11-61" aria-hidden="true" tabindex="-1"></a>kmeans <span class="op">=</span> run_kmeans(X, y)</span>
-<span id="cb11-62"><a href="#cb11-62" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"k-means NMI=</span><span class="sc">{</span>kmeans[<span class="st">'nmi'</span>]<span class="sc">:.3f}</span><span class="ss">, ARI=</span><span class="sc">{</span>kmeans[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss"> (told k=</span><span class="sc">{</span>result<span class="sc">.</span>true_k<span class="sc">}</span><span class="ss">)"</span>)</span>
+<span id="cb11-62"><a href="#cb11-62" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"k-means AMI=</span><span class="sc">{</span>kmeans[<span class="st">'ami'</span>]<span class="sc">:.3f}</span><span class="ss">, ARI=</span><span class="sc">{</span>kmeans[<span class="st">'ari'</span>]<span class="sc">:.3f}</span><span class="ss"> (told k=</span><span class="sc">{</span>result<span class="sc">.</span>true_k<span class="sc">}</span><span class="ss">)"</span>)</span>
 <span id="cb11-63"><a href="#cb11-63" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
 <span id="cb11-64"><a href="#cb11-64" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb11-65"><a href="#cb11-65" aria-hidden="true" tabindex="-1"></a><span class="fu">## Figures</span></span>
@@ -1165,7 +1170,7 @@ Figure&nbsp;3: K-means given the oracle k=40.
 <span id="cb11-119"><a href="#cb11-119" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb11-120"><a href="#cb11-120" aria-hidden="true" tabindex="-1"></a><span class="fu">### What the oracle gets you</span></span>
 <span id="cb11-121"><a href="#cb11-121" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb11-122"><a href="#cb11-122" aria-hidden="true" tabindex="-1"></a>K-means with <span class="in">`k=40`</span> handed over hits NMI 0.629, ARI 0.430. It's a respectable number despite all the challenges — because with the oracle, k-means just has to find 40 centers. It doesn't have to discover that there *are* 40 centers. That discovery is the hard part, and it's what DYF is being asked to do unaided.</span>
+<span id="cb11-122"><a href="#cb11-122" aria-hidden="true" tabindex="-1"></a>K-means with <span class="in">`k=40`</span> handed over hits AMI 0.629, ARI 0.430. It's a respectable number despite all the challenges — because with the oracle, k-means just has to find 40 centers. It doesn't have to discover that there *are* 40 centers. That discovery is the hard part, and it's what DYF is being asked to do unaided.</span>
 <span id="cb11-123"><a href="#cb11-123" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb11-124"><a href="#cb11-124" aria-hidden="true" tabindex="-1"></a><span class="fu">### Would anything fix DYF here?</span></span>
 <span id="cb11-125"><a href="#cb11-125" aria-hidden="true" tabindex="-1"></a></span>
@@ -1182,14 +1187,15 @@ Figure&nbsp;3: K-means given the oracle k=40.
 <span id="cb11-136"><a href="#cb11-136" aria-hidden="true" tabindex="-1"></a><span class="fu">## What to take away</span></span>
 <span id="cb11-137"><a href="#cb11-137" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb11-138"><a href="#cb11-138" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**DYF has a floor condition: density per latent cluster.** When your data has fewer than ~<span class="in">`min_leaf_size × 2`</span> samples per class, DYF will under-partition. That's the pragmatic rule.</span>
-<span id="cb11-139"><a href="#cb11-139" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**High-k / low-n is the hardest regime** for any unsupervised method. Even k-means with the oracle only hits NMI 0.63 here; without the oracle it would do worse.</span>
-<span id="cb11-140"><a href="#cb11-140" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Dimensionality by itself isn't the problem** — 20 Newsgroups was 384d with 18K points and DYF tied k-means. <span class="in">`n / d`</span> ratio and density per cluster are what matter.</span>
-<span id="cb11-141"><a href="#cb11-141" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**If you can pre-embed with a model trained on your identity axis**, the problem transforms into a geometry DYF handles well. That's the right engineering move, and it's what the DYF ecosystem is designed to compose with.</span>
-<span id="cb11-142"><a href="#cb11-142" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb11-143"><a href="#cb11-143" aria-hidden="true" tabindex="-1"></a><span class="fu">## Caveats</span></span>
-<span id="cb11-144"><a href="#cb11-144" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb11-145"><a href="#cb11-145" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>This notebook deliberately uses raw pixels. A version with FaceNet embeddings would tell a very different story and probably match or beat k-means. The gallery shows the *default* behavior; it's not claiming DYF cannot be helped with the right upstream model.</span>
-<span id="cb11-146"><a href="#cb11-146" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Olivetti is a 1994 benchmark dataset. Modern face-identity clustering is a solved problem with pretrained embeddings; this notebook is pedagogical, not a recommendation.</span>
+<span id="cb11-139"><a href="#cb11-139" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**High-k / low-n is the hardest regime** for any unsupervised method. Even k-means with the oracle only hits AMI 0.63 here; without the oracle it would do worse.</span>
+<span id="cb11-140"><a href="#cb11-140" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**DYF is also the slower tool here** (<span class="in">`wall (s)`</span> above): the tree fits a PCA per node over 4,096-d rows, and that costs more than one k-means++ init across 400 points. Low-n / high-d loses on both axes.</span>
+<span id="cb11-141"><a href="#cb11-141" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Dimensionality by itself isn't the problem** — 20 Newsgroups was 384d with 18K points and DYF tied k-means. <span class="in">`n / d`</span> ratio and density per cluster are what matter.</span>
+<span id="cb11-142"><a href="#cb11-142" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**If you can pre-embed with a model trained on your identity axis**, the problem transforms into a geometry DYF handles well. That's the right engineering move, and it's what the DYF ecosystem is designed to compose with.</span>
+<span id="cb11-143"><a href="#cb11-143" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-144"><a href="#cb11-144" aria-hidden="true" tabindex="-1"></a><span class="fu">## Caveats</span></span>
+<span id="cb11-145"><a href="#cb11-145" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-146"><a href="#cb11-146" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>This notebook deliberately uses raw pixels. A version with FaceNet embeddings would tell a very different story and probably match or beat k-means. The gallery shows the *default* behavior; it's not claiming DYF cannot be helped with the right upstream model.</span>
+<span id="cb11-147"><a href="#cb11-147" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Olivetti is a 1994 benchmark dataset. Modern face-identity clustering is a solved problem with pretrained embeddings; this notebook is pedagogical, not a recommendation.</span>
 </code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
 </div></div></div></div></div>
 </div> <!-- /content -->

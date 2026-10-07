@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.10.18">
+<meta name="generator" content="quarto-1.10.19">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -77,9 +77,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-1ed79dc1172df127c7d94f8abf7ffee9.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-c22d5dff81f50d6ca627b6188dc743b9.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-1ed79dc1172df127c7d94f8abf7ffee9.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-2253679dd5a56ef632de4277f35d5a2c.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-99131190c761fa326849492283a1b6ed.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-2253679dd5a56ef632de4277f35d5a2c.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
 <link href="../site_libs/bootstrap/bootstrap-077483bf2c889e981b53a146dc5bf4c0.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
@@ -415,7 +415,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 </section>
 <section id="run-dyf-parameter-free" class="level2">
 <h2 class="anchored" data-anchor-id="run-dyf-parameter-free">Run DYF (parameter-free)</h2>
-<p>Three lines. No <code>k</code>, no <code>eps</code>, no <code>min_cluster_size</code>. The defaults in <code>_gallery.run_dyf</code> are the same across every notebook in this gallery — they are not tuned per dataset.</p>
+<p>Three lines. No <code>k</code>, no <code>eps</code>, no <code>min_cluster_size</code>. <code>_gallery.run_dyf</code> builds the tree with <code>build_dyf_tree</code>’s own defaults (<code>num_bits=3, max_depth=4, min_leaf_size=20</code>), the same on every notebook in this gallery — nothing is tuned per dataset.</p>
 <div id="run-dyf" class="cell" data-execution_count="2">
 <details open="" class="code-fold">
 <summary>Code</summary>
@@ -426,13 +426,13 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 <span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> run_dyf(X, y)</span>
 <span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Recovered k: </span><span class="sc">{</span>result<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">  (true k = </span><span class="sc">{</span>result<span class="sc">.</span>true_k<span class="sc">}</span><span class="ss">)"</span>)</span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"NMI:         </span><span class="sc">{</span>result<span class="sc">.</span>nmi<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"AMI:         </span><span class="sc">{</span>result<span class="sc">.</span>ami<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
 <span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"ARI:         </span><span class="sc">{</span>result<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stdout">
-<pre><code>Recovered k: 7  (true k = 10)
-NMI:         0.627
-ARI:         0.475</code></pre>
+<pre><code>Recovered k: 8  (true k = 10)
+AMI:         0.668
+ARI:         0.536</code></pre>
 </div>
 </div>
 </section>
@@ -515,18 +515,20 @@ Figure&nbsp;3: K-means given the oracle k=10 (unfair ceiling).
 <tr class="header">
 <th>Method</th>
 <th style="text-align: right;">Recovered k</th>
-<th style="text-align: right;">NMI</th>
+<th style="text-align: right;">AMI</th>
 <th style="text-align: right;">ARI</th>
 <th style="text-align: right;">% discarded</th>
+<th style="text-align: right;">wall (s)</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td><strong>DYF</strong> (parameter-free)</td>
-<td style="text-align: right;">7</td>
-<td style="text-align: right;">0.627</td>
-<td style="text-align: right;">0.475</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">0.668</td>
+<td style="text-align: right;">0.536</td>
 <td style="text-align: right;">0%</td>
+<td style="text-align: right;">0.04</td>
 </tr>
 <tr class="even">
 <td>k-means (oracle k=10)</td>
@@ -534,6 +536,7 @@ Figure&nbsp;3: K-means given the oracle k=10 (unfair ceiling).
 <td style="text-align: right;">0.773</td>
 <td style="text-align: right;">0.726</td>
 <td style="text-align: right;">0%</td>
+<td style="text-align: right;">0.03</td>
 </tr>
 <tr class="odd">
 <td>HDBSCAN (defaults)</td>
@@ -541,18 +544,20 @@ Figure&nbsp;3: K-means given the oracle k=10 (unfair ceiling).
 <td style="text-align: right;">0.935</td>
 <td style="text-align: right;">0.924</td>
 <td style="text-align: right;">33%</td>
+<td style="text-align: right;">0.16</td>
 </tr>
 </tbody>
 </table>
+<p><em>Wall time: DYF 0.04 s (tree build + index write + Louvain) vs k-means 0.03 s (one k-means++ init at the oracle k) — DYF 1.2× slower here. The shared UMAP layout is not counted for either.</em></p>
 </div>
 </section>
 <section id="how-dyf-and-k-means-disagree-and-why" class="level2">
 <h2 class="anchored" data-anchor-id="how-dyf-and-k-means-disagree-and-why">How DYF and k-means disagree — and why</h2>
-<p>Squint at the three panels and the difference is obvious: <strong>k-means’s partitions track the ground-truth digit classes more faithfully than DYF’s do.</strong> K-means wins on every alignment metric here (NMI 0.77 vs 0.63, ARI 0.73 vs 0.48). That’s worth being honest about.</p>
+<p>Squint at the three panels and the difference is obvious: <strong>k-means’s partitions track the ground-truth digit classes more faithfully than DYF’s do.</strong> K-means wins on every alignment metric here (AMI 0.77 vs 0.67, ARI 0.73 vs 0.54). That’s worth being honest about.</p>
 <p>Two things are driving the gap:</p>
 <p><strong>1. The oracle is doing a lot of work.</strong> K-means was <em>told</em> <code>k=10</code>. That’s not a small hint — it’s the whole answer to the only question DYF actually has to solve. An algorithm with <code>k</code> handed to it is solving a completely different problem (a constrained one) than an algorithm that has to discover <code>k</code> from the data. The gallery exists precisely because you usually don’t have that oracle.</p>
-<p><strong>2. DYF under-splits here, and the reason is size.</strong> DYF does not cluster the 1,797 points directly. It builds a tree, takes the centroid of each leaf, and runs Louvain community detection on a k-nearest-neighbour graph of those centroids. On this dataset the tree has about 170 leaves. Modularity — the quantity Louvain maximises — has a well-known <em>resolution limit</em>: on a graph that small it cannot see communities below a certain size, and merges them. Three digit classes get absorbed into neighbours, and DYF reports 7.</p>
-<p>That is not a property of the digits; it is a property of running a modularity optimiser on a 170-node graph at the standard resolution. The next cell shows the fix.</p>
+<p><strong>2. DYF under-splits here, and the reason is size.</strong> DYF does not cluster the 1,797 points directly. It builds a tree, takes the centroid of each leaf, and runs Louvain community detection on a k-nearest-neighbour graph of those centroids. On this dataset the tree has about 190 leaves. Modularity — the quantity Louvain maximises — has a well-known <em>resolution limit</em>: on a graph that small it cannot see communities below a certain size, and merges them. Two digit classes get absorbed into neighbours, and DYF reports 8.</p>
+<p>That is not a property of the digits; it is a property of running a modularity optimiser on a 190-node graph at the standard resolution. The next cell shows the fix.</p>
 <section id="turning-the-one-knob-dyf-actually-has" class="level3">
 <h3 class="anchored" data-anchor-id="turning-the-one-knob-dyf-actually-has">Turning the one knob DYF actually has</h3>
 <p><code>resolution</code> is the Louvain granularity parameter. At 1.0 (the default, used in every notebook) it under-splits this graph; at 2.0 it doesn’t:</p>
@@ -562,26 +567,24 @@ Figure&nbsp;3: K-means given the oracle k=10 (unfair ceiling).
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> tempfile</span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pathlib <span class="im">import</span> Path</span>
 <span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
-<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.metrics <span class="im">import</span> adjusted_rand_score, normalized_mutual_info_score</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.metrics <span class="im">import</span> adjusted_mutual_info_score, adjusted_rand_score</span>
 <span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dyf <span class="im">import</span> LazyIndex, build_dyf_tree, write_lazy_index</span>
 <span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dyf.agglomerate <span class="im">import</span> louvain_cluster_leaves</span>
-<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> _gallery <span class="im">import</span> auto_tune_tree_params</span>
-<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>params <span class="op">=</span> auto_tune_tree_params(<span class="bu">len</span>(X))          <span class="co"># the same tree the defaults use</span></span>
-<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>tree <span class="op">=</span> build_dyf_tree(X, seed<span class="op">=</span><span class="dv">42</span>, <span class="op">**</span>params)</span>
-<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> tempfile.TemporaryDirectory() <span class="im">as</span> td:</span>
-<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>    path <span class="op">=</span> <span class="bu">str</span>(Path(td) <span class="op">/</span> <span class="st">"digits.dyf"</span>)</span>
-<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>    write_lazy_index(tree, X, path, compression<span class="op">=</span><span class="st">"none"</span>, quantization<span class="op">=</span><span class="st">"float32"</span>)</span>
-<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>    <span class="cf">with</span> LazyIndex(path) <span class="im">as</span> idx:</span>
-<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>        res2 <span class="op">=</span> louvain_cluster_leaves(idx, result.umap_2d, X, resolution<span class="op">=</span><span class="fl">2.0</span>)</span>
-<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>labels2 <span class="op">=</span> np.asarray(res2.point_labels)</span>
-<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"resolution=2.0 → recovered k: </span><span class="sc">{</span><span class="bu">len</span>(<span class="bu">set</span>(labels2))<span class="sc">}</span><span class="ss">  "</span></span>
-<span id="cb10-19"><a href="#cb10-19" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"NMI: </span><span class="sc">{</span>normalized_mutual_info_score(y, labels2)<span class="sc">:.3f}</span><span class="ss">  "</span></span>
-<span id="cb10-20"><a href="#cb10-20" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"ARI: </span><span class="sc">{</span>adjusted_rand_score(y, labels2)<span class="sc">:.3f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>tree <span class="op">=</span> build_dyf_tree(X, seed<span class="op">=</span><span class="dv">42</span>, <span class="op">**</span>result.tree_params)   <span class="co"># the same tree the page used</span></span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> tempfile.TemporaryDirectory() <span class="im">as</span> td:</span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>    path <span class="op">=</span> <span class="bu">str</span>(Path(td) <span class="op">/</span> <span class="st">"digits.dyf"</span>)</span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>    write_lazy_index(tree, X, path, compression<span class="op">=</span><span class="st">"none"</span>, quantization<span class="op">=</span><span class="st">"float32"</span>)</span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">with</span> LazyIndex(path) <span class="im">as</span> idx:</span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>        res2 <span class="op">=</span> louvain_cluster_leaves(idx, result.umap_2d, X, resolution<span class="op">=</span><span class="fl">2.0</span>)</span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>labels2 <span class="op">=</span> np.asarray(res2.point_labels)</span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"resolution=2.0 → recovered k: </span><span class="sc">{</span><span class="bu">len</span>(<span class="bu">set</span>(labels2))<span class="sc">}</span><span class="ss">  "</span></span>
+<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"AMI: </span><span class="sc">{</span>adjusted_mutual_info_score(y, labels2)<span class="sc">:.3f}</span><span class="ss">  "</span></span>
+<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"ARI: </span><span class="sc">{</span>adjusted_rand_score(y, labels2)<span class="sc">:.3f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stdout">
-<pre><code>resolution=2.0 → recovered k: 11  NMI: 0.744  ARI: 0.630</code></pre>
+<pre><code>resolution=2.0 → recovered k: 10  AMI: 0.700  ARI: 0.628</code></pre>
 </div>
 </div>
 <p>Same tree, same leaves, one knob moved — and the count lands at the label’s granularity with both metrics up. The gallery keeps <code>resolution=1.0</code> everywhere anyway, because no single value wins across the datasets (the large ones prefer 1–2, the small ones 2–4), and tuning it per dataset against the labels would defeat the point of the exercise. Read this cell as the diagnosis, not the recipe.</p>
@@ -643,9 +646,10 @@ Figure&nbsp;3: K-means given the oracle k=10 (unfair ceiling).
 <section id="what-to-take-away" class="level2">
 <h2 class="anchored" data-anchor-id="what-to-take-away">What to take away</h2>
 <ul>
-<li><strong>Recovered k</strong> — DYF landed at 7 for 10. Below a few hundred leaves, expect this: the community-detection stage under-resolves small graphs at the default resolution. Above a few thousand leaves (MNIST, CIFAR) it lands on or next to the true count.</li>
-<li><strong>NMI</strong> — the fairer comparison. K-means with the oracle <em>k</em> is the ceiling. DYF’s gap to that ceiling is what you’re paying for the privilege of not having to know <em>k</em> — and on this dataset, also for running a graph method on a tiny graph.</li>
-<li><strong>HDBSCAN</strong> — looks like a blowout when its NMI is reported in isolation, but note the <code>% discarded</code> column: HDBSCAN’s defaults label a third of the points as <em>noise</em> on this dataset, and the NMI is computed only on the non-noise subset. It’s answering a different question (“can you cluster the easy points?”) than DYF and k-means (“can you cluster every point?”).</li>
+<li><strong>Recovered k</strong> — DYF landed at 8 for 10. Below a few hundred leaves, expect this: the community-detection stage under-resolves small graphs at the default resolution. Above a few thousand leaves (MNIST, CIFAR) it lands on or next to the true count.</li>
+<li><strong>AMI</strong> — the fairer comparison. K-means with the oracle <em>k</em> is the ceiling. DYF’s gap to that ceiling is what you’re paying for the privilege of not having to know <em>k</em> — and on this dataset, also for running a graph method on a tiny graph.</li>
+<li><strong>wall (s)</strong> — at 1,797 points every method finishes in a few hundredths of a second, so the column says nothing here. It is on every page because it says something on the larger ones: DYF builds a tree, writes an index and runs Louvain, and that is slower than one k-means++ init wherever the gallery measured it.</li>
+<li><strong>HDBSCAN</strong> — looks like a blowout when its AMI is reported in isolation, but note the <code>% discarded</code> column: HDBSCAN’s defaults label a third of the points as <em>noise</em> on this dataset, and the AMI is computed only on the non-noise subset. It’s answering a different question (“can you cluster the easy points?”) than DYF and k-means (“can you cluster every point?”).</li>
 </ul>
 </section>
 <section id="what-this-does-not-prove" class="level2">
@@ -653,7 +657,7 @@ Figure&nbsp;3: K-means given the oracle k=10 (unfair ceiling).
 <ul>
 <li><code>load_digits</code> is a tiny, clean, well-separated dataset — the easy mode. The later notebooks (MNIST 70K, 20 Newsgroups, Olivetti) stress the same call under harder regimes.</li>
 <li>The pixel-space Euclidean metric on 8×8 images is kind to any clustering algorithm. The MNIST notebook repeats this on 70K samples at 28×28, where the geometry gets noticeably harder — and DYF gets noticeably better.</li>
-<li>Earlier versions of this page reported 9 communities and quoted NMI/ARI that did not match the cell output. The community counts before <code>dyf-rs</code> 0.12.0 came from a single-level Louvain that could not merge communities (dyf <code>KNOWN_ISSUES.md</code>, issue 10); the numbers here are from the corrected optimiser.</li>
+<li>Earlier versions of this page reported 9 communities and quoted AMI/ARI that did not match the cell output. The community counts before <code>dyf-rs</code> 0.12.0 came from a single-level Louvain that could not merge communities (dyf <code>KNOWN_ISSUES.md</code>, issue 10); the numbers here are from the corrected optimiser.</li>
 </ul>
 
 
@@ -1161,7 +1165,7 @@ Figure&nbsp;3: K-means given the oracle k=10 (unfair ceiling).
 <span id="cb12-35"><a href="#cb12-35" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb12-36"><a href="#cb12-36" aria-hidden="true" tabindex="-1"></a><span class="fu">## Run DYF (parameter-free)</span></span>
 <span id="cb12-37"><a href="#cb12-37" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-38"><a href="#cb12-38" aria-hidden="true" tabindex="-1"></a>Three lines. No <span class="in">`k`</span>, no <span class="in">`eps`</span>, no <span class="in">`min_cluster_size`</span>. The defaults in <span class="in">`_gallery.run_dyf`</span> are the same across every notebook in this gallery — they are not tuned per dataset.</span>
+<span id="cb12-38"><a href="#cb12-38" aria-hidden="true" tabindex="-1"></a>Three lines. No <span class="in">`k`</span>, no <span class="in">`eps`</span>, no <span class="in">`min_cluster_size`</span>. <span class="in">`_gallery.run_dyf`</span> builds the tree with <span class="in">`build_dyf_tree`</span>'s own defaults (<span class="in">`num_bits=3, max_depth=4, min_leaf_size=20`</span>), the same on every notebook in this gallery — nothing is tuned per dataset.</span>
 <span id="cb12-39"><a href="#cb12-39" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb12-42"><a href="#cb12-42" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
 <span id="cb12-43"><a href="#cb12-43" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: run-dyf</span></span>
@@ -1172,7 +1176,7 @@ Figure&nbsp;3: K-means given the oracle k=10 (unfair ceiling).
 <span id="cb12-48"><a href="#cb12-48" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> run_dyf(X, y)</span>
 <span id="cb12-49"><a href="#cb12-49" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb12-50"><a href="#cb12-50" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Recovered k: </span><span class="sc">{</span>result<span class="sc">.</span>recovered_k<span class="sc">}</span><span class="ss">  (true k = </span><span class="sc">{</span>result<span class="sc">.</span>true_k<span class="sc">}</span><span class="ss">)"</span>)</span>
-<span id="cb12-51"><a href="#cb12-51" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"NMI:         </span><span class="sc">{</span>result<span class="sc">.</span>nmi<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb12-51"><a href="#cb12-51" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"AMI:         </span><span class="sc">{</span>result<span class="sc">.</span>ami<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
 <span id="cb12-52"><a href="#cb12-52" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"ARI:         </span><span class="sc">{</span>result<span class="sc">.</span>ari<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
 <span id="cb12-53"><a href="#cb12-53" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
 <span id="cb12-54"><a href="#cb12-54" aria-hidden="true" tabindex="-1"></a></span>
@@ -1218,7 +1222,7 @@ Figure&nbsp;3: K-means given the oracle k=10 (unfair ceiling).
 <span id="cb12-104"><a href="#cb12-104" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb12-105"><a href="#cb12-105" aria-hidden="true" tabindex="-1"></a><span class="fu">## How DYF and k-means disagree — and why</span></span>
 <span id="cb12-106"><a href="#cb12-106" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-107"><a href="#cb12-107" aria-hidden="true" tabindex="-1"></a>Squint at the three panels and the difference is obvious: **k-means's partitions track the ground-truth digit classes more faithfully than DYF's do.** K-means wins on every alignment metric here (NMI 0.77 vs 0.63, ARI 0.73 vs 0.48). That's worth being honest about.</span>
+<span id="cb12-107"><a href="#cb12-107" aria-hidden="true" tabindex="-1"></a>Squint at the three panels and the difference is obvious: **k-means's partitions track the ground-truth digit classes more faithfully than DYF's do.** K-means wins on every alignment metric here (AMI 0.77 vs 0.67, ARI 0.73 vs 0.54). That's worth being honest about.</span>
 <span id="cb12-108"><a href="#cb12-108" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb12-109"><a href="#cb12-109" aria-hidden="true" tabindex="-1"></a>Two things are driving the gap:</span>
 <span id="cb12-110"><a href="#cb12-110" aria-hidden="true" tabindex="-1"></a></span>
@@ -1226,9 +1230,9 @@ Figure&nbsp;3: K-means given the oracle k=10 (unfair ceiling).
 <span id="cb12-112"><a href="#cb12-112" aria-hidden="true" tabindex="-1"></a>K-means was *told* <span class="in">`k=10`</span>. That's not a small hint — it's the whole answer to the only question DYF actually has to solve. An algorithm with <span class="in">`k`</span> handed to it is solving a completely different problem (a constrained one) than an algorithm that has to discover <span class="in">`k`</span> from the data. The gallery exists precisely because you usually don't have that oracle.</span>
 <span id="cb12-113"><a href="#cb12-113" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb12-114"><a href="#cb12-114" aria-hidden="true" tabindex="-1"></a>**2. DYF under-splits here, and the reason is size.**</span>
-<span id="cb12-115"><a href="#cb12-115" aria-hidden="true" tabindex="-1"></a>DYF does not cluster the 1,797 points directly. It builds a tree, takes the centroid of each leaf, and runs Louvain community detection on a k-nearest-neighbour graph of those centroids. On this dataset the tree has about 170 leaves. Modularity — the quantity Louvain maximises — has a well-known *resolution limit*: on a graph that small it cannot see communities below a certain size, and merges them. Three digit classes get absorbed into neighbours, and DYF reports 7.</span>
+<span id="cb12-115"><a href="#cb12-115" aria-hidden="true" tabindex="-1"></a>DYF does not cluster the 1,797 points directly. It builds a tree, takes the centroid of each leaf, and runs Louvain community detection on a k-nearest-neighbour graph of those centroids. On this dataset the tree has about 190 leaves. Modularity — the quantity Louvain maximises — has a well-known *resolution limit*: on a graph that small it cannot see communities below a certain size, and merges them. Two digit classes get absorbed into neighbours, and DYF reports 8.</span>
 <span id="cb12-116"><a href="#cb12-116" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-117"><a href="#cb12-117" aria-hidden="true" tabindex="-1"></a>That is not a property of the digits; it is a property of running a modularity optimiser on a 170-node graph at the standard resolution. The next cell shows the fix.</span>
+<span id="cb12-117"><a href="#cb12-117" aria-hidden="true" tabindex="-1"></a>That is not a property of the digits; it is a property of running a modularity optimiser on a 190-node graph at the standard resolution. The next cell shows the fix.</span>
 <span id="cb12-118"><a href="#cb12-118" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb12-119"><a href="#cb12-119" aria-hidden="true" tabindex="-1"></a><span class="fu">### Turning the one knob DYF actually has</span></span>
 <span id="cb12-120"><a href="#cb12-120" aria-hidden="true" tabindex="-1"></a></span>
@@ -1239,53 +1243,52 @@ Figure&nbsp;3: K-means given the oracle k=10 (unfair ceiling).
 <span id="cb12-127"><a href="#cb12-127" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> tempfile</span>
 <span id="cb12-128"><a href="#cb12-128" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pathlib <span class="im">import</span> Path</span>
 <span id="cb12-129"><a href="#cb12-129" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
-<span id="cb12-130"><a href="#cb12-130" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.metrics <span class="im">import</span> adjusted_rand_score, normalized_mutual_info_score</span>
+<span id="cb12-130"><a href="#cb12-130" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.metrics <span class="im">import</span> adjusted_mutual_info_score, adjusted_rand_score</span>
 <span id="cb12-131"><a href="#cb12-131" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dyf <span class="im">import</span> LazyIndex, build_dyf_tree, write_lazy_index</span>
 <span id="cb12-132"><a href="#cb12-132" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dyf.agglomerate <span class="im">import</span> louvain_cluster_leaves</span>
-<span id="cb12-133"><a href="#cb12-133" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> _gallery <span class="im">import</span> auto_tune_tree_params</span>
-<span id="cb12-134"><a href="#cb12-134" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-135"><a href="#cb12-135" aria-hidden="true" tabindex="-1"></a>params <span class="op">=</span> auto_tune_tree_params(<span class="bu">len</span>(X))          <span class="co"># the same tree the defaults use</span></span>
-<span id="cb12-136"><a href="#cb12-136" aria-hidden="true" tabindex="-1"></a>tree <span class="op">=</span> build_dyf_tree(X, seed<span class="op">=</span><span class="dv">42</span>, <span class="op">**</span>params)</span>
-<span id="cb12-137"><a href="#cb12-137" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> tempfile.TemporaryDirectory() <span class="im">as</span> td:</span>
-<span id="cb12-138"><a href="#cb12-138" aria-hidden="true" tabindex="-1"></a>    path <span class="op">=</span> <span class="bu">str</span>(Path(td) <span class="op">/</span> <span class="st">"digits.dyf"</span>)</span>
-<span id="cb12-139"><a href="#cb12-139" aria-hidden="true" tabindex="-1"></a>    write_lazy_index(tree, X, path, compression<span class="op">=</span><span class="st">"none"</span>, quantization<span class="op">=</span><span class="st">"float32"</span>)</span>
-<span id="cb12-140"><a href="#cb12-140" aria-hidden="true" tabindex="-1"></a>    <span class="cf">with</span> LazyIndex(path) <span class="im">as</span> idx:</span>
-<span id="cb12-141"><a href="#cb12-141" aria-hidden="true" tabindex="-1"></a>        res2 <span class="op">=</span> louvain_cluster_leaves(idx, result.umap_2d, X, resolution<span class="op">=</span><span class="fl">2.0</span>)</span>
-<span id="cb12-142"><a href="#cb12-142" aria-hidden="true" tabindex="-1"></a>labels2 <span class="op">=</span> np.asarray(res2.point_labels)</span>
-<span id="cb12-143"><a href="#cb12-143" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-144"><a href="#cb12-144" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"resolution=2.0 → recovered k: </span><span class="sc">{</span><span class="bu">len</span>(<span class="bu">set</span>(labels2))<span class="sc">}</span><span class="ss">  "</span></span>
-<span id="cb12-145"><a href="#cb12-145" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"NMI: </span><span class="sc">{</span>normalized_mutual_info_score(y, labels2)<span class="sc">:.3f}</span><span class="ss">  "</span></span>
-<span id="cb12-146"><a href="#cb12-146" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"ARI: </span><span class="sc">{</span>adjusted_rand_score(y, labels2)<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
-<span id="cb12-147"><a href="#cb12-147" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb12-133"><a href="#cb12-133" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-134"><a href="#cb12-134" aria-hidden="true" tabindex="-1"></a>tree <span class="op">=</span> build_dyf_tree(X, seed<span class="op">=</span><span class="dv">42</span>, <span class="op">**</span>result.tree_params)   <span class="co"># the same tree the page used</span></span>
+<span id="cb12-135"><a href="#cb12-135" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> tempfile.TemporaryDirectory() <span class="im">as</span> td:</span>
+<span id="cb12-136"><a href="#cb12-136" aria-hidden="true" tabindex="-1"></a>    path <span class="op">=</span> <span class="bu">str</span>(Path(td) <span class="op">/</span> <span class="st">"digits.dyf"</span>)</span>
+<span id="cb12-137"><a href="#cb12-137" aria-hidden="true" tabindex="-1"></a>    write_lazy_index(tree, X, path, compression<span class="op">=</span><span class="st">"none"</span>, quantization<span class="op">=</span><span class="st">"float32"</span>)</span>
+<span id="cb12-138"><a href="#cb12-138" aria-hidden="true" tabindex="-1"></a>    <span class="cf">with</span> LazyIndex(path) <span class="im">as</span> idx:</span>
+<span id="cb12-139"><a href="#cb12-139" aria-hidden="true" tabindex="-1"></a>        res2 <span class="op">=</span> louvain_cluster_leaves(idx, result.umap_2d, X, resolution<span class="op">=</span><span class="fl">2.0</span>)</span>
+<span id="cb12-140"><a href="#cb12-140" aria-hidden="true" tabindex="-1"></a>labels2 <span class="op">=</span> np.asarray(res2.point_labels)</span>
+<span id="cb12-141"><a href="#cb12-141" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-142"><a href="#cb12-142" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"resolution=2.0 → recovered k: </span><span class="sc">{</span><span class="bu">len</span>(<span class="bu">set</span>(labels2))<span class="sc">}</span><span class="ss">  "</span></span>
+<span id="cb12-143"><a href="#cb12-143" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"AMI: </span><span class="sc">{</span>adjusted_mutual_info_score(y, labels2)<span class="sc">:.3f}</span><span class="ss">  "</span></span>
+<span id="cb12-144"><a href="#cb12-144" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"ARI: </span><span class="sc">{</span>adjusted_rand_score(y, labels2)<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb12-145"><a href="#cb12-145" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb12-146"><a href="#cb12-146" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-147"><a href="#cb12-147" aria-hidden="true" tabindex="-1"></a>Same tree, same leaves, one knob moved — and the count lands at the label's granularity with both metrics up. The gallery keeps <span class="in">`resolution=1.0`</span> everywhere anyway, because no single value wins across the datasets (the large ones prefer 1–2, the small ones 2–4), and tuning it per dataset against the labels would defeat the point of the exercise. Read this cell as the diagnosis, not the recipe.</span>
 <span id="cb12-148"><a href="#cb12-148" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-149"><a href="#cb12-149" aria-hidden="true" tabindex="-1"></a>Same tree, same leaves, one knob moved — and the count lands at the label's granularity with both metrics up. The gallery keeps <span class="in">`resolution=1.0`</span> everywhere anyway, because no single value wins across the datasets (the large ones prefer 1–2, the small ones 2–4), and tuning it per dataset against the labels would defeat the point of the exercise. Read this cell as the diagnosis, not the recipe.</span>
+<span id="cb12-149"><a href="#cb12-149" aria-hidden="true" tabindex="-1"></a><span class="fu">### Pros and cons, side by side</span></span>
 <span id="cb12-150"><a href="#cb12-150" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-151"><a href="#cb12-151" aria-hidden="true" tabindex="-1"></a><span class="fu">### Pros and cons, side by side</span></span>
-<span id="cb12-152"><a href="#cb12-152" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-153"><a href="#cb12-153" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span>                                   <span class="pp">|</span> **DYF (parameter-free)**                                                | **K-means (oracle k)**                                                                       <span class="pp">|</span></span>
-<span id="cb12-154"><a href="#cb12-154" aria-hidden="true" tabindex="-1"></a><span class="pp">|-----------------------------------|-------------------------------------------------------------------------|----------------------------------------------------------------------------------------------|</span></span>
-<span id="cb12-155"><a href="#cb12-155" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Needs <span class="in">`k`</span>?                        <span class="pp">|</span> No — recovered from data.                                               <span class="pp">|</span> Yes — given k=10 upfront.                                                                    <span class="pp">|</span></span>
-<span id="cb12-156"><a href="#cb12-156" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Cluster shape                     <span class="pp">|</span> Arbitrary (density + graph connectivity).                               <span class="pp">|</span> Convex Voronoi cells around centroids.                                                       <span class="pp">|</span></span>
-<span id="cb12-157"><a href="#cb12-157" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Behavior when ground truth *is* convex blobs <span class="pp">|</span> Good once the tree has enough leaves; under-splits when it doesn't. <span class="pp">|</span> Excellent — this is exactly the geometry k-means optimizes for.                              <span class="pp">|</span></span>
-<span id="cb12-158"><a href="#cb12-158" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Behavior when ground truth is curved / elongated / nested <span class="pp">|</span> Follows the manifold; non-convex clusters are fine.          <span class="pp">|</span> Fails — forces straight-line Voronoi cuts through curved structure.                          <span class="pp">|</span></span>
-<span id="cb12-159"><a href="#cb12-159" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Hierarchical output?              <span class="pp">|</span> Yes — the tree gives you a multi-resolution structure for free.         <span class="pp">|</span> No — flat partition at exactly <span class="in">`k`</span>.                                                          <span class="pp">|</span></span>
-<span id="cb12-160"><a href="#cb12-160" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Sensitivity to ghost centers / init <span class="pp">|</span> Low — deterministic given seed.                                       <span class="pp">|</span> High — <span class="in">`n_init`</span> and <span class="in">`random_state`</span> matter; can get stuck.                                    <span class="pp">|</span></span>
+<span id="cb12-151"><a href="#cb12-151" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span>                                   <span class="pp">|</span> **DYF (parameter-free)**                                                | **K-means (oracle k)**                                                                       <span class="pp">|</span></span>
+<span id="cb12-152"><a href="#cb12-152" aria-hidden="true" tabindex="-1"></a><span class="pp">|-----------------------------------|-------------------------------------------------------------------------|----------------------------------------------------------------------------------------------|</span></span>
+<span id="cb12-153"><a href="#cb12-153" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Needs <span class="in">`k`</span>?                        <span class="pp">|</span> No — recovered from data.                                               <span class="pp">|</span> Yes — given k=10 upfront.                                                                    <span class="pp">|</span></span>
+<span id="cb12-154"><a href="#cb12-154" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Cluster shape                     <span class="pp">|</span> Arbitrary (density + graph connectivity).                               <span class="pp">|</span> Convex Voronoi cells around centroids.                                                       <span class="pp">|</span></span>
+<span id="cb12-155"><a href="#cb12-155" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Behavior when ground truth *is* convex blobs <span class="pp">|</span> Good once the tree has enough leaves; under-splits when it doesn't. <span class="pp">|</span> Excellent — this is exactly the geometry k-means optimizes for.                              <span class="pp">|</span></span>
+<span id="cb12-156"><a href="#cb12-156" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Behavior when ground truth is curved / elongated / nested <span class="pp">|</span> Follows the manifold; non-convex clusters are fine.          <span class="pp">|</span> Fails — forces straight-line Voronoi cuts through curved structure.                          <span class="pp">|</span></span>
+<span id="cb12-157"><a href="#cb12-157" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Hierarchical output?              <span class="pp">|</span> Yes — the tree gives you a multi-resolution structure for free.         <span class="pp">|</span> No — flat partition at exactly <span class="in">`k`</span>.                                                          <span class="pp">|</span></span>
+<span id="cb12-158"><a href="#cb12-158" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Sensitivity to ghost centers / init <span class="pp">|</span> Low — deterministic given seed.                                       <span class="pp">|</span> High — <span class="in">`n_init`</span> and <span class="in">`random_state`</span> matter; can get stuck.                                    <span class="pp">|</span></span>
+<span id="cb12-159"><a href="#cb12-159" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-160"><a href="#cb12-160" aria-hidden="true" tabindex="-1"></a><span class="fu">### So why run DYF on digits at all?</span></span>
 <span id="cb12-161"><a href="#cb12-161" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-162"><a href="#cb12-162" aria-hidden="true" tabindex="-1"></a><span class="fu">### So why run DYF on digits at all?</span></span>
+<span id="cb12-162"><a href="#cb12-162" aria-hidden="true" tabindex="-1"></a>Because the *story* of the gallery isn't "DYF beats k-means on every dataset." It's "DYF holds up *close enough* to oracle-tuned k-means on easy datasets, and pulls ahead where the oracle's assumptions break or the data gets big." Digits is the easy mode *and* the small mode — the one regime where DYF's leaf-centroid design is at a genuine disadvantage. <span class="co">[</span><span class="ot">MNIST</span><span class="co">](mnist.qmd)</span> is the same task at 40× the size, and there DYF beats oracle k-means on both metrics with the same defaults.</span>
 <span id="cb12-163"><a href="#cb12-163" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-164"><a href="#cb12-164" aria-hidden="true" tabindex="-1"></a>Because the *story* of the gallery isn't "DYF beats k-means on every dataset." It's "DYF holds up *close enough* to oracle-tuned k-means on easy datasets, and pulls ahead where the oracle's assumptions break or the data gets big." Digits is the easy mode *and* the small mode — the one regime where DYF's leaf-centroid design is at a genuine disadvantage. <span class="co">[</span><span class="ot">MNIST</span><span class="co">](mnist.qmd)</span> is the same task at 40× the size, and there DYF beats oracle k-means on both metrics with the same defaults.</span>
+<span id="cb12-164"><a href="#cb12-164" aria-hidden="true" tabindex="-1"></a><span class="fu">## What to take away</span></span>
 <span id="cb12-165"><a href="#cb12-165" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-166"><a href="#cb12-166" aria-hidden="true" tabindex="-1"></a><span class="fu">## What to take away</span></span>
-<span id="cb12-167"><a href="#cb12-167" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-168"><a href="#cb12-168" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Recovered k** — DYF landed at 7 for 10. Below a few hundred leaves, expect this: the community-detection stage under-resolves small graphs at the default resolution. Above a few thousand leaves (MNIST, CIFAR) it lands on or next to the true count.</span>
-<span id="cb12-169"><a href="#cb12-169" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**NMI** — the fairer comparison. K-means with the oracle *k* is the ceiling. DYF's gap to that ceiling is what you're paying for the privilege of not having to know *k* — and on this dataset, also for running a graph method on a tiny graph.</span>
-<span id="cb12-170"><a href="#cb12-170" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**HDBSCAN** — looks like a blowout when its NMI is reported in isolation, but note the <span class="in">`% discarded`</span> column: HDBSCAN's defaults label a third of the points as *noise* on this dataset, and the NMI is computed only on the non-noise subset. It's answering a different question ("can you cluster the easy points?") than DYF and k-means ("can you cluster every point?").</span>
-<span id="cb12-171"><a href="#cb12-171" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-172"><a href="#cb12-172" aria-hidden="true" tabindex="-1"></a><span class="fu">## What this does not prove</span></span>
-<span id="cb12-173"><a href="#cb12-173" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-174"><a href="#cb12-174" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`load_digits`</span> is a tiny, clean, well-separated dataset — the easy mode. The later notebooks (MNIST 70K, 20 Newsgroups, Olivetti) stress the same call under harder regimes.</span>
-<span id="cb12-175"><a href="#cb12-175" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>The pixel-space Euclidean metric on 8×8 images is kind to any clustering algorithm. The MNIST notebook repeats this on 70K samples at 28×28, where the geometry gets noticeably harder — and DYF gets noticeably better.</span>
-<span id="cb12-176"><a href="#cb12-176" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Earlier versions of this page reported 9 communities and quoted NMI/ARI that did not match the cell output. The community counts before <span class="in">`dyf-rs`</span> 0.12.0 came from a single-level Louvain that could not merge communities (dyf <span class="in">`KNOWN_ISSUES.md`</span>, issue 10); the numbers here are from the corrected optimiser.</span>
+<span id="cb12-166"><a href="#cb12-166" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Recovered k** — DYF landed at 8 for 10. Below a few hundred leaves, expect this: the community-detection stage under-resolves small graphs at the default resolution. Above a few thousand leaves (MNIST, CIFAR) it lands on or next to the true count.</span>
+<span id="cb12-167"><a href="#cb12-167" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**AMI** — the fairer comparison. K-means with the oracle *k* is the ceiling. DYF's gap to that ceiling is what you're paying for the privilege of not having to know *k* — and on this dataset, also for running a graph method on a tiny graph.</span>
+<span id="cb12-168"><a href="#cb12-168" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**wall (s)** — at 1,797 points every method finishes in a few hundredths of a second, so the column says nothing here. It is on every page because it says something on the larger ones: DYF builds a tree, writes an index and runs Louvain, and that is slower than one k-means++ init wherever the gallery measured it.</span>
+<span id="cb12-169"><a href="#cb12-169" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**HDBSCAN** — looks like a blowout when its AMI is reported in isolation, but note the <span class="in">`% discarded`</span> column: HDBSCAN's defaults label a third of the points as *noise* on this dataset, and the AMI is computed only on the non-noise subset. It's answering a different question ("can you cluster the easy points?") than DYF and k-means ("can you cluster every point?").</span>
+<span id="cb12-170"><a href="#cb12-170" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-171"><a href="#cb12-171" aria-hidden="true" tabindex="-1"></a><span class="fu">## What this does not prove</span></span>
+<span id="cb12-172"><a href="#cb12-172" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-173"><a href="#cb12-173" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`load_digits`</span> is a tiny, clean, well-separated dataset — the easy mode. The later notebooks (MNIST 70K, 20 Newsgroups, Olivetti) stress the same call under harder regimes.</span>
+<span id="cb12-174"><a href="#cb12-174" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>The pixel-space Euclidean metric on 8×8 images is kind to any clustering algorithm. The MNIST notebook repeats this on 70K samples at 28×28, where the geometry gets noticeably harder — and DYF gets noticeably better.</span>
+<span id="cb12-175"><a href="#cb12-175" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Earlier versions of this page reported 9 communities and quoted AMI/ARI that did not match the cell output. The community counts before <span class="in">`dyf-rs`</span> 0.12.0 came from a single-level Louvain that could not merge communities (dyf <span class="in">`KNOWN_ISSUES.md`</span>, issue 10); the numbers here are from the corrected optimiser.</span>
 </code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
 </div></div></div></div></div>
 </div> <!-- /content -->
