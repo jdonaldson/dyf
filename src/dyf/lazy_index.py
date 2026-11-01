@@ -156,6 +156,26 @@ class AdaptiveProbeConfig:
     max_probes: int = 5
 
 
+@dataclass(frozen=True)
+class RouteResult:
+    """Where :meth:`LazyIndex.route` sent each row, through the index's frozen hyperplanes.
+
+    Attributes:
+        leaf: (n,) int64 — leaf batch index per row (the ``batch_index`` that
+            :meth:`LazyIndex.get_leaf` takes).
+        path: (n, max_depth + 1) int64 — node id at each depth, root at column 0. A row whose
+            leaf is shallower than the deepest leaf repeats its leaf id in the deeper columns,
+            so every column is a complete partition of the rows.
+        unseen: (n,) bool — True where the row's bucket had no members at build time at some
+            node, and it was sent to the nearest bucket by margin instead (the same fallback
+            search uses). A rising unseen share is the drift signal for a frozen basis.
+    """
+
+    leaf: np.ndarray
+    path: np.ndarray
+    unseen: np.ndarray
+
+
 def _build_flat_node(node_id, node, node_to_id, embeddings, embedding_dim, batch_idx):
     """Build a single flat node dict from a tree node.
 
@@ -1240,6 +1260,31 @@ class LazyIndex:
         self._cache_order = deque()
         self._cache_maxsize = 64
 
+        # Rows no leaf points to are counted in total_items but never searched or extracted.
+        # dyf_rs.DyfFile.append_items produces exactly that, and compact() does not repair
+        # it (measured 2026-11-01: 0 of 5 appended rows findable, before or after compact).
+        # Say so at open rather than return results that silently omit them.
+        unreachable = self.total_items - self.reachable_items
+        if unreachable > 0:
+            import warnings
+
+            warnings.warn(
+                f"{path}: {unreachable} of {self.total_items} items are not in any leaf (rows added "
+                "with DyfFile.append_items?) and will never be returned by search. Use "
+                "dyf.extend_lazy_index to add rows through the frozen tree instead.",
+                stacklevel=2,
+            )
+
+    @property
+    def reachable_items(self) -> int:
+        """Rows held by some leaf — the rows search and extraction can actually return."""
+        total = 0
+        for nid in range(self._index.NodesLength()):
+            node = self._index.Nodes(nid)
+            if node.ChildrenLength() == 0 and node.BatchIndex() >= 0:
+                total += self._index.Batches(node.BatchIndex()).NumRows()
+        return total
+
     def close(self):
         """Release mmap and file handle."""
         if self._mm is not None:
@@ -1660,6 +1705,69 @@ class LazyIndex:
             if xor & (1 << i):
                 cost += abs(float(projections[i]))
         return cost
+
+    def route(self, vectors) -> RouteResult:
+        """Route rows through this index's frozen tree without changing it.
+
+        This is the read path of a frozen basis: fit an index once, then give later data the
+        same addresses the fitted data has. Each row follows the primary path search would
+        take with ``nprobe=1`` — rows are L2-normalised, hashed against each internal node's
+        stored hyperplanes, and sent to the child for that bucket. A bucket with no child
+        (empty at build time) falls back to the child with the cheapest margin-weighted bit
+        flips, and the row is marked ``unseen``. Rows the index was built from route to the
+        leaf that holds them.
+
+        Args:
+            vectors: (n, dim) or (dim,) array. Any float dtype; cast to float32.
+
+        Returns:
+            RouteResult with ``leaf``, ``path`` and ``unseen`` arrays of length n.
+        """
+        from ._arrays import ensure_f32
+
+        X = ensure_f32(np.atleast_2d(np.asarray(vectors)), name="vectors")
+        if X.shape[1] != self.embedding_dim:
+            raise ValueError(f"vectors have dim {X.shape[1]}, index has dim {self.embedding_dim}")
+        norms = np.linalg.norm(X, axis=1, keepdims=True)
+        X = X / np.where(norms > 1e-10, norms, 1.0)
+
+        n = len(X)
+        max_depth = max(self._index.Nodes(i).Depth() for i in range(self._index.NodesLength()))
+        path = np.full((n, max_depth + 1), -1, dtype=np.int64)
+        leaf = np.full(n, -1, dtype=np.int64)
+        unseen = np.zeros(n, dtype=bool)
+        stack = [(self._index.Root(), np.arange(n, dtype=np.int64), 0)]
+        while stack:
+            node_id, rows, depth = stack.pop()
+            if not len(rows):
+                continue
+            path[rows, depth:] = node_id
+            node = self._index.Nodes(node_id)
+            n_children = node.ChildrenLength()
+            if n_children == 0:
+                leaf[rows] = node.BatchIndex()
+                continue
+            children = [node.Children(ci) for ci in range(n_children)]
+            hyperplanes = self._get_node_hyperplanes(node)
+            if hyperplanes is None or node.BucketIdsToChildrenIsNone():
+                stack.append((children[0], rows, depth + 1))
+                continue
+            proj = X[rows] @ hyperplanes.T
+            num_bits = hyperplanes.shape[0]
+            bucket = ((proj > 0).astype(np.int64) << np.arange(num_bits, dtype=np.int64)).sum(1)
+            bids = np.array([node.BucketIdsToChildren(ci) for ci in range(n_children)], dtype=np.int64)
+            lut = np.full(1 << num_bits, -1, dtype=np.int64)
+            lut[bids] = np.arange(n_children)
+            child_of = lut[bucket]
+            miss = np.where(child_of < 0)[0]
+            if len(miss):
+                unseen[rows[miss]] = True
+                # margin-weighted flip cost to each existing bucket, as in _margin_distance
+                flips = ((bucket[miss, None] ^ bids[None, :])[:, :, None] >> np.arange(num_bits)) & 1
+                child_of[miss] = (flips * np.abs(proj[miss])[:, None, :]).sum(2).argmin(1)
+            for ci, child in enumerate(children):
+                stack.append((child, rows[child_of == ci], depth + 1))
+        return RouteResult(leaf=leaf, path=path, unseen=unseen)
 
     def search(self, query, k=10, nprobe=3, return_routing=False, backend="rust"):
         """Search the index for nearest neighbors.
@@ -2538,7 +2646,7 @@ def from_faiss(
     return LazyIndex(path)
 
 
-def _reconstruct_tree(idx):
+def _reconstruct_tree(idx, extra_leaf_items=None):
     """Reconstruct tree dict from LazyIndex FlatBuffers + Arrow batches.
 
     Rebuilds the recursive tree structure that write_lazy_index expects,
@@ -2547,6 +2655,8 @@ def _reconstruct_tree(idx):
 
     Args:
         idx: An open LazyIndex instance.
+        extra_leaf_items: Optional {leaf node id: item indices} appended to those leaves
+            (how extend_lazy_index places routed rows).
 
     Returns:
         dict compatible with write_lazy_index's tree parameter.
@@ -2595,6 +2705,9 @@ def _reconstruct_tree(idx):
         if is_leaf and batch_index >= 0:
             batch = idx.get_leaf(batch_index)
             indices = batch.column("item_index").to_numpy().astype(np.intp)
+        if is_leaf and extra_leaf_items and nid in extra_leaf_items:
+            extra = np.asarray(extra_leaf_items[nid], dtype=np.intp)
+            indices = extra if indices is None else np.concatenate([indices, extra])
 
         node_data.append(
             {
@@ -2744,6 +2857,100 @@ def rewrite_lazy_index(
         format_version=format_ver,
         embedding_dim=src_embedding_dim,
     )
+
+
+def extend_lazy_index(
+    path: str,
+    vectors: np.ndarray,
+    stored_fields: Mapping[str, StoredFieldInput] | None = None,
+    output_path: str | None = None,
+) -> RouteResult:
+    """Add rows to a .dyf through its frozen tree: route, then rewrite with each row in its leaf.
+
+    The write path of a frozen basis. Hyperplanes and bucket maps are kept exactly, so every
+    existing row keeps its address and the new rows get addresses that mean the same thing
+    (see ``LazyIndex.route``). Nothing is refit: leaves grow, they never split. Watch the
+    returned ``unseen`` share — when new data keeps landing in buckets the fit never saw,
+    the basis is stale and the index should be rebuilt.
+
+    Use this rather than ``dyf_rs.DyfFile.append_items``, whose rows are attached to no leaf
+    and are never returned by search, even after ``compact()``.
+
+    Args:
+        path: Existing .dyf file (must store embeddings; PQ indexes are not supported).
+        vectors: (m, dim) rows to add. New item indices are total_items .. total_items + m - 1.
+        stored_fields: Values for the new rows, one entry per stored field in the file
+            (each of length m). Required when the file has stored fields.
+        output_path: Output path. If None, overwrites ``path``.
+
+    Returns:
+        RouteResult for the new rows.
+
+    Raises:
+        ValueError: PQ or embedding-less index, wrong dim, or stored fields missing / extra /
+            of the wrong length.
+    """
+    from ._arrays import ensure_f32
+
+    new = ensure_f32(np.atleast_2d(np.asarray(vectors)), name="vectors")
+    m = len(new)
+    with LazyIndex(path) as idx:
+        if idx.is_pq:
+            raise ValueError("extend_lazy_index does not support PQ-quantized indexes (lossy round-trip)")
+        data = idx.extract_all_fields()
+        if data["embeddings"] is None:
+            raise ValueError(f"{path} stores no embeddings; there is nothing to route new rows against")
+        routed = idx.route(new)
+        n = idx.total_items
+        extra: dict[int, np.ndarray] = {}
+        for leaf_node in np.unique(routed.path[:, -1]):
+            extra[int(leaf_node)] = n + np.where(routed.path[:, -1] == leaf_node)[0]
+        tree = _reconstruct_tree(idx, extra_leaf_items=extra)
+        bp = idx._index.BuildParams()
+        build_params = {
+            "max_depth": bp.MaxDepth() if bp else 8,
+            "num_bits": bp.NumBits() if bp else 3,
+            "min_leaf_size": bp.MinLeafSize() if bp else 4,
+            "seed": bp.Seed() if bp else 42,
+        }
+        quantization = idx.quantization
+        compression = bp.Compression().decode() if bp and bp.Compression() else "none"
+        dim = idx.embedding_dim
+    format_ver = detect_dyf_version(path)
+
+    old_fields = dict(data["fields"])
+    given = dict(stored_fields or {})
+    missing, unknown = set(old_fields) - set(given), set(given) - set(old_fields)
+    if missing or unknown:
+        raise ValueError(
+            f"stored_fields must match the file's fields exactly; missing {sorted(missing)}, "
+            f"not in file {sorted(unknown)}"
+        )
+    merged: dict[str, StoredFieldInput] = {}
+    for name, old in old_fields.items():
+        add = given[name]
+        if len(add) != m:
+            raise ValueError(f"stored field {name!r} has {len(add)} values for {m} new rows")
+        if isinstance(old, np.ndarray):
+            merged[name] = np.concatenate([old, np.asarray(add, dtype=old.dtype)])
+        else:
+            merged[name] = list(old) + list(add)
+
+    meta = dict(data["metadata"])
+    meta.pop("stored_fields", None)
+    write_lazy_index(
+        tree,
+        np.concatenate([data["embeddings"], new]),
+        output_path or path,
+        compression=compression,
+        quantization=quantization,
+        metadata=meta or None,
+        build_params=build_params,
+        stored_fields=merged or None,
+        format_version=format_ver,
+        embedding_dim=dim,
+    )
+    return routed
 
 
 def _append_fields_v2(

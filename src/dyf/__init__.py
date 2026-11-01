@@ -194,10 +194,12 @@ try:
         AdaptiveProbeConfig,
         ExtractedData,
         LazyIndex,
+        RouteResult,
         StoredFieldInput,
         StoredFieldValue,
         TreeNode,
         detect_dyf_version,
+        extend_lazy_index,
         from_faiss,
         rewrite_lazy_index,
         split_dyf3,
@@ -215,9 +217,11 @@ except ImportError:
     LazyIndex = None
     write_lazy_index = None
     rewrite_lazy_index = None
+    extend_lazy_index = None
     split_dyf3 = None
     from_faiss = None
     AdaptiveProbeConfig = None
+    RouteResult = None
     ExtractedData = None
     StoredFieldValue = None
     StoredFieldInput = None
@@ -422,12 +426,14 @@ __all__ = [
     "LazyIndex",
     "write_lazy_index",
     "rewrite_lazy_index",
+    "extend_lazy_index",
     "split_dyf3",
     "from_faiss",
     "to_parquet",
     "from_parquet",
     "SearchResult",
     "AdaptiveProbeConfig",
+    "RouteResult",
     "ExtractedData",
     "StoredFieldValue",
     "StoredFieldInput",

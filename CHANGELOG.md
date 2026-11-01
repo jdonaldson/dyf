@@ -4,6 +4,15 @@
 
 ### Added
 
+**`LazyIndex.route` and `extend_lazy_index` — a working write path for a frozen basis.**
+`idx.route(vectors)` sends rows through the index's stored hyperplanes without changing it and
+returns a `RouteResult` (`leaf`, per-depth `path`, `unseen`). `dyf.extend_lazy_index(path,
+vectors, stored_fields)` uses it to add rows to their leaves and rewrite the file, keeping the
+hyperplanes exactly, so existing rows keep their addresses and new rows get comparable ones.
+Replaces `DyfFile.append_items` for anything that must be searchable: those rows join no leaf
+and are never returned, even after `compact()` (KNOWN_ISSUES #13). `LazyIndex` now warns at
+open when a file holds rows no leaf points to; `reachable_items` reports how many it does.
+
 **`to_parquet` / `from_parquet` — a Parquet round trip at the dataset boundary.**
 `dyf.to_parquet(index, "out.parquet")` exports an index to Parquet that polars and DuckDB read
 natively, with embeddings as `FixedSizeList<float32, dim>` (verified: polars 1.39.3 restores

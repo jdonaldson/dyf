@@ -1169,3 +1169,187 @@ class TestResolveArrowSchema:
         )
         assert "label" in schema.names
         assert "label" in sf_types
+
+
+@lazy_deps
+class TestRoute:
+    """LazyIndex.route: new rows get the addresses the fitted rows have (frozen basis)."""
+
+    @pytest.fixture
+    def index_data(self):
+        from dyf import LazyIndex, build_dyf_tree
+        from dyf.lazy_index import write_lazy_index
+
+        embeddings = _make_clustered_embeddings(n_clusters=6, points_per_cluster=60, dim=16, seed=3)
+        tree = build_dyf_tree(embeddings, max_depth=3, num_bits=3, min_leaf_size=4, seed=42)
+        with tempfile.NamedTemporaryFile(suffix=".dyf", delete=False) as f:
+            path = f.name
+        try:
+            write_lazy_index(tree, embeddings, path, quantization="float32")
+            idx = LazyIndex(path)
+            yield {"idx": idx, "embeddings": embeddings}
+            idx.close()
+        finally:
+            if os.path.exists(path):
+                os.unlink(path)
+
+    def test_fitted_rows_route_to_their_own_leaf(self, index_data):
+        idx, E = index_data["idx"], index_data["embeddings"]
+        assert idx.num_leaves > 6, "tree did not split; the test would pass vacuously"
+        held_by = np.full(len(E), -1)
+        for b in range(idx.num_leaves):
+            held_by[idx.get_leaf(b).column("item_index").to_numpy()] = b
+        assert (held_by >= 0).all()
+        r = idx.route(E)
+        np.testing.assert_array_equal(r.leaf, held_by)
+        assert not r.unseen.any()
+
+    def test_path_columns_are_nested_partitions(self, index_data):
+        idx, E = index_data["idx"], index_data["embeddings"]
+        r = idx.route(E)
+        assert (r.path >= 0).all()
+        assert (r.path[:, 0] == r.path[0, 0]).all()  # one root
+        assert len(np.unique(r.path[:, 1])) > 1
+        for d in range(1, r.path.shape[1]):
+            # each depth-d cell sits inside exactly one depth-(d-1) cell
+            parents = {}
+            for child, parent in zip(r.path[:, d], r.path[:, d - 1]):
+                assert parents.setdefault(child, parent) == parent
+
+    def test_float64_input_routes_like_float32(self, index_data):
+        idx, E = index_data["idx"], index_data["embeddings"]
+        np.testing.assert_array_equal(idx.route(E.astype(np.float64)).leaf, idx.route(E).leaf)
+
+    def test_off_distribution_rows_fall_back_and_are_flagged(self, index_data):
+        idx, E = index_data["idx"], index_data["embeddings"]
+        far = np.random.default_rng(0).standard_normal((500, E.shape[1])).astype(np.float32)
+        r = idx.route(far)
+        assert r.unseen.any(), "random directions never hit an empty bucket; fallback untested"
+        assert (r.leaf >= 0).all() and (r.leaf < idx.num_leaves).all()
+
+    def test_single_vector_and_wrong_dim(self, index_data):
+        idx, E = index_data["idx"], index_data["embeddings"]
+        assert idx.route(E[0]).leaf.shape == (1,)
+        with pytest.raises(ValueError, match="dim"):
+            idx.route(np.ones((2, E.shape[1] + 1)))
+
+
+@lazy_deps
+class TestExtendLazyIndex:
+    """extend_lazy_index: new rows join leaves through the frozen tree and are searchable."""
+
+    @pytest.fixture(params=[2, 3])
+    def built(self, request):
+        from dyf import build_dyf_tree
+        from dyf.lazy_index import write_lazy_index
+
+        E = _make_clustered_embeddings(n_clusters=6, points_per_cluster=60, dim=16, seed=3)
+        tree = build_dyf_tree(E, max_depth=3, num_bits=3, min_leaf_size=4, seed=42)
+        d = tempfile.mkdtemp()
+        path = os.path.join(d, "base.dyf")
+        write_lazy_index(
+            tree,
+            E,
+            path,
+            quantization="float32",
+            format_version=request.param,
+            stored_fields={"label": [f"old{i}" for i in range(len(E))], "score": np.arange(len(E), dtype=np.float32)},
+        )
+        # a different seed, so no new row duplicates an old one (search would return the old twin)
+        new = _make_clustered_embeddings(n_clusters=6, points_per_cluster=5, dim=16, seed=11)[::3]
+        yield {"path": path, "E": E, "new": new.astype(np.float32), "out": os.path.join(d, "extended.dyf")}
+
+    def _extend(self, built):
+        from dyf import extend_lazy_index
+
+        m = len(built["new"])
+        return extend_lazy_index(
+            built["path"],
+            built["new"],
+            output_path=built["out"],
+            stored_fields={"label": [f"new{i}" for i in range(m)], "score": np.full(m, -1.0, dtype=np.float32)},
+        )
+
+    def test_new_rows_are_searchable_and_carry_fields(self, built):
+        from dyf import LazyIndex
+
+        self._extend(built)
+        n, m = len(built["E"]), len(built["new"])
+        with LazyIndex(built["out"]) as idx:
+            assert idx.total_items == idx.reachable_items == n + m
+            data = idx.extract_all_fields()
+            for i, q in enumerate(built["new"]):
+                res = idx.search(q, k=1, nprobe=idx.num_leaves)
+                assert int(res.indices[0]) == n + i
+                assert float(res.scores[0]) > 0.999
+            assert data["fields"]["label"][n] == "new0"
+            assert data["fields"]["label"][0] == "old0"
+            assert data["fields"]["score"][n + m - 1] == -1.0
+            np.testing.assert_allclose(data["embeddings"][:n], built["E"], atol=1e-6)
+
+    def test_old_rows_keep_their_leaf_and_hyperplanes_are_unchanged(self, built):
+        from dyf import LazyIndex
+
+        with LazyIndex(built["path"]) as before:
+            leaf_before = before.route(built["E"]).leaf
+            hp_before = before.get_split_hyperplanes()
+        routed = self._extend(built)
+        with LazyIndex(built["out"]) as after:
+            r_old = after.route(built["E"])
+            np.testing.assert_array_equal(r_old.leaf, leaf_before)
+            np.testing.assert_array_equal(after.route(built["new"]).leaf, routed.leaf)
+            hp_after = after.get_split_hyperplanes()
+            assert hp_before.keys() == hp_after.keys() and len(hp_before) > 0
+            for k in hp_before:
+                np.testing.assert_array_equal(hp_before[k], hp_after[k])
+
+    def test_field_mismatch_raises(self, built):
+        from dyf import extend_lazy_index
+
+        with pytest.raises(ValueError, match="missing"):
+            extend_lazy_index(
+                built["path"],
+                built["new"],
+                stored_fields={"label": ["x"] * len(built["new"])},
+                output_path=built["out"],
+            )
+        with pytest.raises(ValueError, match="values for"):
+            extend_lazy_index(
+                built["path"],
+                built["new"],
+                output_path=built["out"],
+                stored_fields={"label": ["x"], "score": np.zeros(len(built["new"]), np.float32)},
+            )
+
+
+@lazy_deps
+def test_open_warns_when_appended_rows_are_unreachable():
+    """DyfFile.append_items rows sit in no leaf; LazyIndex must say so instead of silently dropping them."""
+    import pyarrow as pa
+
+    dyf_rs = pytest.importorskip("dyf_rs")
+    from dyf import LazyIndex, build_dyf_tree
+    from dyf.lazy_index import write_lazy_index
+
+    E = _make_clustered_embeddings(n_clusters=4, points_per_cluster=40, dim=16, seed=1)
+    path = os.path.join(tempfile.mkdtemp(), "appended.dyf")
+    write_lazy_index(
+        build_dyf_tree(E, max_depth=2, num_bits=3, min_leaf_size=4), E, path, quantization="float32", format_version=2
+    )
+    f = dyf_rs.DyfFile.open(path)
+    schema = pa.ipc.open_stream(f.read_base_batch(0)).schema
+    batch = pa.record_batch(
+        [
+            pa.array(np.arange(len(E), len(E) + 3, dtype=np.uint32)),
+            pa.FixedSizeListArray.from_arrays(pa.array(E[:3].ravel()), 16),
+        ],
+        schema=schema,
+    )
+    sink = pa.BufferOutputStream()
+    with pa.ipc.new_stream(sink, schema) as w:
+        w.write_batch(batch)
+    f.append_items([sink.getvalue().to_pybytes()], [3])
+    with pytest.warns(UserWarning, match="3 of 163 items are not in any leaf"):
+        idx = LazyIndex(path)
+    assert idx.reachable_items == len(E)
+    idx.close()

@@ -755,6 +755,38 @@ pages state how long each method took instead of only how well it scored. ⚠ Th
 above still mix the gallery's "NMI" (AMI) with true NMI from the bench scripts; read their
 gallery columns as AMI.
 
+## 13. `DyfFile.append_items` rows are counted but never searchable, even after `compact()` — MITIGATED (2026-11-01)
+
+`dyf_rs.DyfFile.append_items` (`dyf-core/src/format.rs:447`) writes Arrow batches as DYF2
+overflow batches and bumps `total_items`, but no tree node points at them: leaves reference
+base batches by `BatchIndex`, and nothing routes the new rows to a leaf. `compact()` merges
+overflow into base batches and still attaches them to no node. Measured on a 400-row DYF2
+index with 5 appended rows: `LazyIndex.total_items` reports 405; exhaustive search
+(`nprobe` = every leaf) for each appended vector returns an old row at cosine 0.57–0.72
+instead of the row itself at 1.0 — **0 of 5 found, before and after `compact()`**. Silent:
+no error, no warning, and `total_items` says the rows are there.
+
+This is the write path `POSTGRES_NOTES.md` ("What DYF2 already gives us") assumed for a frozen
+basis. Found 2026-11-01 from sec10quant, adding new quarters to a frozen tree of stock-return
+factor loadings.
+
+**Mitigated 2026-11-01** in the Python layer, without changing the format:
+
+- `LazyIndex.route(vectors)` — routes rows through the stored hyperplanes (primary path,
+  margin-weighted fallback for unseen buckets, as search does) and returns leaf, per-depth
+  path and an `unseen` flag. Fitted rows route to the leaf holding them (100% on the test
+  fixture; on a 30,116-row, 1,900-leaf sec10quant index, 100% of rows not hitting an unseen
+  bucket).
+- `extend_lazy_index(path, vectors, stored_fields)` — routes the new rows and rewrites the
+  file with each in its leaf; hyperplanes and bucket maps are kept exactly, so old rows keep
+  their addresses. Leaves grow, they never split. Costs a full rewrite per call.
+- `LazyIndex` warns at open when `total_items` exceeds the rows held by leaves
+  (`reachable_items`), naming the likely cause.
+
+Still open: `append_items` itself. Making it correct needs the overflow batch to carry a leaf
+id (format change in dyf-core) or the binding to route — until then it should not be used to
+add searchable rows.
+
 ---
 
 ## Source
