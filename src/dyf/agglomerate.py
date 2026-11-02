@@ -131,6 +131,73 @@ def _reassign_points(point_labels, embeddings):
     return point_labels
 
 
+def _unit_rows(a):
+    norms = np.linalg.norm(a, axis=1, keepdims=True)
+    return a / np.maximum(norms, 1e-10)
+
+
+def _group_centroids(point_labels, emb_normed, k, fallback=None):
+    """Unit mean direction per group id ``0..k-1``.
+
+    A group with no points keeps its ``fallback`` row (its previous centroid) when one is
+    given, else stays zero. Returns ``(centroids, empty_group_ids)``.
+    """
+    centroids = np.zeros((k, emb_normed.shape[1]), dtype=np.float32)
+    np.add.at(centroids, point_labels, emb_normed)
+    counts = np.bincount(point_labels, minlength=k)
+    nonempty = counts > 0
+    centroids[nonempty] = _unit_rows(centroids[nonempty])
+    if fallback is not None:
+        centroids[~nonempty] = fallback[~nonempty]
+    return centroids, np.flatnonzero(~nonempty).astype(np.int32)
+
+
+def _assign_from_centroids(embeddings, init_centroids, max_iter=5):
+    """Nearest-centroid rounds (cosine) started from given centroids; group id = row index.
+
+    Same loop as :func:`_reassign_points`, but the starting groups come from the caller, so
+    ids carry over between runs. A group that loses every point keeps its starting centroid.
+    """
+    emb_normed = _unit_rows(embeddings)
+    start = _unit_rows(init_centroids)
+    k = len(start)
+    centroids = start
+    point_labels = np.argmax(emb_normed @ centroids.T, axis=1).astype(np.int32)
+    changed = 0
+    _iter = 0
+    for _iter in range(max_iter):
+        centroids, _ = _group_centroids(point_labels, emb_normed, k, fallback=start)
+        new_labels = np.argmax(emb_normed @ centroids.T, axis=1).astype(np.int32)
+        changed = int((new_labels != point_labels).sum())
+        point_labels = new_labels
+        if changed == 0:
+            break
+    centroids, empty = _group_centroids(point_labels, emb_normed, k, fallback=start)
+    logger.info(f"    Warm-start assignment: {_iter + 1} iterations, {changed} changed in last round")
+    return point_labels, centroids, empty
+
+
+def _check_init_centroids(init_centroids, embeddings, n_groups):
+    init = np.asarray(init_centroids, dtype=np.float32)
+    if init.ndim != 2 or init.shape[0] < 1:
+        raise ValueError(f"init_centroids must be a (k, D) array with k >= 1, got shape {init.shape}")
+    if init.shape[1] != embeddings.shape[1]:
+        raise ValueError(
+            f"init_centroids have dimension {init.shape[1]} but embeddings have {embeddings.shape[1]}; "
+            "they must come from the same embedding space"
+        )
+    if not np.isfinite(init).all():
+        raise ValueError("init_centroids contain NaN or inf")
+    if (np.linalg.norm(init, axis=1) < 1e-10).any():
+        raise ValueError("init_centroids contain a zero row, which has no direction to assign to")
+    if n_groups is not None and n_groups != len(init):
+        raise ValueError(
+            f"n_groups={n_groups} conflicts with {len(init)} init_centroids; with init_centroids the "
+            "number of groups is len(init_centroids), so leave n_groups unset"
+        )
+    return init
+
+
 def _build_output(point_labels, coords):
     """Build lsh_names and lsh_label_data from final point_labels."""
     unique_groups = sorted(set(point_labels.tolist()))
@@ -697,6 +764,18 @@ class LeafGroupingResult:
     """Spectrum of the leaf graph the communities came from (:func:`louvain_cluster_leaves`
     only; None for :func:`agglomerate_tree_leaves` and the too-few-leaves case). Not part of
     the 5-tuple unpacking."""
+    centroids: np.ndarray | None = None
+    """(k, D) unit centroid per group, row ``i`` = group ``i`` (:func:`agglomerate_tree_leaves`
+    only). Pass it as ``init_centroids`` to the next run to keep group ids. Not part of the
+    5-tuple unpacking."""
+    empty_groups: np.ndarray | None = None
+    """Ids of groups with no points this run (warm start only; their centroid row is the one
+    passed in, so the id stays available). Empty array when every group has points."""
+    mean_cosine: float | None = None
+    """Mean cosine between each point and its group centroid. Compare it with the previous
+    run's: a sharp drop after a warm start means the old centroids no longer fit the data
+    (new embedding model, unaligned frame, or a real regime change), even though ids carried
+    over."""
 
     def _as_tuple(self):
         return (self.point_labels, self.names, self.label_data, self.item_leaf_map, self.tree)
@@ -735,12 +814,16 @@ class LeafGroupingResult:
         if not self.ok:
             return "Leaf grouping did not run: tree has fewer than two leaves."
         text = f"{self.n_groups} groups over {len(self.point_labels)} points."
+        if self.mean_cosine is not None:
+            text += f" Mean cosine to group centroid {self.mean_cosine:.3f}."
+        if self.empty_groups is not None and len(self.empty_groups):
+            text += f" {len(self.empty_groups)} groups empty: {self.empty_groups.tolist()}."
         if self.spectrum is not None:
             text += f" {self.spectrum.summary()}."
         return text
 
 
-def agglomerate_tree_leaves(idx, coords, embeddings, n_groups=50):
+def agglomerate_tree_leaves(idx, coords, embeddings, n_groups=None, init_centroids=None):
     """Agglomerate DYF tree leaves into ~n_groups using embedding centroids.
 
     Walks the tree to find leaf nodes, computes per-leaf embedding centroids,
@@ -748,12 +831,37 @@ def agglomerate_tree_leaves(idx, coords, embeddings, n_groups=50):
     clusters.  After initial assignment, reassigns individual points to their
     nearest bucket centroid to clean up impure leaves and bad merges.
 
+    The reassignment is spherical k-means, so the result is one of many
+    near-equivalent solutions and its group ids are arbitrary: rerun on slightly
+    different data (an extended index, the next time window) and the groups
+    reshuffle. Pass the previous result's ``centroids`` as ``init_centroids`` to
+    start from them instead of from the leaf merge. Group ``i`` is then the group
+    that grew from row ``i``, so ids carry over and the solution stays near the
+    old one. On quarterly stock-correlation windows this kept 75% of groups
+    (Jaccard >= 0.5) against 41% for refitting, at the same within-group
+    co-movement (sec10quant, 2026-11-01).
+
+    Warm-started ids are stable even when the data under them is not: a group
+    can keep its id while its members turn over, and a structural break leaves
+    the ids in place. Watch ``mean_cosine`` against the previous run, and use a
+    separate break check where that matters.
+
     Args:
         idx: An open ``LazyIndex`` handle (used to read tree structure and
             leaf batches).
         coords: (N, 2-or-3) UMAP coordinates for every item.
         embeddings: (N, D) embedding matrix (float32).
-        n_groups: Target number of agglomerated buckets (default 50).
+        n_groups: Target number of agglomerated buckets (default 50). With
+            ``init_centroids`` the count is ``len(init_centroids)``; leave this unset.
+        init_centroids: Optional (k, D) array, usually a previous result's
+            ``centroids``, in the same embedding space as ``embeddings``. Skips the
+            leaf merge; group ids are row indices; a group that gets no points
+            keeps its row and is listed in ``empty_groups``. The tree is still read
+            for ``item_leaf_map``.
+
+    Raises:
+        ValueError: ``init_centroids`` has the wrong shape or dimension, contains
+            non-finite values or a zero row, or disagrees with ``n_groups``.
 
     Returns:
         :class:`LeafGroupingResult`, ready for ``multi_level_data``. Unpacks as the
@@ -766,10 +874,19 @@ def agglomerate_tree_leaves(idx, coords, embeddings, n_groups=50):
            tree leaf ``node_id`` (before agglomeration).
         *  ``tree`` – raw tree node list from ``idx.get_tree_structure()``.
 
+        Also carries ``centroids`` (row ``i`` = group ``i``), ``empty_groups`` and
+        ``mean_cosine``. Without ``init_centroids``, ids are relabelled to
+        ``0..n_groups-1`` after reassignment, so ``centroids`` has no gaps.
+
         When the tree has fewer than two leaves, ``.ok`` is False and the array fields
         are None — check ``.ok`` rather than testing ``point_labels is None``.
     """
     from scipy.cluster.hierarchy import fcluster, linkage
+
+    if init_centroids is not None:
+        init_centroids = _check_init_centroids(init_centroids, embeddings, n_groups)
+    elif n_groups is None:
+        n_groups = 50
 
     result = _collect_leaf_data(idx)
     if result is None:
@@ -780,6 +897,10 @@ def agglomerate_tree_leaves(idx, coords, embeddings, n_groups=50):
     n_points = coords.shape[0]
 
     item_leaf_map = _build_item_leaf_map(leaves, leaf_point_indices, n_points)
+
+    if init_centroids is not None:
+        point_labels, group_centroids, empty = _assign_from_centroids(embeddings, init_centroids)
+        return _grouping_result(point_labels, group_centroids, empty, embeddings, coords, item_leaf_map, tree)
 
     centroids = np.vstack(leaf_centroids).astype(np.float32)
 
@@ -811,6 +932,16 @@ def agglomerate_tree_leaves(idx, coords, embeddings, n_groups=50):
     # Point-level reassignment pass
     point_labels = _reassign_points(point_labels, embeddings)
 
+    # Reassignment can empty a group; relabel to 0..k-1 so centroid rows have no gaps
+    point_labels = np.unique(point_labels, return_inverse=True)[1].astype(np.int32)
+    k = int(point_labels.max()) + 1
+    group_centroids, empty = _group_centroids(point_labels, _unit_rows(embeddings), k)
+    return _grouping_result(point_labels, group_centroids, empty, embeddings, coords, item_leaf_map, tree)
+
+
+def _grouping_result(point_labels, group_centroids, empty, embeddings, coords, item_leaf_map, tree):
+    emb_normed = _unit_rows(np.asarray(embeddings, dtype=np.float32))
+    mean_cosine = float(np.mean(np.sum(emb_normed * group_centroids[point_labels], axis=1)))
     lsh_names, lsh_label_data = _build_output(point_labels, coords)
     return LeafGroupingResult(
         point_labels=point_labels,
@@ -818,6 +949,9 @@ def agglomerate_tree_leaves(idx, coords, embeddings, n_groups=50):
         label_data=lsh_label_data,
         item_leaf_map=item_leaf_map,
         tree=tree,
+        centroids=group_centroids,
+        empty_groups=empty,
+        mean_cosine=mean_cosine,
     )
 
 

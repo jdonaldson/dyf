@@ -1,5 +1,35 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+**`agglomerate_tree_leaves(init_centroids=...)` — group ids that carry over between runs.**
+The final step of leaf grouping is spherical k-means, which has many near-equivalent solutions,
+so rerunning on slightly different data (an index grown with `extend_lazy_index`, the next time
+window) reshuffles the groups and renumbers them arbitrarily. Passing the previous result's
+`centroids` as `init_centroids` skips the leaf merge and starts from them: group `i` is the group
+that grew from row `i`, and the solution stays near the old one. Relabelling after the fact does
+not get this — it only renames whatever new solution the merge found. Measured on 52 quarterly
+S&P 500 correlation windows (sec10quant, 29 groups): 71% of groups continue to the next quarter
+(best match Jaccard ≥ 0.5) against 36% for a fresh run each quarter, with the same next-quarter
+within-group co-movement.
+
+`LeafGroupingResult` gains `centroids` (row `i` = group `i`, pass it to the next run),
+`empty_groups` (a warm-started group that got no points keeps its row and id) and `mean_cosine`
+(mean cosine of points to their group centroid). Stable ids hide change by design — a group can
+keep its id while its members turn over — so `mean_cosine` is the thing to watch: on the same
+windows its four lowest values are the four 2020 quarters (0.79–0.83 against a median of 0.87),
+a break the ids carried straight through. `init_centroids` raises `ValueError` on a dimension
+mismatch, non-finite values, a zero row, or an `n_groups` that disagrees with its length.
+
+### Changed
+
+**`agglomerate_tree_leaves` group ids are now `0..n_groups-1` with no gaps.** Reassignment can
+empty a group; ids used to keep the hole. They are relabelled after reassignment so `centroids`
+has one row per group. `n_groups` now defaults to `None` (meaning 50, as before) so that a call
+with `init_centroids` can tell it was not set.
+
 ## 0.16.0 — 2026-11-01
 
 ### Added
