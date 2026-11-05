@@ -133,7 +133,10 @@ coming back. Numbers are in `KNOWN_ISSUES.md` #9, #11, #14; the conclusions:
   three seeds a point's profile reproduces far better than random on every dataset; the
   unstable minority is misclassified only on Fashion and droplet. The shipped bridge,
   connector and boundary flags do not coincide with the unstable points (AUC 0.42–0.59), and
-  `bridge_persistence` took 37 minutes at 140k points (KNOWN_ISSUES #15). Nothing in the graph-construction or objective
+  `bridge_persistence` took 37 minutes at 140k points (KNOWN_ISSUES #15). Branch shape does
+  not calibrate retrieval: on LongMemEval it adds −0.005 CV AUC to the routing features, and
+  top-1 plus mean top-5 cosine (0.669) beats top-1 plus every dyf routing feature (0.613) —
+  query confidence should come from those two cosines, not from dyf. Nothing in the graph-construction or objective
   direction is worth another probe without a consumer whose data sits in the regime where it moved.
 
 ### Parked: sequence key / leaf Markov state model (2026-10-01)
