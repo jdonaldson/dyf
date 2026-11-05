@@ -738,6 +738,22 @@ and whether to auto-switch objective on the flag are mechanism decisions that ne
 seven-dataset bench re-run under them; not made here. The gallery's "Metric: cosine" row on the index attributes the
 Moons failure to the metric; the cause is one level down, in the tree's input handling.
 
+**Centred threshold measured (2026-11-05, `benchmarks/cut_audit_2026_11/centred_hash_tree_*.py`).**
+The kernel tests `dot > 0` with no offset (`dyf-core/src/compute.rs`): PCA directions come
+from centred data, the threshold does not, so leaves are cones through the origin. A Python
+replica of the recursion (faithful to the Rust tree within noise) with `sign(w·(x−μ))` instead
+gives 1.1–2× more leaves and purer ones (+0.01 MNIST to +0.055 MoCap). k-matched over a
+resolution sweep, three seeds, mean ARI delta centred − uncentred: block level −0.02 (MNIST,
+AG News) to +0.05 (MoCap, droplet, brain); after the shipped point reassignment −0.035 (MNIST)
+to +0.026 (droplet), the rest within ±0.01. The shapes are unchanged (circles leaf purity
+0.52 → 0.60, ARI 0): normalisation merges the rings before any threshold applies, so this is
+not the lever for the regime above. Decision: not worth the DYF3 format change (one offset per
+hyperplane) for ≤ +0.03 on the shipped path; the tree-level gain is real and is erased by the
+re-cut in issue 14, so revisit only if that re-cut ever becomes optional. A hash-derived leaf
+graph (boundary mass across each hyperplane, routed multiprobe-style) was tested the same day
+and loses to the centroid-cosine graph at matched k on every dataset
+(`hash_leaf_graph_test.py`).
+
 ---
 
 ## 12. The gallery prints AMI and calls it NMI — FIXED (2026-10-01)

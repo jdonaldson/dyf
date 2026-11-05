@@ -16,5 +16,7 @@ Question answered, in order:
 | `community_cut_profile*.py`, `cut_profile_calibration.py` | density profile across a cut: valley / saddle / shoulder, calibrated on Gaussians | strict shoulders 0–4% over all pairs |
 | `reassignment_effect.py` | what does `_reassign_points` do? | spherical k-means; moves 4–31% of points, ARI −0.13…+0.11, sign stable over seeds 42/1/2 |
 | `leaf_reassignment_test.py` | would leaf-level or straggler-only reassignment do better? | no: leaf-level loses to the shipped point step everywhere it helps and cuts more edges; straggler arm moves zero leaves by construction |
+| `hash_leaf_graph_test.py` | can the leaf graph come from the hash (boundary mass across each hyperplane) instead of centroid cosine? | no: loses at matched k on every dataset, −0.18 ARI on MNIST; AG News gain was community count |
+| `centred_hash_tree_test.py`, `centred_hash_tree_kmatched.py` | does centring the hash threshold, `sign(w·(x−μ))`, help? | purer leaves, block ARI +0.05 on three sets at matched k, shipped output within ±0.03; shapes unchanged; not worth the format change |
 
 Run with the project venv: `.venv/bin/python benchmarks/cut_audit_2026_11/<script>.py`.

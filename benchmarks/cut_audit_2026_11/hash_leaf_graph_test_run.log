@@ -1,0 +1,170 @@
+
+== mnist seed=42: leaves=3395 boundary routings=166589 hash edges=53066 isolated leaves=0 graph 0.3s
+   cent-block      k= 13 cut=0.180 phi max=0.352 ARI=0.581 AMI=0.643
+   cent-point      k= 13 cut=0.153 phi max=0.259 ARI=0.472 AMI=0.565
+   hash_raw-block  k= 11 cut=0.194 phi max=0.293 ARI=0.399 AMI=0.519
+   hash_raw-point  k= 11 cut=0.157 phi max=0.240 ARI=0.407 AMI=0.512
+   hash_norm-block k= 12 cut=0.244 phi max=0.413 ARI=0.304 AMI=0.426
+   hash_norm-point k= 12 cut=0.164 phi max=0.273 ARI=0.404 AMI=0.518
+
+== mnist seed=1: leaves=3344 boundary routings=166567 hash edges=52626 isolated leaves=0 graph 0.3s
+   cent-block      k= 12 cut=0.174 phi max=0.262 ARI=0.566 AMI=0.637
+   cent-point      k= 12 cut=0.154 phi max=0.250 ARI=0.462 AMI=0.556
+   hash_raw-block  k= 12 cut=0.210 phi max=0.325 ARI=0.374 AMI=0.508
+   hash_raw-point  k= 12 cut=0.161 phi max=0.273 ARI=0.428 AMI=0.527
+   hash_norm-block k= 11 cut=0.234 phi max=0.440 ARI=0.361 AMI=0.449
+   hash_norm-point k= 11 cut=0.175 phi max=0.280 ARI=0.386 AMI=0.484
+
+== mnist seed=2: leaves=3382 boundary routings=166673 hash edges=53137 isolated leaves=0 graph 0.3s
+   cent-block      k= 11 cut=0.163 phi max=0.387 ARI=0.610 AMI=0.660
+   cent-point      k= 11 cut=0.145 phi max=0.236 ARI=0.482 AMI=0.568
+   hash_raw-block  k=  9 cut=0.148 phi max=0.304 ARI=0.459 AMI=0.566
+   hash_raw-point  k=  9 cut=0.139 phi max=0.248 ARI=0.427 AMI=0.514
+   hash_norm-block k= 12 cut=0.245 phi max=0.449 ARI=0.307 AMI=0.419
+   hash_norm-point k= 12 cut=0.168 phi max=0.313 ARI=0.392 AMI=0.508
+
+== fashion_mnist seed=42: leaves=2193 boundary routings=165948 hash edges=26523 isolated leaves=0 graph 0.2s
+   cent-block      k= 14 cut=0.113 phi max=0.358 ARI=0.381 AMI=0.545
+   cent-point      k= 14 cut=0.105 phi max=0.224 ARI=0.340 AMI=0.528
+   hash_raw-block  k= 12 cut=0.099 phi max=0.162 ARI=0.442 AMI=0.578
+   hash_raw-point  k= 12 cut=0.084 phi max=0.140 ARI=0.442 AMI=0.575
+   hash_norm-block k= 12 cut=0.137 phi max=0.238 ARI=0.328 AMI=0.488
+   hash_norm-point k= 12 cut=0.095 phi max=0.160 ARI=0.370 AMI=0.519
+
+== fashion_mnist seed=1: leaves=2192 boundary routings=166017 hash edges=26587 isolated leaves=0 graph 0.2s
+   cent-block      k= 13 cut=0.094 phi max=0.424 ARI=0.410 AMI=0.582
+   cent-point      k= 13 cut=0.093 phi max=0.151 ARI=0.434 AMI=0.561
+   hash_raw-block  k= 13 cut=0.103 phi max=0.183 ARI=0.399 AMI=0.566
+   hash_raw-point  k= 13 cut=0.087 phi max=0.155 ARI=0.407 AMI=0.572
+   hash_norm-block k= 11 cut=0.126 phi max=0.250 ARI=0.332 AMI=0.493
+   hash_norm-point k= 11 cut=0.104 phi max=0.156 ARI=0.346 AMI=0.502
+
+== fashion_mnist seed=2: leaves=2182 boundary routings=165890 hash edges=26480 isolated leaves=0 graph 0.2s
+   cent-block      k= 12 cut=0.099 phi max=0.324 ARI=0.424 AMI=0.579
+   cent-point      k= 12 cut=0.089 phi max=0.127 ARI=0.379 AMI=0.548
+   hash_raw-block  k= 12 cut=0.098 phi max=0.175 ARI=0.390 AMI=0.552
+   hash_raw-point  k= 12 cut=0.086 phi max=0.164 ARI=0.440 AMI=0.575
+   hash_norm-block k=  9 cut=0.099 phi max=0.176 ARI=0.365 AMI=0.522
+   hash_norm-point k=  9 cut=0.078 phi max=0.137 ARI=0.358 AMI=0.518
+
+== cmu_mocap seed=42: leaves=1478 boundary routings=323955 hash edges=9414 isolated leaves=1 graph 0.2s
+   cent-block      k= 22 cut=0.023 phi max=0.800 ARI=0.176 AMI=0.391
+   cent-point      k= 21 cut=0.020 phi max=0.053 ARI=0.152 AMI=0.366
+   hash_raw-block  k= 16 cut=0.025 phi max=0.049 ARI=0.136 AMI=0.315
+   hash_raw-point  k= 16 cut=0.021 phi max=0.051 ARI=0.129 AMI=0.315
+   hash_norm-block k= 18 cut=0.034 phi max=0.067 ARI=0.161 AMI=0.276
+   hash_norm-point k= 18 cut=0.020 phi max=0.052 ARI=0.156 AMI=0.326
+
+== cmu_mocap seed=1: leaves=1563 boundary routings=322038 hash edges=10134 isolated leaves=1 graph 0.2s
+   cent-block      k= 22 cut=0.025 phi max=0.800 ARI=0.201 AMI=0.354
+   cent-point      k= 21 cut=0.021 phi max=0.073 ARI=0.170 AMI=0.319
+   hash_raw-block  k= 16 cut=0.029 phi max=0.667 ARI=0.095 AMI=0.270
+   hash_raw-point  k= 16 cut=0.020 phi max=0.053 ARI=0.133 AMI=0.319
+   hash_norm-block k= 17 cut=0.041 phi max=0.667 ARI=0.104 AMI=0.227
+   hash_norm-point k= 17 cut=0.020 phi max=0.056 ARI=0.188 AMI=0.338
+
+== cmu_mocap seed=2: leaves=1628 boundary routings=324260 hash edges=10619 isolated leaves=1 graph 0.2s
+   cent-block      k= 22 cut=0.027 phi max=0.069 ARI=0.142 AMI=0.366
+   cent-point      k= 22 cut=0.024 phi max=0.054 ARI=0.130 AMI=0.355
+   hash_raw-block  k= 14 cut=0.028 phi max=0.200 ARI=0.144 AMI=0.329
+   hash_raw-point  k= 14 cut=0.021 phi max=0.074 ARI=0.159 AMI=0.342
+   hash_norm-block k= 19 cut=0.034 phi max=0.200 ARI=0.169 AMI=0.319
+   hash_norm-point k= 19 cut=0.021 phi max=0.061 ARI=0.187 AMI=0.349
+
+== ag_news seed=42: leaves=3274 boundary routings=238352 hash edges=82636 isolated leaves=0 graph 0.5s
+   cent-block      k= 15 cut=0.285 phi max=0.568 ARI=0.279 AMI=0.387
+   cent-point      k= 15 cut=0.203 phi max=0.357 ARI=0.286 AMI=0.440
+   hash_raw-block  k=  7 cut=0.232 phi max=0.402 ARI=0.383 AMI=0.440
+   hash_raw-point  k=  7 cut=0.170 phi max=0.262 ARI=0.426 AMI=0.499
+   hash_norm-block k=  8 cut=0.267 phi max=0.634 ARI=0.409 AMI=0.439
+   hash_norm-point k=  8 cut=0.167 phi max=0.405 ARI=0.448 AMI=0.508
+
+== ag_news seed=1: leaves=3202 boundary routings=238188 hash edges=80806 isolated leaves=0 graph 0.4s
+   cent-block      k= 17 cut=0.280 phi max=0.632 ARI=0.296 AMI=0.407
+   cent-point      k= 17 cut=0.216 phi max=0.477 ARI=0.283 AMI=0.441
+   hash_raw-block  k=  7 cut=0.217 phi max=0.407 ARI=0.400 AMI=0.456
+   hash_raw-point  k=  7 cut=0.167 phi max=0.244 ARI=0.441 AMI=0.512
+   hash_norm-block k=  7 cut=0.240 phi max=0.511 ARI=0.459 AMI=0.453
+   hash_norm-point k=  7 cut=0.174 phi max=0.442 ARI=0.514 AMI=0.521
+
+== ag_news seed=2: leaves=3242 boundary routings=238318 hash edges=81895 isolated leaves=0 graph 0.5s
+   cent-block      k= 16 cut=0.284 phi max=0.585 ARI=0.285 AMI=0.404
+   cent-point      k= 16 cut=0.206 phi max=0.347 ARI=0.275 AMI=0.438
+   hash_raw-block  k=  8 cut=0.242 phi max=0.449 ARI=0.374 AMI=0.444
+   hash_raw-point  k=  8 cut=0.189 phi max=0.332 ARI=0.385 AMI=0.472
+   hash_norm-block k=  7 cut=0.293 phi max=0.509 ARI=0.371 AMI=0.427
+   hash_norm-point k=  7 cut=0.176 phi max=0.394 ARI=0.442 AMI=0.493
+
+== tms_facs seed=42: leaves=1534 boundary routings=260621 hash edges=18839 isolated leaves=0 graph 0.2s
+   cent-block      k= 24 cut=0.025 phi max=0.214 ARI=0.553 AMI=0.754
+   cent-point      k= 24 cut=0.020 phi max=0.128 ARI=0.559 AMI=0.753
+   hash_raw-block  k= 17 cut=0.034 phi max=0.092 ARI=0.555 AMI=0.728
+   hash_raw-point  k= 17 cut=0.020 phi max=0.050 ARI=0.560 AMI=0.739
+   hash_norm-block k= 14 cut=0.080 phi max=0.199 ARI=0.439 AMI=0.631
+   hash_norm-point k= 14 cut=0.026 phi max=0.074 ARI=0.499 AMI=0.700
+
+== tms_facs seed=1: leaves=1800 boundary routings=260117 hash edges=20086 isolated leaves=0 graph 0.2s
+   cent-block      k= 23 cut=0.027 phi max=0.222 ARI=0.548 AMI=0.744
+   cent-point      k= 23 cut=0.017 phi max=0.133 ARI=0.563 AMI=0.757
+   hash_raw-block  k= 17 cut=0.036 phi max=0.267 ARI=0.534 AMI=0.718
+   hash_raw-point  k= 17 cut=0.020 phi max=0.116 ARI=0.529 AMI=0.727
+   hash_norm-block k= 13 cut=0.073 phi max=0.539 ARI=0.344 AMI=0.624
+   hash_norm-point k= 13 cut=0.028 phi max=0.097 ARI=0.433 AMI=0.674
+
+== tms_facs seed=2: leaves=1623 boundary routings=260672 hash edges=19114 isolated leaves=0 graph 0.2s
+   cent-block      k= 25 cut=0.030 phi max=0.331 ARI=0.555 AMI=0.752
+   cent-point      k= 25 cut=0.021 phi max=0.110 ARI=0.576 AMI=0.758
+   hash_raw-block  k= 17 cut=0.033 phi max=0.225 ARI=0.539 AMI=0.725
+   hash_raw-point  k= 17 cut=0.021 phi max=0.101 ARI=0.543 AMI=0.731
+   hash_norm-block k= 14 cut=0.084 phi max=0.211 ARI=0.322 AMI=0.632
+   hash_norm-point k= 14 cut=0.020 phi max=0.074 ARI=0.488 AMI=0.710
+
+== tms_droplet seed=42: leaves=1768 boundary routings=577736 hash edges=19680 isolated leaves=0 graph 0.4s
+   cent-block      k= 29 cut=0.021 phi max=0.313 ARI=0.467 AMI=0.726
+   cent-point      k= 29 cut=0.022 phi max=0.101 ARI=0.563 AMI=0.745
+   hash_raw-block  k= 19 cut=0.025 phi max=0.088 ARI=0.498 AMI=0.695
+   hash_raw-point  k= 19 cut=0.016 phi max=0.052 ARI=0.524 AMI=0.713
+   hash_norm-block k= 14 cut=0.050 phi max=0.109 ARI=0.398 AMI=0.627
+   hash_norm-point k= 14 cut=0.016 phi max=0.040 ARI=0.482 AMI=0.685
+
+== tms_droplet seed=1: leaves=1748 boundary routings=577800 hash edges=20277 isolated leaves=0 graph 0.3s
+   cent-block      k= 29 cut=0.019 phi max=0.130 ARI=0.536 AMI=0.741
+   cent-point      k= 29 cut=0.018 phi max=0.091 ARI=0.586 AMI=0.755
+   hash_raw-block  k= 17 cut=0.021 phi max=0.076 ARI=0.498 AMI=0.693
+   hash_raw-point  k= 17 cut=0.014 phi max=0.050 ARI=0.503 AMI=0.699
+   hash_norm-block k= 12 cut=0.068 phi max=0.256 ARI=0.334 AMI=0.586
+   hash_norm-point k= 12 cut=0.013 phi max=0.031 ARI=0.446 AMI=0.676
+
+== tms_droplet seed=2: leaves=1698 boundary routings=576824 hash edges=19295 isolated leaves=0 graph 0.3s
+   cent-block      k= 26 cut=0.021 phi max=0.144 ARI=0.521 AMI=0.730
+   cent-point      k= 26 cut=0.014 phi max=0.064 ARI=0.551 AMI=0.745
+   hash_raw-block  k= 20 cut=0.024 phi max=0.120 ARI=0.544 AMI=0.716
+   hash_raw-point  k= 20 cut=0.014 phi max=0.070 ARI=0.552 AMI=0.725
+   hash_norm-block k= 14 cut=0.076 phi max=0.143 ARI=0.319 AMI=0.602
+   hash_norm-point k= 14 cut=0.016 phi max=0.097 ARI=0.456 AMI=0.677
+
+== brain_1m seed=42: leaves=3691 boundary routings=3092253 hash edges=120797 isolated leaves=0 graph 1.9s
+   cent-block      k= 19 cut=0.127 phi max=0.608 ARI=0.491 AMI=0.670
+   cent-point      k= 19 cut=0.093 phi max=0.210 ARI=0.515 AMI=0.699
+   hash_raw-block  k= 13 cut=0.113 phi max=0.208 ARI=0.403 AMI=0.624
+   hash_raw-point  k= 13 cut=0.077 phi max=0.153 ARI=0.445 AMI=0.647
+   hash_norm-block k= 13 cut=0.157 phi max=0.411 ARI=0.255 AMI=0.520
+   hash_norm-point k= 13 cut=0.072 phi max=0.114 ARI=0.345 AMI=0.622
+
+== brain_1m seed=1: leaves=3638 boundary routings=3091786 hash edges=121958 isolated leaves=0 graph 1.8s
+   cent-block      k= 21 cut=0.114 phi max=0.557 ARI=0.448 AMI=0.658
+   cent-point      k= 21 cut=0.107 phi max=0.318 ARI=0.527 AMI=0.696
+   hash_raw-block  k= 14 cut=0.110 phi max=0.283 ARI=0.510 AMI=0.650
+   hash_raw-point  k= 14 cut=0.083 phi max=0.210 ARI=0.574 AMI=0.692
+   hash_norm-block k= 13 cut=0.164 phi max=0.403 ARI=0.297 AMI=0.517
+   hash_norm-point k= 13 cut=0.085 phi max=0.142 ARI=0.459 AMI=0.645
+
+== brain_1m seed=2: leaves=3616 boundary routings=3091239 hash edges=119816 isolated leaves=0 graph 1.9s
+   cent-block      k= 20 cut=0.101 phi max=0.343 ARI=0.459 AMI=0.664
+   cent-point      k= 20 cut=0.091 phi max=0.250 ARI=0.570 AMI=0.709
+   hash_raw-block  k= 14 cut=0.112 phi max=0.193 ARI=0.464 AMI=0.645
+   hash_raw-point  k= 14 cut=0.082 phi max=0.133 ARI=0.495 AMI=0.672
+   hash_norm-block k= 13 cut=0.173 phi max=0.464 ARI=0.289 AMI=0.523
+   hash_norm-point k= 13 cut=0.076 phi max=0.149 ARI=0.479 AMI=0.651
+
+wrote /Volumes/Models/dyf_bench_2026-11-04/hash_leaf_graph_test_results.json

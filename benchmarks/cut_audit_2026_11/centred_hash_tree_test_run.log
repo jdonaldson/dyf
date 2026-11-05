@@ -1,0 +1,119 @@
+
+== shapes/moons
+   py-uncentred leaves=  29 purity=0.872 block ARI=0.349 point ARI=0.350
+   py-centred   leaves= 178 purity=0.878 block ARI=0.139 point ARI=0.138
+
+== shapes/circles
+   py-uncentred leaves=  32 purity=0.523 block ARI=-0.000 point ARI=-0.000
+   py-centred   leaves= 199 purity=0.597 block ARI=-0.001 point ARI=-0.001
+
+== shapes/blobs
+   py-uncentred leaves=  24 purity=0.892 block ARI=0.307 point ARI=0.493
+   py-centred   leaves= 214 purity=0.899 block ARI=0.215 point ARI=0.268
+
+== mnist seed=42
+   rust         leaves= 3395 purity=0.861 | block k= 13 ARI=0.581 cut=0.180 | point k= 13 ARI=0.472 cut=0.153
+   py-uncentred leaves= 3324 purity=0.859 | block k= 11 ARI=0.597 cut=0.167 | point k= 11 ARI=0.475 cut=0.149
+   py-centred   leaves= 4075 purity=0.873 | block k= 13 ARI=0.541 cut=0.176 | point k= 13 ARI=0.410 cut=0.164
+
+== mnist seed=1
+   rust         leaves= 3344 purity=0.859 | block k= 12 ARI=0.566 cut=0.174 | point k= 12 ARI=0.462 cut=0.154
+   py-uncentred leaves= 3323 purity=0.859 | block k= 11 ARI=0.605 cut=0.170 | point k= 11 ARI=0.475 cut=0.149
+   py-centred   leaves= 4075 purity=0.873 | block k= 13 ARI=0.541 cut=0.176 | point k= 13 ARI=0.410 cut=0.164
+
+== mnist seed=2
+   rust         leaves= 3382 purity=0.863 | block k= 11 ARI=0.610 cut=0.163 | point k= 11 ARI=0.482 cut=0.145
+   py-uncentred leaves= 3324 purity=0.859 | block k= 12 ARI=0.593 cut=0.171 | point k= 12 ARI=0.456 cut=0.156
+   py-centred   leaves= 4075 purity=0.873 | block k= 13 ARI=0.545 cut=0.178 | point k= 13 ARI=0.411 cut=0.164
+
+== fashion_mnist seed=42
+   rust         leaves= 2193 purity=0.784 | block k= 14 ARI=0.381 cut=0.113 | point k= 14 ARI=0.340 cut=0.105
+   py-uncentred leaves= 2211 purity=0.784 | block k= 13 ARI=0.411 cut=0.102 | point k= 13 ARI=0.433 cut=0.087
+   py-centred   leaves= 3624 purity=0.801 | block k= 15 ARI=0.428 cut=0.106 | point k= 15 ARI=0.391 cut=0.102
+
+== fashion_mnist seed=1
+   rust         leaves= 2192 purity=0.781 | block k= 13 ARI=0.410 cut=0.094 | point k= 13 ARI=0.434 cut=0.093
+   py-uncentred leaves= 2211 purity=0.784 | block k= 13 ARI=0.411 cut=0.102 | point k= 13 ARI=0.433 cut=0.087
+   py-centred   leaves= 3625 purity=0.801 | block k= 14 ARI=0.422 cut=0.102 | point k= 14 ARI=0.390 cut=0.098
+
+== fashion_mnist seed=2
+   rust         leaves= 2182 purity=0.780 | block k= 12 ARI=0.424 cut=0.099 | point k= 12 ARI=0.379 cut=0.089
+   py-uncentred leaves= 2211 purity=0.784 | block k= 12 ARI=0.422 cut=0.096 | point k= 12 ARI=0.440 cut=0.086
+   py-centred   leaves= 3624 purity=0.801 | block k= 15 ARI=0.428 cut=0.106 | point k= 15 ARI=0.391 cut=0.102
+
+== cmu_mocap seed=42
+   rust         leaves= 1478 purity=0.842 | block k= 22 ARI=0.176 cut=0.023 | point k= 21 ARI=0.152 cut=0.020
+   py-uncentred leaves= 1481 purity=0.841 | block k= 21 ARI=0.195 cut=0.022 | point k= 21 ARI=0.167 cut=0.021
+   py-centred   leaves= 3111 purity=0.896 | block k= 28 ARI=0.178 cut=0.028 | point k= 28 ARI=0.145 cut=0.026
+
+== cmu_mocap seed=1
+   rust         leaves= 1563 purity=0.830 | block k= 22 ARI=0.201 cut=0.025 | point k= 21 ARI=0.170 cut=0.021
+   py-uncentred leaves= 1480 purity=0.841 | block k= 21 ARI=0.138 cut=0.020 | point k= 21 ARI=0.172 cut=0.018
+   py-centred   leaves= 3113 purity=0.896 | block k= 29 ARI=0.178 cut=0.026 | point k= 29 ARI=0.148 cut=0.026
+
+== cmu_mocap seed=2
+   rust         leaves= 1628 purity=0.846 | block k= 22 ARI=0.142 cut=0.027 | point k= 22 ARI=0.130 cut=0.024
+   py-uncentred leaves= 1480 purity=0.841 | block k= 20 ARI=0.181 cut=0.019 | point k= 20 ARI=0.166 cut=0.020
+   py-centred   leaves= 3110 purity=0.896 | block k= 32 ARI=0.177 cut=0.030 | point k= 32 ARI=0.135 cut=0.027
+
+== ag_news seed=42
+   rust         leaves= 3274 purity=0.853 | block k= 15 ARI=0.279 cut=0.285 | point k= 15 ARI=0.286 cut=0.203
+   py-uncentred leaves= 3269 purity=0.853 | block k= 16 ARI=0.297 cut=0.277 | point k= 16 ARI=0.272 cut=0.206
+   py-centred   leaves= 4045 purity=0.856 | block k= 21 ARI=0.184 cut=0.300 | point k= 21 ARI=0.198 cut=0.227
+
+== ag_news seed=1
+   rust         leaves= 3202 purity=0.851 | block k= 17 ARI=0.296 cut=0.280 | point k= 17 ARI=0.283 cut=0.216
+   py-uncentred leaves= 3271 purity=0.853 | block k= 16 ARI=0.306 cut=0.280 | point k= 16 ARI=0.278 cut=0.204
+   py-centred   leaves= 4052 purity=0.856 | block k= 20 ARI=0.212 cut=0.288 | point k= 20 ARI=0.224 cut=0.221
+
+== ag_news seed=2
+   rust         leaves= 3242 purity=0.852 | block k= 16 ARI=0.285 cut=0.284 | point k= 16 ARI=0.275 cut=0.206
+   py-uncentred leaves= 3238 purity=0.852 | block k= 14 ARI=0.291 cut=0.282 | point k= 14 ARI=0.297 cut=0.206
+   py-centred   leaves= 4059 purity=0.857 | block k= 19 ARI=0.220 cut=0.283 | point k= 19 ARI=0.234 cut=0.221
+
+== tms_facs seed=42
+   rust         leaves= 1534 purity=0.783 | block k= 24 ARI=0.553 cut=0.025 | point k= 24 ARI=0.559 cut=0.020
+   py-uncentred leaves= 1587 purity=0.785 | block k= 23 ARI=0.558 cut=0.026 | point k= 23 ARI=0.565 cut=0.021
+   py-centred   leaves= 3000 purity=0.801 | block k= 27 ARI=0.622 cut=0.037 | point k= 27 ARI=0.633 cut=0.027
+
+== tms_facs seed=1
+   rust         leaves= 1800 purity=0.787 | block k= 23 ARI=0.548 cut=0.027 | point k= 23 ARI=0.563 cut=0.017
+   py-uncentred leaves= 1583 purity=0.785 | block k= 23 ARI=0.558 cut=0.026 | point k= 23 ARI=0.565 cut=0.021
+   py-centred   leaves= 3001 purity=0.801 | block k= 27 ARI=0.622 cut=0.037 | point k= 27 ARI=0.633 cut=0.027
+
+== tms_facs seed=2
+   rust         leaves= 1623 purity=0.786 | block k= 25 ARI=0.555 cut=0.030 | point k= 25 ARI=0.576 cut=0.021
+   py-uncentred leaves= 1582 purity=0.786 | block k= 23 ARI=0.558 cut=0.026 | point k= 23 ARI=0.565 cut=0.021
+   py-centred   leaves= 3002 purity=0.801 | block k= 28 ARI=0.625 cut=0.037 | point k= 28 ARI=0.636 cut=0.027
+
+== tms_droplet seed=42
+   rust         leaves= 1768 purity=0.793 | block k= 29 ARI=0.467 cut=0.021 | point k= 29 ARI=0.563 cut=0.022
+   py-uncentred leaves= 1733 purity=0.791 | block k= 27 ARI=0.458 cut=0.016 | point k= 27 ARI=0.555 cut=0.016
+   py-centred   leaves= 3642 purity=0.825 | block k= 35 ARI=0.600 cut=0.030 | point k= 35 ARI=0.621 cut=0.022
+
+== tms_droplet seed=1
+   rust         leaves= 1748 purity=0.787 | block k= 29 ARI=0.536 cut=0.019 | point k= 29 ARI=0.586 cut=0.018
+   py-uncentred leaves= 1732 purity=0.791 | block k= 27 ARI=0.459 cut=0.016 | point k= 27 ARI=0.555 cut=0.016
+   py-centred   leaves= 3642 purity=0.825 | block k= 34 ARI=0.614 cut=0.026 | point k= 34 ARI=0.627 cut=0.020
+
+== tms_droplet seed=2
+   rust         leaves= 1698 purity=0.789 | block k= 26 ARI=0.521 cut=0.021 | point k= 26 ARI=0.551 cut=0.014
+   py-uncentred leaves= 1730 purity=0.791 | block k= 27 ARI=0.459 cut=0.016 | point k= 27 ARI=0.555 cut=0.016
+   py-centred   leaves= 3642 purity=0.825 | block k= 34 ARI=0.591 cut=0.030 | point k= 34 ARI=0.619 cut=0.023
+
+== brain_1m seed=42
+   rust         leaves= 3691 purity=0.846 | block k= 19 ARI=0.491 cut=0.127 | point k= 19 ARI=0.515 cut=0.093
+   py-uncentred leaves= 3630 purity=0.843 | block k= 19 ARI=0.409 cut=0.115 | point k= 19 ARI=0.560 cut=0.091
+   py-centred   leaves= 4096 purity=0.855 | block k= 24 ARI=0.512 cut=0.149 | point k= 24 ARI=0.545 cut=0.103
+
+== brain_1m seed=1
+   rust         leaves= 3638 purity=0.846 | block k= 21 ARI=0.448 cut=0.114 | point k= 21 ARI=0.527 cut=0.107
+   py-uncentred leaves= 3629 purity=0.843 | block k= 19 ARI=0.395 cut=0.122 | point k= 19 ARI=0.541 cut=0.094
+   py-centred   leaves= 4096 purity=0.855 | block k= 24 ARI=0.460 cut=0.148 | point k= 24 ARI=0.536 cut=0.102
+
+== brain_1m seed=2
+   rust         leaves= 3616 purity=0.844 | block k= 20 ARI=0.459 cut=0.101 | point k= 20 ARI=0.570 cut=0.091
+   py-uncentred leaves= 3624 purity=0.843 | block k= 19 ARI=0.381 cut=0.111 | point k= 19 ARI=0.538 cut=0.093
+   py-centred   leaves= 4096 purity=0.855 | block k= 23 ARI=0.495 cut=0.149 | point k= 23 ARI=0.541 cut=0.099
+
+wrote /Volumes/Models/dyf_bench_2026-11-04/centred_hash_tree_test_results.json
