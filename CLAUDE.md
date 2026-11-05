@@ -112,8 +112,12 @@ coming back. Numbers are in `KNOWN_ISSUES.md` #9, #11, #14; the conclusions:
   points; snapping costs ≤0.02 ARI at the useful level on five of seven sets, 0.04–0.06 on
   Fashion and brain), not by merging up from a fine partition (0.06–0.13 lost on images) or
   by recursive Louvain inside communities (skips every intermediate k); per-community
-  persistence does not predict purity. Nothing in the graph-construction or objective
-  direction is worth another probe without a consumer whose data sits in the regime where it moved.
+  persistence does not predict purity. "Is it a continuum" is answerable only per boundary at
+  a level: the cut profile of touching sibling pairs sorts class boundaries from continuum
+  slices on the cell atlases (AUC 0.66–0.97) and brain (0.61–0.78), not on images (≈0.5) —
+  annotate splits with it on atlas-shaped data, never as a dataset verdict. Nothing in the
+  graph-construction or objective direction is worth another probe without a consumer whose
+  data sits in the regime where it moved.
 
 ### Parked: sequence key / leaf Markov state model (2026-10-01)
 
