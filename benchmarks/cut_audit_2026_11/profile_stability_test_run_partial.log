@@ -1,0 +1,57 @@
+
+== mnist: n=70000 flat bits=10; cross-seed profile distance median 0.177 vs random-pair q10 0.157 / median 0.421; family agreement (3 seeds) 52.3% vs chance 20.8%
+   band          share  purity  moved  bridge  orphan  connector  boundary
+   reproducible  44.7%   0.88  25.3%   0.7%   0.0%    9.1%    26.8%
+   ambiguous     42.8%   0.85  25.5%   0.9%   0.0%   13.0%    24.9%
+   noise         12.5%   0.82  30.6%   0.8%   0.0%   15.6%    30.5%
+   bridge   : rate  0.8%; seed-42 vs seed-1 agreement 98.7% (chance 98.4%); AUC(flag | stab) 0.5191515386502894
+   orphan   : rate  0.0%; seed-42 vs seed-1 agreement 100.0% (chance 100.0%); AUC(flag | stab) None
+   connector: rate 11.6%; seed-42 vs seed-1 agreement 94.8% (chance 79.5%); AUC(flag | stab) 0.5788830657676757
+   AUC(moved | stab) 0.5180012359428567; AUC(boundary | stab) 0.4982797875015169
+   by family (seed 42): share | reproducible share | noise share | purity | moved
+     curve      4.0% | 37.0% | 19.9% | 0.91 | 12.4%
+     sheet     47.5% | 46.3% | 10.3% | 0.89 | 19.5%
+     blobs      2.0% | 63.3% | 16.1% | 0.76 | 43.5%
+     mixture   46.5% | 43.0% | 13.8% | 0.83 | 33.2%
+   (110s)
+/Volumes/Models/dyf_bench_2026-11-04/profile_stability_test.py:113: RuntimeWarning: Mean of empty slice
+  stab = np.nanmean(D, axis=0)
+
+== fashion_mnist: n=70000 flat bits=10; cross-seed profile distance median 0.097 vs random-pair q10 0.217 / median 0.508; family agreement (3 seeds) 74.9% vs chance 18.4%
+   band          share  purity  moved  bridge  orphan  connector  boundary
+   reproducible  75.4%   0.80  26.9%   1.8%   0.0%   47.6%    25.1%
+   ambiguous     20.2%   0.73  38.2%   1.1%   0.0%   42.3%    28.4%
+   noise          3.8%   0.67  42.0%   2.0%   0.0%   43.2%    42.4%
+   undefined      0.6%   0.75  32.4%  11.3%   0.0%   38.4%    75.2%
+   bridge   : rate  1.7%; seed-42 vs seed-1 agreement 97.9% (chance 96.6%); AUC(flag | stab) 0.42106077980694273
+   orphan   : rate  0.0%; seed-42 vs seed-1 agreement 100.0% (chance 100.0%); AUC(flag | stab) None
+   connector: rate 46.3%; seed-42 vs seed-1 agreement 97.1% (chance 50.3%); AUC(flag | stab) 0.48560209363386136
+   AUC(moved | stab) 0.581106327996243; AUC(boundary | stab) 0.5032128381290286
+   by family (seed 42): share | reproducible share | noise share | purity | moved
+     curve     54.6% | 78.0% |  2.3% | 0.80 | 24.5%
+     sheet     20.1% | 84.2% |  3.2% | 0.83 | 27.6%
+     blobs      3.0% | 52.1% |  5.9% | 0.65 | 50.9%
+     mixture   21.8% | 65.7% |  7.7% | 0.72 | 42.2%
+   (127s)
+/Volumes/Models/dyf_bench_2026-11-04/profile_stability_test.py:113: RuntimeWarning: Mean of empty slice
+  stab = np.nanmean(D, axis=0)
+
+== cmu_mocap: n=140837 flat bits=11; cross-seed profile distance median 0.484 vs random-pair q10 0.304 / median 0.716; family agreement (3 seeds) 42.2% vs chance 25.9%
+   band          share  purity  moved  bridge  orphan  connector  boundary
+   reproducible  23.1%   0.96  14.7%   0.4%   0.0%   36.3%    27.6%
+   ambiguous     55.0%   0.81  10.7%   0.2%   0.0%   43.3%    34.1%
+   noise         21.8%   0.81  16.4%   0.3%   0.0%   42.7%    43.6%
+   undefined      0.1%   0.95  46.4%   6.0%   0.0%   28.4%    71.0%
+   bridge   : rate  0.3%; seed-42 vs seed-1 agreement 99.6% (chance 99.5%); AUC(flag | stab) 0.45151008972669116
+   orphan   : rate  0.0%; seed-42 vs seed-1 agreement 100.0% (chance 100.0%); AUC(flag | stab) None
+   connector: rate 41.5%; seed-42 vs seed-1 agreement 92.2% (chance 51.6%); AUC(flag | stab) 0.5304620476323042
+   AUC(moved | stab) 0.5134381432977788; AUC(boundary | stab) 0.5792974633106284
+   by family (seed 42): share | reproducible share | noise share | purity | moved
+     ball       0.1% |  2.9% | 15.6% | 0.96 | 36.4%
+     curve     22.8% | 15.0% | 24.9% | 0.71 | 11.9%
+     sheet     62.4% | 29.5% | 18.4% | 0.89 | 11.4%
+     blobs      0.8% | 10.0% | 60.3% | 0.94 | 30.0%
+     mixture   13.8% |  7.4% | 30.3% | 0.82 | 19.9%
+   (2230s)
+/Volumes/Models/dyf_bench_2026-11-04/profile_stability_test.py:113: RuntimeWarning: Mean of empty slice
+  stab = np.nanmean(D, axis=0)

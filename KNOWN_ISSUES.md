@@ -886,6 +886,33 @@ best of the three on every dataset where reassignment helps.
 
 ---
 
+## 15. `DensityClassifier.bridge_persistence` takes ~37 minutes at 140k × 62 — OPEN (2026-11-06)
+
+Observed, not profiled. `benchmarks/cut_audit_2026_11/profile_stability_test.py` calls, per
+dataset, three deep tree builds, `multi_resolution_analysis(10)`, `bridge_persistence(X, 0.8)`
+and `boundary_persistence_scores` on a flat classifier whose bit count is derived from `n` the
+way `find_super_connectors` does (10–12 bits here). Wall time per dataset:
+
+| dataset | n × d | bits | with `bridge_persistence` | without (`SKIP_PERSISTENCE=1`) |
+|---|---|---|---|---|
+| MNIST | 70k × 50 | 10 | 110 s | — |
+| Fashion-MNIST | 70k × 50 | 10 | 127 s | — |
+| CMU MoCap | 141k × 62 | 11 | **2,230 s** | — |
+| AG News | 100k × 384 | 11 | (still running) | 12 s |
+| TMS droplet | 245k × 50 | 12 | — | 11 s |
+| brain | 1.29M × 50 | 12 | — | 63 s |
+
+Everything else in the script is seconds. The persistence pass scores every item against
+every coarse bucket centroid at every prefix depth, so it is at least O(n · 2^bits · d · bits)
+and the bit count grows with n; at the derived resolution it stops being usable somewhere
+between 70k and 140k points. The same call also returned a connector flag on 100% of MNIST
+items at its default `relative_threshold=0.8` (issue 5's class: a constant that does not
+transfer across resolutions), so the probe had to fall back to a percentile of the persistence
+count. Both the cost and the default need a measurement before the method is relied on; until
+then it should not be called on >100k points.
+
+---
+
 ## Source
 
 Discovered 2026-04-07 while wiring `experiments/capability_dyf_router.py` in

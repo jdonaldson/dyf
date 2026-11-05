@@ -1,0 +1,76 @@
+/Volumes/Models/dyf_bench_2026-11-04/profile_stability_test.py:118: RuntimeWarning: Mean of empty slice
+  stab = np.nanmean(D, axis=0)
+
+== ag_news: n=100000 flat bits=11; cross-seed profile distance median 0.350 vs random-pair q10 0.323 / median 0.699; family agreement (3 seeds) 69.1% vs chance 24.1%
+   band          share  purity  moved  bridge  orphan  connector  boundary
+   reproducible  45.2%   0.87  29.2%   2.2%   0.0%    0.0%    22.3%
+   ambiguous     44.8%   0.84  32.6%   1.7%   0.0%    0.0%    24.8%
+   noise          9.7%   0.84  34.1%   1.8%   0.0%    0.0%    28.1%
+   undefined      0.4%   0.72  55.4%  14.2%   0.0%    0.0%    61.3%
+   bridge   : rate  2.0%; seed-42 vs seed-1 agreement 97.0% (chance 96.3%); AUC(flag | stab) 0.4494615178615575
+   orphan   : rate  0.0%; seed-42 vs seed-1 agreement 100.0% (chance 100.0%); AUC(flag | stab) None
+   connector: rate  0.0%; seed-42 vs seed-1 agreement 100.0% (chance 100.0%); AUC(flag | stab) None
+   AUC(moved | stab) 0.5222467801851851; AUC(boundary | stab) 0.5240652335363526
+   by family (seed 42): share | reproducible share | noise share | purity | moved
+     ball      56.8% | 44.5% |  9.1% | 0.82 | 34.9%
+     curve      0.1% | 45.4% | 32.4% | 0.93 |  4.6%
+     sheet      3.3% | 56.9% |  8.9% | 0.91 | 18.2%
+     blobs      1.7% | 42.6% | 24.2% | 0.82 | 35.1%
+     mixture   37.3% | 44.9% | 10.0% | 0.90 | 26.4%
+   (12s)
+/Volumes/Models/dyf_bench_2026-11-04/profile_stability_test.py:118: RuntimeWarning: Mean of empty slice
+  stab = np.nanmean(D, axis=0)
+
+== tms_facs: n=110824 flat bits=11; cross-seed profile distance median 0.399 vs random-pair q10 0.279 / median 0.624; family agreement (3 seeds) 52.0% vs chance 21.3%
+   band          share  purity  moved  bridge  orphan  connector  boundary
+   reproducible  29.3%   0.76   5.1%   1.2%   0.0%    0.0%    28.4%
+   ambiguous     46.7%   0.79   3.8%   1.3%   0.0%    0.0%    29.7%
+   noise         23.5%   0.81   4.1%   2.6%   0.0%    0.0%    34.1%
+   undefined      0.5%   0.69  25.3%  19.4%   0.0%    0.0%    91.1%
+   bridge   : rate  1.7%; seed-42 vs seed-1 agreement 97.8% (chance 96.7%); AUC(flag | stab) 0.5887548266572085
+   orphan   : rate  0.0%; seed-42 vs seed-1 agreement 100.0% (chance 100.0%); AUC(flag | stab) None
+   connector: rate  0.0%; seed-42 vs seed-1 agreement 100.0% (chance 100.0%); AUC(flag | stab) None
+   AUC(moved | stab) 0.4716589688004022; AUC(boundary | stab) 0.5218608662440958
+   by family (seed 42): share | reproducible share | noise share | purity | moved
+     curve     44.5% | 21.7% | 26.8% | 0.79 |  1.4%
+     sheet     49.3% | 38.1% | 18.0% | 0.80 |  5.5%
+     blobs      0.4% | 13.1% | 50.4% | 0.62 | 27.4%
+     mixture    5.1% | 12.2% | 44.8% | 0.66 | 15.6%
+   (5s)
+/Volumes/Models/dyf_bench_2026-11-04/profile_stability_test.py:118: RuntimeWarning: Mean of empty slice
+  stab = np.nanmean(D, axis=0)
+
+== tms_droplet: n=245389 flat bits=12; cross-seed profile distance median 0.386 vs random-pair q10 0.309 / median 0.633; family agreement (3 seeds) 55.3% vs chance 21.6%
+   band          share  purity  moved  bridge  orphan  connector  boundary
+   reproducible  35.9%   0.79   9.7%   0.8%   0.0%    0.0%    31.1%
+   ambiguous     44.6%   0.79  16.5%   0.8%   0.0%    0.0%    34.1%
+   noise         19.4%   0.80  26.0%   1.9%   0.0%    0.0%    41.4%
+   undefined      0.1%   0.71  38.1%  33.6%   0.0%    0.0%    99.7%
+   bridge   : rate  1.0%; seed-42 vs seed-1 agreement 98.7% (chance 97.9%); AUC(flag | stab) 0.588922768734339
+   orphan   : rate  0.0%; seed-42 vs seed-1 agreement 100.0% (chance 100.0%); AUC(flag | stab) None
+   connector: rate  0.0%; seed-42 vs seed-1 agreement 100.0% (chance 100.0%); AUC(flag | stab) None
+   AUC(moved | stab) 0.6340770161874221; AUC(boundary | stab) 0.5378885112166423
+   by family (seed 42): share | reproducible share | noise share | purity | moved
+     curve     49.0% | 31.4% | 24.5% | 0.77 | 16.3%
+     sheet     46.0% | 42.3% | 11.8% | 0.83 | 14.1%
+     blobs      0.3% | 25.5% | 41.5% | 0.69 | 43.7%
+     mixture    4.6% | 20.2% | 40.9% | 0.73 | 27.7%
+   (11s)
+
+== brain_1m: n=1290029 flat bits=12; cross-seed profile distance median 0.431 vs random-pair q10 0.397 / median 0.778; family agreement (3 seeds) 56.1% vs chance 11.1%
+   band          share  purity  moved  bridge  orphan  connector  boundary
+   reproducible  44.5%   0.84  32.3%   0.3%   0.0%    0.0%    29.0%
+   ambiguous     42.5%   0.85  27.0%   0.2%   0.0%    0.0%    29.0%
+   noise         13.0%   0.84  24.1%   0.4%   0.0%    0.0%    35.5%
+   bridge   : rate  0.3%; seed-42 vs seed-1 agreement 99.6% (chance 99.5%); AUC(flag | stab) 0.5030308398221197
+   orphan   : rate  0.0%; seed-42 vs seed-1 agreement 100.0% (chance 100.0%); AUC(flag | stab) None
+   connector: rate  0.0%; seed-42 vs seed-1 agreement 100.0% (chance 100.0%); AUC(flag | stab) None
+   AUC(moved | stab) 0.45511037813914196; AUC(boundary | stab) 0.5178271150803604
+   by family (seed 42): share | reproducible share | noise share | purity | moved
+     curve     35.0% | 44.3% | 12.2% | 0.86 | 18.7%
+     sheet     24.1% | 47.0% | 12.6% | 0.91 | 14.5%
+     blobs      3.2% | 32.1% | 24.8% | 0.70 | 42.9%
+     mixture   37.7% | 44.2% | 12.9% | 0.80 | 46.6%
+   (63s)
+
+wrote /Volumes/Models/dyf_bench_2026-11-04/profile_stability_light_results.json

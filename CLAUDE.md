@@ -129,7 +129,11 @@ coming back. Numbers are in `KNOWN_ISSUES.md` #9, #11, #14; the conclusions:
   a leaf share the path); per-leaf nearest-family labels are class-aligned above a shuffle
   null on every dataset, curve/sheet leaves are the purest, the "dip" shape marks small
   impure pockets the re-cut moves, and the same shapes recur across the whole embedding
-  except a few localized ones that name real structures. Nothing in the graph-construction or objective
+  except a few localized ones that name real structures. The shape is data, not tree: across
+  three seeds a point's profile reproduces far better than random on every dataset; the
+  unstable minority is misclassified only on Fashion and droplet. The shipped bridge,
+  connector and boundary flags do not coincide with the unstable points (AUC 0.42–0.59), and
+  `bridge_persistence` took 37 minutes at 140k points (KNOWN_ISSUES #15). Nothing in the graph-construction or objective
   direction is worth another probe without a consumer whose data sits in the regime where it moved.
 
 ### Parked: sequence key / leaf Markov state model (2026-10-01)
