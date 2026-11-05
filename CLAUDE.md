@@ -120,7 +120,12 @@ coming back. Numbers are in `KNOWN_ISSUES.md` #9, #11, #14; the conclusions:
   is the one label-free continuousness measure with signal: it predicts which points the
   re-cut moves (AUC ≈ 0.6–0.7, stable over three seeds) and anticorrelates with leaf purity
   on every dataset; a longer binary ladder is no better and margin ratios carry nothing — a
-  moderate signal, not built. Nothing in the graph-construction or objective
+  moderate signal, not built. Read per rung and calibrated on synthetic families, the
+  dimension *profile* is interpretable as a description (dip = clusters separate at that
+  scale, spike = a hyperplane sliced a homogeneous region, low-then-rising = noisy manifold):
+  atlases and brain are 2–3-D sheets plus noise, MiniLM text has no low-d structure at any
+  scale, MoCap is ≈2 at fine scales, images bump where classes mix — but the shape adds
+  nothing over the mean as a per-point score. Nothing in the graph-construction or objective
   direction is worth another probe without a consumer whose data sits in the regime where it moved.
 
 ### Parked: sequence key / leaf Markov state model (2026-10-01)
