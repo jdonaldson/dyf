@@ -1,0 +1,177 @@
+{
+ "mnist": {
+  "profile": [
+   3.58,
+   5.92,
+   6.43,
+   3.16,
+   1.24,
+   0.81
+  ],
+  "shares": {
+   "curve": 0.04,
+   "sheet": 0.475,
+   "blobs": 0.02,
+   "mixture": 0.465
+  },
+  "localized": [],
+  "reproducible": 0.4473,
+  "noise": 0.12452857142857143,
+  "family_agree": 0.5232142857142857,
+  "family_agree_chance": 0.20770801911375508,
+  "line1": "MNIST PCA-50: about 4 dimensions at the coarsest split, peaking at 6 at rung 3 where groups overlap, then 1 within them. 51% of points sit in curve- or sheet-like branches, 46% in mixed-scale branches, 0% in structureless branches, 2.0% in small isolated pockets (44% of those reassigned by the final re-cut).",
+  "line2": "Another tree seed reproduces the branch shape for 45% of points beyond the random null and changes it for 12%; the shape family agrees across three seeds for 52% vs 21% by chance. Every shape recurs across the whole embedding."
+ },
+ "fashion_mnist": {
+  "profile": [
+   1.72,
+   4.19,
+   4.63,
+   3.95,
+   2.84,
+   1.83
+  ],
+  "shares": {
+   "curve": 0.546,
+   "sheet": 0.201,
+   "blobs": 0.03,
+   "mixture": 0.218
+  },
+  "localized": [
+   "blobs"
+  ],
+  "reproducible": 0.7543857142857143,
+  "noise": 0.0377,
+  "family_agree": 0.7494571428571428,
+  "family_agree_chance": 0.1842151935908433,
+  "line1": "Fashion-MNIST PCA-50: about two dimensions at the coarsest split, peaking at 5 at rung 3 where groups overlap, then 2 within them. 75% of points sit in curve- or sheet-like branches, 22% in mixed-scale branches, 0% in structureless branches, 3.0% in small isolated pockets (51% of those reassigned by the final re-cut).",
+  "line2": "Another tree seed reproduces the branch shape for 75% of points beyond the random null and changes it for 4%; the shape family agrees across three seeds for 75% vs 18% by chance. Shapes recur across the embedding except pocket branches, which sit together."
+ },
+ "cmu_mocap": {
+  "profile": [
+   3.68,
+   5.09,
+   3.76,
+   2.84,
+   2.65,
+   2.06
+  ],
+  "shares": {
+   "ball": 0.001,
+   "curve": 0.228,
+   "sheet": 0.624,
+   "blobs": 0.008,
+   "mixture": 0.138
+  },
+  "localized": [
+   "curve"
+  ],
+  "reproducible": 0.2309478333108487,
+  "noise": 0.21772687574998048,
+  "family_agree": 0.4220339825472,
+  "family_agree_chance": 0.25869368532940046,
+  "line1": "CMU MoCap joint angles: about 4 dimensions at coarse scales, narrowing to 2.1 at the finest reliable scale. 85% of points sit in curve- or sheet-like branches, 14% in mixed-scale branches, 0% in structureless branches, 0.8% in small isolated pockets (30% of those reassigned by the final re-cut).",
+  "line2": "Another tree seed reproduces the branch shape for 23% of points beyond the random null and changes it for 22%; the shape family agrees across three seeds for 42% vs 26% by chance. Shapes recur across the embedding except curve-like branches, which sit together."
+ },
+ "ag_news": {
+  "profile": [
+   11.78,
+   18.54,
+   15.65,
+   10.53,
+   9.96,
+   9.57
+  ],
+  "shares": {
+   "ball": 0.568,
+   "curve": 0.001,
+   "sheet": 0.033,
+   "blobs": 0.017,
+   "mixture": 0.373
+  },
+  "localized": [],
+  "reproducible": 0.45152,
+  "noise": 0.09653,
+  "family_agree": 0.69098,
+  "family_agree_chance": 0.24072736240782663,
+  "line1": "AG News MiniLM: high-dimensional at every scale (no low-dimensional structure the tree can use). 3% of points sit in curve- or sheet-like branches, 37% in mixed-scale branches, 57% in structureless branches, 1.7% in small isolated pockets (35% of those reassigned by the final re-cut).",
+  "line2": "Another tree seed reproduces the branch shape for 45% of points beyond the random null and changes it for 10%; the shape family agrees across three seeds for 69% vs 24% by chance. Every shape recurs across the whole embedding."
+ },
+ "tms_facs": {
+  "profile": [
+   2.63,
+   2.22,
+   2.19,
+   3.73,
+   4.02,
+   3.52
+  ],
+  "shares": {
+   "curve": 0.445,
+   "sheet": 0.493,
+   "blobs": 0.004,
+   "mixture": 0.051
+  },
+  "localized": [
+   "blobs"
+  ],
+  "reproducible": 0.29314047498736734,
+  "noise": 0.23483180538511514,
+  "family_agree": 0.5195535263119901,
+  "family_agree_chance": 0.21272655168122132,
+  "line1": "Tabula Muris FACS PCA-50: about two dimensions at every reliable scale. 94% of points sit in curve- or sheet-like branches, 5% in mixed-scale branches, 0% in structureless branches, 0.4% in small isolated pockets (27% of those reassigned by the final re-cut).",
+  "line2": "Another tree seed reproduces the branch shape for 29% of points beyond the random null and changes it for 23%; the shape family agrees across three seeds for 52% vs 21% by chance. Shapes recur across the embedding except pocket branches, which sit together."
+ },
+ "tms_droplet": {
+  "profile": [
+   2.37,
+   2.28,
+   1.82,
+   3.76,
+   4.47,
+   6.01
+  ],
+  "shares": {
+   "curve": 0.49,
+   "sheet": 0.46,
+   "blobs": 0.003,
+   "mixture": 0.046
+  },
+  "localized": [
+   "blobs",
+   "mixture"
+  ],
+  "reproducible": 0.3586387327875333,
+  "noise": 0.1944545191512252,
+  "family_agree": 0.5527590886307047,
+  "family_agree_chance": 0.2158054732792281,
+  "line1": "Tabula Muris droplet PCA-50: about two dimensions at coarse scales, rising to 6 at the finest reliable scale (a manifold with a noise floor). 95% of points sit in curve- or sheet-like branches, 5% in mixed-scale branches, 0% in structureless branches, 0.3% in small isolated pockets (44% of those reassigned by the final re-cut).",
+  "line2": "Another tree seed reproduces the branch shape for 36% of points beyond the random null and changes it for 19%; the shape family agrees across three seeds for 55% vs 22% by chance. Shapes recur across the embedding except pocket and mixed-scale branches, which sit together."
+ },
+ "brain_1m": {
+  "profile": [
+   2.94,
+   5.08,
+   6.06,
+   8.17,
+   9.05,
+   8.48
+  ],
+  "shares": {
+   "curve": 0.35,
+   "sheet": 0.241,
+   "blobs": 0.032,
+   "mixture": 0.377
+  },
+  "localized": [
+   "blobs",
+   "mixture"
+  ],
+  "reproducible": 0.4453473526564132,
+  "noise": 0.12956297881675527,
+  "family_agree": 0.5611292459316806,
+  "family_agree_chance": 0.11055740130108638,
+  "line1": "1.3M mouse brain PCA-50: about two dimensions at coarse scales, rising to 8 at the finest reliable scale (a manifold with a noise floor). 59% of points sit in curve- or sheet-like branches, 38% in mixed-scale branches, 0% in structureless branches, 3.2% in small isolated pockets (43% of those reassigned by the final re-cut).",
+  "line2": "Another tree seed reproduces the branch shape for 45% of points beyond the random null and changes it for 13%; the shape family agrees across three seeds for 56% vs 11% by chance. Shapes recur across the embedding except pocket and mixed-scale branches, which sit together."
+ }
+}
