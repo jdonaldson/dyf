@@ -30,7 +30,8 @@ class LouvainHierarchy(TypedDict):
     resolution: float
     centroid_dist: np.ndarray  # float32 (N,)
     nearest_other_dist: np.ndarray  # float32 (N,)
-    community_cohesion: dict[int, float]
+    community_cohesion: dict[int, float]  # mean centroid_dist per community (angular spread)
+    community_inflow: dict[int, float]  # share of each community moved in by the re-cut
     community_embedding_centroids: np.ndarray  # float32 (k, D)
 
 
@@ -643,14 +644,39 @@ def compute_louvain_hierarchy(
 
     Returns:
         Dict with keys:
-            ``point_labels``: int32 array (N,) of community IDs (0-based).
-            ``leaf_to_community``: dict {leaf_idx: community_id}.
+            ``point_labels``: int32 array (N,) of community IDs (0-based). These are the
+                labels *after* ``_reassign_points``: a Voronoi re-cut of the Louvain
+                communities (see ``louvain_cluster_leaves`` and ``KNOWN_ISSUES.md`` #14).
+            ``leaf_to_community``: dict {leaf_idx: community_id} — the Louvain stage's
+                label per leaf, i.e. where each point sat *before* the re-cut.
             ``community_sizes``: dict {community_id: int}.
             ``Z``: (k-1, 4) linkage matrix.
             ``unique_community_ids``: sorted list of community IDs.
             ``leaf_item_map``: dict {leaf_idx: list of item indices}.
             ``natural_k``: int, number of natural communities.
             ``resolution``: float, Louvain resolution used.
+            ``centroid_dist``: float32 (N,), cosine distance from each point to its own
+                community centroid.
+            ``nearest_other_dist``: float32 (N,), cosine distance to the nearest *other*
+                centroid. Per point, neither this nor the margin between the two carries
+                a usable confidence signal (measured 2026-11, bench in
+                ``benchmarks/cut_audit_2026_11/``); keep them as descriptions.
+            ``community_cohesion``: dict {community_id: float}, the mean ``centroid_dist``
+                over the community's members — its angular spread, the per-cell term of
+                the objective the re-cut minimises. A loose community is either a broad
+                region or a Voronoi cell that absorbed its neighbours; ``community_inflow``
+                tells the two apart. **Read it as a rank within this index, never against a
+                constant**: absolute cosine values do not transfer across corpora. Ranked,
+                it picks out the least label-pure quarter of communities at AUC 0.80 on six
+                of seven bench sets, and is uninformative on continuum data (MoCap), where a
+                loose cell is not a defect.
+            ``community_inflow``: dict {community_id: float}, the share of each final
+                community whose members carried a *different* Louvain label before the
+                re-cut. Near 0 means the cell is the Louvain community it is named after;
+                near 1 means a small seed's Voronoi cell swallowed a region (0.94 on one
+                150k-point brain community and one 19k droplet community in the bench).
+            ``community_embedding_centroids``: float32 (k, D) unit centroids in
+                ``unique_community_ids`` order.
 
         Returns ``None`` when the tree has fewer than two leaves.
     """
@@ -690,7 +716,9 @@ def compute_louvain_hierarchy(
         max_id = point_labels.max() + 1
         point_labels[unassigned] = max_id
 
-    # Point-level reassignment pass
+    # Point-level reassignment pass (the Voronoi re-cut). Keep the Louvain labels so each
+    # final community can report how much of it the re-cut moved in.
+    block_labels = point_labels.copy()
     point_labels = _reassign_points(point_labels, embeddings)
 
     # Build leaf_to_community mapping
@@ -703,10 +731,14 @@ def compute_louvain_hierarchy(
     for leaf_idx, item_ids in enumerate(leaf_point_indices):
         leaf_item_map[leaf_idx] = item_ids.tolist()
 
-    # Compute community sizes from final point labels
+    # Compute community sizes and re-cut inflow from final point labels
     community_sizes = {}
+    community_inflow = {}
+    moved = block_labels != point_labels
     for cid in sorted(set(point_labels.tolist())):
-        community_sizes[cid] = int((point_labels == cid).sum())
+        mask = point_labels == cid
+        community_sizes[cid] = int(mask.sum())
+        community_inflow[cid] = float(moved[mask].mean())
 
     # Compute linkage dendrogram over community centroids
     Z, unique_ids, community_centroids_emb = _compute_community_linkage(point_labels, embeddings)
@@ -728,6 +760,7 @@ def compute_louvain_hierarchy(
         "centroid_dist": centroid_dist,
         "nearest_other_dist": nearest_other_dist,
         "community_cohesion": community_cohesion,
+        "community_inflow": community_inflow,
         "community_embedding_centroids": community_centroids_emb,
     }
 

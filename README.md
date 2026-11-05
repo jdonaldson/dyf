@@ -281,7 +281,12 @@ the sign set by the data (`KNOWN_ISSUES.md` #14). Two consequences worth knowing
 partition cuts about as many nearest-neighbour edges as k-means at the same k (2–4× a Leiden
 partition on a point kNN graph), and a community that Louvain found as a non-convex region is
 flattened into a convex cell. Use `LeafGroupingResult.centroids` to place new points by the same
-rule.
+rule. Two free numbers describe each cell afterwards (`compute_louvain_hierarchy`):
+`community_cohesion`, its angular spread, which ranked within an index finds the least pure
+quarter of communities at AUC 0.80 on six of seven bench sets, and `community_inflow`, the share
+of the cell the re-cut moved in from other communities, which says whether a loose cell is a
+broad region or a small seed that swallowed its neighbours. Both are ranks within one index, not
+thresholds, and neither means anything on continuum data.
 
 **Resolution is a granularity choice, and the data does not make it for you.** Louvain's
 `resolution` sets how many communities come back (about 16 on 4-topic AG News and 28 on a

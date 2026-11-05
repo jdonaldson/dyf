@@ -2,7 +2,27 @@
 
 ## Unreleased
 
+### Added
+
+**`compute_louvain_hierarchy` reports each community's re-cut inflow.** New key
+`community_inflow`: per final community, the share of members whose Louvain label before the
+Voronoi re-cut was a different community. Near 0 means the cell is the community it is named
+after; near 1 means a small seed's cell swallowed a region — the bench has one 150k-point brain
+community and one 19k droplet community at 0.94 (`KNOWN_ISSUES.md` #14). Free: the pre-re-cut
+labels were already in hand and are now kept for one comparison.
+
 ### Documented
+
+**`compute_louvain_hierarchy` returned four undocumented keys; they now say what they mean.**
+`centroid_dist`, `nearest_other_dist`, `community_cohesion` and `community_embedding_centroids`
+were in the `LouvainHierarchy` type but not in the docstring. `community_cohesion` is the mean
+cosine distance of members to their centroid — the community's angular spread, the per-cell term
+of the re-cut's objective. Measured on the seven-dataset bench
+(`benchmarks/cut_audit_2026_11/community_shape_probe.py`): ranked within an index it finds the
+least label-pure quarter of communities at AUC 0.80 on six of seven sets, nothing richer (branch
+shape, kNN conductance) beats it, and it is uninformative on continuum data. The docstring says
+to read it as a rank, never against a constant. The per-point distances are documented as
+descriptions with no measured confidence signal.
 
 **The leaf-grouping output is a Voronoi partition, and now says so.** `louvain_cluster_leaves`
 ends with `_reassign_points`: up to five rounds of spherical k-means over every point, seeded by

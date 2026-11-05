@@ -115,6 +115,7 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
   var _communityNames = {};      // {cid: "name"} for natural communities
   var _communityCentroids = {};  // {cid: [x,y,z]} for natural communities
   var _communitySizes = {};      // {cid: int} for natural communities
+  var _communitySpread = {};     // {cid: {rank, cohesion, inflow}} — re-cut read-outs, natural communities only
   var _dendroZ = null;           // linkage matrix (k-1 × 4)
   var _naturalK = 0;
   var _currentMergedIds = null;  // Int32Array(N): point → merged cluster ID at current cut
@@ -126,6 +127,24 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
     _communityNames = _dendro.communityNames || {};
     _communityCentroids = _dendro.communityCentroids || {};
     _communitySizes = _dendro.communitySizes || {};
+
+    // Spread (community_cohesion) is an absolute cosine quantity that does not transfer
+    // across corpora, so it is shown only as a rank within this index: 1 = loosest.
+    // Inflow (community_inflow) is the share of the cell the Voronoi re-cut moved in from
+    // other communities; high inflow means a small seed swallowed a region.
+    if (_dendro.communityCohesion) {
+      var _cohCids = Object.keys(_dendro.communityCohesion);
+      var _cohSorted = _cohCids.slice().sort(function(a, b) {
+        return _dendro.communityCohesion[a] - _dendro.communityCohesion[b];
+      });
+      _cohSorted.forEach(function(cidStr, i) {
+        _communitySpread[cidStr] = {
+          rank: _cohSorted.length > 1 ? i / (_cohSorted.length - 1) : 0,
+          cohesion: _dendro.communityCohesion[cidStr],
+          inflow: _dendro.communityInflow ? _dendro.communityInflow[cidStr] : null,
+        };
+      });
+    }
 
     // Build point → community mapping: prefer community_id stored field
     // (correct post-reassignment labels) over leaf-map reconstruction
@@ -425,7 +444,8 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
       allPoints[i].cluster = mergedGroup;
     }
 
-    // Update labels
+    // Update labels. Spread/inflow are defined for natural communities only, so they are
+    // attached at the natural cut (height 0) and left off merged groups.
     var newLabels = [];
     for (var gid in mergedNames) {
       var cent = mergedCentroids[gid] || [0, 0, 0];
@@ -437,6 +457,7 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
         size: mergedSizes[gid] || 0,
         leaf_cids: [parseInt(gid)],
         color: rgb,
+        spread: height <= 0 ? (_communitySpread[String(gid)] || null) : null,
       });
     }
     labels = newLabels;
@@ -521,6 +542,7 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
           x: cent[0], y: cent[1], z: cent[2] || 0,
           size: _communitySizes[cidStr] || 0,
           leaf_cids: [parseInt(cidStr)],
+          spread: _communitySpread[cidStr] || null,
         });
       }
       labels = initLabels;
@@ -2222,16 +2244,31 @@ import { tableFromIPC } from "https://cdn.jsdelivr.net/npm/apache-arrow@18.1.0/+
         allPoints.forEach(function(p) { if (p.cluster === cid) size++; });
       }
 
+      // Re-cut read-outs (natural communities only): flag the loosest quarter by spread
+      // rank, and cells that are mostly re-cut inflow. Raw numbers go in the hover title.
+      var spread = info ? info.spread : null;
+      var tags = "";
+      var title = "";
+      if (spread) {
+        title = "spread " + spread.cohesion.toFixed(4) + " (rank " + spread.rank.toFixed(2) + " of this index, 1 = loosest)";
+        if (spread.rank >= 0.75) tags += ' <span style="color:var(--fg-muted);font-size:10px;">loose</span>';
+        if (spread.inflow !== null && spread.inflow !== undefined) {
+          title += "; " + Math.round(spread.inflow * 100) + "% of members moved in by the re-cut";
+          if (spread.inflow >= 0.5) tags += ' <span style="color:var(--fg-muted);font-size:10px;">re-cut ' + Math.round(spread.inflow * 100) + '%</span>';
+        }
+      }
+
       var row = document.createElement("div");
       row.style.cursor = "pointer";
       row.style.padding = "2px 0";
       row.style.transition = "opacity 0.15s";
+      if (title) row.title = title;
       row.innerHTML =
         '<span style="display:inline-block;width:10px;height:10px;border-radius:2px;' +
         'background:rgb(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ');margin-right:6px;' +
         'vertical-align:middle;"></span>' +
         '<span style="vertical-align:middle;">' + text +
-        ' <span style="color:var(--fg-muted);">(' + size + ')</span></span>';
+        ' <span style="color:var(--fg-muted);">(' + size + ')</span>' + tags + '</span>';
 
       // Single click: toggle hide
       row.addEventListener("click", function(e) {

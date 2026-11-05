@@ -501,7 +501,8 @@ export async function loadDyf(url, onProgress) {
         communityColors: dendroData.community_colors,
         communityCentroids: dendroData.community_centroids,
         communitySizes: dendroData.community_sizes,
-        communityCohesion: dendroData.community_cohesion || null,
+        communityCohesion: dendroData.community_cohesion || null,  // angular spread per community
+        communityInflow: dendroData.community_inflow || null,      // share moved in by the re-cut
         leafToCommunity: leafCommData.leaf_to_community,
         naturalK: leafCommData.natural_k,
         resolution: leafCommData.resolution,
