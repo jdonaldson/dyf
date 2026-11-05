@@ -838,6 +838,29 @@ consumer ever wants the block partition; `dyfviz` stores the post-reassignment l
 why the default is not changing. The gallery pages score the shipped (post-reassignment)
 partition; the README now says what that is.
 
+**The obvious alternative was tested and lost (2026-11-05,
+`benchmarks/cut_audit_2026_11/leaf_reassignment_test.py`, seeds 42/1/2).** Hypothesis: move
+whole *leaves* to the nearest community centroid instead of points, keeping Louvain's structure
+while repairing scattered leaves. Result, mean ARI over three seeds:
+
+| arm | MNIST | Fashion | MoCap | AG News | FACS | droplet | brain |
+|---|---|---|---|---|---|---|---|
+| block (no reassignment) | 0.586 | 0.405 | 0.173 | 0.287 | 0.552 | 0.508 | 0.466 |
+| point (shipped) | 0.472 | 0.384 | 0.151 | 0.281 | 0.566 | 0.567 | 0.537 |
+| leaf-level | 0.468 | 0.381 | 0.147 | 0.269 | 0.558 | 0.554 | 0.498 |
+| leaf then one point round | 0.473 | 0.385 | 0.149 | 0.276 | 0.562 | 0.559 | 0.527 |
+| stragglers only | = block | = block | = block | = block | = block | = block | = block |
+
+Leaf-level moves 12–33% of leaves, loses exactly what the point arm loses on MNIST, captures only
+half the brain gain, and cuts *more* point-kNN edges than the block labels (MNIST 0.197 vs 0.172):
+a leaf's centroid being nearest to community X does not put its points' neighbours in X. The
+straggler arm — move only leaves with no same-community neighbour in the k=10 leaf graph — moved
+zero leaves on every dataset, by construction: Louvain optimises modularity on that graph, so no
+leaf is isolated in it. The "scattered" block communities are leaves that are adjacent in the
+cosine leaf-centroid graph but remote on the point graph; only point-level moves repair that. So
+the MNIST loss is the nearest-centroid objective, not the granularity, and the shipped step is the
+best of the three on every dataset where reassignment helps.
+
 ---
 
 ## Source

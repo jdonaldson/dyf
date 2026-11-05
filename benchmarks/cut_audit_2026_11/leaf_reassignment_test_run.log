@@ -1,0 +1,149 @@
+
+== mnist seed=42: leaves=3395, leaf arm moved 28.8% of leaves in 5 rounds; straggler arm moved 0 leaves (0.0%)
+   block      k= 13 moved= 0.0% cut=0.180 phi max=0.352 ARI=0.581 AMI=0.643
+   point      k= 13 moved=26.0% cut=0.153 phi max=0.259 ARI=0.472 AMI=0.565
+   leaf       k= 13 moved=19.3% cut=0.202 phi max=0.349 ARI=0.464 AMI=0.555
+   leaf+point k= 13 moved=26.3% cut=0.151 phi max=0.248 ARI=0.468 AMI=0.567
+   straggler  k= 13 moved= 0.0% cut=0.180 phi max=0.352 ARI=0.581 AMI=0.643
+
+== mnist seed=1: leaves=3344, leaf arm moved 30.3% of leaves in 5 rounds; straggler arm moved 0 leaves (0.0%)
+   block      k= 12 moved= 0.0% cut=0.174 phi max=0.262 ARI=0.566 AMI=0.637
+   point      k= 12 moved=28.0% cut=0.154 phi max=0.250 ARI=0.462 AMI=0.556
+   leaf       k= 12 moved=21.6% cut=0.200 phi max=0.298 ARI=0.458 AMI=0.553
+   leaf+point k= 12 moved=28.6% cut=0.151 phi max=0.243 ARI=0.464 AMI=0.563
+   straggler  k= 12 moved= 0.0% cut=0.174 phi max=0.262 ARI=0.566 AMI=0.637
+
+== mnist seed=2: leaves=3382, leaf arm moved 30.0% of leaves in 5 rounds; straggler arm moved 0 leaves (0.0%)
+   block      k= 11 moved= 0.0% cut=0.163 phi max=0.387 ARI=0.610 AMI=0.660
+   point      k= 11 moved=27.2% cut=0.145 phi max=0.236 ARI=0.482 AMI=0.568
+   leaf       k= 11 moved=21.7% cut=0.189 phi max=0.343 ARI=0.482 AMI=0.564
+   leaf+point k= 11 moved=27.3% cut=0.143 phi max=0.232 ARI=0.485 AMI=0.572
+   straggler  k= 11 moved= 0.0% cut=0.163 phi max=0.387 ARI=0.610 AMI=0.660
+
+== fashion_mnist seed=42: leaves=2193, leaf arm moved 31.6% of leaves in 5 rounds; straggler arm moved 0 leaves (0.0%)
+   block      k= 14 moved= 0.0% cut=0.113 phi max=0.358 ARI=0.381 AMI=0.545
+   point      k= 14 moved=29.8% cut=0.105 phi max=0.224 ARI=0.340 AMI=0.528
+   leaf       k= 14 moved=27.4% cut=0.124 phi max=0.320 ARI=0.331 AMI=0.520
+   leaf+point k= 14 moved=30.7% cut=0.103 phi max=0.237 ARI=0.337 AMI=0.528
+   straggler  k= 14 moved= 0.0% cut=0.113 phi max=0.358 ARI=0.381 AMI=0.545
+
+== fashion_mnist seed=1: leaves=2192, leaf arm moved 36.8% of leaves in 5 rounds; straggler arm moved 0 leaves (0.0%)
+   block      k= 13 moved= 0.0% cut=0.094 phi max=0.424 ARI=0.410 AMI=0.582
+   point      k= 13 moved=34.4% cut=0.093 phi max=0.151 ARI=0.434 AMI=0.561
+   leaf       k= 13 moved=33.7% cut=0.111 phi max=0.186 ARI=0.438 AMI=0.567
+   leaf+point k= 13 moved=35.7% cut=0.092 phi max=0.144 ARI=0.440 AMI=0.569
+   straggler  k= 13 moved= 0.0% cut=0.094 phi max=0.424 ARI=0.410 AMI=0.582
+
+== fashion_mnist seed=2: leaves=2182, leaf arm moved 29.4% of leaves in 5 rounds; straggler arm moved 0 leaves (0.0%)
+   block      k= 12 moved= 0.0% cut=0.099 phi max=0.324 ARI=0.424 AMI=0.579
+   point      k= 12 moved=24.7% cut=0.089 phi max=0.127 ARI=0.379 AMI=0.548
+   leaf       k= 12 moved=20.7% cut=0.105 phi max=0.172 ARI=0.374 AMI=0.542
+   leaf+point k= 12 moved=23.9% cut=0.089 phi max=0.130 ARI=0.378 AMI=0.547
+   straggler  k= 12 moved= 0.0% cut=0.099 phi max=0.324 ARI=0.424 AMI=0.579
+
+== cmu_mocap seed=42: leaves=1478, leaf arm moved 15.4% of leaves in 5 rounds; straggler arm moved 1 leaves (0.1%)
+   block      k= 22 moved= 0.0% cut=0.023 phi max=0.800 ARI=0.176 AMI=0.391
+   point      k= 21 moved=12.9% cut=0.020 phi max=0.053 ARI=0.152 AMI=0.366
+   leaf       k= 21 moved= 7.6% cut=0.024 phi max=0.064 ARI=0.158 AMI=0.372
+   leaf+point k= 21 moved=12.9% cut=0.019 phi max=0.057 ARI=0.150 AMI=0.366
+   straggler  k= 21 moved= 0.0% cut=0.023 phi max=0.056 ARI=0.176 AMI=0.391
+
+== cmu_mocap seed=1: leaves=1563, leaf arm moved 21.9% of leaves in 5 rounds; straggler arm moved 1 leaves (0.1%)
+   block      k= 22 moved= 0.0% cut=0.025 phi max=0.800 ARI=0.201 AMI=0.354
+   point      k= 21 moved=17.7% cut=0.021 phi max=0.073 ARI=0.170 AMI=0.319
+   leaf       k= 21 moved=14.1% cut=0.026 phi max=0.075 ARI=0.158 AMI=0.313
+   leaf+point k= 21 moved=16.5% cut=0.020 phi max=0.066 ARI=0.160 AMI=0.317
+   straggler  k= 21 moved= 0.0% cut=0.025 phi max=0.063 ARI=0.201 AMI=0.354
+
+== cmu_mocap seed=2: leaves=1628, leaf arm moved 29.5% of leaves in 5 rounds; straggler arm moved 0 leaves (0.0%)
+   block      k= 22 moved= 0.0% cut=0.027 phi max=0.069 ARI=0.142 AMI=0.366
+   point      k= 22 moved=25.1% cut=0.024 phi max=0.054 ARI=0.130 AMI=0.355
+   leaf       k= 22 moved=21.7% cut=0.031 phi max=0.072 ARI=0.125 AMI=0.346
+   leaf+point k= 22 moved=24.9% cut=0.022 phi max=0.060 ARI=0.136 AMI=0.360
+   straggler  k= 22 moved= 0.0% cut=0.027 phi max=0.069 ARI=0.142 AMI=0.366
+
+== ag_news seed=42: leaves=3274, leaf arm moved 28.8% of leaves in 5 rounds; straggler arm moved 0 leaves (0.0%)
+   block      k= 15 moved= 0.0% cut=0.285 phi max=0.568 ARI=0.279 AMI=0.387
+   point      k= 15 moved=31.3% cut=0.203 phi max=0.357 ARI=0.286 AMI=0.440
+   leaf       k= 15 moved=20.4% cut=0.290 phi max=0.606 ARI=0.277 AMI=0.406
+   leaf+point k= 15 moved=31.4% cut=0.208 phi max=0.370 ARI=0.286 AMI=0.442
+   straggler  k= 15 moved= 0.0% cut=0.285 phi max=0.568 ARI=0.279 AMI=0.387
+
+== ag_news seed=1: leaves=3202, leaf arm moved 30.4% of leaves in 5 rounds; straggler arm moved 0 leaves (0.0%)
+   block      k= 17 moved= 0.0% cut=0.280 phi max=0.632 ARI=0.296 AMI=0.407
+   point      k= 17 moved=32.2% cut=0.216 phi max=0.477 ARI=0.283 AMI=0.441
+   leaf       k= 17 moved=20.1% cut=0.301 phi max=0.628 ARI=0.265 AMI=0.401
+   leaf+point k= 17 moved=32.9% cut=0.223 phi max=0.450 ARI=0.269 AMI=0.435
+   straggler  k= 17 moved= 0.0% cut=0.280 phi max=0.632 ARI=0.296 AMI=0.407
+
+== ag_news seed=2: leaves=3242, leaf arm moved 29.9% of leaves in 5 rounds; straggler arm moved 0 leaves (0.0%)
+   block      k= 16 moved= 0.0% cut=0.284 phi max=0.585 ARI=0.285 AMI=0.404
+   point      k= 16 moved=30.0% cut=0.206 phi max=0.347 ARI=0.275 AMI=0.438
+   leaf       k= 16 moved=17.9% cut=0.297 phi max=0.592 ARI=0.265 AMI=0.401
+   leaf+point k= 16 moved=29.8% cut=0.212 phi max=0.364 ARI=0.273 AMI=0.437
+   straggler  k= 16 moved= 0.0% cut=0.284 phi max=0.585 ARI=0.285 AMI=0.404
+
+== tms_facs seed=42: leaves=1534, leaf arm moved 9.6% of leaves in 4 rounds; straggler arm moved 0 leaves (0.0%)
+   block      k= 24 moved= 0.0% cut=0.025 phi max=0.214 ARI=0.553 AMI=0.754
+   point      k= 24 moved= 4.4% cut=0.020 phi max=0.128 ARI=0.559 AMI=0.753
+   leaf       k= 24 moved= 2.1% cut=0.028 phi max=0.236 ARI=0.555 AMI=0.751
+   leaf+point k= 24 moved= 4.0% cut=0.019 phi max=0.125 ARI=0.558 AMI=0.754
+   straggler  k= 24 moved= 0.0% cut=0.025 phi max=0.214 ARI=0.553 AMI=0.754
+
+== tms_facs seed=1: leaves=1800, leaf arm moved 13.2% of leaves in 5 rounds; straggler arm moved 0 leaves (0.0%)
+   block      k= 23 moved= 0.0% cut=0.027 phi max=0.222 ARI=0.548 AMI=0.744
+   point      k= 23 moved= 6.8% cut=0.017 phi max=0.133 ARI=0.563 AMI=0.757
+   leaf       k= 23 moved= 5.4% cut=0.035 phi max=0.234 ARI=0.552 AMI=0.742
+   leaf+point k= 23 moved= 7.6% cut=0.018 phi max=0.136 ARI=0.555 AMI=0.752
+   straggler  k= 23 moved= 0.0% cut=0.027 phi max=0.222 ARI=0.548 AMI=0.744
+
+== tms_facs seed=2: leaves=1623, leaf arm moved 13.1% of leaves in 5 rounds; straggler arm moved 0 leaves (0.0%)
+   block      k= 25 moved= 0.0% cut=0.030 phi max=0.331 ARI=0.555 AMI=0.752
+   point      k= 25 moved= 6.5% cut=0.021 phi max=0.110 ARI=0.576 AMI=0.758
+   leaf       k= 25 moved= 4.1% cut=0.032 phi max=0.219 ARI=0.568 AMI=0.750
+   leaf+point k= 25 moved= 5.9% cut=0.022 phi max=0.166 ARI=0.573 AMI=0.755
+   straggler  k= 25 moved= 0.0% cut=0.030 phi max=0.331 ARI=0.555 AMI=0.752
+
+== tms_droplet seed=42: leaves=1768, leaf arm moved 22.2% of leaves in 5 rounds; straggler arm moved 0 leaves (0.0%)
+   block      k= 29 moved= 0.0% cut=0.021 phi max=0.313 ARI=0.467 AMI=0.726
+   point      k= 29 moved=15.9% cut=0.022 phi max=0.101 ARI=0.563 AMI=0.745
+   leaf       k= 29 moved=13.9% cut=0.025 phi max=0.124 ARI=0.552 AMI=0.743
+   leaf+point k= 29 moved=15.3% cut=0.020 phi max=0.084 ARI=0.558 AMI=0.746
+   straggler  k= 29 moved= 0.0% cut=0.021 phi max=0.313 ARI=0.467 AMI=0.726
+
+== tms_droplet seed=1: leaves=1748, leaf arm moved 15.9% of leaves in 5 rounds; straggler arm moved 0 leaves (0.0%)
+   block      k= 29 moved= 0.0% cut=0.019 phi max=0.130 ARI=0.536 AMI=0.741
+   point      k= 29 moved=10.1% cut=0.018 phi max=0.091 ARI=0.586 AMI=0.755
+   leaf       k= 29 moved= 7.0% cut=0.024 phi max=0.192 ARI=0.564 AMI=0.746
+   leaf+point k= 29 moved= 8.3% cut=0.018 phi max=0.254 ARI=0.567 AMI=0.749
+   straggler  k= 29 moved= 0.0% cut=0.019 phi max=0.130 ARI=0.536 AMI=0.741
+
+== tms_droplet seed=2: leaves=1698, leaf arm moved 22.7% of leaves in 5 rounds; straggler arm moved 0 leaves (0.0%)
+   block      k= 26 moved= 0.0% cut=0.021 phi max=0.144 ARI=0.521 AMI=0.730
+   point      k= 26 moved=11.8% cut=0.014 phi max=0.064 ARI=0.551 AMI=0.745
+   leaf       k= 26 moved=10.5% cut=0.022 phi max=0.109 ARI=0.546 AMI=0.738
+   leaf+point k= 26 moved=11.7% cut=0.014 phi max=0.064 ARI=0.551 AMI=0.744
+   straggler  k= 26 moved= 0.0% cut=0.021 phi max=0.144 ARI=0.521 AMI=0.730
+
+== brain_1m seed=42: leaves=3691, leaf arm moved 28.7% of leaves in 5 rounds; straggler arm moved 0 leaves (0.0%)
+   block      k= 19 moved= 0.0% cut=0.127 phi max=0.608 ARI=0.491 AMI=0.670
+   point      k= 19 moved=29.0% cut=0.093 phi max=0.210 ARI=0.515 AMI=0.699
+   leaf       k= 19 moved=24.2% cut=0.131 phi max=0.274 ARI=0.487 AMI=0.669
+   leaf+point k= 19 moved=28.0% cut=0.090 phi max=0.211 ARI=0.521 AMI=0.700
+   straggler  k= 19 moved= 0.0% cut=0.127 phi max=0.608 ARI=0.491 AMI=0.670
+
+== brain_1m seed=1: leaves=3638, leaf arm moved 33.6% of leaves in 5 rounds; straggler arm moved 0 leaves (0.0%)
+   block      k= 21 moved= 0.0% cut=0.114 phi max=0.557 ARI=0.448 AMI=0.658
+   point      k= 21 moved=31.1% cut=0.107 phi max=0.318 ARI=0.527 AMI=0.696
+   leaf       k= 21 moved=28.7% cut=0.137 phi max=0.335 ARI=0.473 AMI=0.671
+   leaf+point k= 21 moved=33.3% cut=0.098 phi max=0.236 ARI=0.492 AMI=0.698
+   straggler  k= 21 moved= 0.0% cut=0.114 phi max=0.557 ARI=0.448 AMI=0.658
+
+== brain_1m seed=2: leaves=3616, leaf arm moved 29.8% of leaves in 5 rounds; straggler arm moved 0 leaves (0.0%)
+   block      k= 20 moved= 0.0% cut=0.101 phi max=0.343 ARI=0.459 AMI=0.664
+   point      k= 20 moved=27.0% cut=0.091 phi max=0.250 ARI=0.570 AMI=0.709
+   leaf       k= 20 moved=22.1% cut=0.123 phi max=0.332 ARI=0.536 AMI=0.680
+   leaf+point k= 20 moved=26.9% cut=0.090 phi max=0.250 ARI=0.566 AMI=0.708
+   straggler  k= 20 moved= 0.0% cut=0.101 phi max=0.343 ARI=0.459 AMI=0.664
+
+wrote /Volumes/Models/dyf_bench_2026-11-04/leaf_reassignment_test_results.json

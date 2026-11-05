@@ -15,5 +15,6 @@ Question answered, in order:
 | `community_contact_proxies.py` | can anything free reproduce kNN contact? | centroid tie, ρ 0.71–0.95 |
 | `community_cut_profile*.py`, `cut_profile_calibration.py` | density profile across a cut: valley / saddle / shoulder, calibrated on Gaussians | strict shoulders 0–4% over all pairs |
 | `reassignment_effect.py` | what does `_reassign_points` do? | spherical k-means; moves 4–31% of points, ARI −0.13…+0.11, sign stable over seeds 42/1/2 |
+| `leaf_reassignment_test.py` | would leaf-level or straggler-only reassignment do better? | no: leaf-level loses to the shipped point step everywhere it helps and cuts more edges; straggler arm moves zero leaves by construction |
 
 Run with the project venv: `.venv/bin/python benchmarks/cut_audit_2026_11/<script>.py`.
