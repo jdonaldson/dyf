@@ -884,6 +884,15 @@ cosine leaf-centroid graph but remote on the point graph; only point-level moves
 the MNIST loss is the nearest-centroid objective, not the granularity, and the shipped step is the
 best of the three on every dataset where reassignment helps.
 
+**A community can be almost entirely re-cut inflow (2026-11-06,
+`benchmarks/cut_audit_2026_11/community_shape_probe.py`).** Because the final labels are Voronoi
+cells of the Louvain community centroids, a small Louvain community whose centroid sits in the
+middle of a large region ends up owning that region: on brain one final community of 149,692
+points has 94% of its members from other block communities (dataset-wide 29% moved), and on
+droplet one of 19,257 points has 94% (dataset-wide 16%). The `community_id` such a cell carries
+through `dyfviz` is Louvain's id for a seed that was a small fraction of what is shown. Per-community
+shape numbers do not flag these; the free numbers (radius, conductance) partly do.
+
 ---
 
 ## 15. `DensityClassifier.bridge_persistence` takes ~37 minutes at 140k × 62 — OPEN (2026-11-06)

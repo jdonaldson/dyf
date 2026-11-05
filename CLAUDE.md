@@ -163,7 +163,14 @@ coming back. Numbers are in `KNOWN_ISSUES.md` #9, #11, #14; the conclusions:
   `bridge_persistence` took 37 minutes at 140k points (KNOWN_ISSUES #15). Branch shape does
   not calibrate retrieval: on LongMemEval it adds −0.005 CV AUC to the routing features, and
   top-1 plus mean top-5 cosine (0.669) beats top-1 plus every dyf routing feature (0.613) —
-  query confidence should come from those two cosines, not from dyf. Nothing in the graph-construction or objective
+  query confidence should come from those two cosines, not from dyf. Reading the shape per
+  *community* (a deep tree per shipped community) instead of per leaf does not make it a
+  reliability signal either: for "which communities are impure" the free numbers — radius,
+  conductance, size — reach leave-one-dataset-out AUC 0.79, the per-community shape 0.54, the
+  global-leaf shape restricted to the community 0.36, and adding shape to the free numbers
+  lowers them; the community-level profile reads differently (brain's hub becomes one coarse
+  axis then noise) but ranks nothing better. Shape stays a description; reliability comes from
+  radius and φ. Nothing in the graph-construction or objective
   direction is worth another probe without a consumer whose data sits in the regime where it moved.
 
 ### Parked: sequence key / leaf Markov state model (2026-10-01)

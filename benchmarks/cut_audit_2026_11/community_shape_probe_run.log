@@ -1,0 +1,118 @@
+
+== mnist: n=70000 communities=13 (>= 1000: 13); shipped 1s, global binary tree 2294 leaves 1s
+   within-community trees: 13 communities, 1s total
+   largest communities: size | purity cls | moved-in | phi || within: rungs fam-mix(curve+sheet/ball/pocket) dip spike | profile || global-restricted profile
+      9660 | 0.74   1 | 0.19 | 0.099 || 9.7 0.97/0.00/0.01 0.70 0.11 |  2.2  4.3  0.7  3.6  3.0  1.9  2.7  3.6 ||  2.1  2.9  4.8  2.0  6.3  2.8  1.0  2.3
+      8017 | 0.41   4 | 0.26 | 0.129 || 6.8 0.82/0.00/0.00 0.00 0.09 |  4.9  6.4  6.3  7.1  7.0  5.7  4.6  4.0 ||  2.8  4.6  4.3  7.3  4.7  6.4  6.3  5.3
+      6664 | 0.88   0 | 0.10 | 0.108 || 6.7 0.86/0.00/0.00 0.03 0.14 |  3.7  4.2  5.7  4.9  7.0  7.3  3.4  4.4 ||  3.0  3.1  3.6  3.7  4.4  6.2  9.0  5.2
+      6097 | 0.48   9 | 0.20 | 0.144 || 6.2 0.81/0.00/0.00 0.00 0.13 |  4.7  4.9  7.7  6.6  6.8  5.5  5.4  1.3 ||  2.5  5.1  3.8 19.2  8.1  5.5  6.4  7.0
+      6021 | 0.89   6 | 0.10 | 0.110 || 6.4 0.79/0.00/0.00 0.00 0.22 |  3.2  4.9  5.5 11.0  7.1  5.4  5.8  1.6 ||  2.8  3.6  5.0  9.4  5.3  6.3  6.0  6.3
+      5802 | 0.49   3 | 0.38 | 0.173 || 6.2 0.63/0.00/0.01 0.00 0.30 |  6.1  7.8 10.9 12.5  7.7  8.2  4.9  2.1 ||  2.7  3.2  6.3  5.1  5.5  5.5  6.6  7.3
+   largest classes -> communities holding >= 5%: 1: 2 (max 0.91), 7: 3 (max 0.69), 3: 2 (max 0.43), 2: 2 (max 0.43), 9: 2 (max 0.43), 0: 2 (max 0.85), 6: 3 (max 0.78), 8: 4 (max 0.54)
+   Spearman vs purity (within / global / free): mean_d +0.24/-0.27  min_d -0.08/-0.09  dip_share -0.01/+0.38  pocket_share -0.23/+nan  spike_share +0.58/+0.10  log_size -0.16  radius -0.55  phi -0.30
+
+== fashion_mnist: n=70000 communities=14 (>= 1000: 14); shipped 1s, global binary tree 3046 leaves 1s
+   within-community trees: 14 communities, 1s total
+   largest communities: size | purity cls | moved-in | phi || within: rungs fam-mix(curve+sheet/ball/pocket) dip spike | profile || global-restricted profile
+      9144 | 0.63   7 | 0.09 | 0.073 || 7.1 0.89/0.00/0.01 0.09 0.12 |  3.7  4.6  4.4  3.3  5.4  6.1  4.7  4.2 ||  1.0  1.8  1.2  1.0  1.3  4.7  4.0  2.3
+      8942 | 0.43   4 | 0.13 | 0.075 || 7.2 0.85/0.00/0.02 0.08 0.41 |  0.9 12.9  3.4  4.3  8.9  7.9  4.7  4.2 ||  1.2  1.6  1.0  4.6  2.5  1.9  6.4  4.8
+      8797 | 0.33   5 | 0.53 | 0.108 || 7.7 0.86/0.02/0.03 0.32 0.44 |  1.1 10.7 11.2  5.2  4.6  6.3  4.8  2.7 ||  1.0  2.0  1.7  1.4  6.1  1.9  4.5  7.0
+      5296 | 0.64   9 | 0.16 | 0.113 || 6.6 0.92/0.03/0.01 0.23 0.26 |  7.5  3.8  9.3  4.7  6.5  3.6  2.9  5.4 ||  1.0  1.7  3.7  3.2  1.1  4.0  1.4  6.1
+      5211 | 0.69   1 | 0.10 | 0.102 || 6.5 0.95/0.00/0.00 0.28 0.39 |  9.6  3.4  6.4  7.0  2.7  3.6  3.4  1.6 ||  1.1  1.9  2.4  1.5  2.7  8.9  4.2  4.3
+      4678 | 0.77   0 | 0.26 | 0.068 || 6.5 0.97/0.00/0.00 0.15 0.13 |  4.9  6.4  2.1  1.1  5.0  6.8  4.7  3.0 ||  1.2  1.7  2.7  2.3  2.1  5.2  9.1  1.8
+   largest classes -> communities holding >= 5%: 0: 4 (max 0.52), 1: 2 (max 0.51), 2: 3 (max 0.43), 3: 5 (max 0.42), 4: 4 (max 0.55), 5: 4 (max 0.42), 6: 6 (max 0.27), 7: 2 (max 0.82)
+   Spearman vs purity (within / global / free): mean_d -0.32/+0.05  min_d -0.59/-0.32  dip_share +0.09/+0.34  pocket_share -0.02/+nan  spike_share -0.35/+0.25  log_size -0.64  radius -0.42  phi -0.45
+
+== cmu_mocap: n=140837 communities=21 (>= 1000: 18); shipped 1s, global binary tree 4563 leaves 2s
+   within-community trees: 18 communities, 2s total
+   largest communities: size | purity cls | moved-in | phi || within: rungs fam-mix(curve+sheet/ball/pocket) dip spike | profile || global-restricted profile
+     18547 | 0.19  16 | 0.11 | 0.018 || 9.0 0.99/0.00/0.00 0.70 0.11 |  1.2  4.9  2.4  4.8  3.5  3.4  2.9  2.6 ||  3.5  1.7  1.1  1.1  7.7  2.5  0.8  6.3
+     12274 | 0.95   5 | 0.03 | 0.016 || 8.4 0.94/0.00/0.01 0.46 0.57 | 16.9  3.1 10.7  6.1  6.0  4.6  2.4  2.5 ||  4.7  3.3  1.5  1.0  8.3  2.8  1.4  0.9
+     11497 | 0.70  22 | 0.03 | 0.014 || 8.5 0.98/0.00/0.00 0.75 0.33 |  1.1  7.2  1.5  1.2  3.4  2.8  2.7  1.7 ||  5.7  1.2  0.6  1.3  2.2 17.5  1.2  2.1
+     10997 | 0.82  22 | 0.15 | 0.024 || 8.1 0.99/0.00/0.00 0.54 0.21 |  1.3 11.4  3.5  2.9  2.6  1.8  3.1  2.1 ||  3.4  3.0  2.3  2.6  3.1  6.1  2.2  3.3
+     10672 | 0.94  22 | 0.08 | 0.023 || 8.2 0.98/0.00/0.00 0.57 0.32 | 15.8  1.6  3.0  1.5  1.3  2.8  4.6  3.0 ||  4.0  2.1  4.3  1.1 11.2  1.9  1.4  1.5
+     10512 | 0.66  22 | 0.12 | 0.015 || 8.1 0.97/0.00/0.00 0.65 0.15 |  4.2  0.8  2.3  4.9  1.2  3.0  2.6  4.3 ||  3.4  4.5  0.8  2.1  2.0  1.4  2.9  2.6
+   largest classes -> communities holding >= 5%: 22: 6 (max 0.20), 5: 5 (max 0.33), 3: 5 (max 0.22), 16: 6 (max 0.38), 15: 3 (max 0.60), 13: 4 (max 0.51), 17: 4 (max 0.45), 10: 5 (max 0.35)
+   Spearman vs purity (within / global / free): mean_d +0.36/-0.21  min_d +0.40/+0.29  dip_share -0.54/-0.24  pocket_share +0.25/+nan  spike_share +0.58/-0.25  log_size +0.02  radius -0.13  phi -0.10
+
+== ag_news: n=100000 communities=15 (>= 1000: 15); shipped 4s, global binary tree 1598 leaves 3s
+   within-community trees: 15 communities, 3s total
+   largest communities: size | purity cls | moved-in | phi || within: rungs fam-mix(curve+sheet/ball/pocket) dip spike | profile || global-restricted profile
+     12255 | 0.97   2 | 0.04 | 0.061 || 8.8 0.36/0.18/0.01 0.00 0.67 |  9.6 15.0  9.4 11.2 10.5 11.3 14.0 12.9 || 12.2  5.1  7.8 12.3  3.6  7.4  5.8  5.0
+     10814 | 0.80   0 | 0.17 | 0.243 || 7.7 0.46/0.37/0.00 0.00 0.82 | 27.3  7.3  7.3 18.3 13.9  8.8  8.4  5.3 ||  6.6 10.5  5.9 14.8 10.4  8.0 14.7  6.4
+      8603 | 0.96   3 | 0.20 | 0.145 || 7.2 0.88/0.00/0.01 0.00 0.07 |  4.5  9.3 11.2  4.3  3.9  3.2  2.5  3.3 || 11.9  8.5  7.7  4.9  5.9 14.4  8.7  4.6
+      8307 | 0.87   1 | 0.35 | 0.224 || 7.8 0.52/0.05/0.07 0.00 0.67 |  9.0 18.4 15.1 10.5 10.9 11.3  8.0  5.5 ||  6.6 15.5 16.8 15.5  9.5 11.7 14.5 11.0
+      8187 | 0.90   3 | 0.31 | 0.238 || 6.2 0.83/0.06/0.01 0.00 0.42 | 12.2 13.7 15.0  8.5  6.5  6.6  3.7  2.7 || 10.0  9.6 37.1 14.0 10.3 11.5 12.0  6.9
+      8125 | 0.90   1 | 0.29 | 0.177 || 7.5 0.66/0.15/0.01 0.00 0.82 | 21.5 13.5 14.3 13.5 12.1  9.1  3.8  6.8 ||  6.6 15.4  6.3 13.6 26.6  6.7 13.7 10.7
+   largest classes -> communities holding >= 5%: 1: 5 (max 0.29), 3: 4 (max 0.33), 2: 3 (max 0.48), 0: 4 (max 0.35)
+   Spearman vs purity (within / global / free): mean_d -0.21/-0.47  min_d -0.51/-0.62  dip_share +nan/+nan  pocket_share -0.36/-0.71  spike_share +0.06/-0.14  log_size +0.67  radius -0.63  phi -0.85
+
+== tms_facs: n=110824 communities=24 (>= 1000: 22); shipped 1s, global binary tree 3891 leaves 2s
+   within-community trees: 22 communities, 2s total
+   largest communities: size | purity cls | moved-in | phi || within: rungs fam-mix(curve+sheet/ball/pocket) dip spike | profile || global-restricted profile
+     13783 | 0.34  76 | 0.00 | 0.005 || 8.8 0.96/0.00/0.00 0.62 0.32 |  2.9  6.8  1.1  5.5  2.8  4.2  7.2  7.7 ||  3.2  1.6  0.7  1.0  8.0  3.5  5.3  2.1
+     13086 | 1.00  77 | 0.00 | 0.004 || 9.6 0.95/0.00/0.01 0.79 0.52 |  0.7  7.4  7.2  5.5  2.4  7.1 12.5  4.2 ||  1.6  1.6  0.3  0.2 12.7  1.3 11.1  3.2
+     10830 | 0.50   0 | 0.01 | 0.017 || 9.7 0.93/0.00/0.00 0.99 0.58 |  4.6 17.7  1.9  7.9  7.5  1.8  5.5 10.6 ||  1.6  5.1  1.2  0.5  2.3  0.3  0.5  0.6
+      9163 | 0.29  30 | 0.06 | 0.008 || 8.3 0.91/0.00/0.01 0.90 0.26 |  2.3  2.0  0.7  1.4  5.8  9.4  4.1  5.6 ||  3.2  7.2  3.2  2.8  0.7  0.7  1.3  1.2
+      8703 | 0.48  14 | 0.01 | 0.006 || 7.7 0.96/0.00/0.00 0.58 0.19 |  1.6  1.1  2.1  3.4  3.9  4.7  5.9  4.3 ||  3.2  8.0  2.7  1.5  1.0  1.9  1.1  1.7
+      8119 | 0.22   5 | 0.01 | 0.011 || 7.8 0.94/0.00/0.00 0.55 0.14 |  1.5  1.3  2.8  7.1  2.5  1.8  7.2  3.1 ||  1.6  5.1  1.2  1.2  7.0  1.4  2.4  0.4
+   largest classes -> communities holding >= 5%: 77: 1 (max 0.98), 0: 1 (max 0.96), 29: 2 (max 0.50), 76: 1 (max 1.00), 14: 1 (max 0.99), 43: 1 (max 0.97), 49: 1 (max 0.96), 46: 1 (max 0.99)
+   Spearman vs purity (within / global / free): mean_d -0.07/+0.32  min_d -0.47/-0.61  dip_share +0.41/+0.52  pocket_share +0.31/+nan  spike_share -0.06/+0.18  log_size -0.24  radius -0.83  phi -0.25
+
+== tms_droplet: n=245389 communities=29 (>= 1000: 28); shipped 1s, global binary tree 6445 leaves 3s
+   within-community trees: 28 communities, 4s total
+   largest communities: size | purity cls | moved-in | phi || within: rungs fam-mix(curve+sheet/ball/pocket) dip spike | profile || global-restricted profile
+     34541 | 0.87   0 | 0.01 | 0.011 || 11.3 0.99/0.00/0.00 0.99 0.56 |  0.2  1.3  0.4 12.5  1.0  6.6  3.7 11.7 ||  1.3  1.4  0.7  0.2  0.2  0.2  0.5  0.2
+     24934 | 0.39  47 | 0.00 | 0.015 || 11.1 1.00/0.00/0.00 0.96 0.21 |  1.3  1.0  2.0  2.2  1.2  3.1  1.6  5.8 ||  1.3  3.9  1.9  0.7  1.5  1.2  1.7  3.0
+     20515 | 0.54  58 | 0.00 | 0.001 || 8.5 0.99/0.00/0.00 0.12 0.13 |  1.1  1.4  2.2  1.6  3.2  4.5  4.9  7.1 ||  3.9  2.8  0.9  0.6  1.6  1.5  1.2  1.8
+     19878 | 0.50  85 | 0.03 | 0.027 || 9.3 0.96/0.00/0.00 0.48 0.36 |  1.2  1.9  4.5  4.0  4.1  3.6  5.6  6.2 ||  3.9  1.8  1.4  0.8  1.4  0.8  2.8  1.6
+     19257 | 0.40  25 | 0.94 | 0.034 || 9.5 0.97/0.00/0.00 0.94 0.33 |  0.4  1.9  2.0  2.0  2.9  5.0  4.8  7.0 ||  1.3  3.7  1.6  0.7  3.5  1.2  2.1 10.3
+     18920 | 0.50  31 | 0.04 | 0.007 || 9.7 0.97/0.00/0.00 0.77 0.41 |  5.8  3.8  8.1  3.2  3.3  6.4  4.2  4.3 ||  3.9  1.8  1.7  0.4  2.5  9.0  2.0  1.5
+   largest classes -> communities holding >= 5%: 0: 1 (max 0.98), 85: 2 (max 0.76), 47: 2 (max 0.78), 13: 2 (max 0.82), 9: 2 (max 0.86), 58: 1 (max 1.00), 31: 1 (max 0.96), 25: 1 (max 0.98)
+   Spearman vs purity (within / global / free): mean_d +0.25/+0.36  min_d -0.15/-0.17  dip_share +0.07/+0.11  pocket_share -0.28/+nan  spike_share +0.11/+0.11  log_size -0.48  radius -0.76  phi -0.31
+
+== brain_1m: n=1290029 communities=19 (>= 1000: 19); shipped 4s, global binary tree 20966 leaves 16s
+   within-community trees: 19 communities, 19s total
+   largest communities: size | purity cls | moved-in | phi || within: rungs fam-mix(curve+sheet/ball/pocket) dip spike | profile || global-restricted profile
+    178588 | 0.75   0 | 0.09 | 0.089 || 11.4 0.39/0.00/0.06 0.08 0.84 |  1.6 11.8 12.6 13.2 10.6  9.6 11.2 11.6 ||  1.2  4.0  1.8  2.4  1.7  6.9 13.4  6.9
+    149692 | 0.60   1 | 0.94 | 0.125 || 11.1 0.35/0.02/0.00 0.02 0.80 |  6.6  9.9  9.7  8.5  9.9 11.9 13.3 12.0 ||  1.2  1.8  4.5  3.3  3.0  6.5  9.0  7.5
+    115473 | 0.50   1 | 0.13 | 0.089 || 10.9 0.79/0.00/0.00 0.10 0.60 |  3.1  8.1  7.4 11.4  6.4  6.2  7.0  9.4 ||  3.5  3.2  5.0  5.0  1.8  4.2  4.9  4.7
+    108684 | 0.51   6 | 0.03 | 0.027 || 11.2 0.93/0.00/0.00 0.12 0.59 |  2.0  1.7  2.7 10.5  3.1  6.8  8.3  6.9 ||  3.2 13.1  2.3  6.0  7.3  2.4  2.7  4.4
+     90201 | 0.89   3 | 0.03 | 0.029 || 11.4 0.91/0.00/0.00 0.35 0.65 |  4.0  5.2  6.3  6.0  7.7  6.0  7.9  9.6 ||  2.5 15.5  2.7  1.8  1.3  4.0  6.5  3.5
+     88497 | 0.32  13 | 0.42 | 0.056 || 11.4 0.95/0.00/0.00 0.55 0.45 |  3.2  3.8  7.7  3.8  4.6  7.7  4.5  5.5 ||  5.0  1.8  1.9  5.9  4.7  2.7  6.9  3.1
+   largest classes -> communities holding >= 5%: 0: 2 (max 0.77), 1: 2 (max 0.59), 2: 3 (max 0.65), 3: 1 (max 0.99), 4: 1 (max 0.96), 5: 2 (max 0.86), 6: 1 (max 0.98), 7: 3 (max 0.77)
+   Spearman vs purity (within / global / free): mean_d -0.40/-0.35  min_d -0.43/-0.38  dip_share +0.46/+0.44  pocket_share -0.09/+nan  spike_share -0.39/-0.43  log_size -0.58  radius -0.69  phi -0.41
+
+=== pooled over 129 communities from 7 datasets (ranks within dataset)
+   feature                 | rho vs purity  (null 95%)  | rho vs moved-in | rho vs phi
+   within.mean_d           | -0.006 (0.174)  | +0.019  | +0.198* |
+   within.min_d            | -0.255 (0.171)* | +0.245* | +0.378* |
+   within.slope            | +0.112 (0.173)  | -0.181* | -0.165  |
+   within.dip_share        | +0.088 (0.172)  | -0.122  | -0.218* |
+   within.spike_share      | +0.062 (0.189)  | -0.111  | +0.069  |
+   within.pocket_share     | -0.061 (0.189)  | +0.180  | +0.112  |
+   within.curve_sheet_share| -0.071 (0.177)  | -0.248* | -0.314* |
+   within.ball_share       | -0.102 (0.145)  | +0.013  | +0.111  |
+   within.rungs            | -0.104 (0.177)  | -0.416* | -0.353* |
+   global.mean_d           | -0.033 (0.190)  | +0.237* | +0.339* |
+   global.min_d            | -0.273 (0.186)* | +0.430* | +0.526* |
+   global.slope            | -0.016 (0.178)  | -0.023  | +0.075  |
+   global.dip_share        | +0.223 (0.179)* | -0.349* | -0.422* |
+   global.spike_share      | -0.023 (0.176)  | +0.076  | +0.185* |
+   global.pocket_share     | -0.215 (0.179)* | +0.239* | +0.266* |
+   global.curve_sheet_share| +0.152 (0.174)  | -0.388* | -0.404* |
+   global.ball_share       | -0.078 (0.182)  | +0.146  | +0.150  |
+   global.rungs            | -0.031 (0.175)  | -0.345* | -0.235* |
+   free.log_size           | -0.229 (0.179)* | -0.362* | -0.250* |
+   free.radius             | -0.600 (0.179)* | +0.354* | +0.536* |
+   free.phi                | -0.368 (0.177)* | +0.710* | +1.000* |
+
+   leave-one-dataset-out logistic AUC, target = bottom-quartile purity within its dataset (features rank-normalised within dataset)
+   set              mnist  fashion_  cmu_moca   ag_news  tms_facs  tms_drop  brain_1m    pooled
+   FREE              0.94      0.90      0.58      0.66      0.91      0.86      0.76    0.794
+   GLOBAL            0.33      0.48      0.22      0.20      0.09      0.72      0.46    0.357
+   WITHIN            0.78      0.53      0.68      0.43      0.56      0.48      0.36    0.543
+   WITHIN+FREE       0.92      0.88      0.60      0.64      0.66      0.80      0.76    0.753
+   GLOBAL+FREE       0.81      0.72      0.57      0.61      0.68      0.90      0.77    0.741
+
+wrote /Volumes/Models/dyf_bench_2026-11-04/community_shape_probe_results.json
