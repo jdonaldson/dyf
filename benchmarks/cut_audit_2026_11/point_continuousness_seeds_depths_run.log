@@ -1,0 +1,380 @@
+
+== mnist seed=42 bits=3 depth=8: n=70000 mean rungs=5.5 moved=26.0% disagree=30.3%
+   combined rank(dim)+rank(-step)              | AUC moved=0.6321506415982645 disagree=0.6084500989622463
+   step within dim tertiles: low: AUC moved=0.5088675880687246 (moved 13%)  mid: AUC moved=0.4428306720824352 (moved 25%)  high: AUC moved=0.48064272206647013 (moved 40%)
+   dim (higher = more continuous?)        mean=4.316 | AUC moved=0.68 disagree=0.648 | rho(leaf purity)=-0.34
+   -min margin ratio                      mean=-0.035 | AUC moved=0.556 disagree=0.523 | rho(leaf purity)=+0.12
+   -mean margin ratio                     mean=0.218 | AUC moved=0.562 disagree=0.531 | rho(leaf purity)=+0.19
+   -max step (smaller step = continuous)  mean=0.748 | AUC moved=0.552 disagree=0.546 | rho(leaf purity)=+0.08
+   (3s)
+
+== mnist seed=1 bits=3 depth=8: n=70000 mean rungs=5.5 moved=28.0% disagree=32.5%
+   combined rank(dim)+rank(-step)              | AUC moved=0.600686611718366 disagree=0.6253133508141133
+   step within dim tertiles: low: AUC moved=0.5816558075822915 (moved 17%)  mid: AUC moved=0.4048423695755908 (moved 27%)  high: AUC moved=0.4687352708958884 (moved 40%)
+   dim (higher = more continuous?)        mean=4.315 | AUC moved=0.652 disagree=0.661 | rho(leaf purity)=-0.34
+   -min margin ratio                      mean=-0.036 | AUC moved=0.532 disagree=0.512 | rho(leaf purity)=+0.13
+   -mean margin ratio                     mean=0.214 | AUC moved=0.548 disagree=0.533 | rho(leaf purity)=+0.19
+   -max step (smaller step = continuous)  mean=0.750 | AUC moved=0.537 disagree=0.568 | rho(leaf purity)=+0.09
+   (3s)
+
+== mnist seed=2 bits=3 depth=8: n=70000 mean rungs=5.5 moved=27.2% disagree=31.9%
+   combined rank(dim)+rank(-step)              | AUC moved=0.651636919020606 disagree=0.6087058801488918
+   step within dim tertiles: low: AUC moved=0.5811482357948567 (moved 13%)  mid: AUC moved=0.49407298858252174 (moved 28%)  high: AUC moved=0.4935823500750334 (moved 41%)
+   dim (higher = more continuous?)        mean=4.328 | AUC moved=0.677 disagree=0.646 | rho(leaf purity)=-0.35
+   -min margin ratio                      mean=-0.035 | AUC moved=0.532 disagree=0.509 | rho(leaf purity)=+0.09
+   -mean margin ratio                     mean=0.215 | AUC moved=0.568 disagree=0.539 | rho(leaf purity)=+0.17
+   -max step (smaller step = continuous)  mean=0.750 | AUC moved=0.592 disagree=0.555 | rho(leaf purity)=+0.12
+   (3s)
+
+== mnist seed=42 bits=1 depth=16: n=70000 mean rungs=11.8 moved=26.0% disagree=30.3%
+   combined rank(dim)+rank(-step)              | AUC moved=0.5648580822296279 disagree=0.5759403771151362
+   step within dim tertiles: low: AUC moved=0.40700453801987924 (moved 20%)  mid: AUC moved=0.48746829786823526 (moved 23%)  high: AUC moved=0.48216316380288854 (moved 36%)
+   dim (higher = more continuous?)        mean=4.235 | AUC moved=0.607 disagree=0.592 | rho(leaf purity)=-0.12
+   -min margin ratio                      mean=0.067 | AUC moved=0.566 disagree=0.553 | rho(leaf purity)=+0.04
+   -mean margin ratio                     mean=0.587 | AUC moved=0.662 disagree=0.644 | rho(leaf purity)=+0.15
+   -max step (smaller step = continuous)  mean=0.292 | AUC moved=0.492 disagree=0.524 | rho(leaf purity)=-0.03
+   (3s)
+
+== mnist seed=1 bits=1 depth=16: n=70000 mean rungs=12.0 moved=28.0% disagree=32.5%
+   combined rank(dim)+rank(-step)              | AUC moved=0.5676870549216727 disagree=0.5813703582594087
+   step within dim tertiles: low: AUC moved=0.4600094515852265 (moved 20%)  mid: AUC moved=0.48835308037733405 (moved 28%)  high: AUC moved=0.4893477711346551 (moved 36%)
+   dim (higher = more continuous?)        mean=4.233 | AUC moved=0.598 disagree=0.61 | rho(leaf purity)=-0.11
+   -min margin ratio                      mean=0.060 | AUC moved=0.599 disagree=0.596 | rho(leaf purity)=+0.04
+   -mean margin ratio                     mean=0.587 | AUC moved=0.659 disagree=0.682 | rho(leaf purity)=+0.15
+   -max step (smaller step = continuous)  mean=0.286 | AUC moved=0.505 disagree=0.515 | rho(leaf purity)=-0.07
+   (3s)
+
+== mnist seed=2 bits=1 depth=16: n=70000 mean rungs=11.8 moved=27.2% disagree=31.9%
+   combined rank(dim)+rank(-step)              | AUC moved=0.5648289097962996 disagree=0.5570165303533432
+   step within dim tertiles: low: AUC moved=0.4395407433692416 (moved 21%)  mid: AUC moved=0.48703607479899735 (moved 25%)  high: AUC moved=0.5178751489625228 (moved 36%)
+   dim (higher = more continuous?)        mean=4.220 | AUC moved=0.584 disagree=0.583 | rho(leaf purity)=-0.12
+   -min margin ratio                      mean=0.064 | AUC moved=0.608 disagree=0.595 | rho(leaf purity)=+0.03
+   -mean margin ratio                     mean=0.584 | AUC moved=0.682 disagree=0.678 | rho(leaf purity)=+0.17
+   -max step (smaller step = continuous)  mean=0.290 | AUC moved=0.515 disagree=0.507 | rho(leaf purity)=-0.06
+   (3s)
+
+== fashion_mnist seed=42 bits=3 depth=8: n=70000 mean rungs=5.9 moved=29.8% disagree=39.1%
+   combined rank(dim)+rank(-step)              | AUC moved=0.5697333262992152 disagree=0.5585431932722327
+   step within dim tertiles: low: AUC moved=0.4293539948049681 (moved 21%)  mid: AUC moved=0.4792740550501812 (moved 28%)  high: AUC moved=0.517476110922926 (moved 41%)
+   dim (higher = more continuous?)        mean=2.736 | AUC moved=0.619 disagree=0.674 | rho(leaf purity)=-0.37
+   -min margin ratio                      mean=-0.057 | AUC moved=0.481 disagree=0.477 | rho(leaf purity)=-0.04
+   -mean margin ratio                     mean=0.247 | AUC moved=0.516 disagree=0.502 | rho(leaf purity)=+0.02
+   -max step (smaller step = continuous)  mean=1.272 | AUC moved=0.499 disagree=0.413 | rho(leaf purity)=-0.12
+   (2s)
+
+== fashion_mnist seed=1 bits=3 depth=8: n=70000 mean rungs=5.9 moved=34.4% disagree=34.4%
+   combined rank(dim)+rank(-step)              | AUC moved=0.5349965655182619 disagree=0.5695271115397245
+   step within dim tertiles: low: AUC moved=0.39527534856298446 (moved 27%)  mid: AUC moved=0.43331127012894527 (moved 29%)  high: AUC moved=0.4418810657217266 (moved 48%)
+   dim (higher = more continuous?)        mean=2.737 | AUC moved=0.619 disagree=0.669 | rho(leaf purity)=-0.36
+   -min margin ratio                      mean=-0.058 | AUC moved=0.457 disagree=0.49 | rho(leaf purity)=-0.05
+   -mean margin ratio                     mean=0.246 | AUC moved=0.472 disagree=0.5 | rho(leaf purity)=+0.01
+   -max step (smaller step = continuous)  mean=1.266 | AUC moved=0.434 disagree=0.435 | rho(leaf purity)=-0.13
+   (3s)
+
+== fashion_mnist seed=2 bits=3 depth=8: n=70000 mean rungs=5.9 moved=24.7% disagree=39.0%
+   combined rank(dim)+rank(-step)              | AUC moved=0.5904531251347594 disagree=0.543925211348798
+   step within dim tertiles: low: AUC moved=0.3570962189558665 (moved 11%)  mid: AUC moved=0.43486297472650653 (moved 26%)  high: AUC moved=0.44611791071371987 (moved 38%)
+   dim (higher = more continuous?)        mean=2.735 | AUC moved=0.682 disagree=0.643 | rho(leaf purity)=-0.36
+   -min margin ratio                      mean=-0.056 | AUC moved=0.503 disagree=0.472 | rho(leaf purity)=-0.04
+   -mean margin ratio                     mean=0.248 | AUC moved=0.52 disagree=0.49 | rho(leaf purity)=-0.00
+   -max step (smaller step = continuous)  mean=1.270 | AUC moved=0.443 disagree=0.426 | rho(leaf purity)=-0.12
+   (3s)
+
+== fashion_mnist seed=42 bits=1 depth=16: n=70000 mean rungs=14.0 moved=29.8% disagree=39.1%
+   combined rank(dim)+rank(-step)              | AUC moved=0.6195135884571716 disagree=0.6360691326435739
+   step within dim tertiles: low: AUC moved=0.6114292980273816 (moved 21%)  mid: AUC moved=0.5517051716867689 (moved 28%)  high: AUC moved=0.48998072050396324 (moved 40%)
+   dim (higher = more continuous?)        mean=2.720 | AUC moved=0.616 disagree=0.683 | rho(leaf purity)=-0.34
+   -min margin ratio                      mean=0.056 | AUC moved=0.512 disagree=0.535 | rho(leaf purity)=+0.07
+   -mean margin ratio                     mean=0.875 | AUC moved=0.594 disagree=0.69 | rho(leaf purity)=+0.39
+   -max step (smaller step = continuous)  mean=0.633 | AUC moved=0.555 disagree=0.51 | rho(leaf purity)=+0.20
+   (3s)
+
+== fashion_mnist seed=1 bits=1 depth=16: n=70000 mean rungs=14.0 moved=34.4% disagree=34.4%
+   combined rank(dim)+rank(-step)              | AUC moved=0.5214190553915071 disagree=0.648199970877709
+   step within dim tertiles: low: AUC moved=0.34246534591585714 (moved 27%)  mid: AUC moved=0.45260297491869367 (moved 30%)  high: AUC moved=0.4064125945782543 (moved 46%)
+   dim (higher = more continuous?)        mean=2.715 | AUC moved=0.612 disagree=0.665 | rho(leaf purity)=-0.32
+   -min margin ratio                      mean=0.055 | AUC moved=0.503 disagree=0.538 | rho(leaf purity)=+0.08
+   -mean margin ratio                     mean=0.894 | AUC moved=0.61 disagree=0.681 | rho(leaf purity)=+0.38
+   -max step (smaller step = continuous)  mean=0.635 | AUC moved=0.413 disagree=0.545 | rho(leaf purity)=+0.20
+   (3s)
+
+== fashion_mnist seed=2 bits=1 depth=16: n=70000 mean rungs=13.9 moved=24.7% disagree=39.0%
+   combined rank(dim)+rank(-step)              | AUC moved=0.6285410895794838 disagree=0.6018336966689319
+   step within dim tertiles: low: AUC moved=0.44856682091301114 (moved 10%)  mid: AUC moved=0.43512125015796965 (moved 24%)  high: AUC moved=0.49467585831202293 (moved 39%)
+   dim (higher = more continuous?)        mean=2.714 | AUC moved=0.695 disagree=0.659 | rho(leaf purity)=-0.33
+   -min margin ratio                      mean=0.057 | AUC moved=0.523 disagree=0.53 | rho(leaf purity)=+0.07
+   -mean margin ratio                     mean=0.887 | AUC moved=0.641 disagree=0.651 | rho(leaf purity)=+0.38
+   -max step (smaller step = continuous)  mean=0.633 | AUC moved=0.495 disagree=0.488 | rho(leaf purity)=+0.19
+   (3s)
+
+== cmu_mocap seed=42 bits=3 depth=8: n=140837 mean rungs=6.9 moved=12.9% disagree=37.3%
+   combined rank(dim)+rank(-step)              | AUC moved=0.5283326930606038 disagree=0.5572866768848495
+   step within dim tertiles: low: AUC moved=0.38833479246074 (moved 10%)  mid: AUC moved=0.4015127350372454 (moved 12%)  high: AUC moved=0.43984784429632867 (moved 17%)
+   dim (higher = more continuous?)        mean=1.792 | AUC moved=0.587 disagree=0.582 | rho(leaf purity)=-0.18
+   -min margin ratio                      mean=-0.113 | AUC moved=0.486 disagree=0.512 | rho(leaf purity)=+0.07
+   -mean margin ratio                     mean=0.533 | AUC moved=0.47 disagree=0.508 | rho(leaf purity)=+0.19
+   -max step (smaller step = continuous)  mean=2.027 | AUC moved=0.469 disagree=0.524 | rho(leaf purity)=+0.19
+   (7s)
+
+== cmu_mocap seed=1 bits=3 depth=8: n=140837 mean rungs=6.9 moved=17.7% disagree=41.8%
+   combined rank(dim)+rank(-step)              | AUC moved=0.5123773356711572 disagree=0.5492857586441702
+   step within dim tertiles: low: AUC moved=0.41433465909296135 (moved 15%)  mid: AUC moved=0.3967435228158843 (moved 18%)  high: AUC moved=0.46778146036183044 (moved 21%)
+   dim (higher = more continuous?)        mean=1.788 | AUC moved=0.554 disagree=0.578 | rho(leaf purity)=-0.18
+   -min margin ratio                      mean=-0.098 | AUC moved=0.507 disagree=0.507 | rho(leaf purity)=+0.03
+   -mean margin ratio                     mean=0.599 | AUC moved=0.482 disagree=0.522 | rho(leaf purity)=+0.08
+   -max step (smaller step = continuous)  mean=2.033 | AUC moved=0.47 disagree=0.513 | rho(leaf purity)=+0.16
+   (7s)
+
+== cmu_mocap seed=2 bits=3 depth=8: n=140837 mean rungs=6.8 moved=25.1% disagree=36.6%
+   combined rank(dim)+rank(-step)              | AUC moved=0.5312099207682918 disagree=0.5632918616698872
+   step within dim tertiles: low: AUC moved=0.4706919635237073 (moved 22%)  mid: AUC moved=0.42284417356538195 (moved 23%)  high: AUC moved=0.46273976378481624 (moved 30%)
+   dim (higher = more continuous?)        mean=1.779 | AUC moved=0.565 disagree=0.577 | rho(leaf purity)=-0.18
+   -min margin ratio                      mean=-0.118 | AUC moved=0.524 disagree=0.493 | rho(leaf purity)=+0.08
+   -mean margin ratio                     mean=0.552 | AUC moved=0.499 disagree=0.51 | rho(leaf purity)=+0.20
+   -max step (smaller step = continuous)  mean=2.042 | AUC moved=0.495 disagree=0.539 | rho(leaf purity)=+0.13
+   (7s)
+
+== cmu_mocap seed=42 bits=1 depth=16: n=140837 mean rungs=15.3 moved=12.9% disagree=37.3%
+   combined rank(dim)+rank(-step)              | AUC moved=0.5430717015901432 disagree=0.5998714882518005
+   step within dim tertiles: low: AUC moved=0.40947995097036216 (moved 9%)  mid: AUC moved=0.3764285373220224 (moved 11%)  high: AUC moved=0.4052180691154421 (moved 19%)
+   dim (higher = more continuous?)        mean=1.952 | AUC moved=0.628 disagree=0.608 | rho(leaf purity)=-0.22
+   -min margin ratio                      mean=0.096 | AUC moved=0.525 disagree=0.466 | rho(leaf purity)=+0.05
+   -mean margin ratio                     mean=1.502 | AUC moved=0.534 disagree=0.589 | rho(leaf purity)=+0.35
+   -max step (smaller step = continuous)  mean=0.919 | AUC moved=0.445 disagree=0.557 | rho(leaf purity)=+0.34
+   (6s)
+
+== cmu_mocap seed=1 bits=1 depth=16: n=140837 mean rungs=15.4 moved=17.7% disagree=41.8%
+   combined rank(dim)+rank(-step)              | AUC moved=0.52447328527156 disagree=0.58852022458173
+   step within dim tertiles: low: AUC moved=0.3713021801072429 (moved 13%)  mid: AUC moved=0.4473889672307155 (moved 17%)  high: AUC moved=0.4345543984485676 (moved 23%)
+   dim (higher = more continuous?)        mean=1.969 | AUC moved=0.584 disagree=0.603 | rho(leaf purity)=-0.24
+   -min margin ratio                      mean=0.098 | AUC moved=0.556 disagree=0.48 | rho(leaf purity)=+0.03
+   -mean margin ratio                     mean=1.474 | AUC moved=0.501 disagree=0.608 | rho(leaf purity)=+0.36
+   -max step (smaller step = continuous)  mean=0.915 | AUC moved=0.457 disagree=0.544 | rho(leaf purity)=+0.35
+   (6s)
+
+== cmu_mocap seed=2 bits=1 depth=16: n=140837 mean rungs=15.3 moved=25.1% disagree=36.6%
+   combined rank(dim)+rank(-step)              | AUC moved=0.529513360494182 disagree=0.626314607500561
+   step within dim tertiles: low: AUC moved=0.4318458351095994 (moved 20%)  mid: AUC moved=0.4149459349248089 (moved 21%)  high: AUC moved=0.4166628889952948 (moved 34%)
+   dim (higher = more continuous?)        mean=1.938 | AUC moved=0.597 disagree=0.606 | rho(leaf purity)=-0.23
+   -min margin ratio                      mean=0.093 | AUC moved=0.612 disagree=0.476 | rho(leaf purity)=+0.03
+   -mean margin ratio                     mean=1.460 | AUC moved=0.504 disagree=0.592 | rho(leaf purity)=+0.36
+   -max step (smaller step = continuous)  mean=0.928 | AUC moved=0.455 disagree=0.605 | rho(leaf purity)=+0.37
+   (6s)
+
+== ag_news seed=42 bits=3 depth=8: n=100000 mean rungs=5.9 moved=31.3% disagree=16.5%
+   combined rank(dim)+rank(-step)              | AUC moved=0.5739809107274247 disagree=0.5775815280143368
+   step within dim tertiles: low: AUC moved=0.42066980297453993 (moved 25%)  mid: AUC moved=0.4391246737022274 (moved 27%)  high: AUC moved=0.5202889021579444 (moved 42%)
+   dim (higher = more continuous?)        mean=10.633 | AUC moved=0.602 disagree=0.613 | rho(leaf purity)=-0.38
+   -min margin ratio                      mean=-0.028 | AUC moved=0.564 disagree=0.528 | rho(leaf purity)=+0.09
+   -mean margin ratio                     mean=0.142 | AUC moved=0.576 disagree=0.547 | rho(leaf purity)=+0.18
+   -max step (smaller step = continuous)  mean=0.451 | AUC moved=0.533 disagree=0.53 | rho(leaf purity)=+0.19
+   (9s)
+
+== ag_news seed=1 bits=3 depth=8: n=100000 mean rungs=5.9 moved=32.2% disagree=15.3%
+   combined rank(dim)+rank(-step)              | AUC moved=0.566404556187898 disagree=0.5679397088496314
+   step within dim tertiles: low: AUC moved=0.41454966586287517 (moved 26%)  mid: AUC moved=0.4378955465198535 (moved 29%)  high: AUC moved=0.5252288514889756 (moved 42%)
+   dim (higher = more continuous?)        mean=10.582 | AUC moved=0.596 disagree=0.598 | rho(leaf purity)=-0.36
+   -min margin ratio                      mean=-0.029 | AUC moved=0.581 disagree=0.528 | rho(leaf purity)=+0.07
+   -mean margin ratio                     mean=0.142 | AUC moved=0.577 disagree=0.539 | rho(leaf purity)=+0.15
+   -max step (smaller step = continuous)  mean=0.452 | AUC moved=0.525 disagree=0.525 | rho(leaf purity)=+0.18
+   (8s)
+
+== ag_news seed=2 bits=3 depth=8: n=100000 mean rungs=5.9 moved=30.0% disagree=16.0%
+   combined rank(dim)+rank(-step)              | AUC moved=0.5832475675719129 disagree=0.5706569283942525
+   step within dim tertiles: low: AUC moved=0.4087537036020924 (moved 22%)  mid: AUC moved=0.4151686156039598 (moved 27%)  high: AUC moved=0.5267536965093977 (moved 41%)
+   dim (higher = more continuous?)        mean=10.526 | AUC moved=0.619 disagree=0.603 | rho(leaf purity)=-0.35
+   -min margin ratio                      mean=-0.028 | AUC moved=0.591 disagree=0.532 | rho(leaf purity)=+0.08
+   -mean margin ratio                     mean=0.144 | AUC moved=0.59 disagree=0.542 | rho(leaf purity)=+0.15
+   -max step (smaller step = continuous)  mean=0.454 | AUC moved=0.534 disagree=0.526 | rho(leaf purity)=+0.16
+   (9s)
+
+== ag_news seed=42 bits=1 depth=16: n=100000 mean rungs=11.5 moved=31.3% disagree=16.5%
+   combined rank(dim)+rank(-step)              | AUC moved=0.5909283484974464 disagree=0.618625431174204
+   step within dim tertiles: low: AUC moved=0.5473679822743287 (moved 24%)  mid: AUC moved=0.5235111015283178 (moved 30%)  high: AUC moved=0.5214205195457358 (moved 40%)
+   dim (higher = more continuous?)        mean=10.816 | AUC moved=0.6 disagree=0.612 | rho(leaf purity)=-0.21
+   -min margin ratio                      mean=0.025 | AUC moved=0.595 disagree=0.576 | rho(leaf purity)=+0.14
+   -mean margin ratio                     mean=0.291 | AUC moved=0.665 disagree=0.662 | rho(leaf purity)=+0.26
+   -max step (smaller step = continuous)  mean=0.122 | AUC moved=0.526 disagree=0.549 | rho(leaf purity)=+0.21
+   (9s)
+
+== ag_news seed=1 bits=1 depth=16: n=100000 mean rungs=12.0 moved=32.2% disagree=15.3%
+   combined rank(dim)+rank(-step)              | AUC moved=0.5875996140560348 disagree=0.6175249226395075
+   step within dim tertiles: low: AUC moved=0.548315251675338 (moved 24%)  mid: AUC moved=0.48463119040503433 (moved 30%)  high: AUC moved=0.5119405498427386 (moved 42%)
+   dim (higher = more continuous?)        mean=10.919 | AUC moved=0.606 disagree=0.611 | rho(leaf purity)=-0.28
+   -min margin ratio                      mean=0.021 | AUC moved=0.594 disagree=0.568 | rho(leaf purity)=+0.14
+   -mean margin ratio                     mean=0.292 | AUC moved=0.668 disagree=0.644 | rho(leaf purity)=+0.25
+   -max step (smaller step = continuous)  mean=0.127 | AUC moved=0.519 disagree=0.559 | rho(leaf purity)=+0.23
+   (10s)
+
+== ag_news seed=2 bits=1 depth=16: n=100000 mean rungs=11.6 moved=30.0% disagree=16.0%
+   combined rank(dim)+rank(-step)              | AUC moved=0.5755249867974068 disagree=0.6097669320185403
+   step within dim tertiles: low: AUC moved=0.5334563547233045 (moved 23%)  mid: AUC moved=0.4940216790396481 (moved 28%)  high: AUC moved=0.47626052291221427 (moved 39%)
+   dim (higher = more continuous?)        mean=10.864 | AUC moved=0.609 disagree=0.619 | rho(leaf purity)=-0.26
+   -min margin ratio                      mean=0.024 | AUC moved=0.617 disagree=0.587 | rho(leaf purity)=+0.17
+   -mean margin ratio                     mean=0.283 | AUC moved=0.68 disagree=0.664 | rho(leaf purity)=+0.28
+   -max step (smaller step = continuous)  mean=0.122 | AUC moved=0.497 disagree=0.537 | rho(leaf purity)=+0.19
+   (9s)
+
+== tms_facs seed=42 bits=3 depth=8: n=110824 mean rungs=6.9 moved=4.4% disagree=46.4%
+   combined rank(dim)+rank(-step)              | AUC moved=0.7139379052634296 disagree=0.7074846965012689
+   step within dim tertiles: low: AUC moved=0.4383903506962522 (moved 2%)  mid: AUC moved=0.5955479708581336 (moved 2%)  high: AUC moved=0.5880744255744255 (moved 9%)
+   dim (higher = more continuous?)        mean=2.058 | AUC moved=0.741 disagree=0.664 | rho(leaf purity)=-0.44
+   -min margin ratio                      mean=-0.079 | AUC moved=0.651 disagree=0.556 | rho(leaf purity)=+0.15
+   -mean margin ratio                     mean=0.372 | AUC moved=0.537 disagree=0.488 | rho(leaf purity)=+0.08
+   -max step (smaller step = continuous)  mean=1.615 | AUC moved=0.655 disagree=0.708 | rho(leaf purity)=+0.60
+   (4s)
+
+== tms_facs seed=1 bits=3 depth=8: n=110824 mean rungs=6.8 moved=6.8% disagree=47.4%
+   combined rank(dim)+rank(-step)              | AUC moved=0.6263450260853607 disagree=0.6821098768734135
+   step within dim tertiles: low: AUC moved=0.5077020770211763 (moved 5%)  mid: AUC moved=0.5158615793927335 (moved 4%)  high: AUC moved=0.5388181997181881 (moved 11%)
+   dim (higher = more continuous?)        mean=2.067 | AUC moved=0.651 disagree=0.662 | rho(leaf purity)=-0.43
+   -min margin ratio                      mean=-0.072 | AUC moved=0.615 disagree=0.502 | rho(leaf purity)=+0.04
+   -mean margin ratio                     mean=0.406 | AUC moved=0.423 disagree=0.437 | rho(leaf purity)=-0.16
+   -max step (smaller step = continuous)  mean=1.571 | AUC moved=0.585 disagree=0.665 | rho(leaf purity)=+0.50
+   (4s)
+
+== tms_facs seed=2 bits=3 depth=8: n=110824 mean rungs=6.9 moved=6.5% disagree=45.3%
+   combined rank(dim)+rank(-step)              | AUC moved=0.6840389656185508 disagree=0.7204499574440049
+   step within dim tertiles: low: AUC moved=0.24775100823726803 (moved 4%)  mid: AUC moved=0.7097918536057455 (moved 4%)  high: AUC moved=0.6367008518991641 (moved 12%)
+   dim (higher = more continuous?)        mean=2.060 | AUC moved=0.686 disagree=0.684 | rho(leaf purity)=-0.39
+   -min margin ratio                      mean=-0.082 | AUC moved=0.608 disagree=0.514 | rho(leaf purity)=+0.10
+   -mean margin ratio                     mean=0.384 | AUC moved=0.506 disagree=0.494 | rho(leaf purity)=+0.08
+   -max step (smaller step = continuous)  mean=1.564 | AUC moved=0.653 disagree=0.709 | rho(leaf purity)=+0.55
+   (5s)
+
+== tms_facs seed=42 bits=1 depth=16: n=110824 mean rungs=15.4 moved=4.4% disagree=46.4%
+   combined rank(dim)+rank(-step)              | AUC moved=0.7166260929144311 disagree=0.7172953351202023
+   step within dim tertiles: low: AUC moved=0.622595594459388 (moved 1%)  mid: AUC moved=0.6000293244781079 (moved 3%)  high: AUC moved=0.5256794457838441 (moved 9%)
+   dim (higher = more continuous?)        mean=1.819 | AUC moved=0.743 disagree=0.676 | rho(leaf purity)=-0.38
+   -min margin ratio                      mean=0.045 | AUC moved=0.541 disagree=0.497 | rho(leaf purity)=+0.02
+   -mean margin ratio                     mean=1.583 | AUC moved=0.65 disagree=0.527 | rho(leaf purity)=+0.17
+   -max step (smaller step = continuous)  mean=1.005 | AUC moved=0.63 disagree=0.695 | rho(leaf purity)=+0.58
+   (6s)
+
+== tms_facs seed=1 bits=1 depth=16: n=110824 mean rungs=15.5 moved=6.8% disagree=47.4%
+   combined rank(dim)+rank(-step)              | AUC moved=0.6761957653928924 disagree=0.7087015276888518
+   step within dim tertiles: low: AUC moved=0.6128334862017093 (moved 3%)  mid: AUC moved=0.606736424099801 (moved 6%)  high: AUC moved=0.585016062929734 (moved 11%)
+   dim (higher = more continuous?)        mean=1.819 | AUC moved=0.673 disagree=0.669 | rho(leaf purity)=-0.36
+   -min margin ratio                      mean=0.041 | AUC moved=0.532 disagree=0.503 | rho(leaf purity)=+0.02
+   -mean margin ratio                     mean=1.544 | AUC moved=0.517 disagree=0.538 | rho(leaf purity)=+0.19
+   -max step (smaller step = continuous)  mean=0.973 | AUC moved=0.623 disagree=0.675 | rho(leaf purity)=+0.52
+   (5s)
+
+== tms_facs seed=2 bits=1 depth=16: n=110824 mean rungs=15.5 moved=6.5% disagree=45.3%
+   combined rank(dim)+rank(-step)              | AUC moved=0.6835731305932923 disagree=0.7219990216801013
+   step within dim tertiles: low: AUC moved=0.4193023052983855 (moved 3%)  mid: AUC moved=0.4799368408591001 (moved 3%)  high: AUC moved=0.5588714007149301 (moved 13%)
+   dim (higher = more continuous?)        mean=1.818 | AUC moved=0.716 disagree=0.675 | rho(leaf purity)=-0.37
+   -min margin ratio                      mean=0.044 | AUC moved=0.614 disagree=0.486 | rho(leaf purity)=+0.03
+   -mean margin ratio                     mean=1.557 | AUC moved=0.606 disagree=0.54 | rho(leaf purity)=+0.22
+   -max step (smaller step = continuous)  mean=0.998 | AUC moved=0.59 disagree=0.707 | rho(leaf purity)=+0.59
+   (5s)
+
+== tms_droplet seed=42 bits=3 depth=8: n=245389 mean rungs=7.5 moved=15.9% disagree=44.2%
+   combined rank(dim)+rank(-step)              | AUC moved=0.7875349675680066 disagree=0.6102182364885296
+   step within dim tertiles: low: AUC moved=0.30203346953548393 (moved 2%)  mid: AUC moved=0.6893363252881541 (moved 11%)  high: AUC moved=0.5478096209358564 (moved 34%)
+   dim (higher = more continuous?)        mean=1.865 | AUC moved=0.782 disagree=0.585 | rho(leaf purity)=-0.28
+   -min margin ratio                      mean=-0.117 | AUC moved=0.549 disagree=0.542 | rho(leaf purity)=+0.16
+   -mean margin ratio                     mean=0.411 | AUC moved=0.527 disagree=0.512 | rho(leaf purity)=+0.13
+   -max step (smaller step = continuous)  mean=1.709 | AUC moved=0.759 disagree=0.615 | rho(leaf purity)=+0.40
+   (9s)
+
+== tms_droplet seed=1 bits=3 depth=8: n=245389 mean rungs=7.5 moved=10.1% disagree=43.5%
+   combined rank(dim)+rank(-step)              | AUC moved=0.550915882518489 disagree=0.6057537500084452
+   step within dim tertiles: low: AUC moved=0.5078266392507016 (moved 10%)  mid: AUC moved=0.5418731311993277 (moved 9%)  high: AUC moved=0.5107136097146572 (moved 12%)
+   dim (higher = more continuous?)        mean=1.891 | AUC moved=0.552 disagree=0.574 | rho(leaf purity)=-0.29
+   -min margin ratio                      mean=-0.107 | AUC moved=0.565 disagree=0.494 | rho(leaf purity)=+0.14
+   -mean margin ratio                     mean=0.556 | AUC moved=0.552 disagree=0.486 | rho(leaf purity)=+0.07
+   -max step (smaller step = continuous)  mean=1.682 | AUC moved=0.547 disagree=0.624 | rho(leaf purity)=+0.41
+   (9s)
+
+== tms_droplet seed=2 bits=3 depth=8: n=245389 mean rungs=7.5 moved=11.8% disagree=45.3%
+   combined rank(dim)+rank(-step)              | AUC moved=0.7491031839708171 disagree=0.589684761760074
+   step within dim tertiles: low: AUC moved=0.7037632249393166 (moved 3%)  mid: AUC moved=0.7979101688854933 (moved 12%)  high: AUC moved=0.5401390460854365 (moved 20%)
+   dim (higher = more continuous?)        mean=1.883 | AUC moved=0.713 disagree=0.562 | rho(leaf purity)=-0.30
+   -min margin ratio                      mean=-0.119 | AUC moved=0.597 disagree=0.516 | rho(leaf purity)=+0.17
+   -mean margin ratio                     mean=0.515 | AUC moved=0.633 disagree=0.49 | rho(leaf purity)=+0.15
+   -max step (smaller step = continuous)  mean=1.678 | AUC moved=0.751 disagree=0.602 | rho(leaf purity)=+0.39
+   (9s)
+
+== tms_droplet seed=42 bits=1 depth=16: n=245389 mean rungs=16.2 moved=15.9% disagree=44.2%
+   combined rank(dim)+rank(-step)              | AUC moved=0.7704029427502154 disagree=0.5819522588419531
+   step within dim tertiles: low: AUC moved=0.4443402810074426 (moved 3%)  mid: AUC moved=0.6426736583344834 (moved 11%)  high: AUC moved=0.4686916407975266 (moved 35%)
+   dim (higher = more continuous?)        mean=1.599 | AUC moved=0.794 disagree=0.625 | rho(leaf purity)=-0.28
+   -min margin ratio                      mean=0.046 | AUC moved=0.564 disagree=0.493 | rho(leaf purity)=+0.02
+   -mean margin ratio                     mean=2.113 | AUC moved=0.716 disagree=0.582 | rho(leaf purity)=+0.17
+   -max step (smaller step = continuous)  mean=0.897 | AUC moved=0.684 disagree=0.516 | rho(leaf purity)=+0.32
+   (11s)
+
+== tms_droplet seed=1 bits=1 depth=16: n=245389 mean rungs=16.2 moved=10.1% disagree=43.5%
+   combined rank(dim)+rank(-step)              | AUC moved=0.5562545179628324 disagree=0.5927128092312162
+   step within dim tertiles: low: AUC moved=0.3390638667667529 (moved 7%)  mid: AUC moved=0.5900293430419633 (moved 11%)  high: AUC moved=0.4486816769310123 (moved 12%)
+   dim (higher = more continuous?)        mean=1.605 | AUC moved=0.595 disagree=0.631 | rho(leaf purity)=-0.31
+   -min margin ratio                      mean=0.039 | AUC moved=0.507 disagree=0.489 | rho(leaf purity)=+0.01
+   -mean margin ratio                     mean=2.123 | AUC moved=0.505 disagree=0.58 | rho(leaf purity)=+0.20
+   -max step (smaller step = continuous)  mean=0.897 | AUC moved=0.511 disagree=0.526 | rho(leaf purity)=+0.31
+   (11s)
+
+== tms_droplet seed=2 bits=1 depth=16: n=245389 mean rungs=16.2 moved=11.8% disagree=45.3%
+   combined rank(dim)+rank(-step)              | AUC moved=0.7128173049749691 disagree=0.5593681059402063
+   step within dim tertiles: low: AUC moved=0.7372500217947029 (moved 4%)  mid: AUC moved=0.7401705105166292 (moved 12%)  high: AUC moved=0.3883086143727074 (moved 20%)
+   dim (higher = more continuous?)        mean=1.614 | AUC moved=0.704 disagree=0.606 | rho(leaf purity)=-0.30
+   -min margin ratio                      mean=0.042 | AUC moved=0.52 disagree=0.482 | rho(leaf purity)=+0.01
+   -mean margin ratio                     mean=2.145 | AUC moved=0.629 disagree=0.576 | rho(leaf purity)=+0.19
+   -max step (smaller step = continuous)  mean=0.888 | AUC moved=0.655 disagree=0.497 | rho(leaf purity)=+0.31
+   (11s)
+
+== brain_1m seed=42 bits=3 depth=8: n=1290029 mean rungs=7.6 moved=29.0% disagree=35.6%
+   combined rank(dim)+rank(-step)              | AUC moved=0.7002461809170197 disagree=0.5605105341657112
+   step within dim tertiles: low: AUC moved=0.5432253693354836 (moved 14%)  mid: AUC moved=0.5504102302733777 (moved 23%)  high: AUC moved=0.5803661043455812 (moved 50%)
+   dim (higher = more continuous?)        mean=4.337 | AUC moved=0.709 disagree=0.544 | rho(leaf purity)=-0.43
+   -min margin ratio                      mean=-0.074 | AUC moved=0.474 disagree=0.547 | rho(leaf purity)=+0.05
+   -mean margin ratio                     mean=0.193 | AUC moved=0.532 disagree=0.495 | rho(leaf purity)=+0.14
+   -max step (smaller step = continuous)  mean=0.960 | AUC moved=0.603 disagree=0.557 | rho(leaf purity)=+0.20
+   (46s)
+
+== brain_1m seed=1 bits=3 depth=8: n=1290029 mean rungs=7.6 moved=31.1% disagree=35.6%
+   combined rank(dim)+rank(-step)              | AUC moved=0.6730947994690815 disagree=0.5464672700337793
+   step within dim tertiles: low: AUC moved=0.606504713687297 (moved 14%)  mid: AUC moved=0.5488183435692404 (moved 32%)  high: AUC moved=0.5375746823385482 (moved 47%)
+   dim (higher = more continuous?)        mean=4.334 | AUC moved=0.686 disagree=0.553 | rho(leaf purity)=-0.45
+   -min margin ratio                      mean=-0.075 | AUC moved=0.464 disagree=0.541 | rho(leaf purity)=+0.05
+   -mean margin ratio                     mean=0.190 | AUC moved=0.509 disagree=0.486 | rho(leaf purity)=+0.14
+   -max step (smaller step = continuous)  mean=0.962 | AUC moved=0.586 disagree=0.532 | rho(leaf purity)=+0.21
+   (46s)
+
+== brain_1m seed=2 bits=3 depth=8: n=1290029 mean rungs=7.6 moved=27.0% disagree=34.9%
+   combined rank(dim)+rank(-step)              | AUC moved=0.6263591887977971 disagree=0.592227497610309
+   step within dim tertiles: low: AUC moved=0.5551952709527691 (moved 14%)  mid: AUC moved=0.4636052923060622 (moved 27%)  high: AUC moved=0.5292370980115773 (moved 39%)
+   dim (higher = more continuous?)        mean=4.339 | AUC moved=0.664 disagree=0.581 | rho(leaf purity)=-0.44
+   -min margin ratio                      mean=-0.074 | AUC moved=0.505 disagree=0.556 | rho(leaf purity)=+0.06
+   -mean margin ratio                     mean=0.191 | AUC moved=0.51 disagree=0.537 | rho(leaf purity)=+0.16
+   -max step (smaller step = continuous)  mean=0.959 | AUC moved=0.548 disagree=0.564 | rho(leaf purity)=+0.20
+   (46s)
+
+== brain_1m seed=42 bits=1 depth=16: n=1290029 mean rungs=16.7 moved=29.0% disagree=35.6%
+   combined rank(dim)+rank(-step)              | AUC moved=0.6725319113981203 disagree=0.526746776068017
+   step within dim tertiles: low: AUC moved=0.47454914555844846 (moved 13%)  mid: AUC moved=0.4482008011144977 (moved 24%)  high: AUC moved=0.5037005072361077 (moved 50%)
+   dim (higher = more continuous?)        mean=4.029 | AUC moved=0.721 disagree=0.552 | rho(leaf purity)=-0.37
+   -min margin ratio                      mean=0.013 | AUC moved=0.509 disagree=0.518 | rho(leaf purity)=+0.02
+   -mean margin ratio                     mean=0.700 | AUC moved=0.652 disagree=0.48 | rho(leaf purity)=+0.23
+   -max step (smaller step = continuous)  mean=0.460 | AUC moved=0.507 disagree=0.45 | rho(leaf purity)=+0.22
+   (52s)
+
+== brain_1m seed=1 bits=1 depth=16: n=1290029 mean rungs=16.7 moved=31.1% disagree=35.6%
+   combined rank(dim)+rank(-step)              | AUC moved=0.654849347634694 disagree=0.5400309437738141
+   step within dim tertiles: low: AUC moved=0.4933316027043602 (moved 14%)  mid: AUC moved=0.47373110080349345 (moved 31%)  high: AUC moved=0.49433405140634934 (moved 49%)
+   dim (higher = more continuous?)        mean=4.028 | AUC moved=0.699 disagree=0.563 | rho(leaf purity)=-0.39
+   -min margin ratio                      mean=0.014 | AUC moved=0.505 disagree=0.508 | rho(leaf purity)=+0.02
+   -mean margin ratio                     mean=0.716 | AUC moved=0.622 disagree=0.505 | rho(leaf purity)=+0.25
+   -max step (smaller step = continuous)  mean=0.449 | AUC moved=0.523 disagree=0.473 | rho(leaf purity)=+0.23
+   (52s)
+
+== brain_1m seed=2 bits=1 depth=16: n=1290029 mean rungs=16.7 moved=27.0% disagree=34.9%
+   combined rank(dim)+rank(-step)              | AUC moved=0.6143676869829432 disagree=0.5809691038586542
+   step within dim tertiles: low: AUC moved=0.423222371918386 (moved 16%)  mid: AUC moved=0.39872484619543574 (moved 26%)  high: AUC moved=0.48475498513181714 (moved 39%)
+   dim (higher = more continuous?)        mean=4.033 | AUC moved=0.663 disagree=0.594 | rho(leaf purity)=-0.38
+   -min margin ratio                      mean=0.014 | AUC moved=0.507 disagree=0.5 | rho(leaf purity)=+0.01
+   -mean margin ratio                     mean=0.692 | AUC moved=0.606 disagree=0.512 | rho(leaf purity)=+0.23
+   -max step (smaller step = continuous)  mean=0.461 | AUC moved=0.492 disagree=0.526 | rho(leaf purity)=+0.14
+   (53s)
+
+wrote /Volumes/Models/dyf_bench_2026-11-04/point_continuousness_seeds_depths_results.json

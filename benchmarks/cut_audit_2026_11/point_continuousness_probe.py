@@ -114,16 +114,17 @@ def auc_safe(y, s):
     return float(roc_auc_score(y[m], s[m]))
 
 
-def run(name):
+def run(name, seed=42, depth=8, bits=3):
     t0 = time.perf_counter()
     X, y = load(name)
     n = len(X)
     Xn = unit(X)
-    deep = build_dyf_tree(X, seed=42, **DEEP)
-    logn, logir, mratio = ladder(deep, Xn, n, DEEP["max_depth"])
+    params = dict(DEEP, max_depth=depth, num_bits=bits)
+    deep = build_dyf_tree(X, seed=seed, **params)
+    logn, logir, mratio = ladder(deep, Xn, n, depth)
     M = measures(logn, logir, mratio)
     # shipped pipeline outcomes
-    item_leaf = leaf_map(build_dyf_tree(X, seed=42, **SHIPPED), n)
+    item_leaf = leaf_map(build_dyf_tree(X, seed=seed, **SHIPPED), n)
     L = item_leaf.max() + 1
     cent = np.zeros((L, X.shape[1]), dtype=np.float32)
     np.add.at(cent, item_leaf, Xn)
@@ -137,12 +138,48 @@ def run(name):
     leaf_pur = np.array([np.bincount(y[item_leaf == l]).max() / (item_leaf == l).sum() for l in range(L)])[item_leaf]
     out = {
         "n": n,
+        "seed": seed,
+        "depth": depth,
+        "bits": bits,
         "mean_rungs": float(M["rungs"].mean()),
         "moved_frac": float(moved.mean()),
         "disagree_frac": float(disagree.mean()),
     }
     print(
-        f"\n== {name}: n={n} mean rungs={out['mean_rungs']:.1f} moved={moved.mean():.1%} disagree={disagree.mean():.1%}",
+        f"\n== {name} seed={seed} bits={bits} depth={depth}: n={n} mean rungs={out['mean_rungs']:.1f} "
+        f"moved={moved.mean():.1%} disagree={disagree.mean():.1%}",
+        flush=True,
+    )
+    # combined rank score and step gated by dim tertile
+    from scipy.stats import rankdata
+
+    ok = ~np.isnan(M["dim"]) & ~np.isnan(M["step"])
+    comb = np.full(n, np.nan)
+    comb[ok] = rankdata(M["dim"][ok]) + rankdata(-M["step"][ok])
+    out["combined"] = dict(auc_moved=auc_safe(moved, comb), auc_disagree=auc_safe(disagree, comb))
+    print(
+        f"   combined rank(dim)+rank(-step)              | AUC moved={out['combined']['auc_moved']} disagree={out['combined']['auc_disagree']}",
+        flush=True,
+    )
+    q = np.nanpercentile(M["dim"], [33.3, 66.7])
+    out["step_by_dim_tertile"] = {}
+    for lab_, m in (
+        ("low", M["dim"] <= q[0]),
+        ("mid", (M["dim"] > q[0]) & (M["dim"] <= q[1])),
+        ("high", M["dim"] > q[1]),
+    ):
+        s = np.where(m, -M["step"], np.nan)
+        out["step_by_dim_tertile"][lab_] = dict(
+            auc_moved=auc_safe(moved, s),
+            auc_disagree=auc_safe(disagree, s),
+            frac_moved=float(moved[m].mean()) if m.any() else None,
+        )
+    print(
+        "   step within dim tertiles: "
+        + "  ".join(
+            f"{k}: AUC moved={v['auc_moved']} (moved {v['frac_moved']:.0%})"
+            for k, v in out["step_by_dim_tertile"].items()
+        ),
         flush=True,
     )
     for key, sign, label in (
@@ -171,10 +208,28 @@ def run(name):
 
 
 if __name__ == "__main__":
-    names = sys.argv[1:] or ORDER
-    out_path = OUT / "point_continuousness_probe_results.json"
+    # usage: script.py [--seeds 42,1,2] [--depths 8,12] [names...]
+    args = sys.argv[1:]
+    seeds, depths = [42, 1, 2], ["3x8", "1x16"]
+    names = []
+    i = 0
+    while i < len(args):
+        if args[i] == "--seeds":
+            seeds = [int(a) for a in args[i + 1].split(",")]
+            i += 2
+        elif args[i] == "--depths":
+            depths = args[i + 1].split(",")
+            i += 2
+        else:
+            names.append(args[i])
+            i += 1
+    names = names or ORDER
+    out_path = OUT / "point_continuousness_seeds_depths_results.json"
     results = json.loads(out_path.read_text()) if out_path.exists() else {}
     for name in names:
-        results[name] = run(name)
-        out_path.write_text(json.dumps(results, indent=1))
+        for cfg in depths:
+            bits, depth = (int(v) for v in cfg.split("x"))
+            for seed in seeds:
+                results[f"{name}:{seed}:{cfg}"] = run(name, seed, depth, bits)
+                out_path.write_text(json.dumps(results, indent=1))
     print("\nwrote", out_path)

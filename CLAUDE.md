@@ -118,8 +118,9 @@ coming back. Numbers are in `KNOWN_ISSUES.md` #9, #11, #14; the conclusions:
   annotate splits with it on atlas-shaped data, never as a dataset verdict. Per point, the
   box-counting local dimension read off a deep tree's path (log node size vs log 1/radius)
   is the one label-free continuousness measure with signal: it predicts which points the
-  re-cut moves (AUC 0.59–0.78) and anticorrelates with leaf purity on every dataset; margin
-  ratios carry nothing (one seed, not built). Nothing in the graph-construction or objective
+  re-cut moves (AUC ≈ 0.6–0.7, stable over three seeds) and anticorrelates with leaf purity
+  on every dataset; a longer binary ladder is no better and margin ratios carry nothing — a
+  moderate signal, not built. Nothing in the graph-construction or objective
   direction is worth another probe without a consumer whose data sits in the regime where it moved.
 
 ### Parked: sequence key / leaf Markov state model (2026-10-01)
