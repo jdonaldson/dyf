@@ -99,8 +99,11 @@ coming back. Numbers are in `KNOWN_ISSUES.md` #9, #11, #14; the conclusions:
   and the leaf-level / straggler-only alternatives lose to it (#14).
 - **What is left** is the objective and community count modularity returns (leaf oracle vs block
   labels: 0.1–0.7 ARI, mostly k) and the atoms' purity (leaf oracle 0.72 vs Leiden-on-points
-  0.885 on MNIST). Nothing in the graph-construction direction is worth another probe without a
-  consumer whose data sits in the regime where it moved.
+  0.885 on MNIST). The map equation (Infomap) was tried as the objective: it is a *fine-k*
+  prior, 49–90 modules, +0.06 on the 120-type atlases (mostly the k; Louvain at resolution 2–3
+  gets most of it) and −0.2 to −0.3 on 10-class images and 4-class text — not a default. The
+  open problem is a label-free resolution criterion; nothing in the graph-construction
+  direction is worth another probe without a consumer whose data sits in the regime where it moved.
 
 ### Parked: sequence key / leaf Markov state model (2026-10-01)
 

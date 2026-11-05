@@ -1,0 +1,340 @@
+warning: `VIRTUAL_ENV=/Users/jdonaldson/Projects/dyf/.direnv/python-3.12` does not match the project environment path `/Users/jdonaldson/Projects/dyf/.venv` and will be ignored; use `--active` to target the active environment instead
+
+== mnist seed=42: leaves=3395 true k=10 leaf-oracle ARI=0.725
+OMP: Warning #179: Function Can't set size of /tmp file failed:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   cent     louvain@1     k=  13 | block ARI=0.581 AMI=0.643 cut=0.180 | point ARI=0.472 AMI=0.565
+   cent     infomap       k=  64 | block ARI=0.288 AMI=0.530 cut=0.336 | point ARI=0.210 AMI=0.551 | 0.4s
+   cent     louvain@k_im  k=  37 | block ARI=0.316 AMI=0.544 cut=0.308 | point ARI=0.299 AMI=0.562
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   ceiling  louvain@1     k=  10 | block ARI=0.626 AMI=0.670 cut=0.146 | point ARI=0.473 AMI=0.556
+   ceiling  infomap       k=  26 | block ARI=0.485 AMI=0.613 cut=0.212 | point ARI=0.362 AMI=0.559 | 0.9s
+   ceiling  louvain@k_im  k=  28 | block ARI=0.360 AMI=0.581 cut=0.255 | point ARI=0.322 AMI=0.560
+
+== mnist seed=1: leaves=3344 true k=10 leaf-oracle ARI=0.722
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   cent     louvain@1     k=  12 | block ARI=0.566 AMI=0.637 cut=0.174 | point ARI=0.462 AMI=0.556
+   cent     infomap       k=  62 | block ARI=0.267 AMI=0.526 cut=0.341 | point ARI=0.245 AMI=0.554 | 0.3s
+   cent     louvain@k_im  k=  39 | block ARI=0.312 AMI=0.543 cut=0.318 | point ARI=0.299 AMI=0.567
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   ceiling  louvain@1     k=  10 | block ARI=0.636 AMI=0.677 cut=0.148 | point ARI=0.474 AMI=0.557
+   ceiling  infomap       k=  26 | block ARI=0.451 AMI=0.608 cut=0.213 | point ARI=0.337 AMI=0.549 | 0.8s
+   ceiling  louvain@k_im  k=  28 | block ARI=0.380 AMI=0.584 cut=0.248 | point ARI=0.321 AMI=0.556
+
+== mnist seed=2: leaves=3382 true k=10 leaf-oracle ARI=0.730
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   cent     louvain@1     k=  11 | block ARI=0.610 AMI=0.660 cut=0.163 | point ARI=0.482 AMI=0.568
+   cent     infomap       k=  61 | block ARI=0.296 AMI=0.538 cut=0.330 | point ARI=0.250 AMI=0.557 | 0.4s
+   cent     louvain@k_im  k=  40 | block ARI=0.320 AMI=0.553 cut=0.309 | point ARI=0.292 AMI=0.564
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   ceiling  louvain@1     k=   9 | block ARI=0.627 AMI=0.682 cut=0.132 | point ARI=0.440 AMI=0.524
+   ceiling  infomap       k=  29 | block ARI=0.464 AMI=0.611 cut=0.218 | point ARI=0.338 AMI=0.559 | 0.9s
+   ceiling  louvain@k_im  k=  30 | block ARI=0.389 AMI=0.590 cut=0.259 | point ARI=0.340 AMI=0.571
+
+== fashion_mnist seed=42: leaves=2193 true k=10 leaf-oracle ARI=0.615
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   cent     louvain@1     k=  14 | block ARI=0.381 AMI=0.545 cut=0.113 | point ARI=0.340 AMI=0.528
+   cent     infomap       k=  50 | block ARI=0.280 AMI=0.510 cut=0.213 | point ARI=0.231 AMI=0.513 | 0.2s
+   cent     louvain@k_im  k=  35 | block ARI=0.283 AMI=0.515 cut=0.202 | point ARI=0.258 AMI=0.520
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   ceiling  louvain@1     k=  12 | block ARI=0.448 AMI=0.598 cut=0.083 | point ARI=0.441 AMI=0.577
+   ceiling  infomap       k=  32 | block ARI=0.363 AMI=0.551 cut=0.146 | point ARI=0.300 AMI=0.532 | 0.4s
+   ceiling  louvain@k_im  k=  28 | block ARI=0.308 AMI=0.540 cut=0.167 | point ARI=0.285 AMI=0.534
+
+== fashion_mnist seed=1: leaves=2192 true k=10 leaf-oracle ARI=0.612
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   cent     louvain@1     k=  13 | block ARI=0.410 AMI=0.582 cut=0.094 | point ARI=0.434 AMI=0.561
+   cent     infomap       k=  49 | block ARI=0.294 AMI=0.518 cut=0.205 | point ARI=0.235 AMI=0.511 | 0.2s
+   cent     louvain@k_im  k=  35 | block ARI=0.278 AMI=0.523 cut=0.197 | point ARI=0.253 AMI=0.521
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   ceiling  louvain@1     k=  11 | block ARI=0.446 AMI=0.601 cut=0.075 | point ARI=0.439 AMI=0.581
+   ceiling  infomap       k=  33 | block ARI=0.364 AMI=0.557 cut=0.141 | point ARI=0.304 AMI=0.538 | 0.4s
+   ceiling  louvain@k_im  k=  27 | block ARI=0.308 AMI=0.540 cut=0.160 | point ARI=0.298 AMI=0.533
+
+== fashion_mnist seed=2: leaves=2182 true k=10 leaf-oracle ARI=0.610
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   cent     louvain@1     k=  12 | block ARI=0.424 AMI=0.579 cut=0.099 | point ARI=0.379 AMI=0.548
+   cent     infomap       k=  47 | block ARI=0.310 AMI=0.521 cut=0.193 | point ARI=0.258 AMI=0.520 | 0.2s
+   cent     louvain@k_im  k=  35 | block ARI=0.307 AMI=0.523 cut=0.184 | point ARI=0.284 AMI=0.526
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   ceiling  louvain@1     k=  12 | block ARI=0.439 AMI=0.589 cut=0.085 | point ARI=0.439 AMI=0.577
+   ceiling  infomap       k=  34 | block ARI=0.367 AMI=0.551 cut=0.147 | point ARI=0.305 AMI=0.533 | 0.4s
+   ceiling  louvain@k_im  k=  25 | block ARI=0.332 AMI=0.552 cut=0.153 | point ARI=0.308 AMI=0.538
+
+== cmu_mocap seed=42: leaves=1478 true k=25 leaf-oracle ARI=0.820
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   cent     louvain@1     k=  22 | block ARI=0.176 AMI=0.391 cut=0.023 | point ARI=0.152 AMI=0.366
+   cent     infomap       k=  56 | block ARI=0.111 AMI=0.414 cut=0.036 | point ARI=0.103 AMI=0.421 | 0.1s
+   cent     louvain@k_im  k=  40 | block ARI=0.123 AMI=0.402 cut=0.033 | point ARI=0.116 AMI=0.396
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   ceiling  louvain@1     k=  51 | block ARI=0.161 AMI=0.386 cut=0.017 | point ARI=0.133 AMI=0.390
+   ceiling  infomap       k= 169 | block ARI=0.091 AMI=0.439 cut=0.034 | point ARI=0.070 AMI=0.457 | 0.1s
+   ceiling  louvain@k_im  k=  81 | block ARI=0.096 AMI=0.429 cut=0.030 | point ARI=0.098 AMI=0.455
+
+== cmu_mocap seed=1: leaves=1563 true k=25 leaf-oracle ARI=0.779
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   cent     louvain@1     k=  22 | block ARI=0.201 AMI=0.354 cut=0.025 | point ARI=0.170 AMI=0.319
+   cent     infomap       k=  67 | block ARI=0.102 AMI=0.411 cut=0.041 | point ARI=0.109 AMI=0.432 | 0.1s
+   cent     louvain@k_im  k=  47 | block ARI=0.110 AMI=0.396 cut=0.034 | point ARI=0.117 AMI=0.406
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   ceiling  louvain@1     k=  50 | block ARI=0.162 AMI=0.395 cut=0.019 | point ARI=0.123 AMI=0.380
+   ceiling  infomap       k= 166 | block ARI=0.066 AMI=0.403 cut=0.035 | point ARI=0.062 AMI=0.441 | 0.1s
+   ceiling  louvain@k_im  k=  82 | block ARI=0.091 AMI=0.411 cut=0.032 | point ARI=0.092 AMI=0.441
+
+== cmu_mocap seed=2: leaves=1628 true k=25 leaf-oracle ARI=0.851
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   cent     louvain@1     k=  22 | block ARI=0.142 AMI=0.366 cut=0.027 | point ARI=0.130 AMI=0.355
+   cent     infomap       k=  63 | block ARI=0.122 AMI=0.418 cut=0.042 | point ARI=0.109 AMI=0.425 | 0.1s
+   cent     louvain@k_im  k=  43 | block ARI=0.127 AMI=0.405 cut=0.038 | point ARI=0.118 AMI=0.414
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   ceiling  louvain@1     k=  51 | block ARI=0.157 AMI=0.406 cut=0.020 | point ARI=0.122 AMI=0.391
+   ceiling  infomap       k= 178 | block ARI=0.079 AMI=0.444 cut=0.038 | point ARI=0.066 AMI=0.465 | 0.1s
+   ceiling  louvain@k_im  k=  90 | block ARI=0.103 AMI=0.440 cut=0.032 | point ARI=0.099 AMI=0.462
+
+== ag_news seed=42: leaves=3274 true k=4 leaf-oracle ARI=0.653
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   cent     louvain@1     k=  15 | block ARI=0.279 AMI=0.387 cut=0.285 | point ARI=0.286 AMI=0.440
+   cent     infomap       k=  84 | block ARI=0.090 AMI=0.313 cut=0.419 | point ARI=0.069 AMI=0.334 | 0.4s
+   cent     louvain@k_im  k=  54 | block ARI=0.116 AMI=0.326 cut=0.395 | point ARI=0.099 AMI=0.352
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   ceiling  louvain@1     k=   7 | block ARI=0.467 AMI=0.495 cut=0.185 | point ARI=0.474 AMI=0.530
+   ceiling  infomap       k=  55 | block ARI=0.187 AMI=0.359 cut=0.323 | point ARI=0.109 AMI=0.355 | 1.2s
+   ceiling  louvain@k_im  k=  40 | block ARI=0.123 AMI=0.338 cut=0.361 | point ARI=0.116 AMI=0.364
+
+== ag_news seed=1: leaves=3202 true k=4 leaf-oracle ARI=0.649
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   cent     louvain@1     k=  17 | block ARI=0.296 AMI=0.407 cut=0.280 | point ARI=0.283 AMI=0.441
+   cent     infomap       k=  93 | block ARI=0.086 AMI=0.312 cut=0.433 | point ARI=0.063 AMI=0.330 | 0.4s
+   cent     louvain@k_im  k=  53 | block ARI=0.107 AMI=0.321 cut=0.407 | point ARI=0.097 AMI=0.354
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   ceiling  louvain@1     k=   7 | block ARI=0.501 AMI=0.514 cut=0.164 | point ARI=0.500 AMI=0.547
+   ceiling  infomap       k=  62 | block ARI=0.199 AMI=0.358 cut=0.321 | point ARI=0.097 AMI=0.351 | 1.1s
+   ceiling  louvain@k_im  k=  39 | block ARI=0.121 AMI=0.334 cut=0.360 | point ARI=0.119 AMI=0.367
+
+== ag_news seed=2: leaves=3242 true k=4 leaf-oracle ARI=0.653
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   cent     louvain@1     k=  16 | block ARI=0.285 AMI=0.404 cut=0.284 | point ARI=0.275 AMI=0.438
+   cent     infomap       k=  87 | block ARI=0.089 AMI=0.315 cut=0.421 | point ARI=0.070 AMI=0.333 | 0.3s
+   cent     louvain@k_im  k=  52 | block ARI=0.107 AMI=0.326 cut=0.394 | point ARI=0.097 AMI=0.353
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   ceiling  louvain@1     k=   8 | block ARI=0.438 AMI=0.477 cut=0.198 | point ARI=0.433 AMI=0.519
+   ceiling  infomap       k=  53 | block ARI=0.190 AMI=0.360 cut=0.319 | point ARI=0.118 AMI=0.359 | 1.2s
+   ceiling  louvain@k_im  k=  42 | block ARI=0.115 AMI=0.334 cut=0.365 | point ARI=0.114 AMI=0.368
+
+== tms_facs seed=42: leaves=1534 true k=120 leaf-oracle ARI=0.790
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   cent     louvain@1     k=  24 | block ARI=0.553 AMI=0.754 cut=0.025 | point ARI=0.559 AMI=0.753
+   cent     infomap       k=  45 | block ARI=0.636 AMI=0.780 cut=0.044 | point ARI=0.670 AMI=0.792 | 0.1s
+   cent     louvain@k_im  k=  41 | block ARI=0.622 AMI=0.778 cut=0.044 | point ARI=0.591 AMI=0.785
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   ceiling  louvain@1     k=  23 | block ARI=0.560 AMI=0.756 cut=0.022 | point ARI=0.582 AMI=0.763
+   ceiling  infomap       k=  70 | block ARI=0.719 AMI=0.807 cut=0.047 | point ARI=0.725 AMI=0.798 | 0.2s
+   ceiling  louvain@k_im  k=  39 | block ARI=0.593 AMI=0.783 cut=0.050 | point ARI=0.581 AMI=0.785
+
+== tms_facs seed=1: leaves=1800 true k=120 leaf-oracle ARI=0.790
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   cent     louvain@1     k=  23 | block ARI=0.548 AMI=0.744 cut=0.027 | point ARI=0.563 AMI=0.757
+   cent     infomap       k=  61 | block ARI=0.559 AMI=0.772 cut=0.083 | point ARI=0.578 AMI=0.786 | 0.1s
+   cent     louvain@k_im  k=  44 | block ARI=0.526 AMI=0.775 cut=0.066 | point ARI=0.574 AMI=0.790
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   ceiling  louvain@1     k=  22 | block ARI=0.567 AMI=0.754 cut=0.025 | point ARI=0.575 AMI=0.760
+   ceiling  infomap       k=  74 | block ARI=0.733 AMI=0.798 cut=0.057 | point ARI=0.695 AMI=0.802 | 0.2s
+   ceiling  louvain@k_im  k=  43 | block ARI=0.586 AMI=0.778 cut=0.062 | point ARI=0.580 AMI=0.785
+
+== tms_facs seed=2: leaves=1623 true k=120 leaf-oracle ARI=0.794
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   cent     louvain@1     k=  25 | block ARI=0.555 AMI=0.752 cut=0.030 | point ARI=0.576 AMI=0.758
+   cent     infomap       k=  54 | block ARI=0.585 AMI=0.783 cut=0.069 | point ARI=0.616 AMI=0.794 | 0.1s
+   cent     louvain@k_im  k=  42 | block ARI=0.549 AMI=0.771 cut=0.062 | point ARI=0.597 AMI=0.783
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   ceiling  louvain@1     k=  23 | block ARI=0.561 AMI=0.754 cut=0.023 | point ARI=0.586 AMI=0.763
+   ceiling  infomap       k=  65 | block ARI=0.718 AMI=0.805 cut=0.047 | point ARI=0.733 AMI=0.806 | 0.2s
+   ceiling  louvain@k_im  k=  43 | block ARI=0.616 AMI=0.785 cut=0.056 | point ARI=0.623 AMI=0.793
+
+== tms_droplet seed=42: leaves=1768 true k=123 leaf-oracle ARI=0.763
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   cent     louvain@1     k=  29 | block ARI=0.467 AMI=0.726 cut=0.021 | point ARI=0.563 AMI=0.745
+   cent     infomap       k=  66 | block ARI=0.615 AMI=0.760 cut=0.045 | point ARI=0.632 AMI=0.767 | 0.1s
+   cent     louvain@k_im  k=  42 | block ARI=0.578 AMI=0.752 cut=0.029 | point ARI=0.602 AMI=0.757
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   ceiling  louvain@1     k=  27 | block ARI=0.569 AMI=0.751 cut=0.016 | point ARI=0.589 AMI=0.751
+   ceiling  infomap       k=  85 | block ARI=0.615 AMI=0.770 cut=0.042 | point ARI=0.623 AMI=0.772 | 0.2s
+   ceiling  louvain@k_im  k=  46 | block ARI=0.601 AMI=0.759 cut=0.035 | point ARI=0.622 AMI=0.765
+
+== tms_droplet seed=1: leaves=1748 true k=123 leaf-oracle ARI=0.761
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   cent     louvain@1     k=  29 | block ARI=0.536 AMI=0.741 cut=0.019 | point ARI=0.586 AMI=0.755
+   cent     infomap       k=  67 | block ARI=0.620 AMI=0.757 cut=0.055 | point ARI=0.635 AMI=0.766 | 0.1s
+   cent     louvain@k_im  k=  46 | block ARI=0.621 AMI=0.762 cut=0.038 | point ARI=0.628 AMI=0.764
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   ceiling  louvain@1     k=  27 | block ARI=0.551 AMI=0.748 cut=0.014 | point ARI=0.577 AMI=0.747
+   ceiling  infomap       k=  92 | block ARI=0.638 AMI=0.775 cut=0.044 | point ARI=0.655 AMI=0.779 | 0.2s
+   ceiling  louvain@k_im  k=  47 | block ARI=0.516 AMI=0.751 cut=0.042 | point ARI=0.511 AMI=0.750
+
+== tms_droplet seed=2: leaves=1698 true k=123 leaf-oracle ARI=0.761
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   cent     louvain@1     k=  26 | block ARI=0.521 AMI=0.730 cut=0.021 | point ARI=0.551 AMI=0.745
+   cent     infomap       k=  66 | block ARI=0.625 AMI=0.760 cut=0.054 | point ARI=0.626 AMI=0.768 | 0.1s
+   cent     louvain@k_im  k=  44 | block ARI=0.603 AMI=0.760 cut=0.037 | point ARI=0.637 AMI=0.766
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   ceiling  louvain@1     k=  28 | block ARI=0.573 AMI=0.750 cut=0.018 | point ARI=0.583 AMI=0.751
+   ceiling  infomap       k=  85 | block ARI=0.644 AMI=0.780 cut=0.039 | point ARI=0.671 AMI=0.786 | 0.2s
+   ceiling  louvain@k_im  k=  46 | block ARI=0.623 AMI=0.761 cut=0.039 | point ARI=0.637 AMI=0.769
+
+== brain_1m seed=42: leaves=3691 true k=35 leaf-oracle ARI=0.716
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   cent     louvain@1     k=  19 | block ARI=0.491 AMI=0.670 cut=0.127 | point ARI=0.515 AMI=0.699
+   cent     infomap       k=  89 | block ARI=0.416 AMI=0.674 cut=0.253 | point ARI=0.376 AMI=0.711 | 0.4s
+   cent     louvain@k_im  k=  50 | block ARI=0.423 AMI=0.665 cut=0.223 | point ARI=0.474 AMI=0.727
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   ceiling  louvain@1     k=  16 | block ARI=0.418 AMI=0.656 cut=0.106 | point ARI=0.451 AMI=0.669
+   ceiling  infomap       k=  58 | block ARI=0.547 AMI=0.717 cut=0.161 | point ARI=0.534 AMI=0.742 | 1.7s
+   ceiling  louvain@k_im  k=  39 | block ARI=0.452 AMI=0.693 cut=0.195 | point ARI=0.463 AMI=0.717
+
+== brain_1m seed=1: leaves=3638 true k=35 leaf-oracle ARI=0.720
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   cent     louvain@1     k=  21 | block ARI=0.448 AMI=0.658 cut=0.114 | point ARI=0.527 AMI=0.696
+   cent     infomap       k=  86 | block ARI=0.402 AMI=0.668 cut=0.249 | point ARI=0.375 AMI=0.700 | 0.4s
+   cent     louvain@k_im  k=  47 | block ARI=0.554 AMI=0.690 cut=0.189 | point ARI=0.505 AMI=0.726
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   ceiling  louvain@1     k=  15 | block ARI=0.524 AMI=0.675 cut=0.097 | point ARI=0.537 AMI=0.687
+   ceiling  infomap       k=  58 | block ARI=0.555 AMI=0.711 cut=0.169 | point ARI=0.505 AMI=0.736 | 1.7s
+   ceiling  louvain@k_im  k=  36 | block ARI=0.429 AMI=0.680 cut=0.194 | point ARI=0.468 AMI=0.718
+
+== brain_1m seed=2: leaves=3616 true k=35 leaf-oracle ARI=0.717
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   cent     louvain@1     k=  20 | block ARI=0.459 AMI=0.664 cut=0.101 | point ARI=0.570 AMI=0.709
+   cent     infomap       k=  94 | block ARI=0.391 AMI=0.670 cut=0.256 | point ARI=0.334 AMI=0.701 | 0.4s
+   cent     louvain@k_im  k=  52 | block ARI=0.487 AMI=0.689 cut=0.206 | point ARI=0.497 AMI=0.735
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:71: LegacySurfaceWarning: Infomap.nodes is deprecated and leaves in 3.0; read result.nodes(states=True) off the Result returned by im.run() instead.
+  for node in im.nodes:
+/Volumes/Models/dyf_bench_2026-11-04/map_equation_test.py:76: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return lab, int(lab.max() + 1), float(im.codelength)
+   ceiling  louvain@1     k=  15 | block ARI=0.507 AMI=0.678 cut=0.096 | point ARI=0.541 AMI=0.680
+   ceiling  infomap       k=  54 | block ARI=0.524 AMI=0.702 cut=0.164 | point ARI=0.534 AMI=0.740 | 1.5s
+   ceiling  louvain@k_im  k=  39 | block ARI=0.454 AMI=0.690 cut=0.195 | point ARI=0.479 AMI=0.726
+
+wrote /Volumes/Models/dyf_bench_2026-11-04/map_equation_test_results.json

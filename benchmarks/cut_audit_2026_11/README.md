@@ -19,5 +19,6 @@ Question answered, in order:
 | `hash_leaf_graph_test.py` | can the leaf graph come from the hash (boundary mass across each hyperplane) instead of centroid cosine? | no: loses at matched k on every dataset, −0.18 ARI on MNIST; AG News gain was community count |
 | `centred_hash_tree_test.py`, `centred_hash_tree_kmatched.py` | does centring the hash threshold, `sign(w·(x−μ))`, help? | purer leaves, block ARI +0.05 on three sets at matched k, shipped output within ±0.03; shapes unchanged; not worth the format change |
 | `leaf_graph_construction_test.py` | how much can any leaf graph buy? centroid cosine vs SNN vs spread-aware vs the full point kNN coarsened to leaves (ceiling) vs a 20k sample of it | ceiling adds +0.01…+0.06 at matched k; SNN/spread a wash; sampled counts fragment Louvain; the edges are not the bottleneck |
+| `map_equation_test.py` (needs `uv run --with infomap`) | is the map equation (Infomap) a better objective than modularity on the leaf graph? | it is a fine-k prior: 49–90 modules; +0.06 shipped ARI on the 120-type atlases (mostly k), −0.2…−0.3 on 10-class images and 4-class text; not a default |
 
 Run with the project venv: `.venv/bin/python benchmarks/cut_audit_2026_11/<script>.py`.
