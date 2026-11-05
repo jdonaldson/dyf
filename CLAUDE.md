@@ -152,7 +152,11 @@ coming back. Numbers are in `KNOWN_ISSUES.md` #9, #11, #14; the conclusions:
   a leaf share the path); per-leaf nearest-family labels are class-aligned above a shuffle
   null on every dataset, curve/sheet leaves are the purest, the "dip" shape marks small
   impure pockets the re-cut moves, and the same shapes recur across the whole embedding
-  except a few localized ones that name real structures. The shape is data, not tree: across
+  except a few localized ones that name real structures. Clustering leaves on shape does not
+  rediscover the tree (AMI with the top-level branch 0.02–0.10 on rung-free metrics), the
+  same shapes recur on most top-level branches, and branches sharing a shape are not related
+  by class, community or position — a common shape is local vocabulary, a single-branch shape
+  identifies a region. The shape is data, not tree: across
   three seeds a point's profile reproduces far better than random on every dataset; the
   unstable minority is misclassified only on Fashion and droplet. The shipped bridge,
   connector and boundary flags do not coincide with the unstable points (AUC 0.42–0.59), and

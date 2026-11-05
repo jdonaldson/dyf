@@ -1,0 +1,176 @@
+
+== mnist: 6863 leaves, depth-1 subtrees 8, depth-2 64
+/Users/jdonaldson/Projects/dyf/.venv/lib/python3.11/site-packages/joblib/externals/loky/backend/context.py:131: UserWarning: Could not find the number of physical cores for the following reason:
+invalid literal for int() with base 10: ''
+Returning the number of logical cores instead. You can silence this warning by setting LOKY_MAX_CPU_COUNT to the number of cores you want to use.
+  warnings.warn(
+  File "/Users/jdonaldson/Projects/dyf/.venv/lib/python3.11/site-packages/joblib/externals/loky/backend/context.py", line 249, in _count_physical_cores
+    cpu_count_physical = _count_physical_cores_darwin()
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jdonaldson/Projects/dyf/.venv/lib/python3.11/site-packages/joblib/externals/loky/backend/context.py", line 318, in _count_physical_cores_darwin
+    return int(cpu_info)
+           ^^^^^^^^^^^^^
+   [profile] AMI(shape, ancestor) d1: 0.220 (null 0.000)  d2: 0.235 (null 0.000)  d3: 0.320 (null -0.000)  
+   [profile] cross-branch same-shape pairs vs random cross-branch pairs: same class 0.102 vs 0.086 | same community 0.083 vs 0.065 | centroid cos -0.031 vs -0.032
+   [profile] cluster: leaves | points | mean profile | depth-1 subtrees >=5% | largest-subtree share | mean depth
+        966 | 13.2% |  3.2  3.7  2.0  1.8  1.2  0.8 | 4 | 0.55 | 5.5
+/Volumes/Models/dyf_bench_2026-11-04/shape_clusters_vs_branches.py:171: RuntimeWarning: Mean of empty slice
+  prof = np.nanmean(P[m], axis=0)
+       1854 | 27.9% |  3.6  6.1  8.8  6.9    .    . | 7 | 0.18 | 4.3
+        303 |  4.7% |  3.4  4.2 33.0 42.4    .    . | 8 | 0.27 | 4.3
+        125 |  1.8% |  3.4 32.0    .    .    .    . | 3 | 0.49 | 3.8
+       3092 | 44.6% |  3.5  5.6  3.9  3.6  2.0    . | 7 | 0.21 | 4.7
+        523 |  7.8% |  4.6  4.9  3.8  2.2    .    . | 1 | 1.00 | 4.5
+   [summary] AMI(shape, ancestor) d1: 0.079 (null -0.000)  d2: 0.155 (null -0.000)  d3: 0.207 (null -0.000)  
+   [summary] cross-branch same-shape pairs vs random cross-branch pairs: same class 0.103 vs 0.089 | same community 0.078 vs 0.065 | centroid cos -0.031 vs -0.036
+   [summary] cluster: leaves | points | mean profile | depth-1 subtrees >=5% | largest-subtree share | mean depth
+/Volumes/Models/dyf_bench_2026-11-04/shape_clusters_vs_branches.py:171: RuntimeWarning: Mean of empty slice
+  prof = np.nanmean(P[m], axis=0)
+        788 | 10.6% |  3.6  9.4 14.2  9.3    .    . | 6 | 0.26 | 4.2
+        529 |  0.8% |  3.5  4.9  4.3  3.7  1.6    . | 8 | 0.23 | 4.9
+       2849 | 32.4% |  3.6  4.7  4.2  3.6  2.6    . | 8 | 0.19 | 5.0
+        215 |  3.3% |  3.5 18.1 53.7    .    .    . | 7 | 0.28 | 4.0
+        646 | 10.2% |  3.2  3.5  1.8  2.0  1.2  0.8 | 3 | 0.58 | 5.8
+       1836 | 42.9% |  3.7  5.7  5.5  4.6    .    . | 8 | 0.19 | 4.0
+
+== fashion_mnist: 6969 leaves, depth-1 subtrees 8, depth-2 64
+   [profile] AMI(shape, ancestor) d1: 0.266 (null -0.000)  d2: 0.275 (null -0.000)  d3: 0.284 (null -0.000)  
+   [profile] cross-branch same-shape pairs vs random cross-branch pairs: same class 0.056 vs 0.069 | same community 0.023 vs 0.035 | centroid cos -0.160 vs -0.099
+   [profile] cluster: leaves | points | mean profile | depth-1 subtrees >=5% | largest-subtree share | mean depth
+/Volumes/Models/dyf_bench_2026-11-04/shape_clusters_vs_branches.py:171: RuntimeWarning: Mean of empty slice
+  prof = np.nanmean(P[m], axis=0)
+        258 |  3.7% |  1.6 28.8  3.7  1.8  1.5    . | 4 | 0.63 | 4.4
+        233 |  3.1% |  1.5 15.8 41.3 58.7    .    . | 5 | 0.35 | 4.1
+       1126 | 17.0% |  2.9  2.6  2.8  3.5  1.4    . | 4 | 0.33 | 4.5
+       2674 | 39.1% |  1.4  2.5  4.0  2.5  2.0  1.9 | 5 | 0.30 | 5.5
+        573 |  8.0% |  1.8  5.6  9.6 14.8 38.5    . | 6 | 0.25 | 4.4
+       2105 | 29.0% |  1.4  2.5  3.2  5.7  4.7    . | 4 | 0.29 | 5.2
+   [summary] AMI(shape, ancestor) d1: 0.100 (null 0.000)  d2: 0.164 (null 0.000)  d3: 0.176 (null 0.000)  
+   [summary] cross-branch same-shape pairs vs random cross-branch pairs: same class 0.066 vs 0.069 | same community 0.037 vs 0.035 | centroid cos -0.118 vs -0.096
+   [summary] cluster: leaves | points | mean profile | depth-1 subtrees >=5% | largest-subtree share | mean depth
+        665 |  0.9% |  1.7  3.9  4.2  4.4  3.6  2.1 | 7 | 0.23 | 5.3
+        694 | 10.1% |  1.4 13.0 12.1  9.4  7.3  1.4 | 4 | 0.34 | 4.7
+/Volumes/Models/dyf_bench_2026-11-04/shape_clusters_vs_branches.py:171: RuntimeWarning: Mean of empty slice
+  prof = np.nanmean(P[m], axis=0)
+        115 |  1.5% |  1.6 23.4 60.0    .    .    . | 6 | 0.34 | 4.0
+       2486 | 54.6% |  1.8  2.5  3.3  3.7  2.3    . | 8 | 0.26 | 4.6
+        405 |  6.6% |  2.9  7.5  4.3    .    .    . | 4 | 0.39 | 3.9
+       2604 | 26.2% |  1.5  2.3  3.0  3.8  2.6  1.9 | 4 | 0.28 | 5.8
+
+== cmu_mocap: 11014 leaves, depth-1 subtrees 8, depth-2 53
+   [profile] AMI(shape, ancestor) d1: 0.226 (null 0.000)  d2: 0.327 (null -0.000)  d3: 0.338 (null 0.000)  
+   [profile] cross-branch same-shape pairs vs random cross-branch pairs: same class 0.244 vs 0.192 | same community 0.032 vs 0.032 | centroid cos 0.418 vs 0.430
+   [profile] cluster: leaves | points | mean profile | depth-1 subtrees >=5% | largest-subtree share | mean depth
+       2664 | 23.2% |  3.2  2.3  2.8  4.2  5.2  5.2 | 5 | 0.36 | 6.0
+       3588 | 33.3% |  3.8  2.1  1.6  1.8  1.4  1.6 | 5 | 0.38 | 6.2
+       2141 | 19.7% |  2.8 16.4  1.8  1.5  1.4  0.6 | 3 | 0.62 | 5.7
+       1687 | 15.3% |  3.0  1.7 11.4  2.1  1.5  1.0 | 4 | 0.56 | 6.2
+/Volumes/Models/dyf_bench_2026-11-04/shape_clusters_vs_branches.py:171: RuntimeWarning: Mean of empty slice
+  prof = np.nanmean(P[m], axis=0)
+        473 |  4.3% |  3.4  4.8 13.3 23.1 54.5    . | 5 | 0.44 | 5.1
+        461 |  4.3% | 12.3  1.1  1.3  2.1  1.3  1.6 | 1 | 1.00 | 5.4
+   [summary] AMI(shape, ancestor) d1: 0.020 (null 0.000)  d2: 0.083 (null -0.000)  d3: 0.112 (null -0.000)  
+   [summary] cross-branch same-shape pairs vs random cross-branch pairs: same class 0.201 vs 0.201 | same community 0.037 vs 0.036 | centroid cos 0.445 vs 0.432
+   [summary] cluster: leaves | points | mean profile | depth-1 subtrees >=5% | largest-subtree share | mean depth
+       3280 | 40.4% |  3.6  4.1  3.4  2.8  3.5  8.3 | 5 | 0.31 | 5.1
+       2187 |  7.1% |  3.7  3.3  2.8  2.3  2.4  2.1 | 6 | 0.28 | 6.1
+        778 |  0.6% |  3.7  4.7  4.1  2.7  2.0  1.9 | 5 | 0.31 | 6.1
+       3716 | 42.2% |  3.8  2.8  2.3  1.9  2.0  2.0 | 5 | 0.27 | 6.7
+/Volumes/Models/dyf_bench_2026-11-04/shape_clusters_vs_branches.py:171: RuntimeWarning: Mean of empty slice
+  prof = np.nanmean(P[m], axis=0)
+        189 |  1.6% |  3.5  6.0 24.9 36.2 60.0    . | 4 | 0.44 | 5.2
+        864 |  8.1% |  3.3 22.0 11.5  6.8  4.3 11.9 | 3 | 0.56 | 5.8
+
+== ag_news: 9893 leaves, depth-1 subtrees 8, depth-2 64
+   [profile] AMI(shape, ancestor) d1: 0.197 (null 0.000)  d2: 0.276 (null -0.000)  d3: 0.340 (null -0.000)  
+   [profile] cross-branch same-shape pairs vs random cross-branch pairs: same class 0.152 vs 0.179 | same community 0.039 vs 0.044 | centroid cos 0.078 vs 0.078
+   [profile] cluster: leaves | points | mean profile | depth-1 subtrees >=5% | largest-subtree share | mean depth
+/Volumes/Models/dyf_bench_2026-11-04/shape_clusters_vs_branches.py:171: RuntimeWarning: Mean of empty slice
+  prof = np.nanmean(P[m], axis=0)
+       1305 | 13.7% |  8.7 42.3 10.8 10.1  5.1    . | 5 | 0.36 | 4.8
+       1393 | 14.2% | 19.1 17.5  9.6  7.0  7.6    . | 4 | 0.42 | 4.8
+       1561 | 16.4% | 13.9 15.2 19.3 31.5 60.0    . | 8 | 0.19 | 4.6
+       2680 | 26.4% |  9.2  9.4 12.2 10.4 14.6 13.2 | 5 | 0.24 | 5.5
+       1045 | 11.2% | 11.2 26.1 45.9 57.1    .    . | 8 | 0.23 | 4.3
+       1909 | 18.2% |  9.7 12.3 10.3  5.0  4.4  4.3 | 6 | 0.29 | 5.6
+   [summary] AMI(shape, ancestor) d1: 0.077 (null 0.000)  d2: 0.176 (null -0.000)  d3: 0.247 (null -0.000)  
+   [summary] cross-branch same-shape pairs vs random cross-branch pairs: same class 0.166 vs 0.181 | same community 0.046 vs 0.046 | centroid cos 0.084 vs 0.079
+   [summary] cluster: leaves | points | mean profile | depth-1 subtrees >=5% | largest-subtree share | mean depth
+       1721 | 16.6% |  9.8 10.4  9.1  6.6  9.2  9.3 | 6 | 0.26 | 6.4
+/Volumes/Models/dyf_bench_2026-11-04/shape_clusters_vs_branches.py:171: RuntimeWarning: Mean of empty slice
+  prof = np.nanmean(P[m], axis=0)
+       1664 | 21.5% | 15.7 19.2 17.5 15.6    .    . | 5 | 0.23 | 4.3
+        892 |  0.9% | 11.0 15.8 13.5  8.6  9.3  9.6 | 7 | 0.21 | 5.4
+       1861 | 19.5% | 10.3 32.4 16.4 19.3 20.8 60.0 | 5 | 0.34 | 4.9
+       3009 | 33.0% | 11.5 11.4 10.7  9.5 11.6    . | 7 | 0.21 | 5.0
+        746 |  8.5% | 11.4 28.1 53.8 60.0    .    . | 7 | 0.20 | 4.2
+
+== tms_facs: 11466 leaves, depth-1 subtrees 8, depth-2 63
+   [profile] AMI(shape, ancestor) d1: 0.406 (null 0.000)  d2: 0.385 (null -0.000)  d3: 0.361 (null -0.000)  
+   [profile] cross-branch same-shape pairs vs random cross-branch pairs: same class 0.005 vs 0.005 | same community 0.010 vs 0.010 | centroid cos -0.078 vs -0.062
+   [profile] cluster: leaves | points | mean profile | depth-1 subtrees >=5% | largest-subtree share | mean depth
+        932 |  7.7% |  3.7  9.5  1.0  0.8  1.4  2.4 | 5 | 0.65 | 5.8
+/Volumes/Models/dyf_bench_2026-11-04/shape_clusters_vs_branches.py:171: RuntimeWarning: Mean of empty slice
+  prof = np.nanmean(P[m], axis=0)
+        549 |  4.2% |  2.5  3.2  7.5 28.5 57.2    . | 6 | 0.29 | 4.9
+       3135 | 27.4% |  2.5  1.6  1.2  3.8  5.4  4.8 | 3 | 0.41 | 6.2
+       3200 | 28.0% |  2.0  1.8  2.2  2.3  1.9  1.9 | 3 | 0.51 | 6.0
+       1184 | 10.3% |  0.9  0.2  4.3  7.5  8.2  5.4 | 1 | 0.95 | 6.4
+       2466 | 22.3% |  4.0  1.7  1.9  1.5  2.2  1.6 | 4 | 0.51 | 5.6
+   [summary] AMI(shape, ancestor) d1: 0.069 (null 0.000)  d2: 0.134 (null -0.000)  d3: 0.172 (null 0.000)  
+   [summary] cross-branch same-shape pairs vs random cross-branch pairs: same class 0.004 vs 0.006 | same community 0.012 vs 0.011 | centroid cos -0.063 vs -0.061
+   [summary] cluster: leaves | points | mean profile | depth-1 subtrees >=5% | largest-subtree share | mean depth
+/Volumes/Models/dyf_bench_2026-11-04/shape_clusters_vs_branches.py:171: RuntimeWarning: Mean of empty slice
+  prof = np.nanmean(P[m], axis=0)
+       2456 | 28.6% |  3.0  2.4  2.7  3.2  3.1    . | 5 | 0.27 | 4.7
+       2631 | 24.5% |  2.3  2.3  1.6  3.1  4.7  4.2 | 6 | 0.30 | 6.8
+       1410 |  1.3% |  2.7  2.4  2.2  3.1  4.2  4.1 | 5 | 0.31 | 5.8
+        184 |  1.5% |  2.4  5.1 12.0 45.4 58.0    . | 6 | 0.30 | 4.9
+       4125 | 38.4% |  2.7  1.7  1.5  1.8  2.5  2.3 | 4 | 0.33 | 6.2
+        660 |  5.7% |  2.0  3.4  5.2 16.6 12.1  6.1 | 6 | 0.41 | 5.9
+
+== tms_droplet: 23241 leaves, depth-1 subtrees 8, depth-2 64
+   [profile] AMI(shape, ancestor) d1: 0.160 (null 0.000)  d2: 0.263 (null 0.000)  d3: 0.286 (null -0.000)  
+   [profile] cross-branch same-shape pairs vs random cross-branch pairs: same class 0.006 vs 0.009 | same community 0.014 vs 0.017 | centroid cos -0.068 vs -0.055
+   [profile] cluster: leaves | points | mean profile | depth-1 subtrees >=5% | largest-subtree share | mean depth
+       5621 | 23.3% |  2.9  1.4  1.5  1.8  1.3  1.6 | 6 | 0.26 | 6.2
+       1329 |  5.0% |  1.7  4.7 15.3  3.2  4.2  2.7 | 4 | 0.67 | 5.6
+       8678 | 35.5% |  2.7  1.4  1.3  2.4  3.8  3.9 | 5 | 0.35 | 6.5
+       3521 | 14.2% |  2.2  7.5  0.9  1.7  2.4  3.5 | 4 | 0.39 | 6.4
+       2818 | 15.9% |  1.8  1.2  0.8  1.1 11.5 13.3 | 3 | 0.62 | 7.1
+       1274 |  6.1% |  2.0  1.5  0.9 29.2  5.2  7.9 | 6 | 0.54 | 6.4
+   [summary] AMI(shape, ancestor) d1: 0.054 (null 0.000)  d2: 0.090 (null 0.000)  d3: 0.129 (null 0.000)  
+   [summary] cross-branch same-shape pairs vs random cross-branch pairs: same class 0.009 vs 0.007 | same community 0.019 vs 0.015 | centroid cos -0.052 vs -0.058
+   [summary] cluster: leaves | points | mean profile | depth-1 subtrees >=5% | largest-subtree share | mean depth
+       6057 | 48.4% |  2.7  2.0  1.1  1.9  3.2  3.5 | 7 | 0.21 | 6.3
+       1985 | 10.1% |  1.8  4.5  6.2 17.5 15.3 18.4 | 5 | 0.63 | 6.8
+       2627 |  1.1% |  2.4  2.8  1.9  3.1  3.7  4.9 | 7 | 0.25 | 6.2
+       5332 | 23.1% |  2.4  2.4  2.4  3.4  3.7  4.1 | 5 | 0.42 | 5.6
+       7183 | 17.1% |  2.4  2.0  1.1  1.7  3.3  3.8 | 5 | 0.29 | 7.2
+/Volumes/Models/dyf_bench_2026-11-04/shape_clusters_vs_branches.py:171: RuntimeWarning: Mean of empty slice
+  prof = np.nanmean(P[m], axis=0)
+         57 |  0.2% |  2.7 44.9 59.1    .    .    . | 2 | 0.58 | 3.7
+
+== brain_1m: 125247 leaves, depth-1 subtrees 8, depth-2 64
+   [profile] AMI(shape, ancestor) d1: 0.250 (null -0.000)  d2: 0.246 (null -0.000)  d3: 0.276 (null 0.000)  
+   [profile] cross-branch same-shape pairs vs random cross-branch pairs: same class 0.055 vs 0.031 | same community 0.066 vs 0.045 | centroid cos 0.051 vs -0.021
+   [profile] cluster: leaves | points | mean profile | depth-1 subtrees >=5% | largest-subtree share | mean depth
+      18997 | 15.1% |  4.0  2.7  2.4  3.6 10.2 14.0 | 5 | 0.34 | 7.1
+      19946 | 15.9% |  2.4  3.5 16.0  6.3  6.8  7.2 | 5 | 0.33 | 6.5
+       6535 |  5.1% |  2.9 34.4  3.5  6.3  6.5  5.4 | 4 | 0.31 | 6.2
+      23993 | 20.2% |  4.1  3.1  2.9  4.3  2.8  3.5 | 5 | 0.27 | 6.8
+      40475 | 32.3% |  2.2  3.9  4.5 10.9  8.4  8.2 | 4 | 0.40 | 6.8
+      15301 | 11.3% |  2.4  4.2  8.4 17.1 29.5 29.6 | 6 | 0.35 | 6.1
+   [summary] AMI(shape, ancestor) d1: 0.063 (null -0.000)  d2: 0.092 (null 0.000)  d3: 0.123 (null 0.000)  
+   [summary] cross-branch same-shape pairs vs random cross-branch pairs: same class 0.042 vs 0.031 | same community 0.051 vs 0.044 | centroid cos 0.006 vs -0.023
+   [summary] cluster: leaves | points | mean profile | depth-1 subtrees >=5% | largest-subtree share | mean depth
+       4387 |  3.4% |  2.6  5.4 12.8 29.3 55.4 59.9 | 6 | 0.26 | 5.7
+      16970 | 16.8% |  4.0  3.5  2.4  3.3  4.3  5.2 | 6 | 0.26 | 7.2
+      13408 |  1.0% |  3.1  4.8  5.4  7.5  9.7 10.1 | 8 | 0.21 | 6.7
+      23615 | 20.0% |  2.6 10.1  9.6 13.8 15.1 18.9 | 6 | 0.31 | 6.5
+/Volumes/Models/dyf_bench_2026-11-04/shape_clusters_vs_branches.py:171: RuntimeWarning: Mean of empty slice
+  prof = np.nanmean(P[m], axis=0)
+      26616 | 27.3% |  2.9  4.6  6.2  6.9  7.3    . | 7 | 0.22 | 5.7
+      40251 | 31.5% |  2.7  3.4  5.1  6.3  7.1  7.6 | 7 | 0.25 | 7.3
+
+wrote /Volumes/Models/dyf_bench_2026-11-04/shape_clusters_vs_branches_results.json
