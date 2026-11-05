@@ -962,6 +962,21 @@ def louvain_cluster_leaves(idx, coords, embeddings, leaf_k=10, similarity_thresh
     graph over leaf centroids, filters weak edges by cosine similarity
     threshold, then runs Louvain to discover communities.
 
+    **The partition you get back is not the Louvain partition.** The last step
+    (``_reassign_points``) runs up to five rounds of spherical k-means over every
+    point, seeded by the Louvain labels, so the result is a Voronoi tessellation of
+    the community centroids in cosine space: each point belongs to the community whose
+    centroid it is most similar to. The leaf-to-community map is a starting point, not
+    the answer. Measured on the seven-dataset bench (``KNOWN_ISSUES.md`` #14): the step
+    moves 4–31% of points, makes communities contiguous (the worst community's share of
+    neighbours lying outside it falls from 0.6–0.8 to 0.05–0.2), and shifts agreement
+    with ground truth by −0.13 (MNIST) to +0.11 (1.3M brain), the sign stable across
+    seeds and set by the data — it helps on scRNA PCA scores and hurts on image PCA.
+    Across the bench the net ARI effect is about zero; its value is contiguity and a
+    reproducible rule for placing new points, not accuracy. There is no flag to skip
+    it; ``dyfviz`` stores the post-reassignment label, so changing the default would
+    change its files.
+
     Args:
         idx: An open ``LazyIndex`` handle.
         coords: (N, 2-or-3) UMAP coordinates for every item.

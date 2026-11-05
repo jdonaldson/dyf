@@ -272,6 +272,17 @@ directions and cannot be separated. For that regime pre-scale the data so norm i
 or reach for a connectivity/density method; `LeafGroupingResult.spectrum` tells you which regime
 the leaf graph is in.
 
+**The communities you get are Voronoi cells, not graph communities.** Both leaf-grouping paths
+(`louvain_cluster_leaves`, `agglomerate_tree_leaves`) end with spherical k-means over every
+point, seeded by the leaf-level grouping: each point ends up in the community whose centroid it
+is most similar to. The step moves 4–31% of points on the seven-dataset bench, makes communities
+contiguous, and shifts ground-truth agreement by −0.13 (MNIST PCA-50) to +0.11 (1.3M brain) with
+the sign set by the data (`KNOWN_ISSUES.md` #14). Two consequences worth knowing: the final
+partition cuts about as many nearest-neighbour edges as k-means at the same k (2–4× a Leiden
+partition on a point kNN graph), and a community that Louvain found as a non-convex region is
+flattened into a convex cell. Use `LeafGroupingResult.centroids` to place new points by the same
+rule.
+
 ## Performance
 
 Search runs on a Rust multiprobe kernel (`dyf-rs`, PyO3) — the default path for

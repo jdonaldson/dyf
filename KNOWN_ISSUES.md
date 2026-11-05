@@ -88,12 +88,12 @@ one-off measurements.
       and connected components then recover the rings exactly. Documented 2026-09-27
       (`build_dyf_tree` docstring, README); `normalize=False` was measured and refused — see
       the issue's Decision paragraph
-- [ ] **`louvain_cluster_leaves` ends with spherical k-means over every point, and nothing says
-      so** (issue 14). `_reassign_points` moves 4–31% of points and swings ARI by −0.11 (MNIST)
-      to +0.10 (TMS droplet); the shipped partition is a Voronoi tessellation of community
-      centroids, so any non-convex community Louvain found is flattened. Found 2026-11-05 by
-      measuring cut edges on a point kNN graph: dyf's partition cuts as many as k-means at the
-      same k. Decision pending: document as a stated default, expose a flag, or gate it
+- [x] **`louvain_cluster_leaves` ends with spherical k-means over every point, and nothing said
+      so** (issue 14). `_reassign_points` moves 4–31% of points and swings ARI by −0.13 (MNIST)
+      to +0.11 (brain), net about zero; the shipped partition is a Voronoi tessellation of
+      community centroids, so any non-convex community Louvain found is flattened. Found
+      2026-11-05 by measuring cut edges on a point kNN graph. Decision: document, keep the
+      default — docstring, README, CHANGELOG (2026-11-05)
 
 **P2 — sweep the rest of the pattern (see the rule at the end of issue 5)**
 
@@ -795,7 +795,7 @@ add searchable rows.
 
 ---
 
-## 14. `louvain_cluster_leaves` ends with spherical k-means over every point, undocumented — OPEN (2026-11-05)
+## 14. `louvain_cluster_leaves` ends with spherical k-means over every point, undocumented — DOCUMENTED (2026-11-05)
 
 `_reassign_points` (`src/dyf/agglomerate.py:94`) runs up to five Lloyd rounds of spherical
 k-means over **all** points, seeded by the Louvain community labels, and is the last step of
@@ -830,10 +830,13 @@ Also explains two earlier observations: the stage-E collapse under a projective 
 "lifted centroids near-parallel → cosine reassignment collapses") and why "leaf oracle rises,
 ARI doesn't" (issue 9) — the final partition is not a function of leaf purity alone.
 
-**Decision pending.** Options, cheapest first: document it in `louvain_cluster_leaves` and the
-README "How It Works" as a stated default; add `reassign: bool = True` so a consumer can keep
-the block partition; gate it on the leaf-graph spectrum regime (connectivity → skip). Whichever
-is chosen, the gallery pages must say which partition they score.
+**Decision (Justin, 2026-11-05): document, do not change.** The net ARI effect across the bench
+is about zero and the step buys contiguity plus a reproducible rule for placing new points, so it
+stays the default with no flag. Written into the `louvain_cluster_leaves` docstring, the README
+"How It Works" paragraph and the CHANGELOG. A `reassign: bool` flag is a one-line addition if a
+consumer ever wants the block partition; `dyfviz` stores the post-reassignment label, which is
+why the default is not changing. The gallery pages score the shipped (post-reassignment)
+partition; the README now says what that is.
 
 ---
 

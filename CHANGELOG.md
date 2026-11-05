@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Documented
+
+**The leaf-grouping output is a Voronoi partition, and now says so.** `louvain_cluster_leaves`
+ends with `_reassign_points`: up to five rounds of spherical k-means over every point, seeded by
+the Louvain labels, so each point lands in the community whose centroid it is most similar to.
+The docstring described only the Louvain stage. Measured on the seven-dataset bench
+(`benchmarks/cut_audit_2026_11/`, `KNOWN_ISSUES.md` #14): the step moves 4–31% of points, makes
+communities contiguous, and shifts ARI by −0.13 (MNIST) to +0.11 (1.3M brain) with the sign set by
+the data and stable across seeds — net about zero across the bench. Documented in the docstring
+and the README "How It Works"; no behaviour change and no flag, since `dyfviz` stores the
+post-reassignment label.
+
 ## 0.17.0 — 2026-11-01
 
 ### Added
