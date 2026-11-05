@@ -1,0 +1,275 @@
+
+== mnist seed=42
+   res 0.2  k=   6 flat 0.463 | snap 0.469 (k 6, moved 1.7%) | intersect 0.463 (k 6)
+   res 0.3  k=   7 flat 0.499 | snap 0.491 (k 7, moved 3.3%) | intersect 0.499 (k 17)
+   res 0.5  k=   9 flat 0.623 | snap 0.594 (k 9, moved 6.0%) | intersect 0.623 (k 38)
+   res 0.7  k=  10 flat 0.625 | snap 0.594 (k 9, moved 9.8%) | intersect 0.625 (k 55)
+   res 1.0  k=  13 flat 0.581 | snap 0.556 (k 13, moved 7.7%) | intersect 0.583 (k 79)
+   res 1.5  k=  16 flat 0.525 | snap 0.525 (k 16, moved 7.4%) | intersect 0.529 (k 114)
+   res 2.0  k=  21 flat 0.422 | snap 0.419 (k 21, moved 7.7%) | intersect 0.412 (k 157)
+   res 3.0  k=  29 flat 0.372 | snap 0.375 (k 29, moved 10.2%) | intersect 0.350 (k 211)
+   res 4.0  k=  37 flat 0.316 | snap 0.319 (k 37, moved 8.7%) | intersect 0.287 (k 257)
+   res 6.0  k=  57 flat 0.259 | snap 0.259 (k 57, moved 0.0%) | intersect 0.222 (k 349)
+   mean cost: snap +0.008  intersect +0.009; at best level: snap +0.031 intersect +0.000; intersect k growth x5.42
+
+== mnist seed=1
+   res 0.2  k=   5 flat 0.426 | snap 0.433 (k 5, moved 1.7%) | intersect 0.426 (k 5)
+   res 0.3  k=   6 flat 0.457 | snap 0.455 (k 6, moved 2.8%) | intersect 0.458 (k 19)
+   res 0.5  k=   9 flat 0.583 | snap 0.576 (k 9, moved 8.8%) | intersect 0.584 (k 36)
+   res 0.7  k=   9 flat 0.581 | snap 0.576 (k 9, moved 9.0%) | intersect 0.586 (k 61)
+   res 1.0  k=  12 flat 0.566 | snap 0.554 (k 11, moved 11.4%) | intersect 0.564 (k 96)
+   res 1.5  k=  15 flat 0.486 | snap 0.471 (k 15, moved 12.8%) | intersect 0.459 (k 131)
+   res 2.0  k=  20 flat 0.427 | snap 0.420 (k 20, moved 12.6%) | intersect 0.382 (k 179)
+   res 3.0  k=  33 flat 0.344 | snap 0.346 (k 32, moved 17.2%) | intersect 0.309 (k 229)
+   res 4.0  k=  39 flat 0.312 | snap 0.320 (k 37, moved 15.7%) | intersect 0.271 (k 295)
+   res 6.0  k=  54 flat 0.250 | snap 0.250 (k 54, moved 0.0%) | intersect 0.194 (k 404)
+   mean cost: snap +0.003  intersect +0.020; at best level: snap +0.007 intersect -0.001; intersect k growth x6.26
+
+== mnist seed=2
+   res 0.2  k=   6 flat 0.468 | snap 0.475 (k 6, moved 1.4%) | intersect 0.468 (k 6)
+   res 0.3  k=   7 flat 0.507 | snap 0.505 (k 7, moved 1.3%) | intersect 0.502 (k 15)
+   res 0.5  k=   9 flat 0.635 | snap 0.628 (k 9, moved 3.0%) | intersect 0.630 (k 30)
+   res 0.7  k=   9 flat 0.648 | snap 0.628 (k 9, moved 3.8%) | intersect 0.638 (k 43)
+   res 1.0  k=  11 flat 0.610 | snap 0.614 (k 11, moved 8.7%) | intersect 0.615 (k 56)
+   res 1.5  k=  17 flat 0.566 | snap 0.570 (k 16, moved 14.3%) | intersect 0.548 (k 90)
+   res 2.0  k=  21 flat 0.508 | snap 0.516 (k 20, moved 15.1%) | intersect 0.483 (k 125)
+   res 3.0  k=  31 flat 0.381 | snap 0.383 (k 31, moved 17.1%) | intersect 0.345 (k 183)
+   res 4.0  k=  40 flat 0.320 | snap 0.338 (k 38, moved 13.0%) | intersect 0.281 (k 263)
+   res 6.0  k=  56 flat 0.267 | snap 0.267 (k 56, moved 0.0%) | intersect 0.221 (k 364)
+   mean cost: snap -0.002  intersect +0.018; at best level: snap +0.021 intersect +0.011; intersect k growth x4.66
+
+== fashion_mnist seed=42
+   res 0.2  k=   4 flat 0.323 | snap 0.288 (k 4, moved 11.6%) | intersect 0.323 (k 4)
+   res 0.3  k=   6 flat 0.371 | snap 0.380 (k 6, moved 11.1%) | intersect 0.412 (k 10)
+   res 0.5  k=   8 flat 0.392 | snap 0.383 (k 8, moved 13.9%) | intersect 0.393 (k 19)
+   res 0.7  k=  10 flat 0.381 | snap 0.394 (k 10, moved 14.8%) | intersect 0.379 (k 33)
+   res 1.0  k=  14 flat 0.381 | snap 0.379 (k 14, moved 9.0%) | intersect 0.370 (k 55)
+   res 1.5  k=  19 flat 0.365 | snap 0.371 (k 18, moved 13.2%) | intersect 0.355 (k 84)
+   res 2.0  k=  21 flat 0.370 | snap 0.376 (k 20, moved 15.4%) | intersect 0.353 (k 117)
+   res 3.0  k=  29 flat 0.333 | snap 0.358 (k 26, moved 16.0%) | intersect 0.299 (k 149)
+   res 4.0  k=  35 flat 0.283 | snap 0.313 (k 33, moved 11.4%) | intersect 0.229 (k 192)
+   res 6.0  k=  48 flat 0.235 | snap 0.235 (k 48, moved 0.0%) | intersect 0.191 (k 250)
+   mean cost: snap -0.004  intersect +0.013; at best level: snap +0.009 intersect -0.002; intersect k growth x3.81
+
+== fashion_mnist seed=1
+   res 0.2  k=   5 flat 0.394 | snap 0.321 (k 5, moved 10.9%) | intersect 0.394 (k 5)
+   res 0.3  k=   6 flat 0.369 | snap 0.364 (k 6, moved 5.5%) | intersect 0.392 (k 11)
+   res 0.5  k=   9 flat 0.454 | snap 0.390 (k 8, moved 21.8%) | intersect 0.450 (k 19)
+   res 0.7  k=   9 flat 0.447 | snap 0.390 (k 8, moved 20.0%) | intersect 0.445 (k 28)
+   res 1.0  k=  13 flat 0.410 | snap 0.390 (k 9, moved 16.7%) | intersect 0.425 (k 46)
+   res 1.5  k=  15 flat 0.426 | snap 0.413 (k 15, moved 12.7%) | intersect 0.392 (k 74)
+   res 2.0  k=  21 flat 0.360 | snap 0.367 (k 20, moved 16.2%) | intersect 0.335 (k 104)
+   res 3.0  k=  28 flat 0.353 | snap 0.352 (k 27, moved 14.6%) | intersect 0.316 (k 156)
+   res 4.0  k=  35 flat 0.278 | snap 0.292 (k 33, moved 16.7%) | intersect 0.243 (k 204)
+   res 6.0  k=  46 flat 0.247 | snap 0.247 (k 46, moved 0.0%) | intersect 0.197 (k 274)
+   mean cost: snap +0.021  intersect +0.015; at best level: snap +0.064 intersect +0.004; intersect k growth x3.88
+
+== fashion_mnist seed=2
+   res 0.2  k=   4 flat 0.344 | snap 0.324 (k 4, moved 8.5%) | intersect 0.344 (k 4)
+   res 0.3  k=   5 flat 0.409 | snap 0.385 (k 5, moved 8.5%) | intersect 0.409 (k 8)
+   res 0.5  k=   8 flat 0.465 | snap 0.413 (k 8, moved 10.7%) | intersect 0.467 (k 16)
+   res 0.7  k=  10 flat 0.454 | snap 0.421 (k 9, moved 15.2%) | intersect 0.458 (k 20)
+   res 1.0  k=  12 flat 0.424 | snap 0.401 (k 11, moved 13.6%) | intersect 0.425 (k 34)
+   res 1.5  k=  16 flat 0.391 | snap 0.377 (k 16, moved 8.6%) | intersect 0.379 (k 53)
+   res 2.0  k=  21 flat 0.356 | snap 0.355 (k 21, moved 12.3%) | intersect 0.338 (k 71)
+   res 3.0  k=  27 flat 0.336 | snap 0.347 (k 26, moved 13.9%) | intersect 0.314 (k 103)
+   res 4.0  k=  35 flat 0.307 | snap 0.304 (k 34, moved 7.9%) | intersect 0.271 (k 145)
+   res 6.0  k=  50 flat 0.255 | snap 0.255 (k 50, moved 0.0%) | intersect 0.216 (k 210)
+   mean cost: snap +0.016  intersect +0.012; at best level: snap +0.052 intersect -0.001; intersect k growth x2.83
+
+== cmu_mocap seed=42
+   res 0.2  k=   9 flat 0.110 | snap 0.116 (k 9, moved 0.8%) | intersect 0.110 (k 9)
+   res 0.3  k=  12 flat 0.091 | snap 0.095 (k 12, moved 3.8%) | intersect 0.090 (k 14)
+   res 0.5  k=  16 flat 0.157 | snap 0.147 (k 15, moved 6.0%) | intersect 0.154 (k 22)
+   res 0.7  k=  19 flat 0.185 | snap 0.146 (k 19, moved 15.0%) | intersect 0.177 (k 33)
+   res 1.0  k=  22 flat 0.176 | snap 0.153 (k 22, moved 10.4%) | intersect 0.153 (k 39)
+   res 1.5  k=  27 flat 0.152 | snap 0.129 (k 27, moved 12.5%) | intersect 0.141 (k 46)
+   res 2.0  k=  29 flat 0.150 | snap 0.127 (k 29, moved 12.4%) | intersect 0.139 (k 51)
+   res 3.0  k=  32 flat 0.121 | snap 0.121 (k 32, moved 9.0%) | intersect 0.125 (k 68)
+   res 4.0  k=  40 flat 0.123 | snap 0.126 (k 39, moved 8.8%) | intersect 0.113 (k 85)
+   res 6.0  k=  52 flat 0.088 | snap 0.088 (k 52, moved 0.0%) | intersect 0.081 (k 111)
+   mean cost: snap +0.010  intersect +0.007; at best level: snap +0.039 intersect +0.008; intersect k growth x1.69
+
+== cmu_mocap seed=1
+   res 0.2  k=   8 flat 0.103 | snap 0.096 (k 6, moved 11.2%) | intersect 0.103 (k 8)
+   res 0.3  k=  12 flat 0.117 | snap 0.100 (k 9, moved 15.3%) | intersect 0.118 (k 14)
+   res 0.5  k=  14 flat 0.186 | snap 0.142 (k 13, moved 11.4%) | intersect 0.197 (k 20)
+   res 0.7  k=  16 flat 0.183 | snap 0.141 (k 15, moved 11.9%) | intersect 0.188 (k 23)
+   res 1.0  k=  22 flat 0.201 | snap 0.174 (k 21, moved 11.8%) | intersect 0.204 (k 35)
+   res 1.5  k=  29 flat 0.161 | snap 0.158 (k 28, moved 6.2%) | intersect 0.164 (k 48)
+   res 2.0  k=  35 flat 0.120 | snap 0.128 (k 33, moved 4.7%) | intersect 0.122 (k 57)
+   res 3.0  k=  40 flat 0.122 | snap 0.122 (k 38, moved 3.0%) | intersect 0.117 (k 67)
+   res 4.0  k=  47 flat 0.110 | snap 0.110 (k 47, moved 3.9%) | intersect 0.112 (k 82)
+   res 6.0  k=  58 flat 0.100 | snap 0.100 (k 58, moved 0.0%) | intersect 0.102 (k 103)
+   mean cost: snap +0.013  intersect -0.003; at best level: snap +0.026 intersect -0.003; intersect k growth x1.51
+
+== cmu_mocap seed=2
+   res 0.2  k=   7 flat 0.127 | snap 0.116 (k 5, moved 4.3%) | intersect 0.127 (k 7)
+   res 0.3  k=   8 flat 0.176 | snap 0.182 (k 8, moved 2.9%) | intersect 0.182 (k 13)
+   res 0.5  k=  14 flat 0.166 | snap 0.183 (k 14, moved 6.7%) | intersect 0.174 (k 22)
+   res 0.7  k=  17 flat 0.184 | snap 0.224 (k 17, moved 9.5%) | intersect 0.196 (k 27)
+   res 1.0  k=  22 flat 0.142 | snap 0.184 (k 22, moved 12.7%) | intersect 0.150 (k 35)
+   res 1.5  k=  26 flat 0.143 | snap 0.181 (k 24, moved 12.3%) | intersect 0.149 (k 43)
+   res 2.0  k=  32 flat 0.124 | snap 0.137 (k 30, moved 6.1%) | intersect 0.114 (k 63)
+   res 3.0  k=  40 flat 0.119 | snap 0.130 (k 39, moved 4.0%) | intersect 0.110 (k 82)
+   res 4.0  k=  43 flat 0.127 | snap 0.129 (k 42, moved 2.9%) | intersect 0.107 (k 91)
+   res 6.0  k=  55 flat 0.117 | snap 0.117 (k 55, moved 0.0%) | intersect 0.100 (k 118)
+   mean cost: snap -0.016  intersect +0.002; at best level: snap -0.040 intersect -0.012; intersect k growth x1.73
+
+== ag_news seed=42
+   res 0.2  k=   4 flat 0.491 | snap 0.452 (k 4, moved 5.5%) | intersect 0.491 (k 4)
+   res 0.3  k=   5 flat 0.419 | snap 0.376 (k 5, moved 5.6%) | intersect 0.420 (k 11)
+   res 0.5  k=  10 flat 0.345 | snap 0.330 (k 9, moved 12.4%) | intersect 0.348 (k 37)
+   res 0.7  k=  12 flat 0.356 | snap 0.356 (k 11, moved 15.3%) | intersect 0.342 (k 63)
+   res 1.0  k=  15 flat 0.279 | snap 0.293 (k 15, moved 11.1%) | intersect 0.257 (k 92)
+   res 1.5  k=  24 flat 0.199 | snap 0.210 (k 24, moved 10.3%) | intersect 0.181 (k 130)
+   res 2.0  k=  29 flat 0.163 | snap 0.170 (k 29, moved 10.2%) | intersect 0.137 (k 187)
+   res 3.0  k=  41 flat 0.132 | snap 0.143 (k 40, moved 8.8%) | intersect 0.109 (k 252)
+   res 4.0  k=  54 flat 0.116 | snap 0.117 (k 54, moved 4.4%) | intersect 0.097 (k 306)
+   res 6.0  k=  67 flat 0.084 | snap 0.084 (k 67, moved 0.0%) | intersect 0.075 (k 381)
+   mean cost: snap +0.005  intersect +0.013; at best level: snap +0.039 intersect +0.000; intersect k growth x4.76
+
+== ag_news seed=1
+   res 0.2  k=   3 flat 0.490 | snap 0.474 (k 3, moved 3.3%) | intersect 0.490 (k 3)
+   res 0.3  k=   5 flat 0.572 | snap 0.561 (k 5, moved 4.2%) | intersect 0.573 (k 8)
+   res 0.5  k=   7 flat 0.479 | snap 0.469 (k 7, moved 3.8%) | intersect 0.479 (k 21)
+   res 0.7  k=  10 flat 0.411 | snap 0.421 (k 9, moved 6.3%) | intersect 0.409 (k 44)
+   res 1.0  k=  17 flat 0.296 | snap 0.296 (k 16, moved 7.1%) | intersect 0.291 (k 79)
+   res 1.5  k=  23 flat 0.214 | snap 0.232 (k 20, moved 14.4%) | intersect 0.211 (k 111)
+   res 2.0  k=  30 flat 0.162 | snap 0.164 (k 30, moved 7.9%) | intersect 0.136 (k 164)
+   res 3.0  k=  38 flat 0.141 | snap 0.145 (k 38, moved 7.8%) | intersect 0.120 (k 210)
+   res 4.0  k=  53 flat 0.107 | snap 0.108 (k 52, moved 6.4%) | intersect 0.096 (k 268)
+   res 6.0  k=  68 flat 0.089 | snap 0.089 (k 68, moved 0.0%) | intersect 0.079 (k 344)
+   mean cost: snap +0.000  intersect +0.008; at best level: snap +0.012 intersect -0.001; intersect k growth x4.06
+
+== ag_news seed=2
+   res 0.2  k=   3 flat 0.460 | snap 0.475 (k 3, moved 3.8%) | intersect 0.460 (k 3)
+   res 0.3  k=   5 flat 0.529 | snap 0.546 (k 5, moved 8.9%) | intersect 0.540 (k 11)
+   res 0.5  k=   6 flat 0.482 | snap 0.464 (k 6, moved 5.2%) | intersect 0.471 (k 24)
+   res 0.7  k=   9 flat 0.406 | snap 0.382 (k 9, moved 9.7%) | intersect 0.393 (k 38)
+   res 1.0  k=  16 flat 0.285 | snap 0.286 (k 15, moved 12.0%) | intersect 0.269 (k 67)
+   res 1.5  k=  23 flat 0.234 | snap 0.228 (k 23, moved 12.0%) | intersect 0.222 (k 104)
+   res 2.0  k=  33 flat 0.171 | snap 0.188 (k 32, moved 14.5%) | intersect 0.160 (k 157)
+   res 3.0  k=  42 flat 0.123 | snap 0.130 (k 42, moved 8.5%) | intersect 0.107 (k 221)
+   res 4.0  k=  52 flat 0.107 | snap 0.112 (k 52, moved 6.8%) | intersect 0.092 (k 275)
+   res 6.0  k=  65 flat 0.095 | snap 0.095 (k 65, moved 0.0%) | intersect 0.077 (k 363)
+   mean cost: snap -0.001  intersect +0.010; at best level: snap -0.017 intersect -0.011; intersect k growth x4.10
+
+== tms_facs seed=42
+   res 0.2  k=  15 flat 0.453 | snap 0.444 (k 15, moved 4.4%) | intersect 0.453 (k 15)
+   res 0.3  k=  16 flat 0.441 | snap 0.443 (k 16, moved 2.4%) | intersect 0.461 (k 17)
+   res 0.5  k=  22 flat 0.534 | snap 0.536 (k 22, moved 0.6%) | intersect 0.535 (k 25)
+   res 0.7  k=  22 flat 0.534 | snap 0.536 (k 22, moved 0.6%) | intersect 0.535 (k 27)
+   res 1.0  k=  24 flat 0.553 | snap 0.551 (k 24, moved 1.2%) | intersect 0.551 (k 31)
+   res 1.5  k=  27 flat 0.571 | snap 0.571 (k 27, moved 1.5%) | intersect 0.570 (k 34)
+   res 2.0  k=  30 flat 0.601 | snap 0.601 (k 30, moved 1.5%) | intersect 0.599 (k 37)
+   res 3.0  k=  36 flat 0.625 | snap 0.625 (k 36, moved 1.6%) | intersect 0.626 (k 46)
+   res 4.0  k=  41 flat 0.622 | snap 0.621 (k 40, moved 1.0%) | intersect 0.623 (k 56)
+   res 6.0  k=  46 flat 0.521 | snap 0.521 (k 46, moved 0.0%) | intersect 0.523 (k 70)
+   mean cost: snap +0.000  intersect -0.002; at best level: snap -0.000 intersect -0.001; intersect k growth x1.24
+
+== tms_facs seed=1
+   res 0.2  k=  12 flat 0.341 | snap 0.337 (k 11, moved 1.0%) | intersect 0.341 (k 12)
+   res 0.3  k=  16 flat 0.478 | snap 0.480 (k 16, moved 0.4%) | intersect 0.479 (k 19)
+   res 0.5  k=  18 flat 0.497 | snap 0.500 (k 18, moved 0.5%) | intersect 0.497 (k 22)
+   res 0.7  k=  19 flat 0.532 | snap 0.532 (k 19, moved 0.4%) | intersect 0.532 (k 24)
+   res 1.0  k=  23 flat 0.548 | snap 0.546 (k 23, moved 2.0%) | intersect 0.548 (k 28)
+   res 1.5  k=  27 flat 0.584 | snap 0.582 (k 27, moved 0.8%) | intersect 0.588 (k 37)
+   res 2.0  k=  32 flat 0.601 | snap 0.599 (k 32, moved 1.3%) | intersect 0.604 (k 47)
+   res 3.0  k=  37 flat 0.514 | snap 0.511 (k 36, moved 1.4%) | intersect 0.515 (k 52)
+   res 4.0  k=  44 flat 0.526 | snap 0.523 (k 43, moved 1.2%) | intersect 0.527 (k 64)
+   res 6.0  k=  53 flat 0.503 | snap 0.503 (k 53, moved 0.0%) | intersect 0.505 (k 77)
+   mean cost: snap +0.001  intersect -0.001; at best level: snap +0.001 intersect -0.003; intersect k growth x1.30
+
+== tms_facs seed=2
+   res 0.2  k=  11 flat 0.346 | snap 0.334 (k 10, moved 5.1%) | intersect 0.346 (k 11)
+   res 0.3  k=  13 flat 0.415 | snap 0.412 (k 13, moved 1.1%) | intersect 0.437 (k 17)
+   res 0.5  k=  20 flat 0.518 | snap 0.517 (k 20, moved 0.9%) | intersect 0.519 (k 23)
+   res 0.7  k=  23 flat 0.534 | snap 0.532 (k 23, moved 0.9%) | intersect 0.534 (k 26)
+   res 1.0  k=  25 flat 0.555 | snap 0.555 (k 25, moved 0.2%) | intersect 0.557 (k 30)
+   res 1.5  k=  29 flat 0.568 | snap 0.568 (k 29, moved 1.1%) | intersect 0.568 (k 34)
+   res 2.0  k=  32 flat 0.596 | snap 0.595 (k 32, moved 1.1%) | intersect 0.596 (k 41)
+   res 3.0  k=  39 flat 0.648 | snap 0.649 (k 39, moved 1.1%) | intersect 0.649 (k 55)
+   res 4.0  k=  42 flat 0.549 | snap 0.549 (k 42, moved 0.1%) | intersect 0.551 (k 63)
+   res 6.0  k=  50 flat 0.580 | snap 0.580 (k 50, moved 0.0%) | intersect 0.580 (k 81)
+   mean cost: snap +0.002  intersect -0.003; at best level: snap -0.000 intersect -0.000; intersect k growth x1.28
+
+== tms_droplet seed=42
+   res 0.2  k=  12 flat 0.384 | snap 0.378 (k 12, moved 2.0%) | intersect 0.384 (k 12)
+   res 0.3  k=  16 flat 0.411 | snap 0.404 (k 16, moved 2.0%) | intersect 0.411 (k 17)
+   res 0.5  k=  20 flat 0.422 | snap 0.409 (k 19, moved 2.0%) | intersect 0.422 (k 21)
+   res 0.7  k=  25 flat 0.467 | snap 0.452 (k 24, moved 2.1%) | intersect 0.468 (k 29)
+   res 1.0  k=  29 flat 0.467 | snap 0.465 (k 29, moved 1.0%) | intersect 0.477 (k 37)
+   res 1.5  k=  31 flat 0.504 | snap 0.502 (k 31, moved 1.0%) | intersect 0.508 (k 39)
+   res 2.0  k=  33 flat 0.507 | snap 0.505 (k 32, moved 0.5%) | intersect 0.511 (k 42)
+   res 3.0  k=  36 flat 0.504 | snap 0.503 (k 36, moved 0.4%) | intersect 0.508 (k 46)
+   res 4.0  k=  42 flat 0.578 | snap 0.577 (k 42, moved 1.0%) | intersect 0.584 (k 58)
+   res 6.0  k=  54 flat 0.600 | snap 0.600 (k 54, moved 0.0%) | intersect 0.602 (k 79)
+   mean cost: snap +0.005  intersect -0.003; at best level: snap +0.000 intersect -0.002; intersect k growth x1.22
+
+== tms_droplet seed=1
+   res 0.2  k=  13 flat 0.335 | snap 0.334 (k 13, moved 0.1%) | intersect 0.335 (k 13)
+   res 0.3  k=  16 flat 0.430 | snap 0.397 (k 15, moved 6.1%) | intersect 0.430 (k 16)
+   res 0.5  k=  20 flat 0.448 | snap 0.410 (k 19, moved 6.1%) | intersect 0.448 (k 20)
+   res 0.7  k=  24 flat 0.501 | snap 0.486 (k 23, moved 6.7%) | intersect 0.503 (k 26)
+   res 1.0  k=  29 flat 0.536 | snap 0.534 (k 28, moved 1.8%) | intersect 0.550 (k 33)
+   res 1.5  k=  33 flat 0.552 | snap 0.538 (k 32, moved 5.6%) | intersect 0.554 (k 41)
+   res 2.0  k=  35 flat 0.592 | snap 0.576 (k 35, moved 2.9%) | intersect 0.601 (k 45)
+   res 3.0  k=  41 flat 0.604 | snap 0.599 (k 40, moved 2.4%) | intersect 0.605 (k 58)
+   res 4.0  k=  46 flat 0.621 | snap 0.615 (k 45, moved 3.8%) | intersect 0.619 (k 64)
+   res 6.0  k=  57 flat 0.612 | snap 0.612 (k 57, moved 0.0%) | intersect 0.624 (k 83)
+   mean cost: snap +0.013  intersect -0.004; at best level: snap +0.006 intersect +0.002; intersect k growth x1.20
+
+== tms_droplet seed=2
+   res 0.2  k=  10 flat 0.323 | snap 0.320 (k 10, moved 3.6%) | intersect 0.323 (k 10)
+   res 0.3  k=  11 flat 0.348 | snap 0.347 (k 11, moved 0.8%) | intersect 0.367 (k 13)
+   res 0.5  k=  19 flat 0.461 | snap 0.462 (k 18, moved 6.3%) | intersect 0.475 (k 21)
+   res 0.7  k=  21 flat 0.483 | snap 0.495 (k 21, moved 6.6%) | intersect 0.486 (k 23)
+   res 1.0  k=  26 flat 0.521 | snap 0.521 (k 26, moved 6.5%) | intersect 0.524 (k 29)
+   res 1.5  k=  30 flat 0.563 | snap 0.537 (k 30, moved 6.1%) | intersect 0.568 (k 39)
+   res 2.0  k=  35 flat 0.577 | snap 0.581 (k 35, moved 1.9%) | intersect 0.597 (k 48)
+   res 3.0  k=  37 flat 0.588 | snap 0.589 (k 37, moved 0.9%) | intersect 0.598 (k 53)
+   res 4.0  k=  44 flat 0.603 | snap 0.604 (k 44, moved 1.1%) | intersect 0.613 (k 63)
+   res 6.0  k=  55 flat 0.626 | snap 0.626 (k 55, moved 0.0%) | intersect 0.625 (k 82)
+   mean cost: snap +0.001  intersect -0.008; at best level: snap +0.000 intersect +0.001; intersect k growth x1.25
+
+== brain_1m seed=42
+   res 0.2  k=   7 flat 0.150 | snap 0.149 (k 6, moved 2.4%) | intersect 0.150 (k 7)
+   res 0.3  k=   9 flat 0.270 | snap 0.244 (k 8, moved 10.0%) | intersect 0.271 (k 17)
+   res 0.5  k=  13 flat 0.388 | snap 0.290 (k 11, moved 14.9%) | intersect 0.396 (k 36)
+   res 0.7  k=  17 flat 0.426 | snap 0.336 (k 16, moved 14.2%) | intersect 0.461 (k 57)
+   res 1.0  k=  19 flat 0.491 | snap 0.389 (k 19, moved 16.2%) | intersect 0.474 (k 83)
+   res 1.5  k=  24 flat 0.462 | snap 0.398 (k 23, moved 16.1%) | intersect 0.462 (k 120)
+   res 2.0  k=  30 flat 0.415 | snap 0.383 (k 30, moved 11.2%) | intersect 0.405 (k 165)
+   res 3.0  k=  43 flat 0.411 | snap 0.403 (k 43, moved 6.8%) | intersect 0.387 (k 215)
+   res 4.0  k=  50 flat 0.423 | snap 0.415 (k 50, moved 5.7%) | intersect 0.381 (k 244)
+   res 6.0  k=  65 flat 0.421 | snap 0.421 (k 65, moved 0.0%) | intersect 0.374 (k 304)
+   mean cost: snap +0.043  intersect +0.010; at best level: snap +0.103 intersect +0.017; intersect k growth x3.84
+
+== brain_1m seed=1
+   res 0.2  k=   7 flat 0.148 | snap 0.153 (k 7, moved 2.2%) | intersect 0.148 (k 7)
+   res 0.3  k=   8 flat 0.267 | snap 0.265 (k 8, moved 4.9%) | intersect 0.274 (k 12)
+   res 0.5  k=  13 flat 0.356 | snap 0.338 (k 12, moved 10.1%) | intersect 0.373 (k 27)
+   res 0.7  k=  19 flat 0.426 | snap 0.405 (k 18, moved 8.6%) | intersect 0.456 (k 44)
+   res 1.0  k=  21 flat 0.448 | snap 0.423 (k 21, moved 8.7%) | intersect 0.474 (k 68)
+   res 1.5  k=  26 flat 0.494 | snap 0.445 (k 25, moved 11.4%) | intersect 0.516 (k 89)
+   res 2.0  k=  32 flat 0.480 | snap 0.491 (k 31, moved 18.5%) | intersect 0.487 (k 130)
+   res 3.0  k=  41 flat 0.480 | snap 0.503 (k 41, moved 18.4%) | intersect 0.464 (k 177)
+   res 4.0  k=  47 flat 0.554 | snap 0.505 (k 46, moved 13.7%) | intersect 0.474 (k 223)
+   res 6.0  k=  66 flat 0.394 | snap 0.394 (k 66, moved 0.0%) | intersect 0.357 (k 311)
+   mean cost: snap +0.013  intersect +0.003; at best level: snap +0.050 intersect +0.080; intersect k growth x3.14
+
+== brain_1m seed=2
+   res 0.2  k=   8 flat 0.168 | snap 0.155 (k 7, moved 3.3%) | intersect 0.168 (k 8)
+   res 0.3  k=  10 flat 0.182 | snap 0.165 (k 9, moved 6.8%) | intersect 0.183 (k 16)
+   res 0.5  k=  14 flat 0.377 | snap 0.351 (k 14, moved 7.4%) | intersect 0.404 (k 30)
+   res 0.7  k=  18 flat 0.430 | snap 0.363 (k 16, moved 11.8%) | intersect 0.463 (k 48)
+   res 1.0  k=  20 flat 0.459 | snap 0.434 (k 19, moved 10.0%) | intersect 0.521 (k 71)
+   res 1.5  k=  27 flat 0.543 | snap 0.506 (k 27, moved 7.3%) | intersect 0.571 (k 111)
+   res 2.0  k=  33 flat 0.521 | snap 0.492 (k 33, moved 8.7%) | intersect 0.532 (k 145)
+   res 3.0  k=  41 flat 0.482 | snap 0.463 (k 41, moved 6.8%) | intersect 0.481 (k 178)
+   res 4.0  k=  52 flat 0.487 | snap 0.456 (k 50, moved 5.8%) | intersect 0.476 (k 224)
+   res 6.0  k=  66 flat 0.441 | snap 0.441 (k 66, moved 0.0%) | intersect 0.434 (k 276)
+   mean cost: snap +0.026  intersect -0.014; at best level: snap +0.037 intersect -0.028; intersect k growth x3.23
+
+wrote /Volumes/Models/dyf_bench_2026-11-04/nested_sweep_snap_test_results.json

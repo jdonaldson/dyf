@@ -107,8 +107,13 @@ coming back. Numbers are in `KNOWN_ISSUES.md` #9, #11, #14; the conclusions:
   would only reach 0.03. Prediction strength through the frozen tree never clears 0.7 and picks
   the coarsest level. **What works: about fifty randomly labelled items pick the resolution
   within 0.02 of the best in the sweep, better than knowing k** — that is the consumer advice
-  (README "How It Works"). Nothing in the graph-construction or objective direction is worth
-  another probe without a consumer whose data sits in the regime where it moved.
+  (README "How It Works"). If a nested multi-resolution profile ever ships, build it as the
+  resolution sweep snapped bottom-up into exact nesting (the sweep already nests 92–99% of
+  points; snapping costs ≤0.02 ARI at the useful level on five of seven sets, 0.04–0.06 on
+  Fashion and brain), not by merging up from a fine partition (0.06–0.13 lost on images) or
+  by recursive Louvain inside communities (skips every intermediate k); per-community
+  persistence does not predict purity. Nothing in the graph-construction or objective
+  direction is worth another probe without a consumer whose data sits in the regime where it moved.
 
 ### Parked: sequence key / leaf Markov state model (2026-10-01)
 
