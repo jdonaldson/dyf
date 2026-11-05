@@ -81,6 +81,29 @@ real execution path is mute. It runs real invocations instead.
 
 Open queue with priorities: `KNOWN_ISSUES.md`.
 
+### Measuring stick for descriptive output (asserted 2026-11-06)
+
+dyf has never won on retrieval accuracy and this is not the stick it is scored on. The wins on
+record are continuity, stability and legibility over time: group ids that carry over between
+windows (71% vs 36%), drift detection (15× separation), dedup (29% of SEC), resolution from
+fifty labels better than knowing k. The shape read-outs from the November cut audit are the
+same kind of thing — descriptions that reproduce across trees — and are scored on three sticks,
+each fixed before the probe and each with a null:
+
+- **Decision value**: does the read-out change what a consumer does, and is the change right?
+  First instance: inspecting "pocket" branches catches 1.8–2.5× the label errors per item of a
+  random sample on five of seven bench sets (1.0–1.2× on MoCap, AG News) and 1.5–6.4× the
+  points the final re-cut moves.
+- **Agent legibility**: an agent answering fixed questions about an unfamiliar index (what kind
+  of data, how many natural groups, which regions are unreliable, which resolution) with and
+  without the summary, scored on correctness and tool calls spent.
+- **Lead time on drift**: a shape change per window vs the Jensen–Shannon occupancy trigger,
+  scored as lead time and false alarms on sec10quant's 52 quarterly windows.
+
+Retrieval recall and query-confidence AUC stay the stick for search, and shape lost there
+(LongMemEval, 2026-11-06). No composite "insight score"; a description is valued by whether a
+reader acts on it, so a human read sits in the loop at least once per read-out.
+
 ### Closed: where the leaf-grouping quality goes (2026-11-04/05)
 
 Two days of measurement on the seven-dataset bench (`benchmarks/cut_audit_2026_11/`, memory
