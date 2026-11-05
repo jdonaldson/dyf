@@ -1,0 +1,149 @@
+
+== mnist seed=42: leaves=3395 k_ref=13 isolated(sample)=13
+   cent     res=1.0  k= 13 | block ARI=0.581 AMI=0.643 cut=0.180 | point ARI=0.472 AMI=0.565
+   snn      res=0.5  k= 10 | block ARI=0.619 AMI=0.673 cut=0.152 | point ARI=0.463 AMI=0.532
+   spread   res=1.0  k= 12 | block ARI=0.585 AMI=0.648 cut=0.177 | point ARI=0.456 AMI=0.556
+   ceiling  res=1.5  k= 11 | block ARI=0.603 AMI=0.663 cut=0.148 | point ARI=0.435 AMI=0.536
+   sample   res=0.3  k= 19 | block ARI=0.466 AMI=0.636 cut=0.093 | point ARI=0.398 AMI=0.513
+
+== mnist seed=1: leaves=3344 k_ref=12 isolated(sample)=14
+   cent     res=1.0  k= 12 | block ARI=0.566 AMI=0.637 cut=0.174 | point ARI=0.462 AMI=0.556
+   snn      res=0.5  k= 10 | block ARI=0.627 AMI=0.675 cut=0.153 | point ARI=0.477 AMI=0.543
+   spread   res=1.0  k= 11 | block ARI=0.566 AMI=0.649 cut=0.163 | point ARI=0.460 AMI=0.542
+   ceiling  res=1.5  k= 12 | block ARI=0.592 AMI=0.659 cut=0.155 | point ARI=0.444 AMI=0.541
+   sample   res=0.3  k= 20 | block ARI=0.470 AMI=0.624 cut=0.098 | point ARI=0.369 AMI=0.484
+
+== mnist seed=2: leaves=3382 k_ref=11 isolated(sample)=16
+   cent     res=1.0  k= 11 | block ARI=0.610 AMI=0.660 cut=0.163 | point ARI=0.482 AMI=0.568
+   snn      res=0.3  k=  9 | block ARI=0.639 AMI=0.689 cut=0.140 | point ARI=0.459 AMI=0.535
+   spread   res=1.0  k= 11 | block ARI=0.598 AMI=0.649 cut=0.163 | point ARI=0.485 AMI=0.572
+   ceiling  res=1.0  k=  9 | block ARI=0.627 AMI=0.682 cut=0.132 | point ARI=0.440 AMI=0.524
+   sample   res=0.3  k= 21 | block ARI=0.378 AMI=0.589 cut=0.081 | point ARI=0.333 AMI=0.507
+
+== fashion_mnist seed=42: leaves=2193 k_ref=14 isolated(sample)=36
+   cent     res=1.0  k= 14 | block ARI=0.381 AMI=0.545 cut=0.113 | point ARI=0.340 AMI=0.528
+   snn      res=0.5  k= 12 | block ARI=0.416 AMI=0.581 cut=0.095 | point ARI=0.357 AMI=0.527
+   spread   res=1.0  k= 14 | block ARI=0.407 AMI=0.568 cut=0.112 | point ARI=0.370 AMI=0.540
+   ceiling  res=1.5  k= 14 | block ARI=0.412 AMI=0.578 cut=0.100 | point ARI=0.402 AMI=0.564
+   sample   res=0.3  k= 41 | block ARI=0.374 AMI=0.576 cut=0.039 | point ARI=0.304 AMI=0.515
+
+== fashion_mnist seed=1: leaves=2192 k_ref=13 isolated(sample)=35
+   cent     res=1.0  k= 13 | block ARI=0.410 AMI=0.582 cut=0.094 | point ARI=0.434 AMI=0.561
+   snn      res=1.0  k= 15 | block ARI=0.392 AMI=0.564 cut=0.120 | point ARI=0.366 AMI=0.536
+   spread   res=1.0  k= 13 | block ARI=0.429 AMI=0.580 cut=0.095 | point ARI=0.404 AMI=0.545
+   ceiling  res=1.5  k= 13 | block ARI=0.455 AMI=0.592 cut=0.091 | point ARI=0.439 AMI=0.571
+   sample   res=0.3  k= 40 | block ARI=0.382 AMI=0.578 cut=0.041 | point ARI=0.287 AMI=0.513
+
+== fashion_mnist seed=2: leaves=2182 k_ref=12 isolated(sample)=28
+   cent     res=1.0  k= 12 | block ARI=0.424 AMI=0.579 cut=0.099 | point ARI=0.379 AMI=0.548
+   snn      res=0.5  k= 11 | block ARI=0.419 AMI=0.583 cut=0.097 | point ARI=0.360 AMI=0.525
+   spread   res=1.0  k= 12 | block ARI=0.459 AMI=0.585 cut=0.097 | point ARI=0.406 AMI=0.548
+   ceiling  res=1.0  k= 12 | block ARI=0.439 AMI=0.589 cut=0.085 | point ARI=0.439 AMI=0.577
+   sample   res=0.3  k= 33 | block ARI=0.404 AMI=0.611 cut=0.038 | point ARI=0.321 AMI=0.511
+
+== cmu_mocap seed=42: leaves=1478 k_ref=22 isolated(sample)=65
+   cent     res=1.0  k= 22 | block ARI=0.176 AMI=0.391 cut=0.023 | point ARI=0.152 AMI=0.366
+   snn      res=0.5  k= 19 | block ARI=0.155 AMI=0.353 cut=0.021 | point ARI=0.117 AMI=0.313
+   spread   res=0.3  k= 28 | block ARI=0.139 AMI=0.310 cut=0.012 | point ARI=0.093 AMI=0.313
+   ceiling  res=0.3  k= 41 | block ARI=0.170 AMI=0.356 cut=0.010 | point ARI=0.146 AMI=0.379
+   sample   res=0.3  k=114 | block ARI=0.162 AMI=0.331 cut=0.013 | point ARI=0.095 AMI=0.424
+
+== cmu_mocap seed=1: leaves=1563 k_ref=22 isolated(sample)=58
+   cent     res=1.0  k= 22 | block ARI=0.201 AMI=0.354 cut=0.025 | point ARI=0.170 AMI=0.319
+   snn      res=0.3  k= 20 | block ARI=0.210 AMI=0.367 cut=0.020 | point ARI=0.172 AMI=0.345
+   spread   res=0.3  k= 24 | block ARI=0.120 AMI=0.304 cut=0.012 | point ARI=0.130 AMI=0.325
+   ceiling  res=0.3  k= 36 | block ARI=0.174 AMI=0.330 cut=0.009 | point ARI=0.123 AMI=0.362
+   sample   res=0.3  k=109 | block ARI=0.178 AMI=0.338 cut=0.013 | point ARI=0.093 AMI=0.407
+
+== cmu_mocap seed=2: leaves=1628 k_ref=22 isolated(sample)=44
+   cent     res=1.0  k= 22 | block ARI=0.142 AMI=0.366 cut=0.027 | point ARI=0.130 AMI=0.355
+   snn      res=0.5  k= 26 | block ARI=0.160 AMI=0.369 cut=0.027 | point ARI=0.141 AMI=0.374
+   spread   res=0.3  k= 29 | block ARI=0.135 AMI=0.334 cut=0.014 | point ARI=0.148 AMI=0.356
+   ceiling  res=0.3  k= 38 | block ARI=0.201 AMI=0.373 cut=0.010 | point ARI=0.163 AMI=0.379
+   sample   res=0.3  k= 94 | block ARI=0.229 AMI=0.368 cut=0.012 | point ARI=0.085 AMI=0.394
+
+== ag_news seed=42: leaves=3274 k_ref=15 isolated(sample)=31
+   cent     res=1.0  k= 15 | block ARI=0.279 AMI=0.387 cut=0.285 | point ARI=0.286 AMI=0.440
+   snn      res=0.3  k= 12 | block ARI=0.384 AMI=0.420 cut=0.229 | point ARI=0.391 AMI=0.472
+   spread   res=1.0  k= 15 | block ARI=0.263 AMI=0.377 cut=0.301 | point ARI=0.287 AMI=0.442
+   ceiling  res=1.5  k= 12 | block ARI=0.312 AMI=0.422 cut=0.246 | point ARI=0.324 AMI=0.465
+   sample   res=0.3  k= 34 | block ARI=0.499 AMI=0.542 cut=0.088 | point ARI=0.191 AMI=0.377
+
+== ag_news seed=1: leaves=3202 k_ref=17 isolated(sample)=43
+   cent     res=1.0  k= 17 | block ARI=0.296 AMI=0.407 cut=0.280 | point ARI=0.283 AMI=0.441
+   snn      res=0.5  k= 16 | block ARI=0.294 AMI=0.401 cut=0.284 | point ARI=0.284 AMI=0.444
+   spread   res=1.0  k= 16 | block ARI=0.311 AMI=0.410 cut=0.275 | point ARI=0.282 AMI=0.432
+   ceiling  res=2.0  k= 19 | block ARI=0.233 AMI=0.393 cut=0.286 | point ARI=0.231 AMI=0.421
+   sample   res=0.3  k= 46 | block ARI=0.410 AMI=0.503 cut=0.084 | point ARI=0.143 AMI=0.348
+
+== ag_news seed=2: leaves=3242 k_ref=16 isolated(sample)=25
+   cent     res=1.0  k= 16 | block ARI=0.285 AMI=0.404 cut=0.284 | point ARI=0.275 AMI=0.438
+   snn      res=0.5  k= 16 | block ARI=0.318 AMI=0.411 cut=0.267 | point ARI=0.299 AMI=0.441
+   spread   res=1.0  k= 16 | block ARI=0.285 AMI=0.400 cut=0.283 | point ARI=0.275 AMI=0.437
+   ceiling  res=2.0  k= 18 | block ARI=0.244 AMI=0.393 cut=0.285 | point ARI=0.232 AMI=0.420
+   sample   res=0.3  k= 28 | block ARI=0.502 AMI=0.533 cut=0.092 | point ARI=0.236 AMI=0.369
+
+== tms_facs seed=42: leaves=1534 k_ref=24 isolated(sample)=89
+   cent     res=1.0  k= 24 | block ARI=0.553 AMI=0.754 cut=0.025 | point ARI=0.559 AMI=0.753
+   snn      res=0.3  k= 25 | block ARI=0.550 AMI=0.756 cut=0.024 | point ARI=0.561 AMI=0.758
+   spread   res=1.0  k= 24 | block ARI=0.555 AMI=0.752 cut=0.024 | point ARI=0.559 AMI=0.753
+   ceiling  res=1.0  k= 23 | block ARI=0.560 AMI=0.756 cut=0.022 | point ARI=0.582 AMI=0.763
+   sample   res=0.3  k=104 | block ARI=0.477 AMI=0.708 cut=0.021 | point ARI=0.484 AMI=0.772
+
+== tms_facs seed=1: leaves=1800 k_ref=23 isolated(sample)=81
+   cent     res=1.0  k= 23 | block ARI=0.548 AMI=0.744 cut=0.027 | point ARI=0.563 AMI=0.757
+   snn      res=0.3  k= 19 | block ARI=0.452 AMI=0.707 cut=0.025 | point ARI=0.489 AMI=0.721
+   spread   res=1.0  k= 23 | block ARI=0.553 AMI=0.743 cut=0.029 | point ARI=0.580 AMI=0.762
+   ceiling  res=1.0  k= 22 | block ARI=0.567 AMI=0.754 cut=0.025 | point ARI=0.575 AMI=0.760
+   sample   res=0.3  k= 93 | block ARI=0.450 AMI=0.687 cut=0.020 | point ARI=0.584 AMI=0.773
+
+== tms_facs seed=2: leaves=1623 k_ref=25 isolated(sample)=94
+   cent     res=1.0  k= 25 | block ARI=0.555 AMI=0.752 cut=0.030 | point ARI=0.576 AMI=0.758
+   snn      res=0.3  k= 23 | block ARI=0.487 AMI=0.733 cut=0.027 | point ARI=0.541 AMI=0.744
+   spread   res=1.0  k= 25 | block ARI=0.555 AMI=0.753 cut=0.027 | point ARI=0.582 AMI=0.759
+   ceiling  res=1.0  k= 23 | block ARI=0.561 AMI=0.754 cut=0.023 | point ARI=0.586 AMI=0.763
+   sample   res=0.3  k=109 | block ARI=0.413 AMI=0.690 cut=0.019 | point ARI=0.627 AMI=0.781
+
+== tms_droplet seed=42: leaves=1768 k_ref=29 isolated(sample)=197
+   cent     res=1.0  k= 29 | block ARI=0.467 AMI=0.726 cut=0.021 | point ARI=0.563 AMI=0.745
+   snn      res=0.5  k= 27 | block ARI=0.471 AMI=0.726 cut=0.017 | point ARI=0.543 AMI=0.740
+   spread   res=1.0  k= 31 | block ARI=0.507 AMI=0.738 cut=0.021 | point ARI=0.598 AMI=0.758
+   ceiling  res=1.0  k= 27 | block ARI=0.569 AMI=0.751 cut=0.016 | point ARI=0.589 AMI=0.751
+   sample   res=0.3  k=216 | block ARI=0.449 AMI=0.710 cut=0.011 | point ARI=0.463 AMI=0.751
+
+== tms_droplet seed=1: leaves=1748 k_ref=29 isolated(sample)=195
+   cent     res=1.0  k= 29 | block ARI=0.536 AMI=0.741 cut=0.019 | point ARI=0.586 AMI=0.755
+   snn      res=0.5  k= 26 | block ARI=0.523 AMI=0.730 cut=0.019 | point ARI=0.566 AMI=0.743
+   spread   res=1.0  k= 30 | block ARI=0.526 AMI=0.732 cut=0.027 | point ARI=0.577 AMI=0.748
+   ceiling  res=1.5  k= 29 | block ARI=0.575 AMI=0.751 cut=0.019 | point ARI=0.586 AMI=0.753
+   sample   res=0.3  k=214 | block ARI=0.469 AMI=0.708 cut=0.013 | point ARI=0.510 AMI=0.754
+
+== tms_droplet seed=2: leaves=1698 k_ref=26 isolated(sample)=198
+   cent     res=1.0  k= 26 | block ARI=0.521 AMI=0.730 cut=0.021 | point ARI=0.551 AMI=0.745
+   snn      res=0.5  k= 27 | block ARI=0.501 AMI=0.721 cut=0.018 | point ARI=0.561 AMI=0.742
+   spread   res=1.0  k= 29 | block ARI=0.502 AMI=0.728 cut=0.022 | point ARI=0.568 AMI=0.745
+   ceiling  res=1.0  k= 28 | block ARI=0.573 AMI=0.750 cut=0.018 | point ARI=0.583 AMI=0.751
+   sample   res=0.3  k=217 | block ARI=0.469 AMI=0.714 cut=0.011 | point ARI=0.465 AMI=0.743
+
+== brain_1m seed=42: leaves=3691 k_ref=19 isolated(sample)=468
+   cent     res=1.0  k= 19 | block ARI=0.491 AMI=0.670 cut=0.127 | point ARI=0.515 AMI=0.699
+   snn      res=0.5  k= 18 | block ARI=0.355 AMI=0.637 cut=0.102 | point ARI=0.508 AMI=0.684
+   spread   res=1.0  k= 20 | block ARI=0.464 AMI=0.657 cut=0.140 | point ARI=0.520 AMI=0.689
+   ceiling  res=1.5  k= 20 | block ARI=0.477 AMI=0.676 cut=0.137 | point ARI=0.506 AMI=0.701
+   sample   res=0.3  k=477 | block ARI=0.327 AMI=0.583 cut=0.073 | point ARI=0.151 AMI=0.634
+
+== brain_1m seed=1: leaves=3638 k_ref=21 isolated(sample)=435
+   cent     res=1.0  k= 21 | block ARI=0.448 AMI=0.658 cut=0.114 | point ARI=0.527 AMI=0.696
+   snn      res=0.5  k= 19 | block ARI=0.418 AMI=0.635 cut=0.115 | point ARI=0.454 AMI=0.678
+   spread   res=1.0  k= 21 | block ARI=0.444 AMI=0.664 cut=0.108 | point ARI=0.587 AMI=0.721
+   ceiling  res=1.5  k= 21 | block ARI=0.504 AMI=0.686 cut=0.134 | point ARI=0.531 AMI=0.713
+   sample   res=0.3  k=443 | block ARI=0.323 AMI=0.584 cut=0.063 | point ARI=0.150 AMI=0.634
+
+== brain_1m seed=2: leaves=3616 k_ref=20 isolated(sample)=544
+   cent     res=1.0  k= 20 | block ARI=0.459 AMI=0.664 cut=0.101 | point ARI=0.570 AMI=0.709
+   snn      res=0.5  k= 18 | block ARI=0.329 AMI=0.612 cut=0.131 | point ARI=0.417 AMI=0.668
+   spread   res=1.0  k= 21 | block ARI=0.498 AMI=0.666 cut=0.126 | point ARI=0.541 AMI=0.707
+   ceiling  res=1.5  k= 19 | block ARI=0.482 AMI=0.677 cut=0.132 | point ARI=0.537 AMI=0.702
+   sample   res=0.3  k=554 | block ARI=0.282 AMI=0.578 cut=0.055 | point ARI=0.135 AMI=0.628
+
+wrote /Volumes/Models/dyf_bench_2026-11-04/leaf_graph_construction_test_results.json

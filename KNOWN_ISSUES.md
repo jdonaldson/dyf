@@ -520,7 +520,14 @@ outcome variable and decision rule fixed first (beat the default on mean ARI **a
 Uncapping does what this issue predicted where the cap binds — brain 0.472 → 0.577 at 31k
 leaves — and still loses to the default (0.603) at 10× the wall time. The leaf oracle rises with
 every extra leaf on every dataset and the outcome does not follow: purer leaves are not the
-bottleneck, the centroid graph is. At equal leaf counts the default's 8-way shallow split beats
+bottleneck, the centroid graph is. ⚠ Refined 2026-11-05
+(`benchmarks/cut_audit_2026_11/leaf_graph_construction_test.py`): the graph's *edges* are not
+it either. The full point kNN graph coarsened to leaves — the best any leaf graph can be — adds
+only +0.01 to +0.06 block ARI over the shipped centroid-cosine kNN at matched k on seven
+datasets, three seeds; shared-neighbour and spread-aware re-weightings are a wash. What remains
+between the leaf oracle (0.72 MNIST, 0.80 droplet, 0.79 brain) and the block labels (0.59, 0.51,
+0.47) is the objective and the community count modularity returns, and between the leaf oracle
+and Leiden on points (MNIST 0.885 at the same k) is the atoms' purity. At equal leaf counts the default's 8-way shallow split beats
 the binary deep one by 0.13 ARI on brain. The docstring's "beats defaults on 6–7/9" (measured on
 the single-level Louvain) is retracted. **Fixed 2026-10-01:** the helper's
 `max_depth` cap is gone (at 1.29M points it now returns depth 8, ~31k leaves), its docstring

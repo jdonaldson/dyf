@@ -81,6 +81,27 @@ real execution path is mute. It runs real invocations instead.
 
 Open queue with priorities: `KNOWN_ISSUES.md`.
 
+### Closed: where the leaf-grouping quality goes (2026-11-04/05)
+
+Two days of measurement on the seven-dataset bench (`benchmarks/cut_audit_2026_11/`, memory
+`project_community_conductance_bench_2026_11`, `project_hash_native_composition_2026_11`,
+`project_leaf_graph_construction_ceiling_2026_11`) settled four design questions that keep
+coming back. Numbers are in `KNOWN_ISSUES.md` #9, #11, #14; the conclusions:
+
+- **The atoms are cones and that is fine.** Any linear hash gives convex cells; shape has to come
+  from composition. Centring the threshold (`sign(w·(x−μ))`) makes purer leaves but moves the
+  shipped output by ≤ 0.03 — not worth a format change while the re-cut below stays (#11).
+- **The leaf graph's edges are not the bottleneck.** The full point kNN graph coarsened to leaves
+  adds at most +0.06 ARI over the shipped centroid-cosine kNN at matched k; shared-neighbour,
+  spread-aware and hash-derived graphs are a wash or worse (#9).
+- **The shipped partition is spherical k-means seeded by Louvain** (`_reassign_points`): a Voronoi
+  re-cut that moves 4–31% of points, helps single-cell, hurts MNIST, nets ~0 — documented, kept,
+  and the leaf-level / straggler-only alternatives lose to it (#14).
+- **What is left** is the objective and community count modularity returns (leaf oracle vs block
+  labels: 0.1–0.7 ARI, mostly k) and the atoms' purity (leaf oracle 0.72 vs Leiden-on-points
+  0.885 on MNIST). Nothing in the graph-construction direction is worth another probe without a
+  consumer whose data sits in the regime where it moved.
+
 ### Parked: sequence key / leaf Markov state model (2026-10-01)
 
 One day of pre-registered probes asked whether dyf can read non-linear structure (cycles,
