@@ -125,7 +125,11 @@ coming back. Numbers are in `KNOWN_ISSUES.md` #9, #11, #14; the conclusions:
   scale, spike = a hyperplane sliced a homogeneous region, low-then-rising = noisy manifold):
   atlases and brain are 2–3-D sheets plus noise, MiniLM text has no low-d structure at any
   scale, MoCap is ≈2 at fine scales, images bump where classes mix — but the shape adds
-  nothing over the mean as a per-point score. Nothing in the graph-construction or objective
+  nothing over the mean as a per-point score. The profile is a *leaf* property (all points in
+  a leaf share the path); per-leaf nearest-family labels are class-aligned above a shuffle
+  null on every dataset, curve/sheet leaves are the purest, the "dip" shape marks small
+  impure pockets the re-cut moves, and the same shapes recur across the whole embedding
+  except a few localized ones that name real structures. Nothing in the graph-construction or objective
   direction is worth another probe without a consumer whose data sits in the regime where it moved.
 
 ### Parked: sequence key / leaf Markov state model (2026-10-01)

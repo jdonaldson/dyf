@@ -1,0 +1,171 @@
+
+== mnist: 6863 deep leaves with a family label (100% of points)
+   AMI(class, family) leaf-weighted = 0.071   shuffle null 0.002 ± 0.001
+   family   leaves  points  purity  moved   communities(>=5% of its points)   mean cos within vs random
+   curve       309   4.0%   0.94   12.4%     4                                0.03 vs 0.00
+   sheet      3365  47.5%   0.91   19.5%     8                                0.02 vs 0.00
+   blobs       141   2.0%   0.76   43.5%     7                                0.05 vs 0.00
+   mixture    3048  46.5%   0.85   33.2%    11                                0.01 vs 0.00
+   class (largest 8): family mix of its leaves (by points)
+        1: curve 9%  sheet 79%  mixture 12%
+        7: curve 6%  sheet 59%  blobs 0%  mixture 35%
+        3: curve 0%  sheet 37%  blobs 2%  mixture 61%
+        2: curve 1%  sheet 31%  blobs 3%  mixture 64%
+        9: curve 4%  sheet 42%  blobs 0%  mixture 53%
+        0: curve 10%  sheet 68%  blobs 1%  mixture 21%
+        6: curve 1%  sheet 58%  blobs 6%  mixture 35%
+        8: curve 0%  sheet 30%  blobs 3%  mixture 66%
+/Users/jdonaldson/Projects/dyf/.venv/lib/python3.11/site-packages/joblib/externals/loky/backend/context.py:131: UserWarning: Could not find the number of physical cores for the following reason:
+invalid literal for int() with base 10: ''
+Returning the number of logical cores instead. You can silence this warning by setting LOKY_MAX_CPU_COUNT to the number of cores you want to use.
+  warnings.warn(
+  File "/Users/jdonaldson/Projects/dyf/.venv/lib/python3.11/site-packages/joblib/externals/loky/backend/context.py", line 249, in _count_physical_cores
+    cpu_count_physical = _count_physical_cores_darwin()
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jdonaldson/Projects/dyf/.venv/lib/python3.11/site-packages/joblib/externals/loky/backend/context.py", line 318, in _count_physical_cores_darwin
+    return int(cpu_info)
+           ^^^^^^^^^^^^^
+   profile clusters (k=5 on log(1+d), leaves with >=3 rungs): points | mean profile | communities | within cos vs random | class entropy (nats) | purity
+     11.9% |  3.3  3.4  1.8  1.5  1.2  1.2 |   4 | 0.25 vs 0.00 | 1.10 | 0.95
+     16.2% |  3.6  5.0  9.4  8.8  8.8  8.8 |  11 | 0.03 vs 0.00 | 2.20 | 0.84
+     26.7% |  3.6  5.4  3.2  2.9  2.9  2.9 |   8 | 0.01 vs 0.00 | 2.19 | 0.91
+      4.7% |  3.4  4.0 27.7 30.9 30.9 30.9 |  13 | 0.02 vs 0.00 | 2.13 | 0.84
+     30.9% |  3.6  4.9  4.7  4.9  4.9  4.9 |   9 | 0.01 vs 0.00 | 2.23 | 0.88
+
+== fashion_mnist: 6932 deep leaves with a family label (100% of points)
+   AMI(class, family) leaf-weighted = 0.058   shuffle null 0.002 ± 0.000
+   family   leaves  points  purity  moved   communities(>=5% of its points)   mean cos within vs random
+   curve      3846  54.6%   0.85   24.5%     7                                -0.01 vs 0.02
+   sheet      1332  20.1%   0.85   27.6%    10                                0.04 vs 0.02
+   blobs       225   3.0%   0.67   50.9%     5                                0.22 vs 0.02
+   mixture    1529  21.8%   0.75   42.2%     8                                0.04 vs 0.02
+   class (largest 8): family mix of its leaves (by points)
+        0: curve 49%  sheet 24%  blobs 1%  mixture 26%
+        1: curve 69%  sheet 18%  blobs 0%  mixture 14%
+        2: curve 45%  sheet 10%  blobs 6%  mixture 39%
+        3: curve 42%  sheet 23%  blobs 2%  mixture 33%
+        4: curve 59%  sheet 10%  blobs 4%  mixture 27%
+        5: curve 71%  sheet 15%  blobs 1%  mixture 13%
+        6: curve 43%  sheet 19%  blobs 8%  mixture 30%
+        7: curve 85%  sheet 11%  mixture 4%
+   profile clusters (k=5 on log(1+d), leaves with >=3 rungs): points | mean profile | communities | within cos vs random | class entropy (nats) | purity
+      4.1% |  1.6 23.7  3.3  3.0  3.0  3.0 |   5 | 0.17 vs 0.02 | 1.68 | 0.77
+     19.8% |  1.6  2.3  3.7  6.7  6.9  6.9 |  10 | 0.01 vs 0.02 | 2.28 | 0.81
+     33.9% |  1.7  2.3  2.5  3.4  3.3  3.2 |   8 | -0.00 vs 0.02 | 2.26 | 0.85
+     29.0% |  1.6  2.2  3.2  1.8  1.6  1.6 |   8 | 0.01 vs 0.02 | 2.25 | 0.86
+      3.6% |  1.5  2.8 21.0 28.2 28.2 28.2 |   8 | 0.12 vs 0.02 | 1.99 | 0.73
+
+== cmu_mocap: 11004 deep leaves with a family label (100% of points)
+   AMI(class, family) leaf-weighted = 0.035   shuffle null 0.004 ± 0.001
+   family   leaves  points  purity  moved   communities(>=5% of its points)   mean cos within vs random
+   ball         10   0.1%   0.96   36.4%     5                                0.46 vs 0.49
+   curve      2665  22.8%   0.94   11.9%     7                                0.61 vs 0.49
+   sheet      6725  62.4%   0.97   11.4%     9                                0.42 vs 0.49
+   blobs        69   0.8%   0.96   30.0%     6                                0.38 vs 0.49
+   mixture    1535  13.8%   0.97   19.9%     6                                0.55 vs 0.49
+   class (largest 8): family mix of its leaves (by points)
+       22: ball 0%  curve 21%  sheet 67%  blobs 1%  mixture 11%
+        5: ball 0%  curve 19%  sheet 68%  blobs 1%  mixture 13%
+        3: curve 29%  sheet 45%  blobs 0%  mixture 26%
+       16: curve 28%  sheet 63%  blobs 1%  mixture 8%
+       15: curve 16%  sheet 72%  blobs 0%  mixture 12%
+       13: curve 27%  sheet 55%  mixture 18%
+       17: curve 21%  sheet 77%  blobs 0%  mixture 2%
+       10: ball 1%  curve 10%  sheet 70%  blobs 1%  mixture 18%
+   profile clusters (k=5 on log(1+d), leaves with >=3 rungs): points | mean profile | communities | within cos vs random | class entropy (nats) | purity
+     13.5% |  3.1  1.6  8.1  1.5  1.2  1.2 |   7 | 0.61 vs 0.49 | 1.90 | 0.96
+     24.2% |  3.2  1.8  2.5  3.3  4.0  3.9 |   8 | 0.57 vs 0.49 | 2.23 | 0.94
+     20.0% |  2.7 12.9  1.6  1.3  1.3  1.3 |   9 | 0.49 vs 0.49 | 1.90 | 0.98
+      3.7% |  3.1  2.2  5.9 17.8 24.1 24.1 |   8 | 0.53 vs 0.49 | 2.26 | 0.97
+     36.0% |  4.2  1.9  1.4  1.4  1.1  1.2 |  11 | 0.44 vs 0.49 | 1.67 | 0.97
+
+== ag_news: 9816 deep leaves with a family label (99% of points)
+   AMI(class, family) leaf-weighted = 0.014   shuffle null 0.001 ± 0.000
+   family   leaves  points  purity  moved   communities(>=5% of its points)   mean cos within vs random
+   ball       5437  56.8%   0.84   34.9%    10                                0.10 vs 0.10
+   curve         8   0.1%   0.95   4.6%     1                                0.57 vs 0.10
+   sheet       350   3.3%   0.92   18.2%     5                                0.15 vs 0.10
+   blobs       181   1.7%   0.84   35.1%     7                                0.16 vs 0.10
+   mixture    3840  37.3%   0.91   26.4%     8                                0.11 vs 0.10
+   class (largest 8): family mix of its leaves (by points)
+        1: ball 63%  curve 0%  sheet 1%  blobs 1%  mixture 35%
+        3: ball 57%  curve 0%  sheet 7%  blobs 0%  mixture 36%
+        2: ball 54%  sheet 2%  blobs 2%  mixture 42%
+        0: ball 55%  sheet 4%  blobs 3%  mixture 37%
+   profile clusters (k=5 on log(1+d), leaves with >=3 rungs): points | mean profile | communities | within cos vs random | class entropy (nats) | purity
+      9.5% | 10.5 12.9 36.6 48.1 48.3 48.3 |   8 | 0.12 vs 0.10 | 1.37 | 0.83
+     21.0% | 10.7 11.3  8.6  4.8  4.5  4.5 |   9 | 0.09 vs 0.10 | 1.37 | 0.91
+     18.6% | 11.4 13.8 17.2 19.8 20.3 20.3 |   9 | 0.12 vs 0.10 | 1.38 | 0.84
+     16.2% | 10.3 38.1  9.3  8.7  8.6  8.6 |   9 | 0.13 vs 0.10 | 1.32 | 0.85
+     27.1% | 10.9  9.2 10.0  9.2 10.2 10.1 |   9 | 0.11 vs 0.10 | 1.38 | 0.90
+
+== tms_facs: 11370 deep leaves with a family label (99% of points)
+   AMI(class, family) leaf-weighted = 0.134   shuffle null 0.008 ± 0.001
+   family   leaves  points  purity  moved   communities(>=5% of its points)   mean cos within vs random
+   curve      5073  44.5%   0.84   1.4%     7                                0.07 vs 0.01
+   sheet      5644  49.3%   0.86   5.5%     8                                0.01 vs 0.01
+   blobs        35   0.4%   0.62   27.4%     5                                0.27 vs 0.01
+   mixture     618   5.1%   0.73   15.6%     8                                0.06 vs 0.01
+   class (largest 8): family mix of its leaves (by points)
+       77: curve 93%  sheet 2%  mixture 5%
+        0: curve 81%  sheet 15%  mixture 4%
+       29: curve 42%  sheet 51%  blobs 2%  mixture 5%
+       76: curve 97%  sheet 2%  mixture 1%
+       14: curve 38%  sheet 61%  mixture 1%
+       43: curve 25%  sheet 71%  blobs 0%  mixture 3%
+       49: curve 57%  sheet 40%  mixture 3%
+       46: curve 2%  sheet 98%  mixture 0%
+   profile clusters (k=5 on log(1+d), leaves with >=3 rungs): points | mean profile | communities | within cos vs random | class entropy (nats) | purity
+     31.3% |  2.5  1.6  0.9  2.5  3.9  3.9 |   7 | 0.03 vs 0.01 | 3.37 | 0.84
+     14.0% |  1.4  0.5  3.4  4.9  5.9  5.5 |   2 | 0.32 vs 0.01 | 1.73 | 0.90
+     34.9% |  2.7  1.6  1.9  1.6  1.5  1.4 |   9 | 0.02 vs 0.01 | 3.92 | 0.83
+      3.7% |  1.9  1.0  2.9 17.6 23.9 23.9 |   6 | 0.09 vs 0.01 | 2.90 | 0.82
+     11.9% |  3.5  5.2  0.9  0.6  0.8  0.9 |   6 | 0.05 vs 0.01 | 3.61 | 0.89
+
+== tms_droplet: 23202 deep leaves with a family label (100% of points)
+   AMI(class, family) leaf-weighted = 0.098   shuffle null 0.004 ± 0.000
+   family   leaves  points  purity  moved   communities(>=5% of its points)   mean cos within vs random
+   curve     10746  49.0%   0.86   16.3%     7                                0.04 vs 0.01
+   sheet     11159  46.0%   0.90   14.1%     6                                0.02 vs 0.01
+   blobs        92   0.3%   0.73   43.7%     6                                0.27 vs 0.01
+   mixture    1205   4.6%   0.81   27.7%     6                                0.15 vs 0.01
+   class (largest 8): family mix of its leaves (by points)
+        0: curve 85%  sheet 10%  blobs 0%  mixture 5%
+       85: curve 50%  sheet 50%  mixture 1%
+       47: curve 25%  sheet 75%  mixture 0%
+       13: curve 55%  sheet 42%  mixture 3%
+        9: curve 62%  sheet 19%  mixture 19%
+       58: curve 59%  sheet 39%  mixture 3%
+       31: curve 53%  sheet 42%  blobs 0%  mixture 5%
+       25: curve 75%  sheet 24%  blobs 0%  mixture 0%
+   profile clusters (k=5 on log(1+d), leaves with >=3 rungs): points | mean profile | communities | within cos vs random | class entropy (nats) | purity
+     28.9% |  2.7  1.3  1.4  1.0  1.3  1.3 |   8 | 0.02 vs 0.01 | 3.90 | 0.88
+     28.7% |  2.2  1.2  0.7  1.0  4.7  6.0 |   6 | 0.04 vs 0.01 | 3.03 | 0.90
+     10.8% |  2.2  6.7  0.7  0.9  1.6  1.9 |   8 | 0.06 vs 0.01 | 3.37 | 0.87
+      5.3% |  2.0  1.4  1.7 13.2 16.7 16.3 |   6 | 0.09 vs 0.01 | 3.21 | 0.83
+     24.1% |  2.3  1.5  1.6  4.5  2.9  3.0 |   6 | 0.03 vs 0.01 | 3.48 | 0.86
+
+== brain_1m: 125247 deep leaves with a family label (100% of points)
+   AMI(class, family) leaf-weighted = 0.135   shuffle null 0.000 ± 0.000
+   family   leaves  points  purity  moved   communities(>=5% of its points)   mean cos within vs random
+   curve     43900  35.0%   0.92   18.7%     9                                0.04 vs 0.04
+   sheet     29445  24.1%   0.95   14.5%     8                                0.04 vs 0.04
+   blobs      4017   3.2%   0.82   42.9%     7                                0.22 vs 0.04
+   mixture   47885  37.7%   0.88   46.6%     7                                0.18 vs 0.04
+   class (largest 8): family mix of its leaves (by points)
+        0: curve 49%  sheet 1%  blobs 3%  mixture 47%
+        1: curve 25%  sheet 5%  blobs 3%  mixture 67%
+        2: curve 29%  sheet 3%  blobs 7%  mixture 62%
+        3: curve 53%  sheet 41%  mixture 6%
+        4: curve 68%  sheet 21%  blobs 0%  mixture 11%
+        5: curve 24%  sheet 0%  blobs 6%  mixture 69%
+        6: curve 23%  sheet 66%  blobs 0%  mixture 11%
+        7: curve 21%  sheet 25%  blobs 2%  mixture 52%
+   profile clusters (k=5 on log(1+d), leaves with >=3 rungs): points | mean profile | communities | within cos vs random | class entropy (nats) | purity
+     32.7% |  2.3  3.4  7.8  9.2  6.6  6.3 |   6 | 0.20 vs 0.04 | 2.49 | 0.88
+     26.9% |  3.6  3.0  2.8  2.9  2.5  2.7 |   7 | 0.02 vs 0.04 | 3.22 | 0.94
+     10.8% |  2.4  3.6  5.9 12.9 27.2 26.8 |   6 | 0.15 vs 0.04 | 2.68 | 0.85
+     23.8% |  3.0  2.9  2.7  3.5  8.2 10.0 |   8 | 0.03 vs 0.04 | 2.90 | 0.95
+      5.1% |  2.8 28.1  3.0  4.9  5.1  5.1 |   7 | 0.15 vs 0.04 | 2.60 | 0.88
+
+wrote /Volumes/Models/dyf_bench_2026-11-04/leaf_shape_families_results.json
