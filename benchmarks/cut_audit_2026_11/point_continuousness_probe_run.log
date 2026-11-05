@@ -1,0 +1,51 @@
+
+== mnist: n=70000 mean rungs=5.5 moved=26.0% disagree=30.3%
+   dim (higher = more continuous?)        mean=4.316 | AUC moved=0.68 disagree=0.648 | rho(leaf purity)=-0.34
+   -min margin ratio                      mean=-0.035 | AUC moved=0.556 disagree=0.523 | rho(leaf purity)=+0.12
+   -mean margin ratio                     mean=0.218 | AUC moved=0.562 disagree=0.531 | rho(leaf purity)=+0.19
+   -max step (smaller step = continuous)  mean=0.748 | AUC moved=0.552 disagree=0.546 | rho(leaf purity)=+0.08
+   (3s)
+
+== fashion_mnist: n=70000 mean rungs=5.9 moved=29.8% disagree=39.1%
+   dim (higher = more continuous?)        mean=2.736 | AUC moved=0.619 disagree=0.674 | rho(leaf purity)=-0.37
+   -min margin ratio                      mean=-0.057 | AUC moved=0.481 disagree=0.477 | rho(leaf purity)=-0.04
+   -mean margin ratio                     mean=0.247 | AUC moved=0.516 disagree=0.502 | rho(leaf purity)=+0.02
+   -max step (smaller step = continuous)  mean=1.272 | AUC moved=0.499 disagree=0.413 | rho(leaf purity)=-0.12
+   (2s)
+
+== cmu_mocap: n=140837 mean rungs=6.9 moved=12.9% disagree=37.3%
+   dim (higher = more continuous?)        mean=1.792 | AUC moved=0.587 disagree=0.582 | rho(leaf purity)=-0.18
+   -min margin ratio                      mean=-0.113 | AUC moved=0.486 disagree=0.512 | rho(leaf purity)=+0.07
+   -mean margin ratio                     mean=0.533 | AUC moved=0.47 disagree=0.508 | rho(leaf purity)=+0.19
+   -max step (smaller step = continuous)  mean=2.027 | AUC moved=0.469 disagree=0.524 | rho(leaf purity)=+0.19
+   (6s)
+
+== ag_news: n=100000 mean rungs=5.9 moved=31.3% disagree=16.5%
+   dim (higher = more continuous?)        mean=10.633 | AUC moved=0.602 disagree=0.613 | rho(leaf purity)=-0.38
+   -min margin ratio                      mean=-0.028 | AUC moved=0.564 disagree=0.528 | rho(leaf purity)=+0.09
+   -mean margin ratio                     mean=0.142 | AUC moved=0.576 disagree=0.547 | rho(leaf purity)=+0.18
+   -max step (smaller step = continuous)  mean=0.451 | AUC moved=0.533 disagree=0.53 | rho(leaf purity)=+0.19
+   (8s)
+
+== tms_facs: n=110824 mean rungs=6.9 moved=4.4% disagree=46.4%
+   dim (higher = more continuous?)        mean=2.058 | AUC moved=0.741 disagree=0.664 | rho(leaf purity)=-0.44
+   -min margin ratio                      mean=-0.079 | AUC moved=0.651 disagree=0.556 | rho(leaf purity)=+0.15
+   -mean margin ratio                     mean=0.372 | AUC moved=0.537 disagree=0.488 | rho(leaf purity)=+0.08
+   -max step (smaller step = continuous)  mean=1.615 | AUC moved=0.655 disagree=0.708 | rho(leaf purity)=+0.60
+   (4s)
+
+== tms_droplet: n=245389 mean rungs=7.5 moved=15.9% disagree=44.2%
+   dim (higher = more continuous?)        mean=1.865 | AUC moved=0.782 disagree=0.585 | rho(leaf purity)=-0.28
+   -min margin ratio                      mean=-0.117 | AUC moved=0.549 disagree=0.542 | rho(leaf purity)=+0.16
+   -mean margin ratio                     mean=0.411 | AUC moved=0.527 disagree=0.512 | rho(leaf purity)=+0.13
+   -max step (smaller step = continuous)  mean=1.709 | AUC moved=0.759 disagree=0.615 | rho(leaf purity)=+0.40
+   (8s)
+
+== brain_1m: n=1290029 mean rungs=7.6 moved=29.0% disagree=35.6%
+   dim (higher = more continuous?)        mean=4.337 | AUC moved=0.709 disagree=0.544 | rho(leaf purity)=-0.43
+   -min margin ratio                      mean=-0.074 | AUC moved=0.474 disagree=0.547 | rho(leaf purity)=+0.05
+   -mean margin ratio                     mean=0.193 | AUC moved=0.532 disagree=0.495 | rho(leaf purity)=+0.14
+   -max step (smaller step = continuous)  mean=0.960 | AUC moved=0.603 disagree=0.557 | rho(leaf purity)=+0.20
+   (45s)
+
+wrote /Volumes/Models/dyf_bench_2026-11-04/point_continuousness_probe_results.json

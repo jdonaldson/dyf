@@ -115,9 +115,12 @@ coming back. Numbers are in `KNOWN_ISSUES.md` #9, #11, #14; the conclusions:
   persistence does not predict purity. "Is it a continuum" is answerable only per boundary at
   a level: the cut profile of touching sibling pairs sorts class boundaries from continuum
   slices on the cell atlases (AUC 0.66–0.97) and brain (0.61–0.78), not on images (≈0.5) —
-  annotate splits with it on atlas-shaped data, never as a dataset verdict. Nothing in the
-  graph-construction or objective direction is worth another probe without a consumer whose
-  data sits in the regime where it moved.
+  annotate splits with it on atlas-shaped data, never as a dataset verdict. Per point, the
+  box-counting local dimension read off a deep tree's path (log node size vs log 1/radius)
+  is the one label-free continuousness measure with signal: it predicts which points the
+  re-cut moves (AUC 0.59–0.78) and anticorrelates with leaf purity on every dataset; margin
+  ratios carry nothing (one seed, not built). Nothing in the graph-construction or objective
+  direction is worth another probe without a consumer whose data sits in the regime where it moved.
 
 ### Parked: sequence key / leaf Markov state model (2026-10-01)
 
