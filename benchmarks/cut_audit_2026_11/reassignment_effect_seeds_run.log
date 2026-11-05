@@ -1,0 +1,86 @@
+
+== mnist seed=42: n=70000 leaves=3395  reassignment moved 26.0% of points
+   block  k= 13 cut=0.180 phi med=0.201 max=0.352 ARI=0.581 AMI=0.643
+   final  k= 13 cut=0.153 phi med=0.173 max=0.259 ARI=0.472 AMI=0.565
+
+== mnist seed=1: n=70000 leaves=3344  reassignment moved 28.0% of points
+   block  k= 12 cut=0.174 phi med=0.183 max=0.262 ARI=0.566 AMI=0.637
+   final  k= 12 cut=0.154 phi med=0.145 max=0.250 ARI=0.462 AMI=0.556
+
+== mnist seed=2: n=70000 leaves=3382  reassignment moved 27.2% of points
+   block  k= 11 cut=0.163 phi med=0.168 max=0.387 ARI=0.610 AMI=0.660
+   final  k= 11 cut=0.145 phi med=0.131 max=0.236 ARI=0.482 AMI=0.568
+
+== fashion_mnist seed=42: n=70000 leaves=2193  reassignment moved 29.8% of points
+   block  k= 14 cut=0.113 phi med=0.122 max=0.358 ARI=0.381 AMI=0.545
+   final  k= 14 cut=0.105 phi med=0.105 max=0.224 ARI=0.340 AMI=0.528
+
+== fashion_mnist seed=1: n=70000 leaves=2192  reassignment moved 34.4% of points
+   block  k= 13 cut=0.094 phi med=0.125 max=0.424 ARI=0.410 AMI=0.582
+   final  k= 13 cut=0.093 phi med=0.083 max=0.151 ARI=0.434 AMI=0.561
+
+== fashion_mnist seed=2: n=70000 leaves=2182  reassignment moved 24.7% of points
+   block  k= 12 cut=0.099 phi med=0.103 max=0.324 ARI=0.424 AMI=0.579
+   final  k= 12 cut=0.089 phi med=0.089 max=0.127 ARI=0.379 AMI=0.548
+
+== cmu_mocap seed=42: n=140837 leaves=1478  reassignment moved 12.9% of points
+   block  k= 22 cut=0.023 phi med=0.018 max=0.800 ARI=0.176 AMI=0.391
+   final  k= 21 cut=0.020 phi med=0.018 max=0.053 ARI=0.152 AMI=0.366
+
+== cmu_mocap seed=1: n=140837 leaves=1563  reassignment moved 17.7% of points
+   block  k= 22 cut=0.025 phi med=0.027 max=0.800 ARI=0.201 AMI=0.354
+   final  k= 21 cut=0.021 phi med=0.019 max=0.073 ARI=0.170 AMI=0.319
+
+== cmu_mocap seed=2: n=140837 leaves=1628  reassignment moved 25.1% of points
+   block  k= 22 cut=0.027 phi med=0.023 max=0.069 ARI=0.142 AMI=0.366
+   final  k= 22 cut=0.024 phi med=0.020 max=0.054 ARI=0.130 AMI=0.355
+
+== ag_news seed=42: n=100000 leaves=3274  reassignment moved 31.3% of points
+   block  k= 15 cut=0.285 phi med=0.320 max=0.568 ARI=0.279 AMI=0.387
+   final  k= 15 cut=0.203 phi med=0.224 max=0.357 ARI=0.286 AMI=0.440
+
+== ag_news seed=1: n=100000 leaves=3202  reassignment moved 32.2% of points
+   block  k= 17 cut=0.280 phi med=0.398 max=0.632 ARI=0.296 AMI=0.407
+   final  k= 17 cut=0.216 phi med=0.257 max=0.477 ARI=0.283 AMI=0.441
+
+== ag_news seed=2: n=100000 leaves=3242  reassignment moved 30.0% of points
+   block  k= 16 cut=0.284 phi med=0.352 max=0.585 ARI=0.285 AMI=0.404
+   final  k= 16 cut=0.206 phi med=0.239 max=0.347 ARI=0.275 AMI=0.438
+
+== tms_facs seed=42: n=110824 leaves=1534  reassignment moved 4.4% of points
+   block  k= 24 cut=0.025 phi med=0.026 max=0.214 ARI=0.553 AMI=0.754
+   final  k= 24 cut=0.020 phi med=0.022 max=0.128 ARI=0.559 AMI=0.753
+
+== tms_facs seed=1: n=110824 leaves=1800  reassignment moved 6.8% of points
+   block  k= 23 cut=0.027 phi med=0.029 max=0.222 ARI=0.548 AMI=0.744
+   final  k= 23 cut=0.017 phi med=0.018 max=0.133 ARI=0.563 AMI=0.757
+
+== tms_facs seed=2: n=110824 leaves=1623  reassignment moved 6.5% of points
+   block  k= 25 cut=0.030 phi med=0.036 max=0.331 ARI=0.555 AMI=0.752
+   final  k= 25 cut=0.021 phi med=0.029 max=0.110 ARI=0.576 AMI=0.758
+
+== tms_droplet seed=42: n=245389 leaves=1768  reassignment moved 15.9% of points
+   block  k= 29 cut=0.021 phi med=0.017 max=0.313 ARI=0.467 AMI=0.726
+   final  k= 29 cut=0.022 phi med=0.015 max=0.101 ARI=0.563 AMI=0.745
+
+== tms_droplet seed=1: n=245389 leaves=1748  reassignment moved 10.1% of points
+   block  k= 29 cut=0.019 phi med=0.020 max=0.130 ARI=0.536 AMI=0.741
+   final  k= 29 cut=0.018 phi med=0.015 max=0.091 ARI=0.586 AMI=0.755
+
+== tms_droplet seed=2: n=245389 leaves=1698  reassignment moved 11.8% of points
+   block  k= 26 cut=0.021 phi med=0.016 max=0.144 ARI=0.521 AMI=0.730
+   final  k= 26 cut=0.014 phi med=0.015 max=0.064 ARI=0.551 AMI=0.745
+
+== brain_1m seed=42: n=1290029 leaves=3691  reassignment moved 29.0% of points
+   block  k= 19 cut=0.127 phi med=0.113 max=0.608 ARI=0.491 AMI=0.670
+   final  k= 19 cut=0.093 phi med=0.089 max=0.210 ARI=0.515 AMI=0.699
+
+== brain_1m seed=1: n=1290029 leaves=3638  reassignment moved 31.1% of points
+   block  k= 21 cut=0.114 phi med=0.122 max=0.557 ARI=0.448 AMI=0.658
+   final  k= 21 cut=0.107 phi med=0.083 max=0.318 ARI=0.527 AMI=0.696
+
+== brain_1m seed=2: n=1290029 leaves=3616  reassignment moved 27.0% of points
+   block  k= 20 cut=0.101 phi med=0.097 max=0.343 ARI=0.459 AMI=0.664
+   final  k= 20 cut=0.091 phi med=0.085 max=0.250 ARI=0.570 AMI=0.709
+
+wrote /Volumes/Models/dyf_bench_2026-11-04/reassignment_effect_seeds_results.json

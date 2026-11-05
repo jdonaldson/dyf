@@ -1,0 +1,68 @@
+
+== mnist: n=70000
+/Users/jdonaldson/Projects/dyf/.venv/lib/python3.11/site-packages/joblib/externals/loky/backend/context.py:131: UserWarning: Could not find the number of physical cores for the following reason:
+invalid literal for int() with base 10: ''
+Returning the number of logical cores instead. You can silence this warning by setting LOKY_MAX_CPU_COUNT to the number of cores you want to use.
+  warnings.warn(
+  File "/Users/jdonaldson/Projects/dyf/.venv/lib/python3.11/site-packages/joblib/externals/loky/backend/context.py", line 249, in _count_physical_cores
+    cpu_count_physical = _count_physical_cores_darwin()
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jdonaldson/Projects/dyf/.venv/lib/python3.11/site-packages/joblib/externals/loky/backend/context.py", line 318, in _count_physical_cores_darwin
+    return int(cpu_info)
+           ^^^^^^^^^^^^^
+   dyf          k=  11 pairs=  72 valley<.3=0.51 saddle=0.49 shoulder@.95=0.00 (pts 0.0%; @.90 0.00, @1.0 0.00) med valley=0.28
+   kmeans@k     k=  11 pairs=  67 valley<.3=0.57 saddle=0.43 shoulder@.95=0.00 (pts 0.0%; @.90 0.00, @1.0 0.00) med valley=0.25
+   leiden@0.5   k=  11 pairs=  52 valley<.3=0.35 saddle=0.60 shoulder@.95=0.06 (pts 28.0%; @.90 0.06, @1.0 0.04) med valley=0.43
+   dyf_seed1    k=  12 pairs=  78 valley<.3=0.59 saddle=0.40 shoulder@.95=0.01 (pts 4.9%; @.90 0.01, @1.0 0.01) med valley=0.26
+   dyf_seed2    k=  10 pairs=  64 valley<.3=0.48 saddle=0.52 shoulder@.95=0.00 (pts 0.0%; @.90 0.00, @1.0 0.00) med valley=0.30
+   (3s)
+
+== fashion_mnist: n=70000
+   dyf          k=  12 pairs=  50 valley<.3=0.48 saddle=0.46 shoulder@.95=0.06 (pts 25.0%; @.90 0.06, @1.0 0.06) med valley=0.32
+   kmeans@k     k=  12 pairs=  52 valley<.3=0.46 saddle=0.50 shoulder@.95=0.04 (pts 13.3%; @.90 0.04, @1.0 0.02) med valley=0.33
+   leiden@0.5   k=  13 pairs=  49 valley<.3=0.22 saddle=0.69 shoulder@.95=0.08 (pts 21.5%; @.90 0.08, @1.0 0.08) med valley=0.64
+   dyf_seed1    k=  13 pairs=  54 valley<.3=0.46 saddle=0.48 shoulder@.95=0.06 (pts 17.3%; @.90 0.13, @1.0 0.06) med valley=0.32
+   dyf_seed2    k=  11 pairs=  44 valley<.3=0.41 saddle=0.52 shoulder@.95=0.07 (pts 25.3%; @.90 0.07, @1.0 0.02) med valley=0.42
+   (2s)
+
+== cmu_mocap: n=140837
+   dyf          k=  20 pairs=  65 valley<.3=0.71 saddle=0.29 shoulder@.95=0.00 (pts 0.0%; @.90 0.00, @1.0 0.00) med valley=0.12
+   kmeans@k     k=  20 pairs=  77 valley<.3=0.71 saddle=0.27 shoulder@.95=0.01 (pts 3.9%; @.90 0.01, @1.0 0.01) med valley=0.11
+   leiden@0.5   k= 310 pairs= 389 valley<.3=0.29 saddle=0.53 shoulder@.95=0.18 (pts 31.5%; @.90 0.19, @1.0 0.13) med valley=0.62
+   dyf_seed1    k=  22 pairs=  84 valley<.3=0.57 saddle=0.42 shoulder@.95=0.01 (pts 2.2%; @.90 0.01, @1.0 0.01) med valley=0.21
+   dyf_seed2    k=  20 pairs=  77 valley<.3=0.66 saddle=0.32 shoulder@.95=0.01 (pts 1.9%; @.90 0.01, @1.0 0.01) med valley=0.13
+   (3s)
+
+== ag_news: n=100000
+   dyf          k=  16 pairs=  88 valley<.3=0.55 saddle=0.44 shoulder@.95=0.01 (pts 3.9%; @.90 0.03, @1.0 0.01) med valley=0.28
+   kmeans@k     k=  16 pairs=  86 valley<.3=0.45 saddle=0.53 shoulder@.95=0.01 (pts 3.6%; @.90 0.01, @1.0 0.00) med valley=0.31
+   leiden@0.5   k=  30 pairs= 161 valley<.3=0.22 saddle=0.72 shoulder@.95=0.06 (pts 12.8%; @.90 0.07, @1.0 0.04) med valley=0.54
+   dyf_seed1    k=  15 pairs=  83 valley<.3=0.60 saddle=0.37 shoulder@.95=0.02 (pts 6.8%; @.90 0.04, @1.0 0.01) med valley=0.27
+   dyf_seed2    k=  16 pairs=  83 valley<.3=0.52 saddle=0.46 shoulder@.95=0.02 (pts 10.8%; @.90 0.02, @1.0 0.01) med valley=0.27
+   (12s)
+
+== tms_facs: n=110824
+   dyf          k=  26 pairs= 110 valley<.3=0.83 saddle=0.16 shoulder@.95=0.01 (pts 2.9%; @.90 0.01, @1.0 0.01) med valley=0.07
+   kmeans@k     k=  26 pairs=  78 valley<.3=0.94 saddle=0.06 shoulder@.95=0.00 (pts 0.0%; @.90 0.01, @1.0 0.00) med valley=0.10
+   leiden@0.5   k=  38 pairs= 145 valley<.3=0.77 saddle=0.19 shoulder@.95=0.04 (pts 3.8%; @.90 0.04, @1.0 0.04) med valley=0.09
+   dyf_seed1    k=  25 pairs= 104 valley<.3=0.86 saddle=0.14 shoulder@.95=0.00 (pts 0.0%; @.90 0.00, @1.0 0.00) med valley=0.09
+   dyf_seed2    k=  27 pairs= 113 valley<.3=0.81 saddle=0.19 shoulder@.95=0.00 (pts 0.0%; @.90 0.00, @1.0 0.00) med valley=0.07
+   (3s)
+
+== tms_droplet: n=245389
+   dyf          k=  30 pairs= 120 valley<.3=0.82 saddle=0.17 shoulder@.95=0.02 (pts 4.9%; @.90 0.02, @1.0 0.01) med valley=0.04
+   kmeans@k     k=  30 pairs=  79 valley<.3=0.80 saddle=0.18 shoulder@.95=0.03 (pts 3.8%; @.90 0.03, @1.0 0.00) med valley=0.10
+   leiden@0.5   k=  45 pairs= 148 valley<.3=0.78 saddle=0.21 shoulder@.95=0.01 (pts 6.2%; @.90 0.02, @1.0 0.01) med valley=0.08
+   dyf_seed1    k=  26 pairs= 114 valley<.3=0.76 saddle=0.20 shoulder@.95=0.04 (pts 8.6%; @.90 0.04, @1.0 0.03) med valley=0.05
+   dyf_seed2    k=  25 pairs= 101 valley<.3=0.86 saddle=0.12 shoulder@.95=0.02 (pts 5.2%; @.90 0.02, @1.0 0.02) med valley=0.06
+   (5s)
+
+== brain_1m: n=1290029
+   dyf          k=  22 pairs= 111 valley<.3=0.53 saddle=0.40 shoulder@.95=0.07 (pts 30.3%; @.90 0.08, @1.0 0.05) med valley=0.26
+   kmeans@k     k=  22 pairs=  92 valley<.3=0.67 saddle=0.27 shoulder@.95=0.05 (pts 38.2%; @.90 0.07, @1.0 0.03) med valley=0.14
+   leiden@0.5   k=  23 pairs= 108 valley<.3=0.41 saddle=0.46 shoulder@.95=0.13 (pts 42.9%; @.90 0.14, @1.0 0.11) med valley=0.40
+   dyf_seed1    k=  20 pairs=  99 valley<.3=0.42 saddle=0.52 shoulder@.95=0.06 (pts 23.7%; @.90 0.07, @1.0 0.06) med valley=0.34
+   dyf_seed2    k=  18 pairs=  82 valley<.3=0.48 saddle=0.41 shoulder@.95=0.11 (pts 49.5%; @.90 0.11, @1.0 0.10) med valley=0.34
+   (28s)
+
+wrote /Volumes/Models/dyf_bench_2026-11-04/community_cut_profile_full_results.json

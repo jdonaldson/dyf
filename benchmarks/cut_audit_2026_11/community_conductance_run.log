@@ -1,0 +1,72 @@
+
+== fashion_mnist: n=70000 d=50
+   kNN 15 via pynndescent: 6.3s
+   dyf            k=   12 cut=0.086 phi med=0.098 p90=0.116 max=0.129 (worst 7.3% of pts)
+   leiden@0.5     k=   13 cut=0.046 phi med=0.046 p90=0.075 max=0.076 (worst 4.5% of pts)
+/Users/jdonaldson/Projects/dyf/.venv/lib/python3.11/site-packages/joblib/externals/loky/backend/context.py:131: UserWarning: Could not find the number of physical cores for the following reason:
+invalid literal for int() with base 10: ''
+Returning the number of logical cores instead. You can silence this warning by setting LOKY_MAX_CPU_COUNT to the number of cores you want to use.
+  warnings.warn(
+  File "/Users/jdonaldson/Projects/dyf/.venv/lib/python3.11/site-packages/joblib/externals/loky/backend/context.py", line 249, in _count_physical_cores
+    cpu_count_physical = _count_physical_cores_darwin()
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jdonaldson/Projects/dyf/.venv/lib/python3.11/site-packages/joblib/externals/loky/backend/context.py", line 318, in _count_physical_cores_darwin
+    return int(cpu_info)
+           ^^^^^^^^^^^^^
+   kmeans@k       k=   12 cut=0.093 phi med=0.080 p90=0.140 max=0.162 (worst 8.5% of pts)
+   truth          k=   10 cut=0.193 phi med=0.166 p90=0.344 max=0.446 (worst 10.0% of pts)
+   leaves         k= 2193 cut=0.640 phi med=0.867 p90=1.000 max=1.000 (worst 0.0% of pts)
+   kmeans@L       k= 2193 cut=0.560 phi med=0.618 p90=0.823 max=1.000 (worst 0.0% of pts)
+   (10.9s)
+
+== cmu_mocap: n=140837 d=62
+   kNN 15 via pynndescent: 0.7s
+   dyf            k=   20 cut=0.020 phi med=0.016 p90=0.041 max=0.054 (worst 0.2% of pts)
+   leiden@0.5     k=  310 cut=0.003 phi med=0.000 p90=0.005 max=0.012 (worst 0.7% of pts)
+   kmeans@k       k=   20 cut=0.021 phi med=0.021 p90=0.034 max=0.049 (worst 2.1% of pts)
+   truth          k=   25 cut=0.010 phi med=0.003 p90=0.103 max=0.422 (worst 0.2% of pts)
+   leaves         k= 1478 cut=0.174 phi med=0.283 p90=0.818 max=1.000 (worst 0.0% of pts)
+   kmeans@L       k= 1478 cut=0.104 phi med=0.101 p90=0.212 max=0.514 (worst 0.0% of pts)
+   (4.4s)
+
+== ag_news: n=100000 d=384
+   kNN 15 via pynndescent: 1.3s
+   dyf            k=   16 cut=0.209 phi med=0.234 p90=0.331 max=0.396 (worst 4.2% of pts)
+   leiden@0.5     k=   30 cut=0.077 phi med=0.072 p90=0.105 max=0.139 (worst 3.7% of pts)
+   kmeans@k       k=   16 cut=0.221 phi med=0.225 p90=0.339 max=0.355 (worst 5.4% of pts)
+   truth          k=    4 cut=0.128 phi med=0.145 p90=0.171 max=0.172 (worst 24.8% of pts)
+   leaves         k= 3274 cut=0.778 phi med=0.942 p90=1.000 max=1.000 (worst 0.0% of pts)
+   kmeans@L       k= 3274 cut=0.442 phi med=0.492 p90=0.818 max=1.000 (worst 0.0% of pts)
+   (30.6s)
+
+== tms_facs: n=110824 d=50
+   kNN 15 via pynndescent: 0.6s
+   dyf            k=   26 cut=0.022 phi med=0.026 p90=0.082 max=0.117 (worst 0.3% of pts)
+   leiden@0.5     k=   38 cut=0.010 phi med=0.009 p90=0.025 max=0.042 (worst 3.4% of pts)
+   kmeans@k       k=   26 cut=0.026 phi med=0.018 p90=0.046 max=0.067 (worst 10.0% of pts)
+   truth          k=  120 cut=0.183 phi med=0.274 p90=0.774 max=0.989 (worst 0.0% of pts)
+   leaves         k= 1534 cut=0.443 phi med=0.864 p90=1.000 max=1.000 (worst 0.0% of pts)
+   kmeans@L       k= 1534 cut=0.445 phi med=0.459 p90=0.663 max=1.000 (worst 0.0% of pts)
+   (4.0s)
+
+== tms_droplet: n=245389 d=50
+   kNN 15 via pynndescent: 1.3s
+   dyf            k=   30 cut=0.021 phi med=0.019 p90=0.063 max=0.100 (worst 1.9% of pts)
+   leiden@0.5     k=   45 cut=0.010 phi med=0.009 p90=0.023 max=0.037 (worst 0.4% of pts)
+   kmeans@k       k=   30 cut=0.022 phi med=0.015 p90=0.042 max=0.061 (worst 3.7% of pts)
+   truth          k=  123 cut=0.151 phi med=0.176 p90=0.787 max=1.000 (worst 0.0% of pts)
+   leaves         k= 1768 cut=0.335 phi med=0.831 p90=1.000 max=1.000 (worst 0.0% of pts)
+   kmeans@L       k= 1768 cut=0.398 phi med=0.408 p90=0.600 max=0.900 (worst 0.0% of pts)
+   (6.4s)
+
+== brain_1m: n=1290029 d=50
+   kNN 15 via pynndescent: 9.4s
+   dyf            k=   22 cut=0.102 phi med=0.094 p90=0.160 max=0.229 (worst 3.8% of pts)
+   leiden@0.5     k=   23 cut=0.060 phi med=0.039 p90=0.097 max=0.137 (worst 4.2% of pts)
+   kmeans@k       k=   22 cut=0.075 phi med=0.052 p90=0.117 max=0.141 (worst 3.5% of pts)
+   truth          k=   35 cut=0.083 phi med=0.054 p90=0.173 max=0.249 (worst 1.7% of pts)
+   leaves         k= 3691 cut=0.654 phi med=0.878 p90=1.000 max=1.000 (worst 0.0% of pts)
+   kmeans@L       k= 3691 cut=0.606 phi med=0.608 p90=0.759 max=1.000 (worst 0.0% of pts)
+   (26.2s)
+
+wrote /Volumes/Models/dyf_bench_2026-11-04/community_conductance_results.json

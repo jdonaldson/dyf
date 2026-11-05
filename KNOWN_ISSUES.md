@@ -88,6 +88,12 @@ one-off measurements.
       and connected components then recover the rings exactly. Documented 2026-09-27
       (`build_dyf_tree` docstring, README); `normalize=False` was measured and refused — see
       the issue's Decision paragraph
+- [ ] **`louvain_cluster_leaves` ends with spherical k-means over every point, and nothing says
+      so** (issue 14). `_reassign_points` moves 4–31% of points and swings ARI by −0.11 (MNIST)
+      to +0.10 (TMS droplet); the shipped partition is a Voronoi tessellation of community
+      centroids, so any non-convex community Louvain found is flattened. Found 2026-11-05 by
+      measuring cut edges on a point kNN graph: dyf's partition cuts as many as k-means at the
+      same k. Decision pending: document as a stated default, expose a flag, or gate it
 
 **P2 — sweep the rest of the pattern (see the rule at the end of issue 5)**
 
@@ -786,6 +792,48 @@ factor loadings.
 Still open: `append_items` itself. Making it correct needs the overflow batch to carry a leaf
 id (format change in dyf-core) or the binding to route — until then it should not be used to
 add searchable rows.
+
+---
+
+## 14. `louvain_cluster_leaves` ends with spherical k-means over every point, undocumented — OPEN (2026-11-05)
+
+`_reassign_points` (`src/dyf/agglomerate.py:94`) runs up to five Lloyd rounds of spherical
+k-means over **all** points, seeded by the Louvain community labels, and is the last step of
+`louvain_cluster_leaves` (line 1021; also called by `merge_to_max_k`, `compute_louvain_hierarchy`
+and `agglomerate_tree_leaves`). The docstrings describe "Louvain on the leaf-centroid graph";
+the returned partition is a Voronoi tessellation of the community centroids in cosine space.
+
+**Measured** (`/Volumes/Models/dyf_bench_2026-11-04/reassignment_effect.py`, copied to
+`benchmarks/cut_audit_2026_11/`; library defaults, seed 42, pynndescent k=15 Euclidean graph):
+
+| dataset | points moved | kNN cut before → after | ARI before → after |
+|---|---|---|---|
+| MNIST PCA-50 | 26% | 0.180 → 0.153 | 0.581 → 0.472 |
+| Fashion-MNIST | 30% | 0.113 → 0.105 | 0.381 → 0.340 |
+| CMU MoCap | 13% | 0.023 → 0.020 | 0.176 → 0.152 |
+| AG News | 31% | 0.285 → 0.203 | 0.279 → 0.286 |
+| TMS FACS | 4% | 0.025 → 0.020 | 0.553 → 0.559 |
+| TMS droplet | 16% | 0.021 → 0.022 | 0.467 → 0.563 |
+| brain 1.3M | 29% | 0.127 → 0.093 | 0.491 → 0.515 |
+
+Two consequences. (a) The partition's cut statistics are those of k-means at the same k, within
+10% on every dataset, and 2–4× Leiden's on the same graph — "Louvain on leaves" is not what a
+consumer receives. (b) The block labels before reassignment contain scattered communities
+(worst-community conductance 0.6–0.8 on MoCap and brain), so the step is doing real repair as
+well as real damage; the sign depends on the dataset — and is stable across seeds 42/1/2
+(`reassignment_effect_seeds_results.json`): MNIST −0.10 to −0.13 on all three, MoCap −0.01 to
+−0.03, TMS FACS +0.01 to +0.02, TMS droplet +0.03 to +0.10, brain +0.02 to +0.11; Fashion and
+AG News within ±0.05 of zero. It helps where the row norm is a nuisance (scRNA PCA scores) and
+hurts on image PCA, which is issue 11's geometry showing up one stage later.
+
+Also explains two earlier observations: the stage-E collapse under a projective lift (issue 11,
+"lifted centroids near-parallel → cosine reassignment collapses") and why "leaf oracle rises,
+ARI doesn't" (issue 9) — the final partition is not a function of leaf purity alone.
+
+**Decision pending.** Options, cheapest first: document it in `louvain_cluster_leaves` and the
+README "How It Works" as a stated default; add `reassign: bool = True` so a consumer can keep
+the block partition; gate it on the leaf-graph spectrum regime (connectivity → skip). Whichever
+is chosen, the gallery pages must say which partition they score.
 
 ---
 

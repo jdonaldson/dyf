@@ -1,0 +1,56 @@
+
+== fashion_mnist: k=12, 108 pairs with kNN contact; 4/10 of the top-10 contact pairs are slices (same label)
+   knn_mutual     rho vs kNN share=  n/a  top-5 overlap=3/5  slice-vs-leak AUC in top-10=0.33
+   knn_pair_cut   rho vs kNN share=  n/a  top-5 overlap=2/5  slice-vs-leak AUC in top-10=0.50
+   A_centroid_tie rho vs kNN share= 0.95  top-5 overlap=3/5  slice-vs-leak AUC in top-10=0.38
+   B_leaf_graph   rho vs kNN share= 0.93  top-5 overlap=1/5  slice-vs-leak AUC in top-10=0.50
+   C_tie_x_treemargin rho vs kNN share= 0.90  top-5 overlap=1/5  slice-vs-leak AUC in top-10=0.58
+   D_centroid_cos rho vs kNN share= 0.69  top-5 overlap=3/5  slice-vs-leak AUC in top-10=0.17
+   (0.8s)
+
+== cmu_mocap: k=20, 133 pairs with kNN contact; 5/10 of the top-10 contact pairs are slices (same label)
+   knn_mutual     rho vs kNN share=  n/a  top-5 overlap=3/5  slice-vs-leak AUC in top-10=0.72
+   knn_pair_cut   rho vs kNN share=  n/a  top-5 overlap=3/5  slice-vs-leak AUC in top-10=0.52
+   A_centroid_tie rho vs kNN share= 0.72  top-5 overlap=2/5  slice-vs-leak AUC in top-10=0.68
+   B_leaf_graph   rho vs kNN share= 0.66  top-5 overlap=2/5  slice-vs-leak AUC in top-10=0.36
+   C_tie_x_treemargin rho vs kNN share= 0.51  top-5 overlap=0/5  slice-vs-leak AUC in top-10=0.28
+   D_centroid_cos rho vs kNN share= 0.41  top-5 overlap=1/5  slice-vs-leak AUC in top-10=0.72
+   (1.0s)
+
+== ag_news: k=16, 240 pairs with kNN contact; 10/10 of the top-10 contact pairs are slices (same label)
+   knn_mutual     rho vs kNN share=  n/a  top-5 overlap=3/5  slice-vs-leak AUC in top-10=n/a
+   knn_pair_cut   rho vs kNN share=  n/a  top-5 overlap=3/5  slice-vs-leak AUC in top-10=n/a
+   A_centroid_tie rho vs kNN share= 0.92  top-5 overlap=3/5  slice-vs-leak AUC in top-10=n/a
+   B_leaf_graph   rho vs kNN share= 0.85  top-5 overlap=2/5  slice-vs-leak AUC in top-10=n/a
+   C_tie_x_treemargin rho vs kNN share= 0.75  top-5 overlap=0/5  slice-vs-leak AUC in top-10=n/a
+   D_centroid_cos rho vs kNN share= 0.83  top-5 overlap=2/5  slice-vs-leak AUC in top-10=n/a
+   (4.5s)
+
+== tms_facs: k=26, 369 pairs with kNN contact; 0/10 of the top-10 contact pairs are slices (same label)
+   knn_mutual     rho vs kNN share=  n/a  top-5 overlap=2/5  slice-vs-leak AUC in top-10=n/a
+   knn_pair_cut   rho vs kNN share=  n/a  top-5 overlap=3/5  slice-vs-leak AUC in top-10=n/a
+   A_centroid_tie rho vs kNN share= 0.76  top-5 overlap=2/5  slice-vs-leak AUC in top-10=n/a
+   B_leaf_graph   rho vs kNN share= 0.53  top-5 overlap=3/5  slice-vs-leak AUC in top-10=n/a
+   C_tie_x_treemargin rho vs kNN share= 0.56  top-5 overlap=2/5  slice-vs-leak AUC in top-10=n/a
+   D_centroid_cos rho vs kNN share= 0.41  top-5 overlap=2/5  slice-vs-leak AUC in top-10=n/a
+   (0.8s)
+
+== tms_droplet: k=30, 420 pairs with kNN contact; 1/10 of the top-10 contact pairs are slices (same label)
+   knn_mutual     rho vs kNN share=  n/a  top-5 overlap=2/5  slice-vs-leak AUC in top-10=0.22
+   knn_pair_cut   rho vs kNN share=  n/a  top-5 overlap=2/5  slice-vs-leak AUC in top-10=0.44
+   A_centroid_tie rho vs kNN share= 0.71  top-5 overlap=2/5  slice-vs-leak AUC in top-10=0.56
+   B_leaf_graph   rho vs kNN share= 0.57  top-5 overlap=1/5  slice-vs-leak AUC in top-10=0.44
+   C_tie_x_treemargin rho vs kNN share= 0.48  top-5 overlap=0/5  slice-vs-leak AUC in top-10=0.33
+   D_centroid_cos rho vs kNN share= 0.51  top-5 overlap=2/5  slice-vs-leak AUC in top-10=0.22
+   (1.7s)
+
+== brain_1m: k=22, 459 pairs with kNN contact; 0/10 of the top-10 contact pairs are slices (same label)
+   knn_mutual     rho vs kNN share=  n/a  top-5 overlap=1/5  slice-vs-leak AUC in top-10=n/a
+   knn_pair_cut   rho vs kNN share=  n/a  top-5 overlap=2/5  slice-vs-leak AUC in top-10=n/a
+   A_centroid_tie rho vs kNN share= 0.83  top-5 overlap=2/5  slice-vs-leak AUC in top-10=n/a
+   B_leaf_graph   rho vs kNN share= 0.54  top-5 overlap=0/5  slice-vs-leak AUC in top-10=n/a
+   C_tie_x_treemargin rho vs kNN share= 0.76  top-5 overlap=2/5  slice-vs-leak AUC in top-10=n/a
+   D_centroid_cos rho vs kNN share= 0.54  top-5 overlap=2/5  slice-vs-leak AUC in top-10=n/a
+   (15.5s)
+
+wrote /Volumes/Models/dyf_bench_2026-11-04/community_contact_proxies_results.json

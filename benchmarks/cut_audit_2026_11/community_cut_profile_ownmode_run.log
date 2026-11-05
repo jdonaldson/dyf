@@ -1,0 +1,56 @@
+
+== mnist: n=70000
+/Users/jdonaldson/Projects/dyf/.venv/lib/python3.11/site-packages/joblib/externals/loky/backend/context.py:131: UserWarning: Could not find the number of physical cores for the following reason:
+invalid literal for int() with base 10: ''
+Returning the number of logical cores instead. You can silence this warning by setting LOKY_MAX_CPU_COUNT to the number of cores you want to use.
+  warnings.warn(
+  File "/Users/jdonaldson/Projects/dyf/.venv/lib/python3.11/site-packages/joblib/externals/loky/backend/context.py", line 249, in _count_physical_cores
+    cpu_count_physical = _count_physical_cores_darwin()
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jdonaldson/Projects/dyf/.venv/lib/python3.11/site-packages/joblib/externals/loky/backend/context.py", line 318, in _count_physical_cores_darwin
+    return int(cpu_info)
+           ^^^^^^^^^^^^^
+   dyf          k=  11 pairs=  72 valley<.3=0.51 shoulder pooled=0.00 strict=0.00 (pts 0.0%) hidden-small-blob=0.00 med own_offset=2.34
+   kmeans@k     k=  11 pairs=  67 valley<.3=0.57 shoulder pooled=0.00 strict=0.00 (pts 0.0%) hidden-small-blob=0.00 med own_offset=2.40
+   leiden@0.5   k=  11 pairs=  52 valley<.3=0.35 shoulder pooled=0.06 strict=0.00 (pts 0.0%) hidden-small-blob=0.06 med own_offset=2.10
+   (1s)
+
+== fashion_mnist: n=70000
+   dyf          k=  12 pairs=  50 valley<.3=0.48 shoulder pooled=0.06 strict=0.04 (pts 18.1%) hidden-small-blob=0.02 med own_offset=2.56
+   kmeans@k     k=  12 pairs=  52 valley<.3=0.46 shoulder pooled=0.04 strict=0.00 (pts 0.0%) hidden-small-blob=0.04 med own_offset=2.69
+   leiden@0.5   k=  13 pairs=  49 valley<.3=0.22 shoulder pooled=0.08 strict=0.00 (pts 0.0%) hidden-small-blob=0.08 med own_offset=2.31
+   (1s)
+
+== cmu_mocap: n=140837
+   dyf          k=  20 pairs=  65 valley<.3=0.71 shoulder pooled=0.00 strict=0.00 (pts 0.0%) hidden-small-blob=0.00 med own_offset=3.07
+   kmeans@k     k=  20 pairs=  77 valley<.3=0.71 shoulder pooled=0.01 strict=0.00 (pts 0.0%) hidden-small-blob=0.01 med own_offset=3.00
+   leiden@0.5   k= 310 pairs= 389 valley<.3=0.29 shoulder pooled=0.18 strict=0.09 (pts 15.3%) hidden-small-blob=0.09 med own_offset=1.46
+   (1s)
+
+== ag_news: n=100000
+   dyf          k=  16 pairs=  88 valley<.3=0.55 shoulder pooled=0.01 strict=0.00 (pts 0.0%) hidden-small-blob=0.01 med own_offset=2.37
+   kmeans@k     k=  16 pairs=  86 valley<.3=0.45 shoulder pooled=0.01 strict=0.00 (pts 0.0%) hidden-small-blob=0.01 med own_offset=2.34
+/Users/jdonaldson/Projects/dyf/.venv/lib/python3.11/site-packages/numpy/lib/_histograms_impl.py:897: RuntimeWarning: invalid value encountered in divide
+  return n / db / n.sum(), bin_edges
+   leiden@0.5   k=  30 pairs= 161 valley<.3=0.22 shoulder pooled=0.06 strict=0.02 (pts 0.1%) hidden-small-blob=0.03 med own_offset=2.19
+   (3s)
+
+== tms_facs: n=110824
+   dyf          k=  26 pairs= 110 valley<.3=0.83 shoulder pooled=0.01 strict=0.00 (pts 0.0%) hidden-small-blob=0.01 med own_offset=3.26
+   kmeans@k     k=  26 pairs=  78 valley<.3=0.94 shoulder pooled=0.00 strict=0.00 (pts 0.0%) hidden-small-blob=0.00 med own_offset=3.02
+   leiden@0.5   k=  38 pairs= 145 valley<.3=0.77 shoulder pooled=0.04 strict=0.03 (pts 2.4%) hidden-small-blob=0.01 med own_offset=3.14
+   (1s)
+
+== tms_droplet: n=245389
+   dyf          k=  30 pairs= 120 valley<.3=0.82 shoulder pooled=0.02 strict=0.02 (pts 4.9%) hidden-small-blob=0.00 med own_offset=3.99
+   kmeans@k     k=  30 pairs=  79 valley<.3=0.80 shoulder pooled=0.03 strict=0.01 (pts 2.7%) hidden-small-blob=0.01 med own_offset=3.63
+   leiden@0.5   k=  45 pairs= 148 valley<.3=0.78 shoulder pooled=0.01 strict=0.00 (pts 0.0%) hidden-small-blob=0.01 med own_offset=3.35
+   (2s)
+
+== brain_1m: n=1290029
+   dyf          k=  22 pairs= 111 valley<.3=0.53 shoulder pooled=0.07 strict=0.04 (pts 20.6%) hidden-small-blob=0.04 med own_offset=2.43
+   kmeans@k     k=  22 pairs=  92 valley<.3=0.67 shoulder pooled=0.05 strict=0.03 (pts 27.4%) hidden-small-blob=0.02 med own_offset=2.92
+   leiden@0.5   k=  23 pairs= 108 valley<.3=0.41 shoulder pooled=0.13 strict=0.05 (pts 21.1%) hidden-small-blob=0.08 med own_offset=2.63
+   (13s)
+
+wrote /Volumes/Models/dyf_bench_2026-11-04/community_cut_profile_ownmode_results.json

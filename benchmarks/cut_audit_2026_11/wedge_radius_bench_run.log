@@ -1,0 +1,68 @@
+
+== mnist: n=70000 d=50 k_true=10 leaves=3395 norm CV=0.148
+   split 1375/3395 leaves (70% of points) -> 6411 sub-nodes; purity leaves 0.861 bands 0.869 null 0.864; inner/outer ratio median 0.8430271744728088 iqr [0.799832820892334, 0.8797078132629395]
+   leaves cosine: k=  11 ARI=0.609 AMI=0.663
+/Users/jdonaldson/Projects/dyf/.venv/lib/python3.11/site-packages/joblib/externals/loky/backend/context.py:131: UserWarning: Could not find the number of physical cores for the following reason:
+invalid literal for int() with base 10: ''
+Returning the number of logical cores instead. You can silence this warning by setting LOKY_MAX_CPU_COUNT to the number of cores you want to use.
+  warnings.warn(
+  File "/Users/jdonaldson/Projects/dyf/.venv/lib/python3.11/site-packages/joblib/externals/loky/backend/context.py", line 249, in _count_physical_cores
+    cpu_count_physical = _count_physical_cores_darwin()
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jdonaldson/Projects/dyf/.venv/lib/python3.11/site-packages/joblib/externals/loky/backend/context.py", line 318, in _count_physical_cores_darwin
+    return int(cpu_info)
+           ^^^^^^^^^^^^^
+   leaves euclid: k=  16 ARI=0.538 AMI=0.621
+   bands  cosine: k=  13 ARI=0.567 AMI=0.632
+   bands  euclid: k=  17 ARI=0.487 AMI=0.600
+   (4.8s)
+
+== fashion_mnist: n=70000 d=50 k_true=10 leaves=2193 norm CV=0.208
+   split 903/2193 leaves (79% of points) -> 4585 sub-nodes; purity leaves 0.784 bands 0.794 null 0.789; inner/outer ratio median 0.760474681854248 iqr [0.6763554811477661, 0.8236606121063232]
+   leaves cosine: k=  14 ARI=0.379 AMI=0.547
+   leaves euclid: k=  16 ARI=0.359 AMI=0.535
+   bands  cosine: k=  18 ARI=0.373 AMI=0.562
+   bands  euclid: k=  23 ARI=0.365 AMI=0.563
+   (3.1s)
+
+== cmu_mocap: n=140837 d=62 k_true=25 leaves=1478 norm CV=0.249
+   split 977/1478 leaves (87% of points) -> 4530 sub-nodes; purity leaves 0.842 bands 0.866 null 0.844; inner/outer ratio median 0.9169538617134094 iqr [0.8463193774223328, 0.9648498296737671]
+   leaves cosine: k=  21 ARI=0.143 AMI=0.361
+   leaves euclid: k=  54 ARI=0.126 AMI=0.408
+   bands  cosine: k=  47 ARI=0.128 AMI=0.423
+   bands  euclid: k= 138 ARI=0.100 AMI=0.443
+   (4.6s)
+
+== ag_news: n=100000 d=384 k_true=4 leaves=3274 norm CV=0.000
+   split 0/3274 leaves (0% of points) -> 3274 sub-nodes; purity leaves 0.853 bands 0.853 null 0.853; inner/outer ratio median None iqr None
+   leaves cosine: k=  15 ARI=0.279 AMI=0.387
+   leaves euclid: k=  20 ARI=0.214 AMI=0.368
+   bands  cosine: k=  15 ARI=0.279 AMI=0.387
+   bands  euclid: k=  20 ARI=0.214 AMI=0.368
+   (9.0s)
+
+== tms_facs: n=110824 d=50 k_true=120 leaves=1534 norm CV=0.466
+   split 637/1534 leaves (81% of points) -> 3271 sub-nodes; purity leaves 0.783 bands 0.794 null 0.786; inner/outer ratio median 0.6494216322898865 iqr [0.5698406100273132, 0.7284059524536133]
+   leaves cosine: k=  26 ARI=0.557 AMI=0.759
+   leaves euclid: k=  32 ARI=0.577 AMI=0.763
+   bands  cosine: k=  30 ARI=0.614 AMI=0.775
+   bands  euclid: k=  49 ARI=0.613 AMI=0.783
+   (3.1s)
+
+== tms_droplet: n=245389 d=50 k_true=123 leaves=1768 norm CV=0.521
+   split 826/1768 leaves (88% of points) -> 4071 sub-nodes; purity leaves 0.793 bands 0.805 null 0.794; inner/outer ratio median 0.6555821299552917 iqr [0.58226478099823, 0.7356882691383362]
+   leaves cosine: k=  29 ARI=0.465 AMI=0.727
+   leaves euclid: k=  47 ARI=0.573 AMI=0.760
+   bands  cosine: k=  41 ARI=0.565 AMI=0.750
+   bands  euclid: k=  57 ARI=0.590 AMI=0.757
+   (7.3s)
+
+== brain_1m: n=1290029 d=50 k_true=35 leaves=3691 norm CV=0.692
+   split 1884/3691 leaves (55% of points) -> 9013 sub-nodes; purity leaves 0.846 bands 0.853 null 0.846; inner/outer ratio median 0.6111427545547485 iqr [0.5332340002059937, 0.6736473441123962]
+   leaves cosine: k=  21 ARI=0.417 AMI=0.651
+   leaves euclid: k=  35 ARI=0.448 AMI=0.656
+   bands  cosine: k=  27 ARI=0.412 AMI=0.642
+   bands  euclid: k=  40 ARI=0.407 AMI=0.659
+   (68.0s)
+
+wrote /Volumes/Models/dyf_bench_2026-11-04/wedge_radius_bench_results.json
