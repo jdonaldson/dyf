@@ -891,7 +891,11 @@ middle of a large region ends up owning that region: on brain one final communit
 points has 94% of its members from other block communities (dataset-wide 29% moved), and on
 droplet one of 19,257 points has 94% (dataset-wide 16%). The `community_id` such a cell carries
 through `dyfviz` is Louvain's id for a seed that was a small fraction of what is shown. Per-community
-shape numbers do not flag these; the free numbers (radius, conductance) partly do.
+shape numbers do not flag these; the free numbers (radius, conductance) partly do. **Since
+2026-11-06 `compute_louvain_hierarchy` reports both:** `community_cohesion` (the spread; ranked
+within an index it finds the least pure quarter of communities at AUC 0.80 on six of seven sets)
+and `community_inflow` (this share), and the demo viewer's community list tags the loosest
+quarter and any cell that is mostly inflow. Ranks within one index, never thresholds.
 
 ---
 
