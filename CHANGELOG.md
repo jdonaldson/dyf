@@ -14,6 +14,14 @@ the data and stable across seeds — net about zero across the bench. Documented
 and the README "How It Works"; no behaviour change and no flag, since `dyfviz` stores the
 post-reassignment label.
 
+**How to pick Louvain's resolution.** Three label-free criteria (map-equation codelength,
+edge-dropout stability, Laplacian eigengap) and the map equation as an alternative objective
+were measured on the seven-dataset bench and all chose worse than the default; prediction
+strength through the frozen tree never clears its classical threshold. About fifty randomly
+labelled items pick the resolution within 0.02 ARI of the best in the sweep, closer than
+knowing the true number of classes. Written into the README "How It Works"; the probes are in
+`benchmarks/cut_audit_2026_11/`.
+
 ## 0.17.0 — 2026-11-01
 
 ### Added

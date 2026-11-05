@@ -1,0 +1,212 @@
+
+== mnist seed=42: best res=0.7 (k=10) ARI=0.625; default regret=0.044
+   labels n=  10: regret 0.115 ± 0.129 (k 19)
+   labels n=  20: regret 0.031 ± 0.049 (k 9)
+   labels n=  50: regret 0.006 ± 0.013 (k 10)
+   labels n= 100: regret 0.001 ± 0.001 (k 10)
+   labels n= 200: regret 0.002 ± 0.001 (k 9)
+   labels n= 500: regret 0.001 ± 0.001 (k 10)
+   ps: r0.2:k6/0.61  r0.3:k7/0.40  r0.5:k9/0.42  r0.7:k10/0.38  r1.0:k13/0.36  r1.5:k16/0.18  r2.0:k21/0.11  r3.0:k29/0.15  r4.0:k37/0.16  r6.0:k57/0.13
+   ps picks: t0.7: res 0.2 k 6 regret 0.162  t0.8: res 0.2 k 6 regret 0.162  t0.9: res 0.2 k 6 regret 0.162  argmax: res 0.2 k 6 regret 0.162
+
+== mnist seed=1: best res=0.5 (k=9) ARI=0.583; default regret=0.017
+   labels n=  10: regret 0.061 ± 0.057 (k 11)
+   labels n=  20: regret 0.029 ± 0.051 (k 11)
+   labels n=  50: regret 0.002 ± 0.005 (k 9)
+   labels n= 100: regret 0.005 ± 0.008 (k 10)
+   labels n= 200: regret 0.008 ± 0.008 (k 10)
+   labels n= 500: regret 0.004 ± 0.007 (k 10)
+   ps: r0.2:k5/0.54  r0.3:k6/0.41  r0.5:k9/0.48  r0.7:k9/0.47  r1.0:k12/0.39  r1.5:k15/0.29  r2.0:k20/0.29  r3.0:k33/0.26  r4.0:k39/0.19  r6.0:k54/0.14
+   ps picks: t0.7: res 0.2 k 5 regret 0.156  t0.8: res 0.2 k 5 regret 0.156  t0.9: res 0.2 k 5 regret 0.156  argmax: res 0.2 k 5 regret 0.156
+
+== mnist seed=2: best res=0.7 (k=9) ARI=0.648; default regret=0.038
+   labels n=  10: regret 0.066 ± 0.068 (k 9)
+   labels n=  20: regret 0.019 ± 0.016 (k 10)
+   labels n=  50: regret 0.016 ± 0.012 (k 9)
+   labels n= 100: regret 0.003 ± 0.005 (k 9)
+   labels n= 200: regret 0.003 ± 0.005 (k 9)
+   labels n= 500: regret 0.000 ± 0.000 (k 9)
+   ps: r0.2:k6/0.43  r0.3:k7/0.42  r0.5:k9/0.40  r0.7:k9/0.32  r1.0:k11/0.28  r1.5:k17/0.28  r2.0:k21/0.31  r3.0:k31/0.24  r4.0:k40/0.13  r6.0:k56/0.13
+   ps picks: t0.7: res 0.2 k 6 regret 0.180  t0.8: res 0.2 k 6 regret 0.180  t0.9: res 0.2 k 6 regret 0.180  argmax: res 0.2 k 6 regret 0.180
+
+== fashion_mnist seed=42: best res=0.5 (k=8) ARI=0.392; default regret=0.011
+   labels n=  10: regret 0.028 ± 0.032 (k 13)
+   labels n=  20: regret 0.022 ± 0.022 (k 13)
+   labels n=  50: regret 0.028 ± 0.024 (k 14)
+   labels n= 100: regret 0.012 ± 0.009 (k 14)
+   labels n= 200: regret 0.006 ± 0.005 (k 10)
+   labels n= 500: regret 0.004 ± 0.007 (k 10)
+   ps: r0.2:k4/0.45  r0.3:k6/0.45  r0.5:k8/0.40  r0.7:k10/0.34  r1.0:k14/0.28  r1.5:k19/0.38  r2.0:k21/0.31  r3.0:k29/0.31  r4.0:k35/0.19  r6.0:k48/0.22
+   ps picks: t0.7: res 0.2 k 4 regret 0.069  t0.8: res 0.2 k 4 regret 0.069  t0.9: res 0.2 k 4 regret 0.069  argmax: res 0.3 k 6 regret 0.020
+
+== fashion_mnist seed=1: best res=0.5 (k=9) ARI=0.454; default regret=0.044
+   labels n=  10: regret 0.044 ± 0.049 (k 13)
+   labels n=  20: regret 0.048 ± 0.051 (k 12)
+   labels n=  50: regret 0.022 ± 0.029 (k 9)
+   labels n= 100: regret 0.009 ± 0.012 (k 11)
+   labels n= 200: regret 0.006 ± 0.011 (k 10)
+   labels n= 500: regret 0.001 ± 0.002 (k 9)
+   ps: r0.2:k5/0.45  r0.3:k6/0.33  r0.5:k9/0.42  r0.7:k9/0.34  r1.0:k13/0.34  r1.5:k15/0.38  r2.0:k21/0.38  r3.0:k28/0.29  r4.0:k35/0.22  r6.0:k46/0.13
+   ps picks: t0.7: res 0.2 k 5 regret 0.059  t0.8: res 0.2 k 5 regret 0.059  t0.9: res 0.2 k 5 regret 0.059  argmax: res 0.2 k 5 regret 0.059
+
+== fashion_mnist seed=2: best res=0.5 (k=8) ARI=0.465; default regret=0.041
+   labels n=  10: regret 0.071 ± 0.074 (k 17)
+   labels n=  20: regret 0.027 ± 0.024 (k 8)
+   labels n=  50: regret 0.010 ± 0.016 (k 8)
+   labels n= 100: regret 0.010 ± 0.012 (k 9)
+   labels n= 200: regret 0.005 ± 0.006 (k 9)
+   labels n= 500: regret 0.000 ± 0.000 (k 8)
+   ps: r0.2:k4/0.39  r0.3:k5/0.50  r0.5:k8/0.38  r0.7:k10/0.41  r1.0:k12/0.42  r1.5:k16/0.35  r2.0:k21/0.28  r3.0:k27/0.31  r4.0:k35/0.27  r6.0:k50/0.12
+   ps picks: t0.7: res 0.2 k 4 regret 0.122  t0.8: res 0.2 k 4 regret 0.122  t0.9: res 0.2 k 4 regret 0.122  argmax: res 0.3 k 5 regret 0.057
+
+== cmu_mocap seed=42: best res=0.7 (k=19) ARI=0.185; default regret=0.010
+   labels n=  10: regret 0.045 ± 0.033 (k 17)
+   labels n=  20: regret 0.046 ± 0.035 (k 25)
+   labels n=  50: regret 0.009 ± 0.013 (k 18)
+   labels n= 100: regret 0.005 ± 0.009 (k 19)
+   labels n= 200: regret 0.007 ± 0.009 (k 20)
+   labels n= 500: regret 0.000 ± 0.000 (k 19)
+   ps: r0.2:k9/0.75  r0.3:k12/0.26  r0.5:k16/0.24  r0.7:k19/0.32  r1.0:k22/0.21  r1.5:k27/0.24  r2.0:k29/0.22  r3.0:k32/0.19  r4.0:k40/0.26  r6.0:k52/0.22
+   ps picks: t0.7: res 0.2 k 9 regret 0.075  t0.8: res 0.2 k 9 regret 0.075  t0.9: res 0.2 k 9 regret 0.075  argmax: res 0.2 k 9 regret 0.075
+
+== cmu_mocap seed=1: best res=1.0 (k=22) ARI=0.201; default regret=0.000
+   labels n=  10: regret 0.048 ± 0.039 (k 27)
+   labels n=  20: regret 0.024 ± 0.038 (k 22)
+   labels n=  50: regret 0.017 ± 0.035 (k 24)
+   labels n= 100: regret 0.006 ± 0.008 (k 19)
+   labels n= 200: regret 0.004 ± 0.007 (k 20)
+   labels n= 500: regret 0.000 ± 0.000 (k 22)
+   ps: r0.2:k8/0.42  r0.3:k12/0.30  r0.5:k14/0.32  r0.7:k16/0.35  r1.0:k22/0.34  r1.5:k29/0.33  r2.0:k35/0.32  r3.0:k40/0.27  r4.0:k47/0.31  r6.0:k58/0.28
+   ps picks: t0.7: res 0.2 k 8 regret 0.097  t0.8: res 0.2 k 8 regret 0.097  t0.9: res 0.2 k 8 regret 0.097  argmax: res 0.2 k 8 regret 0.097
+
+== cmu_mocap seed=2: best res=0.7 (k=17) ARI=0.184; default regret=0.041
+   labels n=  10: regret 0.029 ± 0.023 (k 22)
+   labels n=  20: regret 0.039 ± 0.023 (k 23)
+   labels n=  50: regret 0.011 ± 0.016 (k 12)
+   labels n= 100: regret 0.004 ± 0.004 (k 12)
+   labels n= 200: regret 0.006 ± 0.012 (k 15)
+   labels n= 500: regret 0.002 ± 0.003 (k 15)
+   ps: r0.2:k7/0.44  r0.3:k8/0.36  r0.5:k14/0.35  r0.7:k17/0.25  r1.0:k22/0.27  r1.5:k26/0.26  r2.0:k32/0.20  r3.0:k40/0.29  r4.0:k43/0.22  r6.0:k55/0.37
+   ps picks: t0.7: res 0.2 k 7 regret 0.056  t0.8: res 0.2 k 7 regret 0.056  t0.9: res 0.2 k 7 regret 0.056  argmax: res 0.2 k 7 regret 0.056
+
+== ag_news seed=42: best res=0.2 (k=4) ARI=0.491; default regret=0.212
+   labels n=  10: regret 0.100 ± 0.116 (k 11)
+   labels n=  20: regret 0.035 ± 0.071 (k 6)
+   labels n=  50: regret 0.000 ± 0.000 (k 4)
+   labels n= 100: regret 0.000 ± 0.000 (k 4)
+   labels n= 200: regret 0.000 ± 0.000 (k 4)
+   labels n= 500: regret 0.000 ± 0.000 (k 4)
+   ps: r0.2:k4/0.71  r0.3:k5/0.47  r0.5:k10/0.44  r0.7:k12/0.24  r1.0:k15/0.20  r1.5:k24/0.18  r2.0:k29/0.15  r3.0:k41/0.14  r4.0:k54/0.11  r6.0:k67/0.06
+   ps picks: t0.7: res 0.2 k 4 regret 0.000  t0.8: res 0.2 k 4 regret 0.000  t0.9: res 0.2 k 4 regret 0.000  argmax: res 0.2 k 4 regret 0.000
+
+== ag_news seed=1: best res=0.3 (k=5) ARI=0.572; default regret=0.276
+   labels n=  10: regret 0.078 ± 0.084 (k 6)
+   labels n=  20: regret 0.040 ± 0.065 (k 6)
+   labels n=  50: regret 0.008 ± 0.025 (k 5)
+   labels n= 100: regret 0.000 ± 0.000 (k 5)
+   labels n= 200: regret 0.000 ± 0.000 (k 5)
+   labels n= 500: regret 0.000 ± 0.000 (k 5)
+   ps: r0.2:k3/0.74  r0.3:k5/0.32  r0.5:k7/0.42  r0.7:k10/0.32  r1.0:k17/0.19  r1.5:k23/0.21  r2.0:k30/0.20  r3.0:k38/0.15  r4.0:k53/0.09  r6.0:k68/0.07
+   ps picks: t0.7: res 0.2 k 3 regret 0.082  t0.8: res 0.2 k 3 regret 0.082  t0.9: res 0.2 k 3 regret 0.082  argmax: res 0.2 k 3 regret 0.082
+
+== ag_news seed=2: best res=0.3 (k=5) ARI=0.529; default regret=0.244
+   labels n=  10: regret 0.067 ± 0.070 (k 6)
+   labels n=  20: regret 0.036 ± 0.049 (k 6)
+   labels n=  50: regret 0.021 ± 0.026 (k 5)
+   labels n= 100: regret 0.009 ± 0.019 (k 5)
+   labels n= 200: regret 0.007 ± 0.021 (k 5)
+   labels n= 500: regret 0.000 ± 0.000 (k 5)
+   ps: r0.2:k3/0.67  r0.3:k5/0.53  r0.5:k6/0.56  r0.7:k9/0.38  r1.0:k16/0.19  r1.5:k23/0.17  r2.0:k33/0.12  r3.0:k42/0.12  r4.0:k52/0.13  r6.0:k65/0.09
+   ps picks: t0.7: res 0.2 k 3 regret 0.069  t0.8: res 0.2 k 3 regret 0.069  t0.9: res 0.2 k 3 regret 0.069  argmax: res 0.2 k 3 regret 0.069
+
+== tms_facs seed=42: best res=3.0 (k=36) ARI=0.625; default regret=0.072
+   labels n=  10: regret 0.089 ± 0.062 (k 26)
+   labels n=  20: regret 0.040 ± 0.055 (k 34)
+   labels n=  50: regret 0.011 ± 0.017 (k 35)
+   labels n= 100: regret 0.002 ± 0.002 (k 40)
+   labels n= 200: regret 0.002 ± 0.002 (k 40)
+   labels n= 500: regret 0.002 ± 0.002 (k 39)
+   ps: r0.2:k15/0.23  r0.3:k16/0.19  r0.5:k22/0.46  r0.7:k22/0.44  r1.0:k24/0.34  r1.5:k27/0.38  r2.0:k30/0.47  r3.0:k36/0.46  r4.0:k41/0.42  r6.0:k46/0.29
+   ps picks: t0.7: res 0.2 k 15 regret 0.172  t0.8: res 0.2 k 15 regret 0.172  t0.9: res 0.2 k 15 regret 0.172  argmax: res 2.0 k 30 regret 0.024
+
+== tms_facs seed=1: best res=2.0 (k=32) ARI=0.601; default regret=0.053
+   labels n=  10: regret 0.101 ± 0.062 (k 32)
+   labels n=  20: regret 0.067 ± 0.038 (k 39)
+   labels n=  50: regret 0.038 ± 0.042 (k 36)
+   labels n= 100: regret 0.005 ± 0.016 (k 31)
+   labels n= 200: regret 0.000 ± 0.000 (k 32)
+   labels n= 500: regret 0.000 ± 0.000 (k 32)
+   ps: r0.2:k12/0.37  r0.3:k16/0.44  r0.5:k18/0.56  r0.7:k19/0.36  r1.0:k23/0.39  r1.5:k27/0.47  r2.0:k32/0.41  r3.0:k37/0.45  r4.0:k44/0.44  r6.0:k53/0.31
+   ps picks: t0.7: res 0.2 k 12 regret 0.260  t0.8: res 0.2 k 12 regret 0.260  t0.9: res 0.2 k 12 regret 0.260  argmax: res 0.5 k 18 regret 0.104
+
+== tms_facs seed=2: best res=3.0 (k=39) ARI=0.648; default regret=0.093
+   labels n=  10: regret 0.150 ± 0.107 (k 22)
+   labels n=  20: regret 0.054 ± 0.047 (k 37)
+   labels n=  50: regret 0.034 ± 0.034 (k 44)
+   labels n= 100: regret 0.007 ± 0.020 (k 40)
+   labels n= 200: regret 0.000 ± 0.000 (k 39)
+   labels n= 500: regret 0.007 ± 0.020 (k 40)
+   ps: r0.2:k11/0.25  r0.3:k13/0.30  r0.5:k20/0.41  r0.7:k23/0.39  r1.0:k25/0.37  r1.5:k29/0.42  r2.0:k32/0.41  r3.0:k39/0.26  r4.0:k42/0.31  r6.0:k50/0.20
+   ps picks: t0.7: res 0.2 k 11 regret 0.302  t0.8: res 0.2 k 11 regret 0.302  t0.9: res 0.2 k 11 regret 0.302  argmax: res 1.5 k 29 regret 0.080
+
+== tms_droplet seed=42: best res=6.0 (k=54) ARI=0.600; default regret=0.133
+   labels n=  10: regret 0.121 ± 0.054 (k 30)
+   labels n=  20: regret 0.101 ± 0.091 (k 32)
+   labels n=  50: regret 0.002 ± 0.007 (k 53)
+   labels n= 100: regret 0.016 ± 0.040 (k 50)
+   labels n= 200: regret 0.004 ± 0.009 (k 52)
+   labels n= 500: regret 0.000 ± 0.000 (k 54)
+   ps: r0.2:k12/0.44  r0.3:k16/0.43  r0.5:k20/0.38  r0.7:k25/0.31  r1.0:k29/0.43  r1.5:k31/0.35  r2.0:k33/0.35  r3.0:k36/0.34  r4.0:k42/0.30  r6.0:k54/0.25
+   ps picks: t0.7: res 0.2 k 12 regret 0.216  t0.8: res 0.2 k 12 regret 0.216  t0.9: res 0.2 k 12 regret 0.216  argmax: res 0.2 k 12 regret 0.216
+
+== tms_droplet seed=1: best res=4.0 (k=46) ARI=0.621; default regret=0.085
+   labels n=  10: regret 0.162 ± 0.117 (k 24)
+   labels n=  20: regret 0.057 ± 0.085 (k 41)
+   labels n=  50: regret 0.005 ± 0.009 (k 47)
+   labels n= 100: regret 0.005 ± 0.010 (k 44)
+   labels n= 200: regret 0.005 ± 0.004 (k 53)
+   labels n= 500: regret 0.003 ± 0.004 (k 49)
+   ps: r0.2:k13/0.49  r0.3:k16/0.47  r0.5:k20/0.36  r0.7:k24/0.34  r1.0:k29/0.37  r1.5:k33/0.35  r2.0:k35/0.32  r3.0:k41/0.31  r4.0:k46/0.46  r6.0:k57/0.23
+   ps picks: t0.7: res 0.2 k 13 regret 0.286  t0.8: res 0.2 k 13 regret 0.286  t0.9: res 0.2 k 13 regret 0.286  argmax: res 0.2 k 13 regret 0.286
+
+== tms_droplet seed=2: best res=6.0 (k=55) ARI=0.626; default regret=0.105
+   labels n=  10: regret 0.071 ± 0.083 (k 35)
+   labels n=  20: regret 0.054 ± 0.049 (k 37)
+   labels n=  50: regret 0.013 ± 0.025 (k 50)
+   labels n= 100: regret 0.024 ± 0.035 (k 46)
+   labels n= 200: regret 0.007 ± 0.011 (k 52)
+   labels n= 500: regret 0.000 ± 0.000 (k 55)
+   ps: r0.2:k10/0.47  r0.3:k11/0.48  r0.5:k19/0.41  r0.7:k21/0.41  r1.0:k26/0.35  r1.5:k30/0.24  r2.0:k35/0.23  r3.0:k37/0.31  r4.0:k44/0.49  r6.0:k55/0.38
+   ps picks: t0.7: res 0.2 k 10 regret 0.303  t0.8: res 0.2 k 10 regret 0.303  t0.9: res 0.2 k 10 regret 0.303  argmax: res 4.0 k 44 regret 0.023
+
+== brain_1m seed=42: best res=1.0 (k=19) ARI=0.491; default regret=0.000
+   labels n=  10: regret 0.068 ± 0.062 (k 24)
+   labels n=  20: regret 0.031 ± 0.033 (k 35)
+   labels n=  50: regret 0.043 ± 0.033 (k 29)
+   labels n= 100: regret 0.037 ± 0.030 (k 30)
+   labels n= 200: regret 0.031 ± 0.033 (k 38)
+   labels n= 500: regret 0.000 ± 0.000 (k 19)
+   ps: r0.2:k7/0.48  r0.3:k9/0.47  r0.5:k13/0.36  r0.7:k17/0.40  r1.0:k19/0.32  r1.5:k24/0.23  r2.0:k30/0.22  r3.0:k43/0.19  r4.0:k50/0.19  r6.0:k65/0.15
+   ps picks: t0.7: res 0.2 k 7 regret 0.341  t0.8: res 0.2 k 7 regret 0.341  t0.9: res 0.2 k 7 regret 0.341  argmax: res 0.2 k 7 regret 0.341
+
+== brain_1m seed=1: best res=4.0 (k=47) ARI=0.554; default regret=0.106
+   labels n=  10: regret 0.144 ± 0.093 (k 28)
+   labels n=  20: regret 0.066 ± 0.051 (k 43)
+   labels n=  50: regret 0.021 ± 0.032 (k 43)
+   labels n= 100: regret 0.037 ± 0.048 (k 38)
+   labels n= 200: regret 0.000 ± 0.000 (k 47)
+   labels n= 500: regret 0.000 ± 0.000 (k 47)
+   ps: r0.2:k7/0.57  r0.3:k8/0.46  r0.5:k13/0.29  r0.7:k19/0.28  r1.0:k21/0.18  r1.5:k26/0.15  r2.0:k32/0.20  r3.0:k41/0.16  r4.0:k47/0.14  r6.0:k66/0.12
+   ps picks: t0.7: res 0.2 k 7 regret 0.406  t0.8: res 0.2 k 7 regret 0.406  t0.9: res 0.2 k 7 regret 0.406  argmax: res 0.2 k 7 regret 0.406
+
+== brain_1m seed=2: best res=1.5 (k=27) ARI=0.543; default regret=0.083
+   labels n=  10: regret 0.065 ± 0.037 (k 36)
+   labels n=  20: regret 0.044 ± 0.039 (k 30)
+   labels n=  50: regret 0.021 ± 0.025 (k 35)
+   labels n= 100: regret 0.026 ± 0.033 (k 37)
+   labels n= 200: regret 0.002 ± 0.007 (k 28)
+   labels n= 500: regret 0.002 ± 0.007 (k 28)
+   ps: r0.2:k8/0.78  r0.3:k10/0.47  r0.5:k14/0.36  r0.7:k18/0.24  r1.0:k20/0.38  r1.5:k27/0.19  r2.0:k33/0.26  r3.0:k41/0.16  r4.0:k52/0.16  r6.0:k66/0.13
+   ps picks: t0.7: res 0.2 k 8 regret 0.374  t0.8: res 0.2 k 8 regret 0.374  t0.9: res 0.2 k 8 regret 0.374  argmax: res 0.2 k 8 regret 0.374
+
+wrote /Volumes/Models/dyf_bench_2026-11-04/resolution_labels_and_prediction_strength_results.json

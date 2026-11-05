@@ -104,9 +104,11 @@ coming back. Numbers are in `KNOWN_ISSUES.md` #9, #11, #14; the conclusions:
   gets most of it) and −0.2 to −0.3 on 10-class images and 4-class text — not a default. Three
   label-free resolution criteria (map-equation codelength, edge-dropout stability, Laplacian
   eigengap) all lose to resolution 1: mean regret 0.18 / 0.13 / 0.18 vs 0.08, and knowing k
-  would only reach 0.03. Resolution stays a consumer knob. Nothing in the graph-construction
-  or objective direction is worth another probe without a consumer whose data sits in the
-  regime where it moved.
+  would only reach 0.03. Prediction strength through the frozen tree never clears 0.7 and picks
+  the coarsest level. **What works: about fifty randomly labelled items pick the resolution
+  within 0.02 of the best in the sweep, better than knowing k** — that is the consumer advice
+  (README "How It Works"). Nothing in the graph-construction or objective direction is worth
+  another probe without a consumer whose data sits in the regime where it moved.
 
 ### Parked: sequence key / leaf Markov state model (2026-10-01)
 

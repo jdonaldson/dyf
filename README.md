@@ -283,6 +283,16 @@ partition on a point kNN graph), and a community that Louvain found as a non-con
 flattened into a convex cell. Use `LeafGroupingResult.centroids` to place new points by the same
 rule.
 
+**Resolution is a granularity choice, and the data does not make it for you.** Louvain's
+`resolution` sets how many communities come back (about 16 on 4-topic AG News and 28 on a
+123-type cell atlas at the default of 1). Three label-free criteria — map-equation codelength,
+edge-dropout stability, the Laplacian eigengap — all chose worse than the default on the
+seven-dataset bench, and the map equation itself only trades a coarse prior for a fine one.
+What works is a few labels: pick the resolution whose partition agrees best with about fifty
+randomly labelled items, and you land within 0.02 ARI of the best resolution in the sweep,
+closer than knowing the true number of classes would get you (`benchmarks/cut_audit_2026_11/`).
+Run `compute_louvain_hierarchy` for the sweep, label fifty items, choose the level that agrees.
+
 ## Performance
 
 Search runs on a Rust multiprobe kernel (`dyf-rs`, PyO3) — the default path for

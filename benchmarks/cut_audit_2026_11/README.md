@@ -21,5 +21,6 @@ Question answered, in order:
 | `leaf_graph_construction_test.py` | how much can any leaf graph buy? centroid cosine vs SNN vs spread-aware vs the full point kNN coarsened to leaves (ceiling) vs a 20k sample of it | ceiling adds +0.01…+0.06 at matched k; SNN/spread a wash; sampled counts fragment Louvain; the edges are not the bottleneck |
 | `map_equation_test.py` (needs `uv run --with infomap`) | is the map equation (Infomap) a better objective than modularity on the leaf graph? | it is a fine-k prior: 49–90 modules; +0.06 shipped ARI on the 120-type atlases (mostly k), −0.2…−0.3 on 10-class images and 4-class text; not a default |
 | `resolution_criterion_test.py` (needs `uv run --with infomap`) | can a label-free criterion pick Louvain's resolution? codelength minimum, edge-dropout stability, Laplacian eigengap | all worse than the default: mean regret 0.18 / 0.13 / 0.18 vs 0.08 for resolution 1; codelength is monotone, eigengap always says k 2–4 |
+| `resolution_labels_and_prediction_strength.py` | how many labels pick the resolution, and does prediction strength through the frozen tree work label-free? | 20 labels beat the default, 50 beat knowing k (regret 0.016 vs 0.034); prediction strength never clears 0.7 and picks the coarsest level |
 
 Run with the project venv: `.venv/bin/python benchmarks/cut_audit_2026_11/<script>.py`.
