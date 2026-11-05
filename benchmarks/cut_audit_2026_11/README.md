@@ -20,5 +20,6 @@ Question answered, in order:
 | `centred_hash_tree_test.py`, `centred_hash_tree_kmatched.py` | does centring the hash threshold, `sign(w·(x−μ))`, help? | purer leaves, block ARI +0.05 on three sets at matched k, shipped output within ±0.03; shapes unchanged; not worth the format change |
 | `leaf_graph_construction_test.py` | how much can any leaf graph buy? centroid cosine vs SNN vs spread-aware vs the full point kNN coarsened to leaves (ceiling) vs a 20k sample of it | ceiling adds +0.01…+0.06 at matched k; SNN/spread a wash; sampled counts fragment Louvain; the edges are not the bottleneck |
 | `map_equation_test.py` (needs `uv run --with infomap`) | is the map equation (Infomap) a better objective than modularity on the leaf graph? | it is a fine-k prior: 49–90 modules; +0.06 shipped ARI on the 120-type atlases (mostly k), −0.2…−0.3 on 10-class images and 4-class text; not a default |
+| `resolution_criterion_test.py` (needs `uv run --with infomap`) | can a label-free criterion pick Louvain's resolution? codelength minimum, edge-dropout stability, Laplacian eigengap | all worse than the default: mean regret 0.18 / 0.13 / 0.18 vs 0.08 for resolution 1; codelength is monotone, eigengap always says k 2–4 |
 
 Run with the project venv: `.venv/bin/python benchmarks/cut_audit_2026_11/<script>.py`.

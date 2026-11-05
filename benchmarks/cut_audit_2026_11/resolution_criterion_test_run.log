@@ -1,0 +1,613 @@
+warning: `VIRTUAL_ENV=/Users/jdonaldson/Projects/dyf/.direnv/python-3.12` does not match the project environment path `/Users/jdonaldson/Projects/dyf/.venv` and will be ignored; use `--active` to target the active environment instead
+OMP: Warning #179: Function Can't set size of /tmp file failed:
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+
+== mnist seed=42: leaves=3395 true k=10 eigengap k=3
+   sweep: r0.2:k6/0.46/cl9.93/st0.86  r0.3:k7/0.50/cl9.73/st0.77  r0.5:k9/0.62/cl9.45/st0.76  r0.7:k10/0.63/cl9.38/st0.70  r1.0:k13/0.58/cl9.19/st0.76  r1.5:k16/0.53/cl9.09/st0.67  r2.0:k21/0.42/cl8.96/st0.60  r3.0:k29/0.37/cl8.85/st0.60  r4.0:k37/0.32/cl8.79/st0.57  r6.0:k57/0.26/cl8.70/st0.55
+   default    res=1.0  k=  13 ARI=0.581 AMI=0.643 regret=0.044
+   best       res=0.7  k=  10 ARI=0.625 AMI=0.672 regret=0.000
+   k_oracle   res=0.7  k=  10 ARI=0.625 AMI=0.672 regret=0.000
+   codelength res=6.0  k=  57 ARI=0.259 AMI=0.525 regret=0.366
+   stability  res=0.2  k=   6 ARI=0.463 AMI=0.635 regret=0.162
+   eigengap   res=0.2  k=   6 ARI=0.463 AMI=0.635 regret=0.162
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+
+== mnist seed=1: leaves=3344 true k=10 eigengap k=3
+   sweep: r0.2:k5/0.43/cl10.04/st0.95  r0.3:k6/0.46/cl9.83/st0.91  r0.5:k9/0.58/cl9.40/st0.82  r0.7:k9/0.58/cl9.39/st0.76  r1.0:k12/0.57/cl9.22/st0.69  r1.5:k15/0.49/cl9.07/st0.71  r2.0:k20/0.43/cl8.99/st0.61  r3.0:k33/0.34/cl8.80/st0.54  r4.0:k39/0.31/cl8.77/st0.54  r6.0:k54/0.25/cl8.71/st0.54
+   default    res=1.0  k=  12 ARI=0.566 AMI=0.637 regret=0.017
+   best       res=0.5  k=   9 ARI=0.583 AMI=0.649 regret=0.000
+   k_oracle   res=0.5  k=   9 ARI=0.583 AMI=0.649 regret=0.000
+   codelength res=6.0  k=  54 ARI=0.250 AMI=0.525 regret=0.333
+   stability  res=0.2  k=   5 ARI=0.426 AMI=0.598 regret=0.156
+   eigengap   res=0.2  k=   5 ARI=0.426 AMI=0.598 regret=0.156
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+
+== mnist seed=2: leaves=3382 true k=10 eigengap k=3
+   sweep: r0.2:k6/0.47/cl9.91/st0.92  r0.3:k7/0.51/cl9.69/st0.91  r0.5:k9/0.63/cl9.40/st0.80  r0.7:k9/0.65/cl9.40/st0.83  r1.0:k11/0.61/cl9.29/st0.78  r1.5:k17/0.57/cl9.05/st0.66  r2.0:k21/0.51/cl8.98/st0.62  r3.0:k31/0.38/cl8.85/st0.57  r4.0:k40/0.32/cl8.76/st0.54  r6.0:k56/0.27/cl8.72/st0.54
+   default    res=1.0  k=  11 ARI=0.610 AMI=0.660 regret=0.038
+   best       res=0.7  k=   9 ARI=0.648 AMI=0.696 regret=0.000
+   k_oracle   res=0.5  k=   9 ARI=0.635 AMI=0.690 regret=0.013
+   codelength res=6.0  k=  56 ARI=0.267 AMI=0.528 regret=0.381
+   stability  res=0.2  k=   6 ARI=0.468 AMI=0.639 regret=0.180
+   eigengap   res=0.2  k=   6 ARI=0.468 AMI=0.639 regret=0.180
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+
+== fashion_mnist seed=42: leaves=2193 true k=10 eigengap k=2
+   sweep: r0.2:k4/0.32/cl9.52/st0.75  r0.3:k6/0.37/cl9.18/st0.63  r0.5:k8/0.39/cl8.87/st0.69  r0.7:k10/0.38/cl8.66/st0.68  r1.0:k14/0.38/cl8.42/st0.64  r1.5:k19/0.37/cl8.21/st0.64  r2.0:k21/0.37/cl8.18/st0.69  r3.0:k29/0.33/cl8.04/st0.66  r4.0:k35/0.28/cl8.01/st0.64  r6.0:k48/0.23/cl7.99/st0.57
+   default    res=1.0  k=  14 ARI=0.381 AMI=0.545 regret=0.011
+   best       res=0.5  k=   8 ARI=0.392 AMI=0.572 regret=0.000
+   k_oracle   res=0.7  k=  10 ARI=0.381 AMI=0.556 regret=0.010
+   codelength res=6.0  k=  48 ARI=0.235 AMI=0.505 regret=0.157
+   stability  res=0.2  k=   4 ARI=0.323 AMI=0.541 regret=0.069
+   eigengap   res=0.2  k=   4 ARI=0.323 AMI=0.541 regret=0.069
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+
+== fashion_mnist seed=1: leaves=2192 true k=10 eigengap k=2
+   sweep: r0.2:k5/0.39/cl9.26/st0.61  r0.3:k6/0.37/cl9.10/st0.70  r0.5:k9/0.45/cl8.67/st0.74  r0.7:k9/0.45/cl8.67/st0.76  r1.0:k13/0.41/cl8.47/st0.70  r1.5:k15/0.43/cl8.35/st0.67  r2.0:k21/0.36/cl8.21/st0.66  r3.0:k28/0.35/cl8.11/st0.59  r4.0:k35/0.28/cl8.07/st0.61  r6.0:k46/0.25/cl8.01/st0.60
+   default    res=1.0  k=  13 ARI=0.410 AMI=0.582 regret=0.044
+   best       res=0.5  k=   9 ARI=0.454 AMI=0.594 regret=0.000
+   k_oracle   res=0.5  k=   9 ARI=0.454 AMI=0.594 regret=0.000
+   codelength res=6.0  k=  46 ARI=0.247 AMI=0.504 regret=0.206
+   stability  res=0.7  k=   9 ARI=0.447 AMI=0.591 regret=0.007
+   eigengap   res=0.2  k=   5 ARI=0.394 AMI=0.589 regret=0.059
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+
+== fashion_mnist seed=2: leaves=2182 true k=10 eigengap k=2
+   sweep: r0.2:k4/0.34/cl9.41/st0.73  r0.3:k5/0.41/cl9.20/st0.75  r0.5:k8/0.47/cl8.76/st0.74  r0.7:k10/0.45/cl8.56/st0.73  r1.0:k12/0.42/cl8.42/st0.67  r1.5:k16/0.39/cl8.24/st0.69  r2.0:k21/0.36/cl8.10/st0.66  r3.0:k27/0.34/cl8.01/st0.65  r4.0:k35/0.31/cl7.99/st0.60  r6.0:k50/0.25/cl7.95/st0.58
+   default    res=1.0  k=  12 ARI=0.424 AMI=0.579 regret=0.041
+   best       res=0.5  k=   8 ARI=0.465 AMI=0.620 regret=0.000
+   k_oracle   res=0.7  k=  10 ARI=0.454 AMI=0.591 regret=0.011
+   codelength res=6.0  k=  50 ARI=0.255 AMI=0.509 regret=0.211
+   stability  res=0.3  k=   5 ARI=0.409 AMI=0.614 regret=0.057
+   eigengap   res=0.2  k=   4 ARI=0.344 AMI=0.561 regret=0.122
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+
+== cmu_mocap seed=42: leaves=1478 true k=25 eigengap k=2
+   sweep: r0.2:k9/0.11/cl8.19/st0.74  r0.3:k12/0.09/cl7.86/st0.76  r0.5:k16/0.16/cl7.49/st0.73  r0.7:k19/0.19/cl7.27/st0.72  r1.0:k22/0.18/cl7.14/st0.75  r1.5:k27/0.15/cl6.94/st0.79  r2.0:k29/0.15/cl6.89/st0.79  r3.0:k32/0.12/cl6.83/st0.75  r4.0:k40/0.12/cl6.76/st0.77  r6.0:k52/0.09/cl6.71/st0.76
+   default    res=1.0  k=  22 ARI=0.176 AMI=0.391 regret=0.010
+   best       res=0.7  k=  19 ARI=0.185 AMI=0.378 regret=0.000
+   k_oracle   res=1.5  k=  27 ARI=0.152 AMI=0.400 regret=0.033
+   codelength res=6.0  k=  52 ARI=0.088 AMI=0.407 regret=0.098
+   stability  res=2.0  k=  29 ARI=0.150 AMI=0.401 regret=0.036
+   eigengap   res=0.2  k=   9 ARI=0.110 AMI=0.251 regret=0.075
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+
+== cmu_mocap seed=1: leaves=1563 true k=25 eigengap k=4
+   sweep: r0.2:k8/0.10/cl8.39/st0.71  r0.3:k12/0.12/cl8.00/st0.70  r0.5:k14/0.19/cl7.74/st0.71  r0.7:k16/0.18/cl7.59/st0.72  r1.0:k22/0.20/cl7.25/st0.69  r1.5:k29/0.16/cl7.03/st0.68  r2.0:k35/0.12/cl6.91/st0.74  r3.0:k40/0.12/cl6.81/st0.72  r4.0:k47/0.11/cl6.75/st0.74  r6.0:k58/0.10/cl6.69/st0.78
+   default    res=1.0  k=  22 ARI=0.201 AMI=0.354 regret=0.000
+   best       res=1.0  k=  22 ARI=0.201 AMI=0.354 regret=0.000
+   k_oracle   res=1.0  k=  22 ARI=0.201 AMI=0.354 regret=0.000
+   codelength res=6.0  k=  58 ARI=0.100 AMI=0.402 regret=0.101
+   stability  res=6.0  k=  58 ARI=0.100 AMI=0.402 regret=0.101
+   eigengap   res=0.2  k=   8 ARI=0.103 AMI=0.261 regret=0.097
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+
+== cmu_mocap seed=2: leaves=1628 true k=25 eigengap k=6
+   sweep: r0.2:k7/0.13/cl8.60/st0.77  r0.3:k8/0.18/cl8.22/st0.76  r0.5:k14/0.17/cl7.73/st0.74  r0.7:k17/0.18/cl7.53/st0.77  r1.0:k22/0.14/cl7.26/st0.70  r1.5:k26/0.14/cl7.12/st0.75  r2.0:k32/0.12/cl6.96/st0.75  r3.0:k40/0.12/cl6.82/st0.76  r4.0:k43/0.13/cl6.78/st0.79  r6.0:k55/0.12/cl6.73/st0.80
+   default    res=1.0  k=  22 ARI=0.142 AMI=0.366 regret=0.041
+   best       res=0.7  k=  17 ARI=0.184 AMI=0.347 regret=0.000
+   k_oracle   res=1.5  k=  26 ARI=0.143 AMI=0.373 regret=0.040
+   codelength res=6.0  k=  55 ARI=0.117 AMI=0.415 regret=0.066
+   stability  res=6.0  k=  55 ARI=0.117 AMI=0.415 regret=0.066
+   eigengap   res=0.2  k=   7 ARI=0.127 AMI=0.293 regret=0.056
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+
+== ag_news seed=42: leaves=3274 true k=4 eigengap k=2
+   sweep: r0.2:k4/0.49/cl10.19/st0.74  r0.3:k5/0.42/cl10.02/st0.72  r0.5:k10/0.35/cl9.53/st0.62  r0.7:k12/0.36/cl9.40/st0.60  r1.0:k15/0.28/cl9.18/st0.60  r1.5:k24/0.20/cl8.86/st0.61  r2.0:k29/0.16/cl8.75/st0.60  r3.0:k41/0.13/cl8.55/st0.65  r4.0:k54/0.12/cl8.43/st0.65  r6.0:k67/0.08/cl8.38/st0.67
+   default    res=1.0  k=  15 ARI=0.279 AMI=0.387 regret=0.212
+   best       res=0.2  k=   4 ARI=0.491 AMI=0.498 regret=0.000
+   k_oracle   res=0.2  k=   4 ARI=0.491 AMI=0.498 regret=0.000
+   codelength res=6.0  k=  67 ARI=0.084 AMI=0.312 regret=0.407
+   stability  res=0.2  k=   4 ARI=0.491 AMI=0.498 regret=0.000
+   eigengap   res=0.2  k=   4 ARI=0.491 AMI=0.498 regret=0.000
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+
+== ag_news seed=1: leaves=3202 true k=4 eigengap k=2
+   sweep: r0.2:k3/0.49/cl10.45/st0.57  r0.3:k5/0.57/cl9.91/st0.84  r0.5:k7/0.48/cl9.65/st0.68  r0.7:k10/0.41/cl9.43/st0.64  r1.0:k17/0.30/cl9.06/st0.64  r1.5:k23/0.21/cl8.87/st0.58  r2.0:k30/0.16/cl8.68/st0.63  r3.0:k38/0.14/cl8.56/st0.66  r4.0:k53/0.11/cl8.42/st0.64  r6.0:k68/0.09/cl8.34/st0.68
+   default    res=1.0  k=  17 ARI=0.296 AMI=0.407 regret=0.276
+   best       res=0.3  k=   5 ARI=0.572 AMI=0.536 regret=0.000
+   k_oracle   res=0.2  k=   3 ARI=0.490 AMI=0.543 regret=0.082
+   codelength res=6.0  k=  68 ARI=0.089 AMI=0.313 regret=0.484
+   stability  res=0.3  k=   5 ARI=0.572 AMI=0.536 regret=0.000
+   eigengap   res=0.2  k=   3 ARI=0.490 AMI=0.543 regret=0.082
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+
+== ag_news seed=2: leaves=3242 true k=4 eigengap k=2
+   sweep: r0.2:k3/0.46/cl10.43/st0.80  r0.3:k5/0.53/cl9.96/st0.74  r0.5:k6/0.48/cl9.76/st0.69  r0.7:k9/0.41/cl9.51/st0.71  r1.0:k16/0.28/cl9.09/st0.67  r1.5:k23/0.23/cl8.86/st0.65  r2.0:k33/0.17/cl8.70/st0.62  r3.0:k42/0.12/cl8.54/st0.63  r4.0:k52/0.11/cl8.45/st0.64  r6.0:k65/0.10/cl8.40/st0.65
+   default    res=1.0  k=  16 ARI=0.285 AMI=0.404 regret=0.244
+   best       res=0.3  k=   5 ARI=0.529 AMI=0.499 regret=0.000
+   k_oracle   res=0.2  k=   3 ARI=0.460 AMI=0.482 regret=0.069
+   codelength res=6.0  k=  65 ARI=0.095 AMI=0.318 regret=0.434
+   stability  res=0.2  k=   3 ARI=0.460 AMI=0.482 regret=0.069
+   eigengap   res=0.2  k=   3 ARI=0.460 AMI=0.482 regret=0.069
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+
+== tms_facs seed=42: leaves=1534 true k=120 eigengap k=11
+   sweep: r0.2:k15/0.45/cl7.20/st0.78  r0.3:k16/0.44/cl7.12/st0.91  r0.5:k22/0.53/cl6.69/st0.89  r0.7:k22/0.53/cl6.69/st0.94  r1.0:k24/0.55/cl6.64/st0.94  r1.5:k27/0.57/cl6.55/st0.91  r2.0:k30/0.60/cl6.45/st0.93  r3.0:k36/0.62/cl6.34/st0.91  r4.0:k41/0.62/cl6.29/st0.88  r6.0:k46/0.52/cl6.31/st0.85
+   default    res=1.0  k=  24 ARI=0.553 AMI=0.754 regret=0.072
+   best       res=3.0  k=  36 ARI=0.625 AMI=0.778 regret=0.000
+   k_oracle   res=6.0  k=  46 ARI=0.521 AMI=0.769 regret=0.104
+   codelength res=4.0  k=  41 ARI=0.622 AMI=0.778 regret=0.003
+   stability  res=1.0  k=  24 ARI=0.553 AMI=0.754 regret=0.072
+   eigengap   res=0.2  k=  15 ARI=0.453 AMI=0.699 regret=0.172
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+
+== tms_facs seed=1: leaves=1800 true k=120 eigengap k=2
+   sweep: r0.2:k12/0.34/cl7.76/st0.83  r0.3:k16/0.48/cl7.29/st0.88  r0.5:k18/0.50/cl7.16/st0.90  r0.7:k19/0.53/cl7.09/st0.92  r1.0:k23/0.55/cl6.95/st0.91  r1.5:k27/0.58/cl6.79/st0.90  r2.0:k32/0.60/cl6.67/st0.88  r3.0:k37/0.51/cl6.59/st0.86  r4.0:k44/0.53/cl6.52/st0.83  r6.0:k53/0.50/cl6.48/st0.81
+   default    res=1.0  k=  23 ARI=0.548 AMI=0.744 regret=0.053
+   best       res=2.0  k=  32 ARI=0.601 AMI=0.771 regret=0.000
+   k_oracle   res=6.0  k=  53 ARI=0.503 AMI=0.765 regret=0.098
+   codelength res=6.0  k=  53 ARI=0.503 AMI=0.765 regret=0.098
+   stability  res=0.7  k=  19 ARI=0.532 AMI=0.734 regret=0.069
+   eigengap   res=0.2  k=  12 ARI=0.341 AMI=0.650 regret=0.260
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+
+== tms_facs seed=2: leaves=1623 true k=120 eigengap k=2
+   sweep: r0.2:k11/0.35/cl7.70/st0.85  r0.3:k13/0.42/cl7.48/st0.72  r0.5:k20/0.52/cl6.97/st0.87  r0.7:k23/0.53/cl6.83/st0.87  r1.0:k25/0.55/cl6.73/st0.93  r1.5:k29/0.57/cl6.62/st0.90  r2.0:k32/0.60/cl6.54/st0.90  r3.0:k39/0.65/cl6.44/st0.90  r4.0:k42/0.55/cl6.42/st0.85  r6.0:k50/0.58/cl6.37/st0.85
+   default    res=1.0  k=  25 ARI=0.555 AMI=0.752 regret=0.093
+   best       res=3.0  k=  39 ARI=0.648 AMI=0.778 regret=0.000
+   k_oracle   res=6.0  k=  50 ARI=0.580 AMI=0.781 regret=0.068
+   codelength res=6.0  k=  50 ARI=0.580 AMI=0.781 regret=0.068
+   stability  res=1.0  k=  25 ARI=0.555 AMI=0.752 regret=0.093
+   eigengap   res=0.2  k=  11 ARI=0.346 AMI=0.639 regret=0.302
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+
+== tms_droplet seed=42: leaves=1768 true k=123 eigengap k=4
+   sweep: r0.2:k12/0.38/cl7.63/st0.82  r0.3:k16/0.41/cl7.37/st0.85  r0.5:k20/0.42/cl7.16/st0.85  r0.7:k25/0.47/cl6.87/st0.82  r1.0:k29/0.47/cl6.67/st0.84  r1.5:k31/0.50/cl6.58/st0.88  r2.0:k33/0.51/cl6.54/st0.89  r3.0:k36/0.50/cl6.47/st0.89  r4.0:k42/0.58/cl6.40/st0.84  r6.0:k54/0.60/cl6.29/st0.86
+   default    res=1.0  k=  29 ARI=0.467 AMI=0.726 regret=0.133
+   best       res=6.0  k=  54 ARI=0.600 AMI=0.757 regret=0.000
+   k_oracle   res=6.0  k=  54 ARI=0.600 AMI=0.757 regret=0.000
+   codelength res=6.0  k=  54 ARI=0.600 AMI=0.757 regret=0.000
+   stability  res=3.0  k=  36 ARI=0.504 AMI=0.735 regret=0.096
+   eigengap   res=0.2  k=  12 ARI=0.384 AMI=0.666 regret=0.216
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+
+== tms_droplet seed=1: leaves=1748 true k=123 eigengap k=3
+   sweep: r0.2:k13/0.33/cl7.72/st0.91  r0.3:k16/0.43/cl7.36/st0.76  r0.5:k20/0.45/cl7.14/st0.83  r0.7:k24/0.50/cl6.88/st0.81  r1.0:k29/0.54/cl6.67/st0.84  r1.5:k33/0.55/cl6.54/st0.84  r2.0:k35/0.59/cl6.48/st0.88  r3.0:k41/0.60/cl6.39/st0.91  r4.0:k46/0.62/cl6.34/st0.85  r6.0:k57/0.61/cl6.27/st0.82
+   default    res=1.0  k=  29 ARI=0.536 AMI=0.741 regret=0.085
+   best       res=4.0  k=  46 ARI=0.621 AMI=0.762 regret=0.000
+   k_oracle   res=6.0  k=  57 ARI=0.612 AMI=0.754 regret=0.009
+   codelength res=6.0  k=  57 ARI=0.612 AMI=0.754 regret=0.009
+   stability  res=0.2  k=  13 ARI=0.335 AMI=0.666 regret=0.286
+   eigengap   res=0.2  k=  13 ARI=0.335 AMI=0.666 regret=0.286
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+
+== tms_droplet seed=2: leaves=1698 true k=123 eigengap k=3
+   sweep: r0.2:k10/0.32/cl7.91/st0.77  r0.3:k11/0.35/cl7.83/st0.78  r0.5:k19/0.46/cl7.17/st0.80  r0.7:k21/0.48/cl7.04/st0.76  r1.0:k26/0.52/cl6.83/st0.80  r1.5:k30/0.56/cl6.66/st0.84  r2.0:k35/0.58/cl6.55/st0.84  r3.0:k37/0.59/cl6.50/st0.82  r4.0:k44/0.60/cl6.40/st0.80  r6.0:k55/0.63/cl6.32/st0.80
+   default    res=1.0  k=  26 ARI=0.521 AMI=0.730 regret=0.105
+   best       res=6.0  k=  55 ARI=0.626 AMI=0.761 regret=0.000
+   k_oracle   res=6.0  k=  55 ARI=0.626 AMI=0.761 regret=0.000
+   codelength res=6.0  k=  55 ARI=0.626 AMI=0.761 regret=0.000
+   stability  res=2.0  k=  35 ARI=0.577 AMI=0.752 regret=0.048
+   eigengap   res=0.2  k=  10 ARI=0.323 AMI=0.620 regret=0.303
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+
+== brain_1m seed=42: leaves=3691 true k=35 eigengap k=2
+   sweep: r0.2:k7/0.15/cl9.97/st0.85  r0.3:k9/0.27/cl9.52/st0.66  r0.5:k13/0.39/cl9.14/st0.72  r0.7:k17/0.43/cl8.81/st0.57  r1.0:k19/0.49/cl8.69/st0.66  r1.5:k24/0.46/cl8.53/st0.64  r2.0:k30/0.42/cl8.38/st0.61  r3.0:k43/0.41/cl8.17/st0.62  r4.0:k50/0.42/cl8.11/st0.68  r6.0:k65/0.42/cl8.03/st0.67
+   default    res=1.0  k=  19 ARI=0.491 AMI=0.670 regret=0.000
+   best       res=1.0  k=  19 ARI=0.491 AMI=0.670 regret=0.000
+   k_oracle   res=2.0  k=  30 ARI=0.415 AMI=0.652 regret=0.076
+   codelength res=6.0  k=  65 ARI=0.421 AMI=0.671 regret=0.070
+   stability  res=0.2  k=   7 ARI=0.150 AMI=0.470 regret=0.341
+   eigengap   res=0.2  k=   7 ARI=0.150 AMI=0.470 regret=0.341
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+
+== brain_1m seed=1: leaves=3638 true k=35 eigengap k=2
+   sweep: r0.2:k7/0.15/cl9.98/st0.82  r0.3:k8/0.27/cl9.67/st0.58  r0.5:k13/0.36/cl9.13/st0.60  r0.7:k19/0.43/cl8.71/st0.63  r1.0:k21/0.45/cl8.58/st0.67  r1.5:k26/0.49/cl8.44/st0.66  r2.0:k32/0.48/cl8.28/st0.65  r3.0:k41/0.48/cl8.12/st0.64  r4.0:k47/0.55/cl8.07/st0.67  r6.0:k66/0.39/cl7.96/st0.68
+   default    res=1.0  k=  21 ARI=0.448 AMI=0.658 regret=0.106
+   best       res=4.0  k=  47 ARI=0.554 AMI=0.690 regret=0.000
+   k_oracle   res=2.0  k=  32 ARI=0.480 AMI=0.664 regret=0.074
+   codelength res=6.0  k=  66 ARI=0.394 AMI=0.661 regret=0.160
+   stability  res=0.2  k=   7 ARI=0.148 AMI=0.466 regret=0.406
+   eigengap   res=0.2  k=   7 ARI=0.148 AMI=0.466 regret=0.406
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+/Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test.py:72: LegacySurfaceWarning: Infomap.codelength is deprecated and leaves in 3.0; read result.codelength off the Result returned by im.run() instead.
+  return float(im.codelength)
+
+== brain_1m seed=2: leaves=3616 true k=35 eigengap k=3
+   sweep: r0.2:k8/0.17/cl9.73/st0.80  r0.3:k10/0.18/cl9.48/st0.69  r0.5:k14/0.38/cl9.13/st0.71  r0.7:k18/0.43/cl8.79/st0.69  r1.0:k20/0.46/cl8.69/st0.64  r1.5:k27/0.54/cl8.42/st0.60  r2.0:k33/0.52/cl8.29/st0.61  r3.0:k41/0.48/cl8.15/st0.64  r4.0:k52/0.49/cl8.04/st0.64  r6.0:k66/0.44/cl7.96/st0.68
+   default    res=1.0  k=  20 ARI=0.459 AMI=0.664 regret=0.083
+   best       res=1.5  k=  27 ARI=0.543 AMI=0.686 regret=0.000
+   k_oracle   res=2.0  k=  33 ARI=0.521 AMI=0.686 regret=0.022
+   codelength res=6.0  k=  66 ARI=0.441 AMI=0.676 regret=0.101
+   stability  res=0.2  k=   8 ARI=0.168 AMI=0.490 regret=0.374
+   eigengap   res=0.2  k=   8 ARI=0.168 AMI=0.490 regret=0.374
+
+wrote /Volumes/Models/dyf_bench_2026-11-04/resolution_criterion_test_results.json

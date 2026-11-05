@@ -101,9 +101,12 @@ coming back. Numbers are in `KNOWN_ISSUES.md` #9, #11, #14; the conclusions:
   labels: 0.1–0.7 ARI, mostly k) and the atoms' purity (leaf oracle 0.72 vs Leiden-on-points
   0.885 on MNIST). The map equation (Infomap) was tried as the objective: it is a *fine-k*
   prior, 49–90 modules, +0.06 on the 120-type atlases (mostly the k; Louvain at resolution 2–3
-  gets most of it) and −0.2 to −0.3 on 10-class images and 4-class text — not a default. The
-  open problem is a label-free resolution criterion; nothing in the graph-construction
-  direction is worth another probe without a consumer whose data sits in the regime where it moved.
+  gets most of it) and −0.2 to −0.3 on 10-class images and 4-class text — not a default. Three
+  label-free resolution criteria (map-equation codelength, edge-dropout stability, Laplacian
+  eigengap) all lose to resolution 1: mean regret 0.18 / 0.13 / 0.18 vs 0.08, and knowing k
+  would only reach 0.03. Resolution stays a consumer knob. Nothing in the graph-construction
+  or objective direction is worth another probe without a consumer whose data sits in the
+  regime where it moved.
 
 ### Parked: sequence key / leaf Markov state model (2026-10-01)
 
