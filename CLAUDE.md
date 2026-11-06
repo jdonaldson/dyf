@@ -170,7 +170,11 @@ coming back. Numbers are in `KNOWN_ISSUES.md` #9, #11, #14; the conclusions:
   global-leaf shape restricted to the community 0.36, and adding shape to the free numbers
   lowers them; the community-level profile reads differently (brain's hub becomes one coarse
   axis then noise) but ranks nothing better. Shape stays a description; reliability comes from
-  radius and φ. Nothing in the graph-construction or objective
+  radius and φ. **The shape description then failed the human read** (2026-11-06): seven
+  two-line label-free summaries, one per bench set, were read cold and did not affect any
+  decision — so there is no `describe`-style shape read-out and no shape field in dyfviz. What
+  shipped from the shape arc is the free pair that did carry a decision: `community_cohesion`
+  (documented) and `community_inflow` (added), as ranks within an index. Nothing in the graph-construction or objective
   direction is worth another probe without a consumer whose data sits in the regime where it moved.
 
 ### Parked: sequence key / leaf Markov state model (2026-10-01)
