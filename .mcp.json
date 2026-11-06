@@ -1,13 +1,3 @@
 {
-  "mcpServers": {
-    "rog-browser": {
-      "command": "python",
-      "args": [
-        "/Users/jdonaldson/Projects/dyf/demo/rog_mcp.py",
-        "/Users/jdonaldson/Projects/dyf/demo/gudid_50k_louvain_r4.dyf",
-        "--ws-url",
-        "ws://localhost:8766/ws"
-      ]
-    }
-  }
+  "mcpServers": {}
 }

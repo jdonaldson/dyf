@@ -15,8 +15,8 @@ import time
 from pathlib import Path
 
 import numpy as np
-import polars as pl
 import plotly.graph_objects as go
+import polars as pl
 import umap
 from sklearn.cluster import Birch
 from sklearn.neighbors import NearestNeighbors
@@ -33,6 +33,7 @@ def load_and_dedup(parquet_path, sample=None):
     embeddings = np.array(df["embedding"].to_list(), dtype=np.float32)
 
     from dyf_rs import DensityClassifier
+
     from dyf.chunks import deduplicate_chunks
 
     clf = DensityClassifier(embedding_dim=embeddings.shape[1], num_bits=12, seed=42)
@@ -57,8 +58,7 @@ def suggest_n_neighbors(embeddings, num_bits=12, min_k=15, max_k=100):
     mean_size = bucket_sizes.mean()
     suggested = int(np.clip(mean_size, min_k, max_k))
     n_buckets = len(set(clf.get_bucket_ids()))
-    print(f"  DYF: {n_buckets} buckets, mean_size={mean_size:.0f}, "
-          f"suggested n_neighbors={suggested}")
+    print(f"  DYF: {n_buckets} buckets, mean_size={mean_size:.0f}, suggested n_neighbors={suggested}")
     return suggested
 
 
@@ -79,7 +79,7 @@ def run_umap(embeddings, n_neighbors=15):
     nan_mask = np.isnan(coords).any(axis=1)
     if nan_mask.any():
         print(f"    Replacing {nan_mask.sum()} NaN coords")
-        nn = NearestNeighbors(n_neighbors=1, metric='cosine')
+        nn = NearestNeighbors(n_neighbors=1, metric="cosine")
         nn.fit(embeddings[~nan_mask])
         _, idx = nn.kneighbors(embeddings[nan_mask])
         coords[nan_mask] = coords[~nan_mask][idx.ravel()]
@@ -96,7 +96,7 @@ def run_umap(embeddings, n_neighbors=15):
 def fit_birch(data, target_k, max_iters=10):
     """Fit BIRCH with binary search on threshold to get ~target_k subclusters."""
     lo, hi = 1e-4, float(np.linalg.norm(data.max(axis=0) - data.min(axis=0)))
-    best_birch, best_diff = None, float('inf')
+    best_birch, best_diff = None, float("inf")
 
     for _ in range(max_iters):
         mid = (lo + hi) / 2
@@ -127,13 +127,13 @@ def golden_ratio_colors(labels):
     for lbl in labels:
         hue = label_to_hue[lbl]
         r, g, b = colorsys.hls_to_rgb(hue, 0.45, 0.6)
-        colors.append(f"#{int(r*255):02x}{int(g*255):02x}{int(b*255):02x}")
+        colors.append(f"#{int(r * 255):02x}{int(g * 255):02x}{int(b * 255):02x}")
     return colors
 
 
 def build_figure(coords, titles, labels, colors, title_str):
     """Build dark-theme Plotly scatter figure."""
-    n_clusters = len(set(labels))
+    len(set(labels))
 
     # Compute cluster centroids and names
     centroids = {}
@@ -147,46 +147,52 @@ def build_figure(coords, titles, labels, colors, title_str):
         names[cid] = titles[pts[np.argmin(dists)]]
 
     fig = go.Figure()
-    fig.add_trace(go.Scattergl(
-        x=coords[:, 0], y=coords[:, 1],
-        mode="markers",
-        marker=dict(size=4, color=colors, opacity=0.7),
-        text=[f"{titles[i]}<br>Cluster {labels[i]}" for i in range(len(titles))],
-        hoverinfo="text",
-        showlegend=False,
-    ))
+    fig.add_trace(
+        go.Scattergl(
+            x=coords[:, 0],
+            y=coords[:, 1],
+            mode="markers",
+            marker=dict(size=4, color=colors, opacity=0.7),
+            text=[f"{titles[i]}<br>Cluster {labels[i]}" for i in range(len(titles))],
+            hoverinfo="text",
+            showlegend=False,
+        )
+    )
 
     for cid, name in names.items():
         cx, cy = centroids[cid]
         fig.add_annotation(
-            x=cx, y=cy, text=name[:25], showarrow=False,
+            x=cx,
+            y=cy,
+            text=name[:25],
+            showarrow=False,
             font=dict(size=9, color="white", family="Arial Black"),
             bgcolor="rgba(40,40,40,0.85)",
             bordercolor="rgba(100,100,100,0.6)",
-            borderwidth=1, borderpad=3,
+            borderwidth=1,
+            borderpad=3,
         )
 
     fig.update_layout(
         title=title_str,
-        plot_bgcolor="#2a2a2a", paper_bgcolor="#2a2a2a",
+        plot_bgcolor="#2a2a2a",
+        paper_bgcolor="#2a2a2a",
         font=dict(color="white"),
         xaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
-        yaxis=dict(showgrid=False, showticklabels=False, zeroline=False,
-                   scaleanchor="x", scaleratio=1),
+        yaxis=dict(showgrid=False, showticklabels=False, zeroline=False, scaleanchor="x", scaleratio=1),
         dragmode="pan",
         margin=dict(l=20, r=20, t=60, b=20),
-        width=1400, height=1000,
+        width=1400,
+        height=1000,
     )
     return fig
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Compare standard vs DYF-parameterized UMAP + BIRCH")
+    parser = argparse.ArgumentParser(description="Compare standard vs DYF-parameterized UMAP + BIRCH")
     parser.add_argument("parquet_path", help="Path to embeddings parquet")
     parser.add_argument("--sample", type=int, default=8000)
-    parser.add_argument("--n-clusters", type=int, default=25,
-                        help="Target number of BIRCH clusters")
+    parser.add_argument("--n-clusters", type=int, default=25, help="Target number of BIRCH clusters")
     args = parser.parse_args()
 
     outdir = Path(args.parquet_path).parent
@@ -222,11 +228,17 @@ def main():
     colors_dyf = golden_ratio_colors(labels_dyf)
 
     fig_std = build_figure(
-        coords_std, titles_arr, labels_std, colors_std,
+        coords_std,
+        titles_arr,
+        labels_std,
+        colors_std,
         f"Standard UMAP (k=15) + BIRCH — {n_std} clusters, {n} points",
     )
     fig_dyf = build_figure(
-        coords_dyf, titles_arr, labels_dyf, colors_dyf,
+        coords_dyf,
+        titles_arr,
+        labels_dyf,
+        colors_dyf,
         f"DYF UMAP (k={dyf_k}) + BIRCH — {n_dyf} clusters, {n} points",
     )
 
@@ -239,6 +251,7 @@ def main():
     print(f"Wrote {path_dyf}")
 
     import subprocess
+
     subprocess.run(["open", path_std])
     subprocess.run(["open", path_dyf])
 

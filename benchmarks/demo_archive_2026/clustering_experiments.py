@@ -7,10 +7,11 @@ from DensityClassifier, tracking Gini coefficient and average similarity.
 Goal: Find clustering that avoids "big blob in center" problem.
 """
 
+from collections import Counter, defaultdict
+from pathlib import Path
+
 import numpy as np
 import polars as pl
-from collections import defaultdict, Counter
-from pathlib import Path
 
 
 def gini_coefficient(sizes: list) -> float:
@@ -19,8 +20,8 @@ def gini_coefficient(sizes: list) -> float:
     n = len(sizes)
     if n == 0 or sizes.sum() == 0:
         return 0.0
-    cumsum = np.cumsum(sizes)
-    return (2 * np.sum((np.arange(1, n+1) * sizes)) - (n + 1) * sizes.sum()) / (n * sizes.sum())
+    np.cumsum(sizes)
+    return (2 * np.sum(np.arange(1, n + 1) * sizes) - (n + 1) * sizes.sum()) / (n * sizes.sum())
 
 
 def avg_within_cluster_similarity(embeddings: np.ndarray, cluster_assignments: np.ndarray) -> float:
@@ -70,9 +71,9 @@ def evaluate_clustering(name: str, embeddings: np.ndarray, assignments: np.ndarr
     avg_sim = avg_within_cluster_similarity(embeddings, assignments)
     largest_frac = largest_cluster_fraction(assignments)
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"{name}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"  Clusters: {len(unique)}")
     print(f"  Gini coefficient: {gini:.3f}")
     print(f"  Avg within-cluster similarity: {avg_sim:.3f}")
@@ -81,17 +82,17 @@ def evaluate_clustering(name: str, embeddings: np.ndarray, assignments: np.ndarr
     print(f"  Median cluster size: {int(np.median(sizes)):,}")
 
     # Size distribution
-    print(f"  Size distribution:")
+    print("  Size distribution:")
     for p in [10, 25, 50, 75, 90]:
         print(f"    {p}th percentile: {int(np.percentile(sizes, p)):,}")
 
     return {
-        'name': name,
-        'n_clusters': len(unique),
-        'gini': gini,
-        'avg_sim': avg_sim,
-        'largest_frac': largest_frac,
-        'sizes': sizes
+        "name": name,
+        "n_clusters": len(unique),
+        "gini": gini,
+        "avg_sim": avg_sim,
+        "largest_frac": largest_frac,
+        "sizes": sizes,
     }
 
 
@@ -138,7 +139,8 @@ def experiment_bridge_communities(embeddings, classifier, bridge_analysis, min_c
     # Find communities using Louvain
     try:
         from networkx.algorithms.community import louvain_communities
-        communities = louvain_communities(G, weight='weight', seed=42)
+
+        communities = louvain_communities(G, weight="weight", seed=42)
     except ImportError:
         # Fallback to connected components
         communities = list(nx.connected_components(G))
@@ -173,7 +175,7 @@ def experiment_bucket_agglomerative(embeddings, classifier, n_clusters=15):
     centroids = np.array([embeddings[bucket_to_indices[b]].mean(axis=0) for b in bucket_list])
 
     # Cluster centroids
-    agg = AgglomerativeClustering(n_clusters=min(n_clusters, len(bucket_list)), metric='cosine', linkage='average')
+    agg = AgglomerativeClustering(n_clusters=min(n_clusters, len(bucket_list)), metric="cosine", linkage="average")
     bucket_clusters = agg.fit_predict(centroids)
 
     # Map buckets to clusters
@@ -247,7 +249,7 @@ def experiment_stability_weighted(embeddings, classifier, n_clusters=15):
 def experiment_density_hierarchical(embeddings, classifier, bridge_analysis, target_clusters=15):
     """Hierarchically merge buckets based on bridge density."""
     bucket_ids = classifier.get_bucket_ids()
-    bucket_sizes = classifier.get_bucket_sizes()
+    classifier.get_bucket_sizes()
 
     # Start with each bucket as its own cluster
     bucket_to_indices = defaultdict(list)
@@ -258,7 +260,7 @@ def experiment_density_hierarchical(embeddings, classifier, bridge_analysis, tar
     top_pairs = bridge_analysis.top_connected_pairs(1000)
 
     # Union-find for merging
-    parent = {b: b for b in bucket_to_indices.keys()}
+    parent = {b: b for b in bucket_to_indices}
 
     def find(x):
         if parent[x] != x:
@@ -271,18 +273,18 @@ def experiment_density_hierarchical(embeddings, classifier, bridge_analysis, tar
             parent[px] = py
 
     # Merge buckets with strong bridge connections
-    n_buckets = len(bucket_to_indices)
+    len(bucket_to_indices)
     for b1, b2, count in top_pairs:
         if b1 in parent and b2 in parent:
             # Only merge if it reduces cluster count toward target
-            current_clusters = len(set(find(b) for b in parent.keys()))
+            current_clusters = len(set(find(b) for b in parent))
             if current_clusters > target_clusters:
                 union(b1, b2)
 
     # Map to final cluster IDs
     root_to_cluster = {}
     cluster_id = 0
-    for b in parent.keys():
+    for b in parent:
         root = find(b)
         if root not in root_to_cluster:
             root_to_cluster[root] = cluster_id
@@ -313,7 +315,7 @@ def experiment_centroid_similarity_split(embeddings, classifier, n_clusters=15):
     cluster_id = 0
 
     # Top buckets: split into core (high sim) and edge (low sim)
-    for bid, indices in sorted_buckets[:n_clusters // 2]:
+    for bid, indices in sorted_buckets[: n_clusters // 2]:
         indices = np.array(indices)
         sims = centroid_sims[indices]
 
@@ -386,10 +388,10 @@ def experiment_bridge_merge_controlled(embeddings, classifier, bridge_analysis, 
     sorted_comps = sorted(comp_sizes.items(), key=lambda x: -x[1])
 
     # Take top target_clusters-1, merge rest
-    top_comps = set(c for c, _ in sorted_comps[:target_clusters - 1])
+    top_comps = set(c for c, _ in sorted_comps[: target_clusters - 1])
 
     assignments = np.zeros(len(bucket_ids), dtype=np.int32)
-    comp_to_cluster = {c: i for i, (c, _) in enumerate(sorted_comps[:target_clusters - 1])}
+    comp_to_cluster = {c: i for i, (c, _) in enumerate(sorted_comps[: target_clusters - 1])}
 
     for i, bid in enumerate(bucket_ids):
         comp_id = bucket_to_component.get(bid, -1)
@@ -482,8 +484,7 @@ def experiment_similarity_then_merge(embeddings, classifier, sim_threshold=0.4, 
         smallest = clusters[smallest_idx]
 
         # Find most similar other cluster
-        sims = [np.dot(smallest[0], c[0]) if i != smallest_idx else -1
-                for i, c in enumerate(clusters)]
+        sims = [np.dot(smallest[0], c[0]) if i != smallest_idx else -1 for i, c in enumerate(clusters)]
         merge_target = np.argmax(sims)
 
         # Merge smallest into target
@@ -642,10 +643,7 @@ def experiment_isolation_buckets_hybrid(embeddings, classifier, target_clusters=
         bucket_to_indices[bid].append(i)
 
     # Compute mean isolation per bucket
-    bucket_isolations = {
-        bid: np.mean(isolation_scores[indices])
-        for bid, indices in bucket_to_indices.items()
-    }
+    bucket_isolations = {bid: np.mean(isolation_scores[indices]) for bid, indices in bucket_to_indices.items()}
 
     # Sort buckets by mean isolation
     sorted_by_isolation = sorted(bucket_isolations.items(), key=lambda x: x[1])
@@ -673,7 +671,7 @@ def main():
 
     print(f"Loading embeddings from {parquet_path}...")
     df = pl.read_parquet(parquet_path)
-    embeddings = np.array(df['embedding'].to_list(), dtype=np.float32)
+    embeddings = np.array(df["embedding"].to_list(), dtype=np.float32)
 
     # Normalize
     norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
@@ -695,112 +693,112 @@ def main():
     results = []
 
     # Experiment 1: Direct top buckets
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("EXPERIMENT 1: Direct top buckets (top 14 + other)")
     assignments = experiment_direct_buckets(embeddings, classifier, n_clusters=15)
     results.append(evaluate_clustering("Direct Top Buckets", embeddings, assignments))
 
     # Experiment 2: Bridge community detection
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("EXPERIMENT 2: Bridge-based community detection")
     assignments = experiment_bridge_communities(embeddings, classifier, bridge_analysis)
     results.append(evaluate_clustering("Bridge Communities", embeddings, assignments))
 
     # Experiment 3: Agglomerative on bucket centroids
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("EXPERIMENT 3: Agglomerative clustering on bucket centroids")
     assignments = experiment_bucket_agglomerative(embeddings, classifier, n_clusters=15)
     results.append(evaluate_clustering("Bucket Agglomerative", embeddings, assignments))
 
     # Experiment 4: Isolation-stratified
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("EXPERIMENT 4: Isolation score stratified")
     assignments = experiment_isolation_stratified(embeddings, classifier, n_strata=5)
     results.append(evaluate_clustering("Isolation Stratified", embeddings, assignments))
 
     # Experiment 5: Density hierarchical merge
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("EXPERIMENT 5: Density-based hierarchical merge")
     assignments = experiment_density_hierarchical(embeddings, classifier, bridge_analysis, target_clusters=15)
     results.append(evaluate_clustering("Density Hierarchical", embeddings, assignments))
 
     # Experiment 6: Centroid similarity split
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("EXPERIMENT 6: Centroid similarity split")
     assignments = experiment_centroid_similarity_split(embeddings, classifier, n_clusters=15)
     results.append(evaluate_clustering("Centroid Sim Split", embeddings, assignments))
 
     # Experiment 7: Bridge merge controlled
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("EXPERIMENT 7: Bridge communities (controlled merge)")
     assignments = experiment_bridge_merge_controlled(embeddings, classifier, bridge_analysis, target_clusters=15)
     results.append(evaluate_clustering("Bridge Controlled", embeddings, assignments))
 
     # Experiment 8: Bucket size balanced
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("EXPERIMENT 8: Greedy bucket size balancing")
     assignments = experiment_bucket_size_balanced(embeddings, classifier, target_clusters=15)
     results.append(evaluate_clustering("Size Balanced", embeddings, assignments))
 
     # Experiment 9: Similarity-constrained balance
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("EXPERIMENT 9: Similarity-constrained balance")
     assignments = experiment_similarity_constrained_balance(embeddings, classifier, target_clusters=15)
     results.append(evaluate_clustering("Sim-Constrained", embeddings, assignments))
 
     # Experiment 10: Isolation-bucket hybrid
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("EXPERIMENT 10: Isolation-bucket hybrid")
     assignments = experiment_isolation_buckets_hybrid(embeddings, classifier, target_clusters=15)
     results.append(evaluate_clustering("Iso-Bucket Hybrid", embeddings, assignments))
 
     # Experiment 11-13: Similarity threshold only (no target K)
     for thresh in [0.3, 0.4, 0.5]:
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print(f"EXPERIMENT: Similarity threshold = {thresh}")
         assignments = experiment_similarity_threshold_only(embeddings, classifier, sim_threshold=thresh)
         results.append(evaluate_clustering(f"SimThresh={thresh}", embeddings, assignments))
 
     # K=12 experiments
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("=" * 60)
     print("K=12 CLUSTER EXPERIMENTS (for 12-color visualization)")
     print("=" * 60)
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("EXPERIMENT: Sim-Constrained K=12")
     assignments = experiment_similarity_constrained_balance(embeddings, classifier, target_clusters=12)
     results.append(evaluate_clustering("SimConstr K=12", embeddings, assignments))
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("EXPERIMENT: Size Balanced K=12")
     assignments = experiment_bucket_size_balanced(embeddings, classifier, target_clusters=12)
     results.append(evaluate_clustering("SizeBal K=12", embeddings, assignments))
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("EXPERIMENT: Isolation Stratified K=12")
     assignments = experiment_isolation_stratified(embeddings, classifier, n_strata=4)  # 4 strata * 3 clusters each ≈ 12
     results.append(evaluate_clustering("IsoStrat K=12", embeddings, assignments))
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("EXPERIMENT: Natural clusters merged to K=12")
     assignments = experiment_similarity_then_merge(embeddings, classifier, sim_threshold=0.4, max_clusters=12)
     results.append(evaluate_clustering("NatMerge K=12", embeddings, assignments))
 
     # Summary
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("SUMMARY")
-    print("="*60)
+    print("=" * 60)
     print(f"{'Method':<25} {'Clusters':>8} {'Gini':>8} {'AvgSim':>8} {'Largest%':>10}")
-    print("-"*60)
+    print("-" * 60)
     for r in results:
         print(f"{r['name']:<25} {r['n_clusters']:>8} {r['gini']:>8.3f} {r['avg_sim']:>8.3f} {r['largest_frac']:>9.1%}")
 
     # Best by metrics
-    print("\n" + "-"*60)
-    best_gini = min(results, key=lambda x: x['gini'])
-    best_sim = max(results, key=lambda x: x['avg_sim'])
-    best_balance = min(results, key=lambda x: x['largest_frac'])
+    print("\n" + "-" * 60)
+    best_gini = min(results, key=lambda x: x["gini"])
+    best_sim = max(results, key=lambda x: x["avg_sim"])
+    best_balance = min(results, key=lambda x: x["largest_frac"])
 
     print(f"Best Gini (most equal sizes): {best_gini['name']} ({best_gini['gini']:.3f})")
     print(f"Best Avg Similarity: {best_sim['name']} ({best_sim['avg_sim']:.3f})")

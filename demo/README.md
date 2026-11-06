@@ -30,7 +30,7 @@ python -c "import torchvision; torchvision.datasets.CIFAR100('~/.cache/torchvisi
 
 ```bash
 python demo/cifar_deck_demo.py        # embeds (cached to demo/cifar100.npz), builds the viewer
-python demo/viz_server.py --dir demo  # serve, then open http://localhost:<port>/cifar_deck.html
+python -m http.server 8766 --directory demo  # serve, then open http://localhost:8766/cifar_deck.html
 ```
 
 deck.gl fetches the texture atlas, so the page **must be served over http(s)** — opening

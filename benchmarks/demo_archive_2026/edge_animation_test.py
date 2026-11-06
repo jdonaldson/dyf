@@ -2,9 +2,10 @@
 """Minimal test: PathLayer edges with animation in pydeck OrbitView."""
 
 import json
-import pydeck as pdk
-import numpy as np
 from pathlib import Path
+
+import numpy as np
+import pydeck as pdk
 
 # Generate point cloud with many clusters
 np.random.seed(42)
@@ -26,21 +27,24 @@ for i in range(n_points):
     r = int(50 + (cluster % 10) * 20)
     g = int(50 + (cluster // 10) * 20)
     b = int(150 + np.random.rand() * 50)
-    points.append({
-        "x": cx + np.random.randn() * 0.4,
-        "y": cy + np.random.randn() * 0.4,
-        "z": np.random.randn() * 0.3,
-        "r": r,
-        "g": g,
-        "b": b,
-        "cluster": cluster,
-    })
+    points.append(
+        {
+            "x": cx + np.random.randn() * 0.4,
+            "y": cy + np.random.randn() * 0.4,
+            "z": np.random.randn() * 0.3,
+            "r": r,
+            "g": g,
+            "b": b,
+            "cluster": cluster,
+        }
+    )
+
 
 # Generate catenary edges between nearby cluster centers
 def catenary(p1, p2, n_pts=20, sag=0.3):
     """Generate catenary curve between two 3D points."""
     path = []
-    dist = np.sqrt((p2[0]-p1[0])**2 + (p2[1]-p1[1])**2)
+    dist = np.sqrt((p2[0] - p1[0]) ** 2 + (p2[1] - p1[1]) ** 2)
     sag_amount = sag * dist / 2  # Scale sag with distance
     for i in range(n_pts):
         t = i / (n_pts - 1)
@@ -50,18 +54,21 @@ def catenary(p1, p2, n_pts=20, sag=0.3):
         path.append([x, y, z])
     return path
 
+
 # Connect clusters that are close (grid neighbors)
 edges = []
 for i in range(n_clusters):
     for j in range(i + 1, n_clusters):
         c1, c2 = centroids[i], centroids[j]
-        dist = np.sqrt((c2[0]-c1[0])**2 + (c2[1]-c1[1])**2)
+        dist = np.sqrt((c2[0] - c1[0]) ** 2 + (c2[1] - c1[1]) ** 2)
         if dist < 3:  # Only connect nearby clusters
-            edges.append({
-                "path": catenary(c1, c2),
-                "color": [255, 140, 0, 200],
-                "width": 0.03,
-            })
+            edges.append(
+                {
+                    "path": catenary(c1, c2),
+                    "color": [255, 140, 0, 200],
+                    "width": 0.03,
+                }
+            )
 
 print(f"Generated {len(points)} points, {len(edges)} edges")
 

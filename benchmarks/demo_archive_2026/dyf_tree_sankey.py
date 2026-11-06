@@ -14,17 +14,16 @@ from collections import defaultdict
 from pathlib import Path
 
 import numpy as np
-import polars as pl
 import plotly.graph_objects as go
+import polars as pl
+from dyf_rs import DensityClassifier
 
 from dyf import cut_tree_to_labels
 from dyf.dyf_tree import (
+    _leaf_coherence,
     build_dyf_tree,
     refine_dyf_tree,
-    _leaf_coherence,
 )
-from dyf_rs import DensityClassifier
-
 
 # ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -52,11 +51,11 @@ def golden_ratio_color(i, _n=0, lightness=0.45, saturation=0.6):
 
 
 def rgb_to_hex(r, g, b):
-    return f"#{int(r*255):02x}{int(g*255):02x}{int(b*255):02x}"
+    return f"#{int(r * 255):02x}{int(g * 255):02x}{int(b * 255):02x}"
 
 
 def rgba_str(r, g, b, a=0.4):
-    return f"rgba({int(r*255)},{int(g*255)},{int(b*255)},{a})"
+    return f"rgba({int(r * 255)},{int(g * 255)},{int(b * 255)},{a})"
 
 
 # ── Tree traversal ──────────────────────────────────────────────────────
@@ -93,9 +92,7 @@ def assign_node_ids(nodes_by_level):
 # ── Grouping strategy for deep levels ───────────────────────────────────
 
 
-def build_sankey_nodes_and_links(
-    tree, n_levels, min_display_size=30, max_nodes_per_parent=8
-):
+def build_sankey_nodes_and_links(tree, n_levels, min_display_size=30, max_nodes_per_parent=8):
     """Build Sankey node/link arrays from the DYF tree.
 
     Levels 0-2: show every node individually.
@@ -130,20 +127,24 @@ def build_sankey_nodes_and_links(
                 n_pts = len(node["indices"])
                 label = f"L{level} ({n_pts})"
                 idx = len(sankey_nodes)
-                sankey_nodes.append({
-                    "label": label,
-                    "level": level,
-                    "point_set": set(node["indices"].tolist()),
-                })
+                sankey_nodes.append(
+                    {
+                        "label": label,
+                        "level": level,
+                        "point_set": set(node["indices"].tolist()),
+                    }
+                )
                 tree_to_sankey[id(node)] = idx
 
                 # Link from parent
                 if parent is not None and id(parent) in tree_to_sankey:
-                    sankey_links.append({
-                        "source": tree_to_sankey[id(parent)],
-                        "target": idx,
-                        "value": n_pts,
-                    })
+                    sankey_links.append(
+                        {
+                            "source": tree_to_sankey[id(parent)],
+                            "target": idx,
+                            "value": n_pts,
+                        }
+                    )
         else:
             # Group small children per parent
             # Group nodes by their parent
@@ -178,36 +179,44 @@ def build_sankey_nodes_and_links(
                     n_pts = len(child["indices"])
                     label = f"L{level} ({n_pts})"
                     idx = len(sankey_nodes)
-                    sankey_nodes.append({
-                        "label": label,
-                        "level": level,
-                        "point_set": set(child["indices"].tolist()),
-                    })
+                    sankey_nodes.append(
+                        {
+                            "label": label,
+                            "level": level,
+                            "point_set": set(child["indices"].tolist()),
+                        }
+                    )
                     tree_to_sankey[id(child)] = idx
 
                     if parent_key is not None and parent_key in tree_to_sankey:
-                        sankey_links.append({
-                            "source": tree_to_sankey[parent_key],
-                            "target": idx,
-                            "value": n_pts,
-                        })
+                        sankey_links.append(
+                            {
+                                "source": tree_to_sankey[parent_key],
+                                "target": idx,
+                                "value": n_pts,
+                            }
+                        )
 
                 # Create aggregate "other" node for small children
                 if small_pool_indices:
                     n_pts = len(small_pool_indices)
                     label = f"L{level} other ({n_pts})"
                     idx = len(sankey_nodes)
-                    sankey_nodes.append({
-                        "label": label,
-                        "level": level,
-                        "point_set": small_pool_indices,
-                    })
+                    sankey_nodes.append(
+                        {
+                            "label": label,
+                            "level": level,
+                            "point_set": small_pool_indices,
+                        }
+                    )
                     if parent_key is not None and parent_key in tree_to_sankey:
-                        sankey_links.append({
-                            "source": tree_to_sankey[parent_key],
-                            "target": idx,
-                            "value": n_pts,
-                        })
+                        sankey_links.append(
+                            {
+                                "source": tree_to_sankey[parent_key],
+                                "target": idx,
+                                "value": n_pts,
+                            }
+                        )
 
     return sankey_nodes, sankey_links, n_levels
 
@@ -216,8 +225,12 @@ def build_sankey_nodes_and_links(
 
 
 def instrumented_refine_clusters(
-    labels, embeddings, min_coherence=None, min_cluster_size=None,
-    num_bits=6, seed_offset=2000,
+    labels,
+    embeddings,
+    min_coherence=None,
+    min_cluster_size=None,
+    num_bits=6,
+    seed_offset=2000,
 ):
     """Replicate refine_clusters step-by-step, capturing flow data.
 
@@ -396,8 +409,12 @@ def instrumented_refine_clusters(
 
 
 def build_sankey(
-    tree, embeddings, n_clusters, n_levels,
-    min_display_size=30, max_nodes_per_parent=8,
+    tree,
+    embeddings,
+    n_clusters,
+    n_levels,
+    min_display_size=30,
+    max_nodes_per_parent=8,
 ):
     """Build the complete 9-column Sankey data.
 
@@ -408,13 +425,13 @@ def build_sankey(
 
     # Columns 1-7: Tree levels
     tree_nodes, tree_links, actual_levels = build_sankey_nodes_and_links(
-        tree, n_levels,
+        tree,
+        n_levels,
         min_display_size=min_display_size,
         max_nodes_per_parent=max_nodes_per_parent,
     )
 
-    print(f"  Tree Sankey: {len(tree_nodes)} nodes, {len(tree_links)} links "
-          f"across {actual_levels} levels")
+    print(f"  Tree Sankey: {len(tree_nodes)} nodes, {len(tree_links)} links across {actual_levels} levels")
 
     # Column 8: Cut clusters
     cut_labels = cut_tree_to_labels(tree, n_points, n_clusters, embeddings=embeddings)
@@ -422,9 +439,7 @@ def build_sankey(
     print(f"  Cut clusters: {n_cut}")
 
     # Column 9: Final clusters (after refine_clusters)
-    final_labels, refine_flows = instrumented_refine_clusters(
-        cut_labels, embeddings
-    )
+    final_labels, refine_flows = instrumented_refine_clusters(cut_labels, embeddings)
     n_final = len(set(final_labels.tolist()))
     print(f"  Final clusters: {n_final}")
 
@@ -496,10 +511,7 @@ def build_sankey(
     # For each tree node at the deepest shown level, compute overlap with
     # cut clusters
     last_tree_level = actual_levels - 1
-    leaf_sankey_nodes = [
-        (i, sn) for i, sn in enumerate(tree_nodes)
-        if sn["level"] == last_tree_level
-    ]
+    leaf_sankey_nodes = [(i, sn) for i, sn in enumerate(tree_nodes) if sn["level"] == last_tree_level]
 
     # Also include nodes from earlier levels that are leaves (no children
     # linking out of them in our Sankey)
@@ -601,9 +613,7 @@ def build_sankey(
             if sources:
                 total_w = sum(w for _, w in sources)
                 if total_w > 0:
-                    target_y[idx] = sum(
-                        node_y[s] * w for s, w in sources
-                    ) / total_w
+                    target_y[idx] = sum(node_y[s] * w for s, w in sources) / total_w
                 else:
                     target_y[idx] = 0.5
             else:
@@ -617,9 +627,17 @@ def build_sankey(
             node_y[idx] = 0.001 + (j / max(n - 1, 1)) * 0.998
 
     return (
-        node_labels, node_colors, node_x, node_y,
-        link_sources, link_targets, link_values, link_colors,
-        actual_levels, n_cut, n_final,
+        node_labels,
+        node_colors,
+        node_x,
+        node_y,
+        link_sources,
+        link_targets,
+        link_values,
+        link_colors,
+        actual_levels,
+        n_cut,
+        n_final,
     )
 
 
@@ -627,56 +645,67 @@ def build_sankey(
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="DYF tree Sankey visualization")
+    parser = argparse.ArgumentParser(description="DYF tree Sankey visualization")
     parser.add_argument("parquet_path", help="Path to embeddings parquet")
     parser.add_argument("--sample", type=int, default=8000)
-    parser.add_argument("--n-clusters", type=int, default=25,
-                        help="Target number of clusters")
-    parser.add_argument("--dyf-depth", type=int, default=8,
-                        help="DYF tree max depth")
-    parser.add_argument("--dyf-bits", type=int, default=3,
-                        help="DYF tree LSH bits per level")
-    parser.add_argument("--min-display-size", type=int, default=30,
-                        help="Min points for a node to be shown individually "
-                        "at deep levels")
-    parser.add_argument("--output", "-o", default=None,
-                        help="Output HTML path (default: alongside input)")
+    parser.add_argument("--n-clusters", type=int, default=25, help="Target number of clusters")
+    parser.add_argument("--dyf-depth", type=int, default=8, help="DYF tree max depth")
+    parser.add_argument("--dyf-bits", type=int, default=3, help="DYF tree LSH bits per level")
+    parser.add_argument(
+        "--min-display-size", type=int, default=30, help="Min points for a node to be shown individually at deep levels"
+    )
+    parser.add_argument("--output", "-o", default=None, help="Output HTML path (default: alongside input)")
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
     print(f"Loading embeddings from {args.parquet_path}...")
-    embeddings, titles = load_embeddings(
-        args.parquet_path, sample=args.sample, seed=args.seed)
+    embeddings, titles = load_embeddings(args.parquet_path, sample=args.sample, seed=args.seed)
     n = len(embeddings)
     print(f"  {n:,} points, dim={embeddings.shape[1]}")
 
     print(f"\nBuilding DYF tree (depth={args.dyf_depth}, bits={args.dyf_bits})...")
     tree = build_dyf_tree(
-        embeddings, max_depth=args.dyf_depth,
-        num_bits=args.dyf_bits, min_leaf_size=4, seed=args.seed,
+        embeddings,
+        max_depth=args.dyf_depth,
+        num_bits=args.dyf_bits,
+        min_leaf_size=4,
+        seed=args.seed,
     )
 
     print("Refining tree...")
     stats = refine_dyf_tree(tree, embeddings)
-    print(f"  Refined {stats['n_refined']} leaves "
-          f"(coherence {stats['coherence_before']:.3f} -> "
-          f"{stats['coherence_after']:.3f}, "
-          f"leaves {stats['n_leaves_before']} -> {stats['n_leaves_after']})")
+    print(
+        f"  Refined {stats['n_refined']} leaves "
+        f"(coherence {stats['coherence_before']:.3f} -> "
+        f"{stats['coherence_after']:.3f}, "
+        f"leaves {stats['n_leaves_before']} -> {stats['n_leaves_after']})"
+    )
 
     # Count actual tree levels
     nodes_by_level = collect_nodes_by_level(tree)
     max_level = max(nodes_by_level.keys())
-    print(f"  Tree has {max_level + 1} levels, "
-          f"nodes per level: {', '.join(f'{len(nodes_by_level[l])}' for l in range(max_level + 1))}")
+    print(
+        f"  Tree has {max_level + 1} levels, "
+        f"nodes per level: {', '.join(f'{len(nodes_by_level[l])}' for l in range(max_level + 1))}"
+    )
 
-    print(f"\nBuilding Sankey data...")
+    print("\nBuilding Sankey data...")
     (
-        node_labels, node_colors, node_x, node_y,
-        link_sources, link_targets, link_values, link_colors,
-        actual_levels, n_cut, n_final,
+        node_labels,
+        node_colors,
+        node_x,
+        node_y,
+        link_sources,
+        link_targets,
+        link_values,
+        link_colors,
+        actual_levels,
+        n_cut,
+        n_final,
     ) = build_sankey(
-        tree, embeddings, args.n_clusters,
+        tree,
+        embeddings,
+        args.n_clusters,
         n_levels=max_level + 1,
         min_display_size=args.min_display_size,
     )
@@ -685,24 +714,28 @@ def main():
     print(f"  Columns: {actual_levels} tree levels + cut ({n_cut}) + final ({n_final})")
 
     # Build Plotly figure
-    fig = go.Figure(data=[go.Sankey(
-        arrangement="snap",
-        node=dict(
-            pad=2,
-            thickness=15,
-            line=dict(color="rgba(50,50,50,0.5)", width=0.5),
-            label=node_labels,
-            color=node_colors,
-            x=node_x,
-            y=node_y,
-        ),
-        link=dict(
-            source=link_sources,
-            target=link_targets,
-            value=link_values,
-            color=link_colors,
-        ),
-    )])
+    fig = go.Figure(
+        data=[
+            go.Sankey(
+                arrangement="snap",
+                node=dict(
+                    pad=2,
+                    thickness=15,
+                    line=dict(color="rgba(50,50,50,0.5)", width=0.5),
+                    label=node_labels,
+                    color=node_colors,
+                    x=node_x,
+                    y=node_y,
+                ),
+                link=dict(
+                    source=link_sources,
+                    target=link_targets,
+                    value=link_values,
+                    color=link_colors,
+                ),
+            )
+        ]
+    )
 
     # Column annotations
     col_names = [f"Level {i}" for i in range(actual_levels)]
@@ -715,20 +748,21 @@ def main():
 
     annotations = []
     for i, name in enumerate(col_names):
-        annotations.append(dict(
-            x=x_positions[i],
-            y=1.05,
-            xref="paper",
-            yref="paper",
-            text=f"<b>{name}</b>",
-            showarrow=False,
-            font=dict(size=12, color="#ccc"),
-        ))
+        annotations.append(
+            dict(
+                x=x_positions[i],
+                y=1.05,
+                xref="paper",
+                yref="paper",
+                text=f"<b>{name}</b>",
+                showarrow=False,
+                font=dict(size=12, color="#ccc"),
+            )
+        )
 
     fig.update_layout(
         title=dict(
-            text=f"DYF Tree Pipeline — {n:,} points, "
-                 f"{actual_levels} levels → {n_cut} cut → {n_final} final",
+            text=f"DYF Tree Pipeline — {n:,} points, {actual_levels} levels → {n_cut} cut → {n_final} final",
             font=dict(size=16, color="#ddd"),
         ),
         font=dict(size=10, color="#ccc"),

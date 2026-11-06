@@ -14,19 +14,19 @@ Usage:
 
 import argparse
 import time
-from pathlib import Path
 
 import numpy as np
 import polars as pl
 import umap
+from scipy.sparse.csgraph import connected_components
 from sklearn.cluster import Birch
 from sklearn.metrics import silhouette_score
 from sklearn.neighbors import NearestNeighbors
-from scipy.sparse.csgraph import connected_components
 
 
 def load_and_dedup(parquet_path, sample=None):
     from dyf_rs import DensityClassifier
+
     from dyf.chunks import deduplicate_chunks
 
     df = pl.read_parquet(parquet_path)
@@ -49,6 +49,7 @@ def load_and_dedup(parquet_path, sample=None):
 
 def suggest_n_neighbors(embeddings):
     from dyf_rs import DensityClassifier
+
     clf = DensityClassifier(embedding_dim=embeddings.shape[1], num_bits=12, seed=42)
     clf.fit(embeddings)
     mean_size = clf.get_bucket_sizes().mean()
@@ -57,13 +58,16 @@ def suggest_n_neighbors(embeddings):
 
 def run_umap(embeddings, n_neighbors):
     reducer = umap.UMAP(
-        n_components=2, n_neighbors=n_neighbors,
-        min_dist=0.1, n_jobs=-1, verbose=False,
+        n_components=2,
+        n_neighbors=n_neighbors,
+        min_dist=0.1,
+        n_jobs=-1,
+        verbose=False,
     )
     coords = np.asarray(reducer.fit_transform(embeddings))
     nan_mask = np.isnan(coords).any(axis=1)
     if nan_mask.any():
-        nn = NearestNeighbors(n_neighbors=1, metric='cosine')
+        nn = NearestNeighbors(n_neighbors=1, metric="cosine")
         nn.fit(embeddings[~nan_mask])
         _, idx = nn.kneighbors(embeddings[nan_mask])
         coords[nan_mask] = coords[~nan_mask][idx.ravel()]
@@ -76,7 +80,7 @@ def run_umap(embeddings, n_neighbors):
 
 def fit_birch(data, target_k, max_iters=10):
     lo, hi = 1e-4, float(np.linalg.norm(data.max(axis=0) - data.min(axis=0)))
-    best_birch, best_diff = None, float('inf')
+    best_birch, best_diff = None, float("inf")
     for _ in range(max_iters):
         mid = (lo + hi) / 2
         birch = Birch(n_clusters=None, threshold=mid, branching_factor=50)
@@ -165,7 +169,7 @@ def evaluate(name, coords, labels, embeddings):
             continue
         nn_c = NearestNeighbors(radius=threshold)
         nn_c.fit(cluster_coords)
-        adj = nn_c.radius_neighbors_graph(cluster_coords, mode='connectivity')
+        adj = nn_c.radius_neighbors_graph(cluster_coords, mode="connectivity")
         n_comp, _ = connected_components(adj, directed=False)
         frag_counts.append(n_comp)
 
@@ -184,11 +188,14 @@ def evaluate(name, coords, labels, embeddings):
     print(f"    Total fragments:       {total_frag:>5d}  (ideal: {n_clusters})")
 
     return {
-        'silh': silh, 'purity': mean_purity,
-        'intra': mean_intra, 'inter': mean_inter,
-        'gap': mean_intra - mean_inter,
-        'frag': mean_frag, 'total_frag': total_frag,
-        'pct_single': pct_single,
+        "silh": silh,
+        "purity": mean_purity,
+        "intra": mean_intra,
+        "inter": mean_inter,
+        "gap": mean_intra - mean_inter,
+        "frag": mean_frag,
+        "total_frag": total_frag,
+        "pct_single": pct_single,
     }
 
 
@@ -235,14 +242,16 @@ def main():
 
     # Delta summary
     print(f"\n  {'Metric':<25s}  {'Standard':>8s}  {'DYF':>8s}  {'Delta':>8s}")
-    print(f"  {'-'*25}  {'-'*8}  {'-'*8}  {'-'*8}")
-    for key, label in [('silh', 'Silhouette'),
-                       ('purity', 'kNN purity'),
-                       ('intra', 'Intra-cluster sim'),
-                       ('inter', 'Inter-cluster sim'),
-                       ('gap', 'Sim gap'),
-                       ('frag', 'Fragmentation'),
-                       ('pct_single', '% single-blob')]:
+    print(f"  {'-' * 25}  {'-' * 8}  {'-' * 8}  {'-' * 8}")
+    for key, label in [
+        ("silh", "Silhouette"),
+        ("purity", "kNN purity"),
+        ("intra", "Intra-cluster sim"),
+        ("inter", "Inter-cluster sim"),
+        ("gap", "Sim gap"),
+        ("frag", "Fragmentation"),
+        ("pct_single", "% single-blob"),
+    ]:
         s, d = r_std[key], r_dyf[key]
         delta = d - s
         sign = "+" if delta > 0 else ""

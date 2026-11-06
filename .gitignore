@@ -48,7 +48,6 @@ demo/*.npz
 demo/*.jpg
 demo/*.dyf
 demo/*.html
-!demo/dyf_viewer.html
 demo/*.mp4
 demo/*.wav
 demo/*.json

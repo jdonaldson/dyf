@@ -197,17 +197,16 @@ When adding features or making API changes:
 1. **CHANGELOG.md** — add entry under current version (or new `## Unreleased` section)
 2. **README.md** — update if the feature touches Quick Start, API examples, or installation
 
-## Visualization Development Pattern
+## Visualization: it lives in dyfviz
 
-The pydeck visualizations use a WebSocket bridge for live control:
-
-1. **Start the viz server**: `python demo/viz_server.py --port 8766 --dir demo --watch`
-2. **Open viz through server**: `http://localhost:8766/rog_3d_birch_clusters.html` (not as a file)
-3. **Control via MCP tools**: `draw_circle`, `highlight_points`, `zoom_to_cluster`, etc.
-
-The `--watch` flag enables hot-reload when HTML files change.
-
-Static HTML files (`file://`) won't receive WebSocket commands — must use the HTTP server.
+The browser viewer (`dyf_viewer.html`, `dyf_tree_view.html`, `pydeck_overlay.js`,
+`js/dyf_reader.mjs`, `viz_server.py`) is canonical in `dyfviz/src/dyfviz/assets/` since
+2026-11-06; `dyfviz tour <file.dyf>` serves it with the WebSocket bridge. The copies that used
+to sit in `demo/`, the `rog_mcp.py` live-control MCP server and the `.mcp.json` entry for it
+(which pointed at a `.dyf` that no longer existed) were removed in the same cleanup. `demo/`
+now holds only what `demo/README.md` documents, the data builders, and `puppet/`; one-off
+experiments moved to `benchmarks/demo_archive_2026/`. Any viewer change goes to dyfviz, and its
+`tests/test_viewer_assets.py` checks the packaged viewer is complete.
 
 ## Sanity Check Before Deep Work
 
@@ -237,6 +236,6 @@ Prefer DAG (directed acyclic graph) oriented pipelines wherever possible:
   - Can we re-run just this step, or do we need upstream work?
   - What's the cost of re-running from this point vs. from scratch?
   - Is a cached intermediate still valid, or have its inputs changed?
-- **Practical application**: `dyfviz.py` and `rog_preprocess.py` currently run monolithic pipelines; prefer checkpointed stages where each stage reads/writes a known artifact and can be skipped if the artifact is fresh
+- **Practical application**: the `dyfviz` enrichment ladder is the live instance (each level reads what the one below wrote; `demo/dyfviz.py` and `rog_preprocess.py`, the monolithic predecessors, were removed 2026-11-06); prefer checkpointed stages where each stage reads/writes a known artifact and can be skipped if the artifact is fresh
 - Think `make`-style: each target depends on prerequisites, only rebuild what's stale
 

@@ -10,25 +10,22 @@ Demonstrates:
 Run: bokeh serve demo/krapivin_explainer.py --port 5009
 """
 
-from bokeh.plotting import figure, curdoc
-from bokeh.models import (
-    ColumnDataSource, Div, Button, Slider,
-    LabelSet, Arrow, VeeHead, Spacer
-)
-from bokeh.layouts import column, row
-from bokeh.palettes import Spectral6
-import numpy as np
 from dataclasses import dataclass
-from typing import Optional
-import asyncio
+
+import numpy as np
+from bokeh.layouts import column, row
+from bokeh.models import Button, ColumnDataSource, Div, LabelSet, Spacer
+from bokeh.plotting import curdoc, figure
 
 # ============================================================================
 # Krapivin Hash Table Simulation
 # ============================================================================
 
+
 @dataclass
 class KrapivinTable:
     """Simplified Krapivin hash table for visualization"""
+
     capacity: int
     delta: float  # empty fraction
 
@@ -85,6 +82,7 @@ class KrapivinTable:
 # Visualization
 # ============================================================================
 
+
 class KrapivinExplainer:
     def __init__(self):
         # Table parameters
@@ -114,83 +112,108 @@ class KrapivinExplainer:
         total_height = self.table.num_levels * (self.level_height + self.level_gap) + 100
 
         self.plot = figure(
-            width=900, height=max(400, total_height + 150),
+            width=900,
+            height=max(400, total_height + 150),
             x_range=(-50, self.max_width + 50),
             y_range=(-50, total_height + 50),
             tools="",
             toolbar_location=None,
-            title="Krapivin Hash Table: Hierarchical Levels with Geometric Sizing"
+            title="Krapivin Hash Table: Hierarchical Levels with Geometric Sizing",
         )
         self.plot.grid.visible = False
         self.plot.axis.visible = False
 
         # Data sources for slots
-        self.slot_source = ColumnDataSource(data=dict(
-            x=[], y=[], width=[], height=[], color=[], line_color=[], alpha=[]
-        ))
+        self.slot_source = ColumnDataSource(
+            data=dict(x=[], y=[], width=[], height=[], color=[], line_color=[], alpha=[])
+        )
 
         # Draw slots as rectangles
         self.plot.rect(
-            x='x', y='y', width='width', height='height',
-            fill_color='color', line_color='line_color', fill_alpha='alpha',
-            source=self.slot_source
+            x="x",
+            y="y",
+            width="width",
+            height="height",
+            fill_color="color",
+            line_color="line_color",
+            fill_alpha="alpha",
+            source=self.slot_source,
         )
 
         # Level labels
-        self.level_label_source = ColumnDataSource(data=dict(
-            x=[], y=[], text=[]
-        ))
+        self.level_label_source = ColumnDataSource(data=dict(x=[], y=[], text=[]))
         level_labels = LabelSet(
-            x='x', y='y', text='text', source=self.level_label_source,
-            text_font_size='12pt', text_color='#333333',
-            x_offset=-45, y_offset=-5
+            x="x",
+            y="y",
+            text="text",
+            source=self.level_label_source,
+            text_font_size="12pt",
+            text_color="#333333",
+            x_offset=-45,
+            y_offset=-5,
         )
         self.plot.add_layout(level_labels)
 
         # Slot labels (for filled slots)
-        self.slot_label_source = ColumnDataSource(data=dict(
-            x=[], y=[], text=[]
-        ))
+        self.slot_label_source = ColumnDataSource(data=dict(x=[], y=[], text=[]))
         slot_labels = LabelSet(
-            x='x', y='y', text='text', source=self.slot_label_source,
-            text_font_size='8pt', text_color='white',
-            text_align='center', text_baseline='middle'
+            x="x",
+            y="y",
+            text="text",
+            source=self.slot_label_source,
+            text_font_size="8pt",
+            text_color="white",
+            text_align="center",
+            text_baseline="middle",
         )
         self.plot.add_layout(slot_labels)
 
         # Probe arrow
-        self.arrow_source = ColumnDataSource(data=dict(
-            x_start=[], y_start=[], x_end=[], y_end=[]
-        ))
+        self.arrow_source = ColumnDataSource(data=dict(x_start=[], y_start=[], x_end=[], y_end=[]))
 
         # Probe indicator (circle showing current probe location)
-        self.probe_source = ColumnDataSource(data=dict(
-            x=[], y=[]
-        ))
+        self.probe_source = ColumnDataSource(data=dict(x=[], y=[]))
         self.plot.circle(
-            x='x', y='y', size=20, fill_color='red', fill_alpha=0.7,
-            line_color='darkred', line_width=3, source=self.probe_source
+            x="x",
+            y="y",
+            size=20,
+            fill_color="red",
+            fill_alpha=0.7,
+            line_color="darkred",
+            line_width=3,
+            source=self.probe_source,
         )
 
         # Hash value display
-        self.hash_label_source = ColumnDataSource(data=dict(
-            x=[self.max_width / 2], y=[self.table.num_levels * (self.level_height + self.level_gap) + 30],
-            text=['']
-        ))
+        self.hash_label_source = ColumnDataSource(
+            data=dict(
+                x=[self.max_width / 2], y=[self.table.num_levels * (self.level_height + self.level_gap) + 30], text=[""]
+            )
+        )
         hash_label = LabelSet(
-            x='x', y='y', text='text', source=self.hash_label_source,
-            text_font_size='14pt', text_color='#666666',
-            text_align='center'
+            x="x",
+            y="y",
+            text="text",
+            source=self.hash_label_source,
+            text_font_size="14pt",
+            text_color="#666666",
+            text_align="center",
         )
         self.plot.add_layout(hash_label)
 
         # Complexity annotation
         complexity_text = f"α = {self.table.num_levels} levels (α = O(log δ⁻¹) where δ = {self.delta})"
-        self.plot.add_layout(LabelSet(
-            x='x', y='y', text='text',
-            source=ColumnDataSource(data=dict(x=[self.max_width/2], y=[-30], text=[complexity_text])),
-            text_font_size='11pt', text_color='#888888', text_align='center'
-        ))
+        self.plot.add_layout(
+            LabelSet(
+                x="x",
+                y="y",
+                text="text",
+                source=ColumnDataSource(data=dict(x=[self.max_width / 2], y=[-30], text=[complexity_text])),
+                text_font_size="11pt",
+                text_color="#888888",
+                text_align="center",
+            )
+        )
 
     def _build_controls(self):
         """Build control widgets"""
@@ -211,16 +234,10 @@ class KrapivinExplainer:
         self.fill_btn.on_click(self._on_fill)
 
         # Info panel
-        self.info_div = Div(
-            text=self._get_info_html(),
-            width=400, height=300
-        )
+        self.info_div = Div(text=self._get_info_html(), width=400, height=300)
 
         # Explanation panel
-        self.explanation_div = Div(
-            text=self._get_explanation_html(),
-            width=450, height=300
-        )
+        self.explanation_div = Div(text=self._get_explanation_html(), width=450, height=300)
 
     def _get_info_html(self):
         """Generate info panel HTML"""
@@ -238,7 +255,7 @@ class KrapivinExplainer:
             <p><b>Capacity:</b> {self.capacity} slots</p>
             <p><b>Delta (δ):</b> {self.delta} (empty fraction target)</p>
             <p><b>Levels (α):</b> {self.table.num_levels}</p>
-            <p><b>Load:</b> {filled}/{total} ({100*filled/total:.1f}%)</p>
+            <p><b>Load:</b> {filled}/{total} ({100 * filled / total:.1f}%)</p>
             <h4>Level Sizes (geometric):</h4>
             <ul style="margin:0; padding-left:20px;">{level_info}</ul>
         </div>
@@ -314,13 +331,13 @@ class KrapivinExplainer:
                 height.append(self.level_height - 4)
 
                 if slot_val is None:
-                    color.append('#27ae60')  # Green for empty
+                    color.append("#27ae60")  # Green for empty
                     alpha.append(0.3)
-                    line_color.append('#1e8449')
+                    line_color.append("#1e8449")
                 else:
-                    color.append('#3498db')  # Blue for filled
+                    color.append("#3498db")  # Blue for filled
                     alpha.append(0.8)
-                    line_color.append('#2471a3')
+                    line_color.append("#2471a3")
                     # Add label for filled slot
                     slot_label_x.append(sx)
                     slot_label_y.append(sy)
@@ -333,8 +350,7 @@ class KrapivinExplainer:
             label_text.append(f"L{level_idx}")
 
         self.slot_source.data = dict(
-            x=x, y=y, width=width, height=height,
-            color=color, line_color=line_color, alpha=alpha
+            x=x, y=y, width=width, height=height, color=color, line_color=line_color, alpha=alpha
         )
         self.level_label_source.data = dict(x=label_x, y=label_y, text=label_text)
         self.slot_label_source.data = dict(x=slot_label_x, y=slot_label_y, text=slot_label_text)
@@ -350,26 +366,26 @@ class KrapivinExplainer:
         self.probe_source.data = dict(x=[x], y=[y])
 
         # Update hash label with probe info
-        self.hash_label_source.data['text'] = [
+        self.hash_label_source.data["text"] = [
             f"Probing Level {level_idx}, Slot {slot_idx} → {'EMPTY (insert here!)' if is_empty else 'COLLISION (continue...)'}"
         ]
 
         # Highlight the slot
-        colors = list(self.slot_source.data['color'])
-        alphas = list(self.slot_source.data['alpha'])
+        colors = list(self.slot_source.data["color"])
+        alphas = list(self.slot_source.data["alpha"])
 
         # Calculate flat index
         flat_idx = sum(len(self.table.levels[i]) for i in range(level_idx)) + slot_idx
 
         if is_empty:
-            colors[flat_idx] = '#2ecc71'  # Bright green
+            colors[flat_idx] = "#2ecc71"  # Bright green
             alphas[flat_idx] = 1.0
         else:
-            colors[flat_idx] = '#f39c12'  # Orange for collision
+            colors[flat_idx] = "#f39c12"  # Orange for collision
             alphas[flat_idx] = 1.0
 
-        self.slot_source.data['color'] = colors
-        self.slot_source.data['alpha'] = alphas
+        self.slot_source.data["color"] = colors
+        self.slot_source.data["alpha"] = alphas
 
     def _on_insert(self):
         """Start inserting a new item"""
@@ -389,7 +405,7 @@ class KrapivinExplainer:
         self.hash_label_source.data = dict(
             x=[self.max_width / 2],
             y=[self.table.num_levels * (self.level_height + self.level_gap) + 30],
-            text=[f"Inserting '{key}' | hash = {hash_val} (mod table sizes)"]
+            text=[f"Inserting '{key}' | hash = {hash_val} (mod table sizes)"],
         )
 
         # Enable step button
@@ -414,7 +430,9 @@ class KrapivinExplainer:
             self.table.levels[level_idx][slot_idx] = self._pending_key
             self._update_table_view()
             self.probe_source.data = dict(x=[], y=[])
-            self.hash_label_source.data['text'] = [f"Inserted '{self._pending_key}' at Level {level_idx}, Slot {slot_idx}"]
+            self.hash_label_source.data["text"] = [
+                f"Inserted '{self._pending_key}' at Level {level_idx}, Slot {slot_idx}"
+            ]
             self.step_btn.disabled = True
         else:
             # Collision, move to next probe
@@ -424,7 +442,7 @@ class KrapivinExplainer:
                 next_empty = self.table.levels[next_level][next_slot] is None
                 self._highlight_probe(next_level, next_slot, next_empty)
             else:
-                self.hash_label_source.data['text'] = ['Table full!']
+                self.hash_label_source.data["text"] = ["Table full!"]
                 self.step_btn.disabled = True
 
     def _on_auto(self):
@@ -445,7 +463,7 @@ class KrapivinExplainer:
         self.table.clear()
         self.items_inserted = 0
         self.probe_source.data = dict(x=[], y=[])
-        self.hash_label_source.data['text'] = ['']
+        self.hash_label_source.data["text"] = [""]
         self.step_btn.disabled = True
         self._update_table_view()
 
@@ -462,10 +480,7 @@ class KrapivinExplainer:
 
     def layout(self):
         """Return the complete layout"""
-        controls = row(
-            self.insert_btn, self.step_btn, self.auto_btn,
-            Spacer(width=20), self.fill_btn, self.clear_btn
-        )
+        controls = row(self.insert_btn, self.step_btn, self.auto_btn, Spacer(width=20), self.fill_btn, self.clear_btn)
         info_row = row(self.info_div, Spacer(width=20), self.explanation_div)
         return column(controls, self.plot, info_row)
 

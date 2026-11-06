@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Removed
+
+**`demo/` cleaned up; the viewer lives in dyfviz.** Removed the five viewer files that
+duplicated `dyfviz/src/dyfviz/assets/` (viewer, tree view, overlay, reader, `viz_server.py`),
+six scripts importing the long-deleted `dyf.pca_tree` module, the pre-split `dyfviz.py`
+monolith with `patch_overlay.py` and the tour-narration JSONs, and the ROG live-control trio
+(`rog_mcp.py`, `rog_demo.py`, `rog_preprocess.py`) with its `.mcp.json` entry, which pointed
+at a `.dyf` that no longer existed and failed on every session. Eight one-off experiments
+that still import moved to `benchmarks/demo_archive_2026/` (README there). `demo/` keeps the
+documented demos, the data builders and `puppet/`.
+
 ### Added
 
 **`compute_louvain_hierarchy` reports each community's re-cut inflow.** New key
