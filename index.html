@@ -2,12 +2,13 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.10.20">
+<meta name="generator" content="quarto-1.11.9">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
+<meta name="description" content="dyf fits once and then changes the level of detail freely: coarse groups, fine groups, a search index and a partition you can keep as data arrives.">
 
-<title>DYF — Density Yields Features</title>
+<title>dyf: a clustering lens for embeddings</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -26,41 +27,6 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
-/* CSS for syntax highlighting */
-html { -webkit-text-size-adjust: 100%; }
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
-}
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
-}
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
-}
 </style>
 
 
@@ -73,18 +39,19 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <meta name="quarto:offset" content="./">
 <script src="site_libs/quarto-html/quarto.js" type="module"></script>
 <script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/scrollable-regions/scrollable-regions.js" type="module"></script>
 <script src="site_libs/quarto-html/popper.min.js"></script>
 <script src="site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="site_libs/quarto-html/anchor.min.js"></script>
 <link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-734e26b3914f3ca69de5470bdf5e21fc.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-dark-838292ca108d4a77d1528a2dedbc84ef.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-734e26b3914f3ca69de5470bdf5e21fc.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-fe5810895752d8be194da6d35d51731d.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-dark-0d22395ff3738decffb559925b3603ed.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-fe5810895752d8be194da6d35d51731d.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="site_libs/bootstrap/bootstrap-67ae0bdbc78d6e9d22a4743bcedfda4b.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="site_libs/bootstrap/bootstrap-dark-0d6eb118ca89c6a29d7c3dea2c909ac7.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="site_libs/bootstrap/bootstrap-67ae0bdbc78d6e9d22a4743bcedfda4b.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<link href="site_libs/bootstrap/bootstrap-c0fc9f6e61a14f4e1cc677f75f9cee50.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="site_libs/bootstrap/bootstrap-dark-9db6cb6caea62b929dbc18b062aa894c.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="site_libs/bootstrap/bootstrap-c0fc9f6e61a14f4e1cc677f75f9cee50.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -121,11 +88,169 @@ function gtag(){dataLayer.push(arguments);}
 gtag('js', new Date());
 gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 </script>
+<!-- generated by benchmarks/site_explainer_2026_11/build_how_dyf_works_page.py --docs; edit the template, not this file -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&amp;family=Public+Sans:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+/* Layout: one reading column (66ch) with replay figures that break out to the full 1080px wrap. */
+:root {
+  --bg: #f6f5f4; --surface: #ffffff; --ink: #1c1b1d; --ink-2: #55525a; --ink-3: #8a8690; --rule: #e2dfe3;
+  --accent: #cf2f4f; --accent-2: #f9a826; --pt-idle: #b9b5bd; --code-bg: #efedf0;
+  --h0: #2a78d6; --h1: #eb6834; --h2: #1baf7a; --h3: #eda100; --h4: #e87ba4; --h5: #008300; --h6: #6250d6; --h7: #e34948;
+  --display: "Montserrat", "Avenir Next", "Segoe UI", sans-serif;
+  --body: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+:root[data-theme="dark"] {
+  --bg: #19181b; --surface: #222126; --ink: #ecebee; --ink-2: #b9b6bf; --ink-3: #85818c; --rule: #37353d;
+  --accent: #f0627a; --accent-2: #f9a826; --pt-idle: #5d5a64; --code-bg: #2a2930;
+  --h0: #3987e5; --h1: #d95926; --h2: #199e70; --h3: #c98500; --h4: #d55181; --h5: #008300; --h6: #9085e9; --h7: #e66767;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6; }
+.wrap { max-width: 1080px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.prose { max-width: 66ch; }
+a { color: inherit; text-decoration-color: var(--accent); text-underline-offset: 3px; }
+a:hover { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 28px; padding-block: 18px; border-bottom: 1px solid var(--rule); }
+.logo { font-family: var(--display); font-weight: 700; font-size: 30px; letter-spacing: -0.02em; line-height: 1; text-decoration: none; }
+.logo span { background: linear-gradient(135deg, #e94560, #f9a826); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.top nav { display: flex; flex-wrap: wrap; gap: 4px 20px; font-size: 14px; }
+.top nav a { text-decoration: none; color: var(--ink-2); }
+.top nav a:hover { color: var(--accent); }
+
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; letter-spacing: -0.015em; line-height: 1.15; margin: 0; }
+h1 { font-size: clamp(34px, 6vw, 58px); font-weight: 700; }
+h2 { font-size: clamp(24px, 3.4vw, 32px); font-weight: 700; }
+h3 { font-size: 18px; font-weight: 600; letter-spacing: 0; }
+p { margin: 0; }
+.hero { padding-block: 40px 8px; display: grid; gap: 16px; }
+.lede { font-size: 20px; line-height: 1.5; color: var(--ink-2); }
+.lede b { color: var(--ink); font-weight: 600; }
+section { padding-block: 56px 0; display: grid; gap: 18px; }
+section > .prose { display: grid; gap: 14px; }
+.eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+
+figure { margin: 10px 0 0; display: grid; gap: 12px; }
+figcaption { font-size: 14px; line-height: 1.5; color: var(--ink-2); max-width: 82ch; }
+figcaption b { color: var(--ink); font-weight: 600; }
+.panels { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.panel { display: grid; gap: 6px; min-width: 0; align-content: start; }
+.panel-title { font-size: 13px; font-weight: 600; color: var(--ink-2); display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-height: 30px; }
+.plot { width: 100%; aspect-ratio: 1 / 1; max-width: 100%; display: block; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; touch-action: pan-y; cursor: crosshair; }
+.readout { font-family: var(--mono); font-size: 13px; color: var(--ink-2); min-height: 2.9em; font-variant-numeric: tabular-nums; }
+.readout b { color: var(--ink); font-weight: 500; }
+
+.controls { display: flex; align-items: flex-start; gap: 14px; }
+.lbtn { font: 500 14px var(--body); color: var(--ink); background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 7px 12px; cursor: pointer; }
+.lbtn:hover { border-color: var(--ink-3); }
+.lbtn:disabled { opacity: 0.45; cursor: default; }
+.lbtn[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.play { width: 40px; height: 40px; padding: 0; font-size: 14px; flex: none; }
+.slider { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.slider input[type=range] { width: 100%; margin: 9px 0 0; accent-color: var(--accent); }
+.ticks { display: flex; justify-content: space-between; padding: 0 7px; font-family: var(--mono); font-size: 11px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.ticks span { width: 0; display: flex; justify-content: center; white-space: nowrap; }
+.slider-label { font-size: 13px; color: var(--ink-2); }
+.seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; }
+.seg .lbtn { border: 0; border-radius: 0; padding: 4px 10px; font-size: 13px; }
+.seg .lbtn + .lbtn { border-left: 1px solid var(--rule); }
+
+.gcard { border-top: 1px solid var(--rule); padding-top: 12px; display: grid; gap: 8px; font-size: 14px; color: var(--ink-2); min-height: 96px; }
+.gcard b { color: var(--ink); font-weight: 600; }
+.thumbs { display: flex; flex-wrap: wrap; gap: 4px; }
+canvas.thumb { width: 42px; height: 42px; border-radius: 3px; display: block; }
+.quotes { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; color: var(--ink); }
+.quotes li::before { content: "\201c"; } .quotes li::after { content: "\201d"; }
+
+.stepper { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 22px; align-items: start; }
+.steps { display: flex; flex-wrap: wrap; gap: 6px; }
+.steps .lbtn { font-family: var(--mono); font-size: 13px; padding: 5px 11px; }
+.step-text { display: grid; gap: 12px; align-content: start; }
+.step-text p { font-size: 16px; color: var(--ink-2); }
+.step-text p b { color: var(--ink); font-weight: 600; }
+.step-nav { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.check { font-size: 14px; color: var(--ink-2); display: flex; gap: 8px; align-items: center; }
+
+.chart-row { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.chart-box { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 12px 10px 8px; min-width: 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 13px; color: var(--ink-2); padding: 0 4px 6px; }
+.legend i { display: inline-block; width: 18px; height: 0; border-top: 2px solid; vertical-align: middle; margin-right: 6px; }
+.legend i.dash { border-top-style: dashed; border-top-width: 1px; border-color: var(--ink-3); }
+svg text { font-family: var(--mono); font-size: 11px; fill: var(--ink-3); }
+svg text.lab { fill: var(--ink-2); font-family: var(--body); font-size: 12px; paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+svg text.now { fill: var(--ink); font-size: 12px; paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+.draws { display: flex; flex-wrap: wrap; gap: 8px; }
+.result { font-size: 14px; color: var(--ink-2); min-height: 3em; }
+.result b { color: var(--ink); font-weight: 600; }
+
+.bars { display: grid; gap: 10px; }
+.bar-row { display: grid; grid-template-columns: minmax(120px, 230px) minmax(0, 1fr) 96px; gap: 12px; align-items: center; font-size: 14px; }
+.bar-row .name { color: var(--ink-2); }
+.bar-row .val { font-family: var(--mono); font-size: 13px; font-variant-numeric: tabular-nums; color: var(--ink); }
+.track { position: relative; height: 12px; border-left: 1px solid var(--ink-3); }
+.fill { position: absolute; top: 1px; bottom: 1px; border-radius: 0 3px 3px 0; background: var(--pt-idle); }
+.fill.own { background: var(--h0); }
+.fill.range { border-radius: 3px; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 34px; }
+.two > div { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.note { font-size: 14px; color: var(--ink-2); }
+
+.limits { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--rule); }
+.limits li { display: grid; grid-template-columns: minmax(0, 15rem) minmax(0, 1fr); gap: 6px 28px; padding-block: 14px; border-bottom: 1px solid var(--rule); }
+.limits h3 { font-size: 16px; }
+.limits p { font-size: 15px; color: var(--ink-2); }
+.limits p b { color: var(--ink); font-weight: 600; }
+
+pre { margin: 0; background: var(--code-bg); border-radius: 6px; padding: 14px 16px; overflow-x: auto; font-family: var(--mono); font-size: 13px; line-height: 1.55; }
+code { font-family: var(--mono); font-size: 0.9em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+pre code { background: none; padding: 0; font-size: inherit; }
+.foot { margin-top: 64px; padding-block: 22px 40px; border-top: 1px solid var(--rule); font-size: 14px; color: var(--ink-3); display: grid; gap: 6px; }
+#tip { position: fixed; z-index: 20; pointer-events: none; max-width: 300px; background: var(--ink); color: var(--bg); border-radius: 6px; padding: 8px 10px; font-size: 13px; line-height: 1.4; }
+#tip .q { font-weight: 500; }
+#tip .m { font-family: var(--mono); font-size: 11.5px; opacity: 0.8; margin-top: 3px; }
+#tip canvas.thumb { width: 64px; height: 64px; margin-bottom: 4px; }
+
+.eq { overflow-x: auto; overflow-y: hidden; padding: 10px 12px; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; font-size: 16px; color: var(--ink); }
+.eq math { font-size: 1.05em; margin: 7px auto; }
+.eq math[display="block"] { text-align: center; }
+.eq code { display: block; background: none; padding: 2px 0; white-space: nowrap; }
+.eq:empty { display: none; }
+@media (max-width: 760px) {
+  body { font-size: 16px; }
+  .panels, .stepper, .chart-row, .two { grid-template-columns: 1fr; }
+  .ticks span:nth-child(even) { visibility: hidden; }
+  .bar-row { grid-template-columns: 1fr 84px; }
+  .bar-row .name { grid-column: 1 / -1; }
+  .limits li { grid-template-columns: 1fr; }
+  section { padding-block: 44px 0; }
+}
+
+/* ---- inside the Quarto site: theme follows Quarto's toggle (body.quarto-dark), not the OS ---- */
+body.quarto-dark { --bg: #19181b; --surface: #222126; --ink: #ecebee; --ink-2: #b9b6bf; --ink-3: #85818c; --rule: #37353d;
+  --accent: #f0627a; --accent-2: #f9a826; --pt-idle: #5d5a64; --code-bg: #2a2930;
+  --h0: #3987e5; --h1: #d95926; --h2: #199e70; --h3: #c98500; --h4: #d55181; --h5: #008300; --h6: #9085e9; --h7: #e66767; color-scheme: dark; }
+body, body.quarto-light, body.quarto-dark { background: var(--bg); color: var(--ink); }
+.wrap { padding-top: 12px; }
+.wrap h1, .wrap h2, .wrap h3, body.quarto-dark .wrap h1, body.quarto-dark .wrap h2, body.quarto-dark .wrap h3 { color: var(--ink); border: 0; border-image: none; padding-bottom: 0; margin: 0; }
+.wrap a { color: inherit; }
+.wrap pre, .wrap code { color: var(--ink); }
+.wrap figure { display: grid; gap: 12px; margin: 10px 0 0; }
+.wrap figcaption { margin-top: 6px; }
+.top .logo { display: none; }
+.top { border-bottom: 0; padding-block: 10px 0; }
+section[id], #top { scroll-margin-top: 72px; }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&amp;family=Public+Sans:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
 
 
 </head>
 
-<body class="nav-fixed quarto-light"><script id="quarto-html-before-body" type="application/javascript">
+<body class="nav-fixed fullcontent quarto-light"><a id="quarto-skip-link" class="visually-hidden-focusable" href="#quarto-content">Skip to main content</a><script id="quarto-html-before-body" type="application/javascript">
     const toggleBodyColorMode = (bsSheetEl) => {
       const mode = bsSheetEl.getAttribute("data-mode");
       const bodyEl = window.document.querySelector("body");
@@ -148,6 +273,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
       for (let i=0; i < toggles.length; i++) {
         const toggle = toggles[i];
         if (toggle) {
+          toggle.setAttribute("aria-checked", alternate ? "true" : "false");
           if (alternate) {
             toggle.classList.add("alternate");
           } else {
@@ -177,13 +303,19 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
       manageTransitions('#quarto-margin-sidebar .nav-link', true);
       // Switch the toggles
       setColorSchemeToggle(alternate)
-      // Hack to workaround the fact that safari doesn't
-      // properly recolor the scrollbar when toggling (#1455)
+    }
+    // Hack to workaround the fact that safari doesn't
+    // properly recolor the scrollbar when toggling (#1455).
+    // Not run on load: stylesheets are set before first paint there, and
+    // scrolling would undo the scroll to a URL fragment (#14973).
+    // The one pixel nudge keeps the reader where they were.
+    const refreshSafariScrollbar = () => {
       if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
         manageTransitions("body", false);
-        window.scrollTo(0, 1);
+        const scrollY = window.scrollY;
+        window.scrollTo(0, scrollY > 0 ? scrollY - 1 : 1);
         setTimeout(() => {
-          window.scrollTo(0, 0);
+          window.scrollTo(0, scrollY);
           manageTransitions("body", true);
         }, 40);
       }
@@ -277,6 +409,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
       // Read the current dark / light value
       let toAlternate = !hasAlternateSentinel();
       toggleColorMode(toAlternate);
+      refreshSafariScrollbar();
       setStyleSentinel(toAlternate);
       toggleGiscusIfUsed(toAlternate, darkModeDefault);
       window.dispatchEvent(new Event('resize'));
@@ -290,8 +423,8 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
   </script>
 
 <div id="quarto-search-results"></div>
-  <header id="quarto-header" class="headroom fixed-top quarto-banner">
-    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark" aria-label="Site">
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
     <a href="./index.html" class="navbar-brand navbar-brand-logo">
@@ -299,8 +432,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
     <img src="./dyf_logo.svg" alt="DYF" class="navbar-logo dark-content">
     </a>
   </div>
-            <div id="quarto-search" class="" title="Search"></div>
-          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
   <span class="navbar-toggler-icon"></span>
 </button>
           <div class="collapse navbar-collapse" id="navbarCollapse">
@@ -312,10 +444,6 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
   <li class="nav-item">
     <a class="nav-link" href="./getting-started.html"> 
 <span class="menu-text">Getting Started</span></a>
-  </li>  
-  <li class="nav-item">
-    <a class="nav-link" href="./how-it-works.html"> 
-<span class="menu-text">How It Works</span></a>
   </li>  
   <li class="nav-item">
     <a class="nav-link" href="./gallery/index.html"> 
@@ -335,151 +463,671 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
 </ul>
           </div> <!-- /navcollapse -->
             <div class="quarto-navbar-tools">
-  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+  <button type="button" role="switch" aria-checked="false" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode" aria-label="Toggle dark mode"><i class="bi"></i></button>
 </div>
+            <div id="quarto-search" class="" title="Search"></div>
       </div> <!-- /container-fluid -->
     </nav>
 </header>
 <!-- content -->
-<header id="title-block-header" class="quarto-title-block default page-columns page-full">
-  <div class="quarto-title-banner page-columns page-full">
-    <div class="quarto-title column-body">
-      <h1 class="title">DYF — Density Yields Features</h1>
-                      </div>
-  </div>
-    
-  
-  <div class="quarto-title-meta">
-
-      
-    
-      
-    </div>
-    
-  
-  </header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<div id="quarto-content" class="quarto-container page-layout-custom page-navbar" tabindex="-1">
 <!-- sidebar -->
 <!-- margin-sidebar -->
-    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
-        <nav id="TOC" role="doc-toc" class="toc-active">
-    <h2 id="toc-title">On this page</h2>
-   
-  <ul>
-  <li><a href="#quick-start" id="toc-quick-start" class="nav-link active" data-scroll-target="#quick-start">Quick start</a></li>
-  <li><a href="#build-search-indexes" id="toc-build-search-indexes" class="nav-link" data-scroll-target="#build-search-indexes">Build &amp; search indexes</a></li>
-  <li><a href="#how-it-works" id="toc-how-it-works" class="nav-link" data-scroll-target="#how-it-works">How it works</a></li>
-  <li><a href="#what-you-can-do-with-it" id="toc-what-you-can-do-with-it" class="nav-link" data-scroll-target="#what-you-can-do-with-it">What you can do with it</a></li>
-  <li><a href="#performance" id="toc-performance" class="nav-link" data-scroll-target="#performance">Performance</a></li>
-  <li><a href="#installation" id="toc-installation" class="nav-link" data-scroll-target="#installation">Installation</a></li>
-  </ul>
-</nav>
-    </div>
 <!-- main -->
-<main class="content quarto-banner-title-block" id="quarto-document-content">
 
 
 
 
 
-
-<p>DYF discovers structure in embedding spaces using density-based LSH. Every item gets classified as <strong>Dense</strong> (core), <strong>Bridge</strong> (connector), or <strong>Orphan</strong> (unique) — no k to pick, no hyperparameters to tune.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">pip</span> install dyf</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p><strong><a href="https://github.com/jdonaldson/dyf">GitHub</a></strong> | <strong><a href="https://pypi.org/project/dyf/">PyPI</a></strong> | <strong><a href="how-it-works.html">How It Works</a></strong> | <strong><a href="reference/index.html">API Reference</a></strong> | <a href="https://colab.research.google.com/github/jdonaldson/dyf/blob/main/docs/notebooks/quickstart.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" class="img-fluid" alt="Open In Colab"></a></p>
-<section id="quick-start" class="level2">
-<h2 class="anchored" data-anchor-id="quick-start">Quick start</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dyf <span class="im">import</span> DensityClassifierFull</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>classifier <span class="op">=</span> DensityClassifierFull.from_texts(</span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    texts<span class="op">=</span>documents,       <span class="co"># any list of strings</span></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    categories<span class="op">=</span>categories, <span class="co"># optional grouping</span></span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(classifier.report())</span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Dense:  8,420 (84.2%) — core topics</span></span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Bridge:   980 (9.8%)  — cross-topic items</span></span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="co"># Orphan:   600 (6.0%)  — unique outliers</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</section>
-<section id="build-search-indexes" class="level2">
-<h2 class="anchored" data-anchor-id="build-search-indexes">Build &amp; search indexes</h2>
-<p>DYF writes <code>.dyf</code> files — memory-mapped indexes with zero startup cost:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dyf <span class="im">import</span> build_dyf_tree, write_lazy_index, LazyIndex</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>tree <span class="op">=</span> build_dyf_tree(embeddings, max_depth<span class="op">=</span><span class="dv">4</span>, num_bits<span class="op">=</span><span class="dv">3</span>, min_leaf_size<span class="op">=</span><span class="dv">8</span>)</span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>write_lazy_index(tree, embeddings, <span class="st">"index.dyf"</span>,</span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>                 quantization<span class="op">=</span><span class="st">"float16"</span>,</span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>                 stored_fields<span class="op">=</span>{<span class="st">"title"</span>: titles},</span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>                 metadata<span class="op">=</span>{<span class="st">"model"</span>: <span class="st">"nomic-embed-text-v1.5"</span>})</span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> LazyIndex(<span class="st">"index.dyf"</span>) <span class="im">as</span> idx:</span>
-<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> idx.search(query_embedding, k<span class="op">=</span><span class="dv">10</span>, nprobe<span class="op">=</span><span class="st">"auto"</span>)</span>
-<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(result.indices, result.scores)</span>
-<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(result.fields[<span class="st">"title"</span>])</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</section>
-<section id="how-it-works" class="level2">
-<h2 class="anchored" data-anchor-id="how-it-works">How it works</h2>
-<p>Two-stage PCA-based LSH:</p>
-<ol type="1">
-<li><strong>Random bucketing</strong> — throw random hyperplanes through embedding space</li>
-<li><strong>Compute centroids</strong> — average embeddings per bucket</li>
-<li><strong>PCA on centroids</strong> — learn directions that separate clusters (fast: hundreds of rows, not millions)</li>
-<li><strong>Re-hash</strong> — project all embeddings onto learned hyperplanes</li>
-</ol>
-<p>Bucket sizes reveal density. Centroid similarity reveals centrality. Stability under perturbation reveals bridges.</p>
-<p>See <a href="how-it-works.html">How It Works</a> for the full algorithm, metrics, and the connection to Krapivin et al.&nbsp;(2025).</p>
-</section>
-<section id="what-you-can-do-with-it" class="level2">
-<h2 class="anchored" data-anchor-id="what-you-can-do-with-it">What you can do with it</h2>
-<ul>
-<li><strong>Semantic navigation</strong> — trace paths between concepts through bridge items</li>
-<li><strong>Structure discovery</strong> — see how data organizes itself without imposing a taxonomy</li>
-<li><strong>Anomaly detection</strong> — surface orphans and bridges that span multiple domains</li>
-<li><strong>Index building</strong> — <code>.dyf</code> files for instant-open, memory-mapped approximate search</li>
-</ul>
-</section>
-<section id="performance" class="level2">
-<h2 class="anchored" data-anchor-id="performance">Performance</h2>
-<table class="caption-top table">
-<thead>
-<tr class="header">
-<th>Dataset</th>
-<th>Time</th>
-<th>Per item</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>60K embeddings (384d)</td>
-<td>~60ms</td>
-<td>1.0 µs</td>
-</tr>
-</tbody>
-</table>
-<p>Rust-accelerated via PyO3.</p>
-</section>
-<section id="installation" class="level2">
-<h2 class="anchored" data-anchor-id="installation">Installation</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">pip</span> install dyf          <span class="co"># core</span></span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="ex">pip</span> install dyf<span class="pp">[</span><span class="ss">io</span><span class="pp">]</span>      <span class="co"># + serialization</span></span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="ex">pip</span> install dyf<span class="pp">[</span><span class="ss">full</span><span class="pp">]</span>    <span class="co"># + embedding generation, LLM labeling</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<!-- The homepage is generated: `python benchmarks/site_explainer_2026_11/build_how_dyf_works_page.py --docs`.
+     It replays one recorded dyf run (lens/*.json). Edit the template in that directory, not the includes. -->
 
 
-</section>
 
-</main> <!-- /main -->
+
+<!-- generated by benchmarks/site_explainer_2026_11/build_how_dyf_works_page.py --docs; edit the template, not this file -->
+<div class="wrap">
+  <header class="top">
+    <a class="logo" href="#top" aria-label="dyf">d<span>ʎ</span>f</a>
+    <nav aria-label="Sections">
+      <a href="#how">How it works</a>
+      <a href="#level">Choosing a level</a>
+      <a href="#time">Over time</a>
+      <a href="#limits">Where it loses</a>
+      <a href="#use">Use it</a>
+    </nav>
+  </header>
+
+  <div class="hero" id="top">
+    <h1 class="prose">A clustering lens for embeddings</h1>
+    <p class="lede prose">dyf fits once, and then you change the focus. <b>A few broad groups, many narrow ones, or anything between, without fitting again.</b> The same fit is also a search index and a partition you can keep as new data arrives.</p>
+    <p class="prose" id="a-intro"></p>
+  </div>
+
+  <figure id="figA" class="figure">
+    <div class="panels">
+      <div class="panel">
+        <div class="panel-title">dyf's groups</div>
+        <canvas class="plot" id="a-left" role="img" aria-label="Scatter of the data coloured by the group dyf assigns at the selected resolution."></canvas>
+        <div class="readout" id="a-left-read"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><span id="a-right-title"></span><span class="seg" role="group" aria-label="Label layer" id="a-layers" hidden=""></span></div>
+        <canvas class="plot" id="a-right" role="img" aria-label="The same points coloured by their human label."></canvas>
+        <div class="readout" id="a-right-read"></div>
+      </div>
+    </div>
+    <div class="controls">
+      <button class="lbtn play" type="button" id="a-play" aria-label="Play through the levels">▶︎</button>
+      <div class="slider">
+        <input type="range" id="a-level" min="0" max="15" step="1" value="3" aria-label="Resolution level">
+        <div class="ticks" id="a-ticks" aria-hidden="true"></div>
+        <div class="slider-label">resolution: low gives a few broad groups, high gives many narrow ones</div>
+      </div>
+    </div>
+    <div class="gcard" id="a-card" aria-live="polite"></div>
+    <figcaption id="a-cap"></figcaption>
+  </figure>
+
+  <section id="how">
+    <div class="prose">
+      <p class="eyebrow">How it works</p>
+      <h2>Cut the space into cells, then join the cells</h2>
+      <p>dyf does not compare every point with every other point. It cuts the embedding space into small cells with a few yes/no questions, and then works with the cells. Step through the run you just saw.</p>
+    </div>
+    <figure id="figB" class="figure">
+      <div class="stepper">
+        <canvas class="plot" id="b-plot" role="img" aria-label="The same points, coloured by the stage of the dyf pipeline selected in the stepper."></canvas>
+        <div class="step-text">
+          <div class="steps" id="b-steps" role="group" aria-label="Pipeline step"></div>
+          <h3 id="b-title"></h3>
+          <div id="b-body" class="step-text"></div>
+          <div class="eq" id="b-eq" role="math" aria-label="This step as a formula"></div>
+          <label class="check" id="b-moved-wrap" hidden=""><input type="checkbox" id="b-moved"> Show only the points that moved</label>
+          <div class="step-nav">
+            <button class="lbtn" type="button" id="b-prev">Back</button>
+            <button class="lbtn" type="button" id="b-next">Next step</button>
+          </div>
+        </div>
+      </div>
+      <figcaption id="b-cap"></figcaption>
+    </figure>
+    <div class="prose">
+      <h3>The whole pipeline in one line</h3>
+      <div class="eq" id="b-oneline" role="math" aria-label="dyf as a composition of its stages"></div>
+      <p class="note" id="b-params"></p>
+      <p>Two things are visible in that form. Only the last two stages depend on the resolution γ, so the tree, the leaves and the graph are computed once and every level reuses them. And every stage uses nothing but inner products of unit vectors: to dyf an item is a direction, and it knows nothing else about it.</p>
+    </div>
+  </section>
+
+  <section id="level">
+    <div class="prose">
+      <p class="eyebrow">Choosing a level</p>
+      <h2>Some data has more than one right answer. A few labels say which one you mean.</h2>
+      <p id="c-intro"></p>
+      <p>A lens does not choose its own focus. We tried fourteen ways to choose the level without labels. None was reliable. What works is small: label about fifty items by hand and keep the level that agrees with them best. Click a level on the chart to see its groups.</p>
+    </div>
+    <figure id="figC" class="figure">
+      <div class="chart-row">
+        <div>
+          <div class="chart-box">
+            <div class="legend" id="c-legend"></div>
+            <div id="c-chart"></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-title">dyf's groups at the chosen level</div>
+          <canvas class="plot" id="c-plot" role="img" aria-label="dyf's groups at the level selected on the chart."></canvas>
+          <div class="readout" id="c-read"></div>
+        </div>
+      </div>
+      <div class="gcard" id="c-card" aria-live="polite"></div>
+      <figcaption id="c-cap"></figcaption>
+    </figure>
+  </section>
+
+  <section id="time">
+    <div class="prose">
+      <p class="eyebrow">Over time</p>
+      <h2>Keep the groups when new data arrives</h2>
+      <p>Most clustering is run once. Real collections grow, and a fresh fit each month hands every group a new identity, so last month's group 12 is nowhere in particular this month. dyf can start a refit from the previous groups instead. The ids carry over.</p>
+      <p>We measured this on the FDA's medical device database: 4.7 million records growing to 5.3 million over 22 months, 86 groups.</p>
+    </div>
+    <div class="two">
+      <div>
+        <h3>Groups still recognisable a quarter later</h3>
+        <div class="bars" id="t-keep"></div>
+        <p class="note">Share of groups whose best match in the next quarter's fit overlaps by at least half (Jaccard ≥ 0.5). Mean of eight quarterly refits.</p>
+      </div>
+      <div>
+        <h3>Seconds per refit at 5 million records</h3>
+        <div class="bars" id="t-secs"></div>
+        <p class="note">Range over the eight refits, 768-dimension embeddings. The nearest-neighbour graph arm ends with thousands of groups, so it is a cost comparison only.</p>
+      </div>
+    </div>
+    <div class="prose">
+      <p>With the warm start, all 86 ids were the same ids after 22 monthly refits, and from the fourth month on fewer than 3% of existing records changed group each month. The first three months moved 19%, 12% and 10% because the final step had not finished settling. That is a known defect, not new data.</p>
+      <p>The cells are useful on their own too. Freeze the tree, count how many new records land in each cell each month, and the counts track real change in the mix of device types as closely as a hand-assigned label does (rank correlation 0.86 to 0.91, against 0.82 for the review-panel label).</p>
+    </div>
+  </section>
+
+  <section id="limits">
+    <div class="prose">
+      <p class="eyebrow">Where it loses</p>
+      <h2>What dyf is not</h2>
+      <p>Every number on this page comes from a benchmark in the repository. These are the results that went against it.</p>
+    </div>
+    <ul class="limits" id="l-list"></ul>
+  </section>
+
+  <section id="use">
+    <div class="prose">
+      <p class="eyebrow">Use it</p>
+      <h2>Fit once, then ask for any level</h2>
+      <pre><code>pip install dyf</code></pre>
+      <pre><code>from dyf import build_dyf_tree, write_lazy_index, LazyIndex, louvain_cluster_leaves
+
+tree = build_dyf_tree(embeddings, num_bits=3, max_depth=4, min_leaf_size=20)
+write_lazy_index(tree, embeddings, "requests.dyf")
+
+with LazyIndex("requests.dyf") as idx:
+    coarse = louvain_cluster_leaves(idx, layout_2d, embeddings, resolution=1.0)
+    fine = louvain_cluster_leaves(idx, layout_2d, embeddings, resolution=32.0)
+    print(coarse.n_groups, fine.n_groups)        # 22 and 151 on 23,850 voice-assistant requests
+
+    hit = idx.search(embeddings[0], k=5, nprobe="auto")   # the same file is a search index</code></pre>
+      <p class="note"><code>layout_2d</code> is any (n, 2) array, for example a UMAP layout. It is used only to name groups by position.</p>
+      <p><a href="https://github.com/jdonaldson/dyf">Source on GitHub</a> · <a href="https://pypi.org/project/dyf/">PyPI</a> · <a href="https://dyf.io/reference/">API reference</a></p>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <span id="f-run"></span>
+    <span>Benchmarks: <code>benchmarks/intent_bench_2026_11</code> and <code>benchmarks/gudid_drift_2026_11</code> in the repository.</span>
+  </footer>
+</div>
+<div id="tip" hidden=""></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script type="application/json" id="run-digits" data-src="lens/dyf-lens-cifar100-clip-run-seed42.json"></script>
+<script type="application/json" id="run-requests">null</script>
+<script>
+(function () {
+  "use strict";
+  // The recorded run is inlined in the JSON script tag, or fetched from its data-src (the docs site).
+  var pending = Array.prototype.filter.call(document.querySelectorAll('script[type="application/json"][data-src]'), function (el) { return !el.textContent.trim(); });
+  if (!pending.length) run();
+  else Promise.all(pending.map(function (el) { return fetch(el.dataset.src).then(function (r) { return r.text(); }).then(function (t) { el.textContent = t; }); })).then(run);
+
+  function run() {
+  var $ = function (id) { return document.getElementById(id); };
+  var fmt = function (v, d) { return v.toFixed(d === undefined ? 2 : d); };
+  var num = function (v) { return v.toLocaleString("en-US"); };
+  var nice = function (s) { return String(s).replace(/_/g, " "); };
+  var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+
+  // ---- recorded runs
+  var scatters = [], cards = [];
+  function prep(id) {
+    var D = JSON.parse($(id).textContent);
+    D.N = D.x.length; D.NL = D.levels.length; D.leafOf = D.cells[D.cells.length - 1].labels; D.DEF = 0;
+    D.levels.forEach(function (l, i) { if (l.res === 1) D.DEF = i; });
+    D.labelled = []; for (var i = 0; i < D.N; i++) if (!D.unlabelled[i]) D.labelled.push(i);
+    if (D.items.kind === "image") { D.img = new Image(); D.img.onload = function () { D.imgReady = true; cards.forEach(function (f) { f(); }); }; D.img.src = D.items.sprite; }
+    return D;
+  }
+  var DG = prep("run-digits"), RQ = $("run-requests").textContent.trim() === "null" ? DG : prep("run-requests"), SAME = RQ === DG;
+  var layerTitle = function (la) { return la.k + " " + la.noun; };
+
+  // ---- theme tokens (canvas and SVG read colours from the page's CSS variables)
+  var HUE = [], INK = {};
+  function readTheme() {
+    var s = getComputedStyle(document.body);
+    HUE = [0, 1, 2, 3, 4, 5, 6, 7].map(function (i) { return s.getPropertyValue("--h" + i).trim(); });
+    ["ink", "ink-2", "ink-3", "rule", "surface", "pt-idle", "accent"].forEach(function (k) { INK[k] = s.getPropertyValue("--" + k).trim(); });
+  }
+  readTheme();
+
+  // ---- what a point is: a thumbnail or a quote
+  function drawThumbs(root, R) {
+    if (R.items.kind !== "image" || !R.imgReady) return;
+    var t = R.items.tile, cols = R.items.cols;
+    Array.prototype.forEach.call(root.querySelectorAll("canvas.thumb"), function (cv) {
+      var i = +cv.dataset.i, ctx = cv.getContext("2d");
+      cv.width = cv.height = t * 4; ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(R.img, (i % cols) * t, Math.floor(i / cols) * t, t, t, 0, 0, t * 4, t * 4);
+    });
+  }
+  function itemHTML(R, i) {
+    return R.items.kind === "image" ? '<canvas class="thumb" data-i="' + i + '" role="img" aria-label="' + esc(R.meta.item) + '"></canvas>' : '<div class="q">“' + esc(R.items.text[i]) + "”</div>";
+  }
+  function truthLine(R, i) {
+    if (R.unlabelled[i]) return "labelled: out of scope";
+    return "labelled: " + R.layers.map(function (la) { return esc(nice(la.names[la.labels[i]])); }).join(" › ");
+  }
+  var tip = $("tip");
+  function showTip(html, x, y, R) {
+    tip.innerHTML = html; tip.hidden = false; if (R) drawThumbs(tip, R);
+    var w = tip.offsetWidth, h = tip.offsetHeight, vw = document.documentElement.clientWidth;
+    var left = Math.min(Math.max(8, x + 14), vw - w - 8), top = y - h - 12;
+    if (top < 8) top = y + 18;
+    tip.style.left = left + "px"; tip.style.top = top + "px";
+  }
+  function hideTip() { tip.hidden = true; }
+  function pointTip(R, level) {
+    return function (i) {
+      var lv = R.levels[level()];
+      return itemHTML(R, i) + '<div class="m">' + truthLine(R, i) + "<br>dyf: one of " + lv.k + " groups at resolution " + lv.res + "</div>";
+    };
+  }
+
+  // ---- "what is in this group": members of the focused point's group at the current level
+  function groupCard(el, R, level, focus) {
+    var lv = R.levels[level], f = lv.final, g = f[focus], mem = [], i;
+    for (i = 0; i < R.N; i++) if (f[i] === g) mem.push(i);
+    var parts = R.layers.map(function (la) {
+      var c = {}, tot = 0, best = -1, bc = 0;
+      mem.forEach(function (j) { if (R.unlabelled[j]) return; var y = la.labels[j]; c[y] = (c[y] || 0) + 1; tot++; if (c[y] > bc) { bc = c[y]; best = y; } });
+      return tot ? "Most common " + la.singular + ": <b>" + esc(nice(la.names[best])) + "</b> (" + Math.round(100 * bc / tot) + "%)" : "";
+    }).filter(Boolean);
+    var want = R.items.kind === "image" ? 22 : 5, step = Math.max(1, Math.floor(mem.length / want)), sample = [];
+    for (i = 0; i < mem.length && sample.length < want; i += step) sample.push(mem[i]);
+    var head = "<span><b>The circled " + esc(R.meta.item) + "'s group</b> at resolution " + lv.res + ": " + num(mem.length) + " of the " + num(R.N) + " shown. " + parts.join(". ") + ". Hover another point to follow it.</span>";
+    el.innerHTML = head + (R.items.kind === "image"
+      ? '<div class="thumbs">' + sample.map(function (j) { return itemHTML(R, j); }).join("") + "</div>"
+      : '<ul class="quotes">' + sample.map(function (j) { return "<li>" + esc(R.items.text[j]) + "</li>"; }).join("") + "</ul>");
+    drawThumbs(el, R);
+  }
+  function biggestGroupPoint(R, level) {
+    var f = R.levels[level].final, c = {}, best = 0, bi = 0;
+    for (var i = 0; i < R.N; i++) { c[f[i]] = (c[f[i]] || 0) + 1; }
+    for (i = 0; i < R.N; i++) if (c[f[i]] > best) { best = c[f[i]]; bi = i; }
+    return bi;
+  }
+
+  // ---- scatter panel: replays recorded labels, never computes groups
+  function Scatter(canvas, R, cfg) {
+    this.cv = canvas; this.ctx = canvas.getContext("2d"); this.R = R; this.cfg = cfg; this.hover = -1;
+    this.px = new Float32Array(R.N); this.py = new Float32Array(R.N);
+    var self = this;
+    if (window.ResizeObserver) new ResizeObserver(function () { self.size(); self.draw(); }).observe(canvas);
+    canvas.addEventListener("pointermove", function (e) { self.onMove(e); });
+    canvas.addEventListener("pointerdown", function (e) { self.onMove(e); });
+    canvas.addEventListener("pointerleave", function () { if (self.hover >= 0) { self.hover = -1; hideTip(); if (cfg.onHover) cfg.onHover(-1); else self.draw(); } });
+    scatters.push(this); this.size(); this.draw();
+  }
+  Scatter.prototype.size = function () {
+    var R = this.R, r = this.cv.getBoundingClientRect(), dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var w = Math.max(50, Math.round(r.width * dpr)), h = Math.max(50, Math.round(r.height * dpr));
+    if (this.cv.width !== w) this.cv.width = w;
+    if (this.cv.height !== h) this.cv.height = h;
+    this.w = w; this.h = h; this.dpr = dpr;
+    var s = Math.min(w, h) / 4096, ox = (w - 4096 * s) / 2, oy = (h - 4096 * s) / 2;
+    this.s = s; this.ox = ox; this.oy = oy;
+    for (var i = 0; i < R.N; i++) { this.px[i] = ox + R.x[i] * s; this.py[i] = oy + (4095 - R.y[i]) * s; }
+  };
+  Scatter.prototype.ring = function (i, r) {
+    var ctx = this.ctx; ctx.strokeStyle = INK.ink; ctx.lineWidth = 1.5 * this.dpr;
+    ctx.beginPath(); ctx.arc(this.px[i], this.py[i], r * this.dpr, 0, 6.2832); ctx.stroke();
+  };
+  Scatter.prototype.draw = function () {
+    var ctx = this.ctx, cfg = this.cfg, w = this.w, px = this.px, py = this.py, N = this.R.N;
+    ctx.clearRect(0, 0, this.w, this.h);
+    var sz = Math.max(1.6 * this.dpr, w / 290), half = sz / 2;
+    var mask = cfg.mask ? cfg.mask() : null, base = cfg.alpha ? cfg.alpha() : 0.85;
+    var buckets = [], dim = [], i, c;
+    for (c = 0; c < 9; c++) { buckets.push([]); dim.push([]); }
+    for (i = 0; i < N; i++) { c = cfg.colour(i); (mask && !mask[i] ? dim : buckets)[c < 0 ? 8 : c].push(i); }
+    for (var pass = 0; pass < 2; pass++) {
+      var set = pass === 0 ? dim : buckets;
+      ctx.globalAlpha = pass === 0 ? 0.1 : (mask ? 0.95 : base);
+      for (c = 8; c >= 0; c--) {
+        var b = set[c]; if (!b.length) continue;
+        ctx.fillStyle = c === 8 ? INK["pt-idle"] : HUE[c];
+        for (var j = 0; j < b.length; j++) ctx.fillRect(px[b[j]] - half, py[b[j]] - half, sz, sz);
+      }
+    }
+    ctx.globalAlpha = 1;
+    if (cfg.over) cfg.over(this);
+    var fo = cfg.focus ? cfg.focus() : -1;
+    if (fo >= 0) this.ring(fo, 6);
+    if (this.hover >= 0 && this.hover !== fo) this.ring(this.hover, 5);
+  };
+  Scatter.prototype.onMove = function (e) {
+    var r = this.cv.getBoundingClientRect(), x = (e.clientX - r.left) * this.dpr, y = (e.clientY - r.top) * this.dpr;
+    var best = -1, bd = Math.pow(12 * this.dpr, 2), px = this.px, py = this.py;
+    for (var i = 0; i < this.R.N; i++) { var dx = px[i] - x, dy = py[i] - y, d = dx * dx + dy * dy; if (d < bd) { bd = d; best = i; } }
+    if (best === this.hover) { if (best >= 0) showTip(this.cfg.tip(best), e.clientX, e.clientY, this.R); return; }
+    this.hover = best;
+    if (best < 0) hideTip(); else showTip(this.cfg.tip(best), e.clientX, e.clientY, this.R);
+    if (this.cfg.onHover) this.cfg.onHover(best); else this.draw();
+  };
+  function maskWhere(R, test) { var m = new Uint8Array(R.N); for (var i = 0; i < R.N; i++) if (test(i)) m[i] = 1; return m; }
+
+  // ================= Figure A: resolution scrubber (digits)
+  (function () {
+    var R = DG, LV = R.levels, st = { level: R.DEF, layer: 0, focus: biggestGroupPoint(R, R.DEF) }, maskL = null, maskR = null;
+    var la = function () { return R.layers[st.layer]; };
+    var tipf = pointTip(R, function () { return st.level; });
+    function onHover(i) {
+      if (i < 0) { maskL = maskR = null; }
+      else {
+        st.focus = i;
+        var f = LV[st.level].final, g = f[i], lab = la().labels, y = lab[i];
+        maskL = maskWhere(R, function (j) { return f[j] === g; });
+        maskR = maskWhere(R, function (j) { return !R.unlabelled[i] && !R.unlabelled[j] && lab[j] === y; });
+        card();
+      }
+      L.hover = Rt.hover = i; L.draw(); Rt.draw();
+    }
+    var L = new Scatter($("a-left"), R, { colour: function (i) { var lv = LV[st.level]; return lv.colours[lv.final[i]]; }, mask: function () { return maskL; }, tip: tipf, onHover: onHover, focus: function () { return st.focus; } });
+    var Rt = new Scatter($("a-right"), R, { colour: function (i) { return R.unlabelled[i] ? -1 : la().colours[la().labels[i]]; }, mask: function () { return maskR; }, tip: tipf, onHover: onHover, focus: function () { return st.focus; } });
+    function card() { groupCard($("a-card"), R, st.level, st.focus); }
+    cards.push(card);
+    function read() {
+      var lv = LV[st.level];
+      $("a-left-read").innerHTML = "<b>" + lv.k + " groups</b> at resolution " + lv.res + (lv.res === 1 ? " (the default)" : "");
+      $("a-right-read").innerHTML = "agreement with the " + R.layers.map(function (l, li) { var s = layerTitle(l) + " " + fmt(lv.ari[li]); return li === st.layer ? "<b>" + s + "</b>" : s; }).join(" · ") + "<br>1 = same grouping, 0 = chance";
+    }
+    function setLevel(i) { i = Math.max(0, Math.min(R.NL - 1, i)); if (i === st.level) return; st.level = i; slider.value = i; maskL = maskR = null; L.hover = Rt.hover = -1; L.draw(); Rt.draw(); read(); card(); }
+    var slider = $("a-level"); slider.max = R.NL - 1; slider.value = st.level;
+    $("a-ticks").innerHTML = LV.map(function (l) { return "<span>" + l.res + "</span>"; }).join("");
+    slider.addEventListener("input", function () { stop(); setLevel(+slider.value); });
+    $("a-right-title").textContent = R.layers.length > 1 ? "The labels people gave" : "The " + la().singular + " each one really is";
+    if (R.layers.length > 1) {
+      var seg = $("a-layers"); seg.hidden = false;
+      seg.innerHTML = R.layers.map(function (l, li) { return '<button class="lbtn" type="button" data-l="' + li + '" aria-pressed="' + (li === 0) + '">' + layerTitle(l) + "</button>"; }).join("");
+      seg.addEventListener("click", function (e) { var b = e.target.closest("button"); if (!b) return; st.layer = +b.dataset.l; Array.prototype.forEach.call(seg.children, function (c, j) { c.setAttribute("aria-pressed", j === st.layer); }); onHover(-1); read(); });
+    }
+    var timer = null;
+    function stop() { if (timer) { clearInterval(timer); timer = null; $("a-play").innerHTML = "&#9654;&#xFE0E;"; } }
+    $("a-play").addEventListener("click", function () {
+      if (timer) { stop(); return; }
+      if (st.level >= R.NL - 1) setLevel(0);
+      $("a-play").innerHTML = "&#10073;&#10073;";
+      timer = setInterval(function () { if (st.level >= R.NL - 1) { stop(); return; } setLevel(st.level + 1); }, reduced ? 1400 : 750);
+    });
+    read(); card();
+    var d0 = LV[R.DEF], l0 = R.layers[0];
+    $("a-intro").innerHTML = "Drag the slider to change the focus. On the left, dyf's groups for " + num(R.meta.n) + " " + R.meta.items + ". On the right, " + (R.layers.length > 1 ? "the labels people gave them: " + R.layers.map(layerTitle).join(" or ") : "the " + l0.singular + " each one really is") + ". dyf was never shown those answers. " +
+      "Low settings give a few broad groups and high settings give many narrow ones. Nothing is refitted as you drag; only the last, cheapest step is replayed. Hover a point to see what is in its group.";
+    $("a-cap").innerHTML = "<b>" + R.meta.dataset + "</b>, " + num(R.meta.n) + " " + R.meta.items + " (" + R.meta.embedding + "); " + num(R.N) + " shown. One recorded dyf run, seed " + R.meta.seed + ". At resolution " + d0.res +
+      " dyf finds <b>" + d0.k + " groups</b> and agrees with the " + layerTitle(l0) + " at <b>" + fmt(d0.ari[0]) + "</b>; k-means told to find " + l0.k + " groups scores " + fmt(l0.ref.ari_mean) +
+      ". " + (R.layers.length > 1 ? R.layers.slice(1).map(function (la, i) { var b = LV[la.fifty.best_level]; return "At resolution " + b.res + " it finds <b>" + b.k + " groups</b> and agrees with the " + layerTitle(la) + " at <b>" + fmt(b.ari[i + 1]) + "</b> (k-means told " + la.k + ": " + fmt(la.ref.ari_mean) + ")."; }).join(" ") + " Agreement is the adjusted Rand index. " : "Agreement is the adjusted Rand index. It falls at higher settings because there is only one label per image: splitting a " + l0.singular + " into narrower groups counts against it, whether or not the split means something. ") +
+      "Changing the focus re-runs only the last two steps of the pipeline: <b>" + fmt(R.meta.seconds.louvain_res1 + R.meta.seconds.recut_res1) + " s</b> here, against " + fmt(R.meta.seconds.tree + R.meta.seconds.graph) + " s for the fit. k-means has to be fitted again for every number of groups: " + R.layers.map(function (la) { return fmt(la.ref.seconds_mean, 1) + " s for " + la.k; }).join(", ") + ". " + "The layout is a 2-D UMAP projection for display; dyf works in " + R.meta.d + " dimensions and never sees it. Colours only tell neighbouring groups apart and are reused across the map.";
+  })();
+
+  // ================= Figure B: pipeline stepper (digits)
+  (function () {
+    var R = DG, L0 = R.levels[R.DEF], M = R.meta, S = M.seconds, CP = M.cells_per_depth, step = 0, movedOnly = false, l0 = R.layers[0];
+    var blockOf = function (i) { return L0.leaf_comm[R.leafOf[i]]; };
+    var moved = maskWhere(R, function (i) { return blockOf(i) !== L0.final[i]; });
+    var cell = function (d) { return function (i) { return R.cells[d].colours[R.cells[d].labels[i]]; }; };
+    var qi = RQ.layers.length - 1, qb = RQ.levels[RQ.layers[qi].fifty.best_level], hurt = L0.ari[0] < L0.ari_block[0];
+    var steps = [
+      { t: "Start with the embeddings", colour: function () { return -1; },
+        body: ["<b>" + num(M.n) + " " + M.items + "</b>, each turned into " + M.d + " numbers. Items that look alike sit close together.",
+               "dyf first scales every vector to length 1, so only its direction matters."] },
+      { t: "Ask three yes/no questions: " + CP[0] + " cells", colour: cell(0),
+        body: ["dyf finds the three directions along which the points vary most: their top three principal components.",
+               "Each point answers one question per direction: which side am I on? Three answers make <b>" + CP[0] + " cells</b>."] },
+      { t: "Ask again inside each cell: " + CP[1] + " cells", colour: cell(1),
+        body: ["Each cell gets three new questions of its own, fitted to the points inside it. " + CP[0] + " cells become <b>" + CP[1] + "</b>.",
+               "This is a tree. Finding the cell for a new point takes three comparisons per level, which is also what makes it a search index."] },
+      { t: "Stop when cells are small: " + num(CP[CP.length - 1]) + " leaves", colour: cell(CP.length - 1),
+        body: ["Splitting continues for " + M.depth + " levels (" + CP.map(num).join(", then ") + " cells), and a cell stops early once it would drop under " + M.tree.min_leaf_size + " points.",
+               "The <b>" + num(M.leaves) + " leaves</b> are the atoms. Each holds about " + Math.round(M.n / M.leaves) + " items that sit close together. Everything after this works on " + num(M.leaves) + " leaves, not " + num(M.n) + " points."] },
+      { t: "Link each leaf to its nearest leaves", colour: function () { return -1; }, alpha: 0.25, graph: true,
+        body: ["Average the points in each leaf to get its centre, then link every leaf to the " + M.leaf_k + " leaves with the most similar centres.",
+               "That gives a small graph: " + num(M.leaves) + " dots and <b>" + num(R.edges.length / 2) + " links</b>. Dense regions show up as tight tangles."] },
+      { t: "Find communities in the graph: " + L0.n_block + " groups", colour: function (i) { return L0.colours[blockOf(i)]; },
+        body: ["A community is a set of leaves with more links to each other than to the rest. dyf finds them with the Louvain method.",
+               "The <b>resolution</b> setting decides how big a community may get. At the default, 1, this run gives <b>" + L0.n_block + " groups</b> for " + layerTitle(l0) + ". The slider at the top of the page replays this step and the next at sixteen settings."] },
+      { t: "Let each point pick its nearest group", colour: function (i) { return L0.colours[L0.final[i]]; }, moved: true,
+        body: ["Leaves have straight edges, so some points sit on the wrong side of a boundary. Each point now moves to the group whose centre it is closest to, and this repeats up to five times.",
+               "Here <b>" + fmt(L0.moved * 100, 0) + "% of points move</b>, and agreement with the " + layerTitle(l0) + " goes from " + fmt(L0.ari_block[0]) + " to <b>" + fmt(L0.ari[0]) + "</b>. " +
+               (hurt && !SAME ? "On this data the step costs accuracy. On the " + RQ.meta.items + " further down it does the opposite: " + fmt(qb.ari_block[qi]) + " to " + fmt(qb.ari[qi]) + " against the " + layerTitle(RQ.layers[qi]) + ". It is not a free improvement."
+                     : "On other data the same step can cost accuracy; see the list of limits below.")] }
+    ];
+    var EQ = [
+      ["\\hat{x}_i = \\frac{x_i}{\\lVert x_i \\rVert}"],
+      ["W_S = \\text{top } b \\text{ eigenvectors of } \\sum_{i \\in S} (\\hat{x}_i - \\mu_S)(\\hat{x}_i - \\mu_S)^{\\top}", "h_S(\\hat{x}) = \\bigl( [\\,w_1 \\cdot \\hat{x} \\ge 0\\,], \\ldots, [\\,w_b \\cdot \\hat{x} \\ge 0\\,] \\bigr) \\in \\{0,1\\}^b"],
+      ["S_c = \\{\\, i \\in S : h_S(\\hat{x}_i) = c \\,\\}, \\qquad c \\in \\{0,1\\}^b"],
+      ["\\text{split } S \\text{ while } \\operatorname{depth}(S) < D \\text{ and } |S| \\ge 2m", "\\ell(i) = \\text{the leaf that holds point } i"],
+      ["c_\\ell = \\frac{\\sum_{i:\\,\\ell(i)=\\ell} \\hat{x}_i}{\\bigl\\lVert \\sum_{i:\\,\\ell(i)=\\ell} \\hat{x}_i \\bigr\\rVert}", "A_{\\ell\\ell'} = \\max(0,\\; c_\\ell \\cdot c_{\\ell'}) \\;\\text{ if } \\ell' \\in N_k(\\ell) \\text{ or } \\ell \\in N_k(\\ell'), \\text{ else } 0"],
+      ["Q_\\gamma(g) = \\frac{1}{2M} \\sum_{\\ell,\\ell'} \\Bigl[ A_{\\ell\\ell'} - \\gamma\\, \\frac{d_\\ell\\, d_{\\ell'}}{2M} \\Bigr] \\, [\\,g_\\ell = g_{\\ell'}\\,]", "d_\\ell = \\sum_{\\ell'} A_{\\ell\\ell'}, \\qquad 2M = \\sum_\\ell d_\\ell"],
+      ["z_i \\leftarrow g_{\\ell(i)}", "\\mu_g = \\frac{\\sum_{i:\\,z_i=g} \\hat{x}_i}{\\bigl\\lVert \\sum_{i:\\,z_i=g} \\hat{x}_i \\bigr\\rVert}", "z_i \\leftarrow \\operatorname*{arg\\,max}_g \\; \\hat{x}_i \\cdot \\mu_g"]
+    ];
+    function tex(el, lines) {
+      el.innerHTML = [].concat(lines).map(function (src) {
+        try { return window.katex.renderToString(src, { output: "mathml", displayMode: true, throwOnError: false }); }
+        catch (e) { return "<code>" + esc(src) + "</code>"; }
+      }).join("");
+    }
+    var plot = new Scatter($("b-plot"), R, {
+      colour: function (i) { return steps[step].colour(i); },
+      alpha: function () { return steps[step].alpha || 0.85; },
+      mask: function () { return steps[step].moved && movedOnly ? moved : null; },
+      tip: function (i) { return itemHTML(R, i) + '<div class="m">' + truthLine(R, i) + "</div>"; },
+      over: function (sc) {
+        if (!steps[step].graph) return;
+        var ctx = sc.ctx, E = R.edges, s = sc.s, X = function (l) { return sc.ox + R.leaf_x[l] * s; }, Y = function (l) { return sc.oy + (4095 - R.leaf_y[l]) * s; };
+        ctx.strokeStyle = INK["ink-2"]; ctx.globalAlpha = 0.2; ctx.lineWidth = 0.6 * sc.dpr; ctx.beginPath();
+        for (var e = 0; e < E.length; e += 2) { ctx.moveTo(X(E[e]), Y(E[e])); ctx.lineTo(X(E[e + 1]), Y(E[e + 1])); }
+        ctx.stroke(); ctx.globalAlpha = 0.9; ctx.fillStyle = INK.accent;
+        var k = sc.w / 2600;
+        for (var l = 0; l < R.leaf_x.length; l++) { ctx.beginPath(); ctx.arc(X(l), Y(l), Math.max(sc.dpr * 0.8, Math.sqrt(R.leaf_size[l]) * k), 0, 6.2832); ctx.fill(); }
+        ctx.globalAlpha = 1;
+      }
+    });
+    $("b-steps").innerHTML = steps.map(function (s, i) { return '<button class="lbtn" type="button" data-i="' + i + '" aria-label="Step ' + (i + 1) + ": " + esc(s.t) + '">' + (i + 1) + "</button>"; }).join("");
+    function show(i) {
+      step = Math.max(0, Math.min(steps.length - 1, i));
+      var s = steps[step];
+      $("b-title").textContent = (step + 1) + ". " + s.t;
+      $("b-body").innerHTML = s.body.map(function (p) { return "<p>" + p + "</p>"; }).join("");
+      $("b-moved-wrap").hidden = !s.moved;
+      tex($("b-eq"), EQ[step]);
+      Array.prototype.forEach.call($("b-steps").children, function (b, j) { b.setAttribute("aria-pressed", j === step); });
+      $("b-prev").disabled = step === 0; $("b-next").disabled = step === steps.length - 1;
+      plot.draw();
+    }
+    $("b-steps").addEventListener("click", function (e) { var b = e.target.closest("button"); if (b) show(+b.dataset.i); });
+    $("b-prev").addEventListener("click", function () { show(step - 1); });
+    $("b-next").addEventListener("click", function () { show(step + 1); });
+    $("b-moved").addEventListener("change", function () { movedOnly = this.checked; plot.draw(); });
+    show(0);
+    tex($("b-oneline"), "\\operatorname{dyf}_\\gamma(X) = \\operatorname{Reassign}\\Bigl( \\operatorname{Louvain}_\\gamma \\bigl( \\operatorname{kNN}_k ( \\operatorname{centres} ( \\operatorname{Tree}_{b,D,m}(\\hat{X}) ) ) \\bigr) \\circ \\ell \\Bigr)");
+    $("b-params").innerHTML = "In these runs: <i>b</i> = " + M.tree.num_bits + " cuts per split, depth <i>D</i> = " + M.tree.max_depth + ", minimum leaf <i>m</i> = " + M.tree.min_leaf_size + ", <i>k</i> = " + M.leaf_k + " neighbours per leaf. <i>S</i> is the set of points in a tree node, &mu;<sub><i>S</i></sub> their mean, <i>N<sub>k</sub></i>(&#8467;) the <i>k</i> leaves most similar to leaf &#8467;, and [&middot;] is 1 when the statement inside is true and 0 otherwise.";
+    $("b-cap").innerHTML = "The same run as above, at resolution 1. Measured on one laptop CPU for all " + num(M.n) + " points: tree " + fmt(S.tree) + " s, leaf graph " + fmt(S.graph) + " s, communities " +
+      fmt(S.louvain_res1 * 1000, 0) + " ms, final reassignment " + fmt(S.recut_res1) + " s. Changing the resolution repeats only the last two.";
+  })();
+
+  // ================= Figure C: agreement by level and the fifty-label pick (requests)
+  var cRender = function () {};
+  (function () {
+    var R = RQ, LV = R.levels, NL = R.NL, st = { level: R.DEF, focus: biggestGroupPoint(R, R.DEF) }, draw = null, hover = -1;
+    var tipf = pointTip(R, function () { return st.level; });
+    var plot = new Scatter($("c-plot"), R, {
+      colour: function (i) { var lv = LV[st.level]; return lv.colours[lv.final[i]]; },
+      tip: tipf, focus: function () { return st.focus; },
+      onHover: function (i) { if (i >= 0) { st.focus = i; card(); } plot.draw(); },
+    });
+    function card() { groupCard($("c-card"), R, st.level, st.focus); }
+    cards.push(card);
+    function setLevel(i) { i = Math.max(0, Math.min(NL - 1, i)); if (i === st.level) return; st.level = i; render(); plot.draw(); card(); read(); }
+    function read() {
+      var lv = LV[st.level];
+      $("c-read").innerHTML = "<b>" + lv.k + " groups</b> at resolution " + lv.res + "<br>" + R.layers.map(function (la, li) { return layerTitle(la) + " " + fmt(lv.ari[li]); }).join(" \u00b7 ");
+    }
+
+    var SV = "http://www.w3.org/2000/svg", box = $("c-chart");
+    var YM = Math.max(0.2, Math.ceil(Math.max.apply(null, LV.map(function (l) { return Math.max.apply(null, l.ari); }).concat(R.layers.map(function (la) { return la.ref.ari_mean; }))) / 0.2 - 1e-9) * 0.2);
+    function el(tag, attrs, text) { var e = document.createElementNS(SV, tag); for (var k in attrs) e.setAttribute(k, attrs[k]); if (text !== undefined) e.textContent = text; return e; }
+    function render() {
+      var W = Math.max(280, box.clientWidth), narrow = W < 520, H = 300, HB = 34, nl = R.layers.length;
+      var m = { l: 34, r: 12, t: 26, b: 22 }, pw = W - m.l - m.r, ph = H - m.t - m.b, total = H + nl * 24 + 12;
+      var X = function (i) { return m.l + pw * (i + 0.5) / NL; }, Y = function (v) { return m.t + ph * (1 - v / YM); };
+      var svg = el("svg", { width: W, height: total, viewBox: "0 0 " + W + " " + total, role: "img",
+        "aria-label": "Agreement between dyf's groups and each label layer at " + NL + " resolution levels: " + R.layers.map(function (la) { return la.noun + " best at resolution " + LV[la.fifty.best_level].res; }).join(", ") + "." });
+      var g, i;
+      for (g = 0; g <= YM + 1e-6; g += YM / 4) {
+        svg.appendChild(el("line", { x1: m.l, x2: W - m.r, y1: Y(g), y2: Y(g), stroke: INK.rule, "stroke-width": 1 }));
+        svg.appendChild(el("text", { x: m.l - 6, y: Y(g) + 4, "text-anchor": "end" }, fmt(g, 1)));
+      }
+      for (i = 0; i < NL; i++) if (!narrow || i % 2 === 1) svg.appendChild(el("text", { x: X(i), y: H - 6, "text-anchor": "middle" }, LV[i].res));
+      var cx = X(st.level), lvn = LV[st.level];
+      svg.appendChild(el("line", { x1: cx, x2: cx, y1: m.t - 6, y2: H - m.b, stroke: INK.ink, "stroke-width": 1 }));
+      var anchor = st.level < 3 ? "start" : st.level > NL - 4 ? "end" : "middle";
+      svg.appendChild(el("text", { x: cx + (anchor === "start" ? -4 : anchor === "end" ? 4 : 0), y: 12, "text-anchor": anchor, "class": "now" }, "resolution " + lvn.res + ": " + lvn.k + " groups"));
+      R.layers.forEach(function (la, li) {
+        var left = la.fifty.best_level < NL / 2, y = Y(la.ref.ari_mean);
+        svg.appendChild(el("line", { x1: m.l, x2: W - m.r, y1: y, y2: y, stroke: HUE[li], "stroke-width": 1, "stroke-dasharray": "5 4", opacity: 0.9 }));
+        svg.appendChild(el("text", { x: left ? W - m.r - 4 : m.l + 6, y: y - 5, "text-anchor": left ? "end" : "start", "class": "lab" }, "k-means told " + la.k + ": " + fmt(la.ref.ari_mean)));
+      });
+      R.layers.forEach(function (la, li) {
+        svg.appendChild(el("polyline", { points: LV.map(function (lv, j) { return X(j) + "," + Y(lv.ari[li]); }).join(" "), fill: "none", stroke: HUE[li], "stroke-width": 2, "stroke-linejoin": "round" }));
+        LV.forEach(function (lv, j) { svg.appendChild(el("circle", { cx: X(j), cy: Y(lv.ari[li]), r: j === st.level ? 5 : 3, fill: HUE[li], stroke: INK.surface, "stroke-width": 2 })); });
+      });
+      R.layers.forEach(function (la, li) {
+        var b = la.fifty.best_level, left = b < NL / 2, j = left ? b : Math.max(0, b - 2);
+        svg.appendChild(el("text", { x: X(j) + (left ? 8 : -8), y: Y(LV[j].ari[li]) - (left ? 10 : 4), "text-anchor": left ? "start" : "end", "class": "lab" }, "vs " + layerTitle(la)));
+      });
+      R.layers.forEach(function (la, li) {
+        // where fifty random labels put the level: the central 80% of 200 recorded draws
+        var counts = la.fifty.pick_counts, tot = counts.reduce(function (a, b) { return a + b; }, 0), acc = 0, lo = -1, hi = -1;
+        counts.forEach(function (c, j) { acc += c; if (lo < 0 && acc >= 0.1 * tot) lo = j; if (hi < 0 && acc >= 0.9 * tot) hi = j; });
+        var y0 = H + 12 + li * 24, half = pw / NL / 2 - 3, x0 = X(lo) - half, x1 = X(hi) + half, left = (lo + hi) / 2 < NL / 2;
+        svg.appendChild(el("rect", { x: x0, y: y0, width: x1 - x0, height: 6, rx: 3, fill: HUE[li] }));
+        svg.appendChild(el("text", { x: left ? x1 + 8 : x0 - 8, y: y0 + 7, "text-anchor": left ? "start" : "end", "class": "lab" }, "fifty " + la.singular + " labels choose a level here"));
+      });
+      if (hover >= 0) svg.appendChild(el("line", { x1: X(hover), x2: X(hover), y1: m.t, y2: H - m.b, stroke: INK["ink-3"], "stroke-width": 1, "stroke-dasharray": "2 3" }));
+      var hit = el("rect", { x: m.l, y: 0, width: pw, height: H, fill: "transparent", style: "cursor:pointer;touch-action:pan-y" });
+      var at = function (e) { var r = svg.getBoundingClientRect(); return Math.max(0, Math.min(NL - 1, Math.floor((e.clientX - r.left - m.l) / pw * NL))); };
+      hit.addEventListener("pointermove", function (e) {
+        var j = at(e), lv = LV[j];
+        showTip('<div class="q">resolution ' + lv.res + ": " + lv.k + ' groups</div><div class="m">' + R.layers.map(function (la, li) { return "vs " + layerTitle(la) + " " + fmt(lv.ari[li]); }).join("<br>") + "<br>click to show this level</div>", e.clientX, e.clientY);
+        if (j !== hover) { hover = j; render(); }
+      });
+      hit.addEventListener("pointerleave", function () { hideTip(); if (hover >= 0) { hover = -1; render(); } });
+      hit.addEventListener("click", function (e) { setLevel(at(e)); });
+      svg.appendChild(hit);
+      box.textContent = ""; box.appendChild(svg);
+    }
+    cRender = render;
+    $("c-legend").innerHTML = R.layers.map(function (la, li) { return '<span><i style="border-color:var(--h' + li + ')"></i>agreement with the ' + layerTitle(la) + "</span>"; }).join("") + '<span><i class="dash"></i>k-means told the true number of groups</span>';
+    if (window.ResizeObserver) new ResizeObserver(render).observe(box);
+    render(); card(); read();
+    var A = R.layers[0], B = R.layers[R.layers.length - 1], dg = DG.layers[0];
+    var ex = function (la) { return esc(nice(la.names[0])) + " or " + esc(nice(la.names[1])); };
+    $("c-intro").innerHTML = (SAME ? "These " + num(R.meta.n) + " " + R.meta.items + " were labelled twice: "
+      : "On the " + DG.meta.items + " the default setting happened to be the best one" + (dg.fifty.default_regret < 0.005 ? "" : " (within " + fmt(dg.fifty.default_regret) + ")") + ". That is luck, not design. Here are " + num(R.meta.n) + " " + R.meta.items + ", which people labelled twice: ") +
+      layerTitle(A) + " such as " + ex(A) + ", and " + layerTitle(B) + " such as " + ex(B) + ". Both are correct groupings. dyf's low levels match the " + A.noun + " and its high levels match the " + B.noun +
+      ", so no single setting is right for everyone, and the default gives the coarser answer.";
+    $("c-cap").innerHTML = "<b>" + R.meta.dataset + "</b>, " + num(R.meta.n) + " " + R.meta.items + " (" + R.meta.embedding + "); " + num(R.N) + " shown. Agreement is the adjusted Rand index between dyf's groups and each label layer, at " + NL +
+      " resolutions of one fit, on the " + num(R.meta.n_labelled) + " labelled " + R.meta.items + ". Dashed lines are k-means given the true number of groups, mean of three seeds. The bars under the axis mark where fifty randomly chosen labels put the level in 8 of 10 draws (200 draws each). " +
+      R.layers.map(function (la) { return "For " + la.noun + " the chosen level scored on average <b>" + fmt(la.fifty.regret_mean, 3) + " below the best</b>; leaving the default costs " + fmt(la.fifty.default_regret, la.fifty.default_regret < 0.1 ? 3 : 2) + "."; }).join(" ");
+  })();
+
+  // ================= Over time: bars from the device-database benchmark
+  function bars(id, rows, max, unit) {
+    $(id).innerHTML = rows.map(function (r) {
+      var lo = r.lo === undefined ? 0 : r.lo, hi = r.hi === undefined ? r.v : r.hi;
+      return '<div class="bar-row"><span class="name">' + r.name + '</span><div class="track"><div class="fill' + (r.own ? " own" : "") + (r.lo !== undefined ? " range" : "") +
+        '" style="left:' + (100 * lo / max) + "%;width:" + Math.max(0.8, 100 * (hi - lo) / max) + '%"></div></div><span class="val">' + r.label + unit + "</span></div>";
+    }).join("");
+  }
+  bars("t-keep", [
+    { name: "dyf, started from last quarter's groups", v: 97.5, label: "97.5", own: true },
+    { name: "k-means told 86, fresh each quarter", v: 61.8, label: "61.8" },
+    { name: "dyf, fresh each quarter", v: 44.6, label: "44.6", own: true }
+  ], 100, "%");
+  bars("t-secs", [
+    { name: "dyf, started from last quarter's groups", lo: 40, hi: 76, label: "40–76", own: true },
+    { name: "nearest-neighbour graph + Leiden, after removing duplicates", lo: 60, hi: 66, label: "60–66" },
+    { name: "dyf, fresh", lo: 86, hi: 120, label: "86–120", own: true },
+    { name: "nearest-neighbour graph + Leiden", lo: 89, hi: 103, label: "89–103" },
+    { name: "k-means told 86, fresh", lo: 324, hi: 354, label: "324–354" }
+  ], 360, " s");
+
+  // ================= Where it loses
+  (function () {
+    var qi = RQ.layers.length - 1, la = RQ.layers[qi], d0 = RQ.levels[RQ.DEF], bi = RQ.levels[la.fifty.best_level], g0 = DG.levels[DG.DEF], gl = DG.layers[0];
+    var MN = { moved: 25, before: 0.58, after: 0.47 }; // MNIST PCA-50 at resolution 1: record_pipeline_run.py --dataset mnist
+    var rows = [
+      ["The default level is coarse", "Resolution 1 gave <b>" + d0.k + " groups for " + layerTitle(la) + "</b> on the " + RQ.meta.items + " (agreement " + fmt(d0.ari[qi]) + "; the best level reaches " + fmt(bi.ari[qi]) + "). Across three intent datasets and five embedding models the default found 14 to 26 groups every time. If you want fine groups you must choose a level."],
+      ["Nothing picks the level without labels", "Fourteen label-free rules were tested, from modularity to stability to per-model calibration. The best averaged 0.05 below the best level and missed by 0.20 at worst. Fifty labels average " + fmt(la.fifty.regret_mean, 3) + " on the " + RQ.meta.items + "."],
+      ["The last step can cost accuracy", "Letting each point pick its nearest group " + (g0.ari[0] < g0.ari_block[0] ? "moved " + fmt(g0.moved * 100, 0) + "% of the " + DG.meta.items + " and took agreement from <b>" + fmt(g0.ari_block[0]) + " to " + fmt(g0.ari[0]) + "</b>" : "moves " + MN.moved + "% of the MNIST handwritten digits and takes agreement with the digit labels from <b>" + fmt(MN.before) + " to " + fmt(MN.after) + "</b>") + ". On the " + RQ.meta.items + " the same step raised it from " + fmt(bi.ari_block[qi]) + " to " + fmt(bi.ari[qi]) + ". Across eighteen dataset and level combinations it helped in nine and hurt in two."],
+      ["At the right level it ties k-means, it does not beat it", "Told the true number of groups, k-means scores <b>" + fmt(la.ref.ari_mean) + "</b> on the " + layerTitle(la) + "; dyf at its best level scores <b>" + fmt(bi.ari[qi]) + "</b>." + (!SAME && g0.ari[0] > gl.ref.ari_mean ? " On the " + DG.meta.items + " dyf is ahead (" + fmt(g0.ari[0]) + " against " + fmt(gl.ref.ari_mean) + ")." : "") + " What dyf adds is every level from one fit, without being told the number."],
+      ["Other methods have levels too", "Agglomerative clustering also gives every level from one fit, but it compares every pair of points, which puts it out of reach at this size. k-means and graph clustering on the points must be fitted again for each setting. What is unusual about dyf is that changing the level stays cheap at millions of points, not that it has levels."],
+      ["A fresh fit is not stable", "Refitted from scratch each quarter, dyf kept 45% of its groups and k-means kept 62%. The continuity comes from starting at the previous groups, not from the method."],
+      ["It is not the fastest fresh fit at scale", "At 5 million records a fresh dyf fit took 86 to 120 seconds. A nearest-neighbour graph with Leiden took 60 to 66 after removing duplicate records. dyf is cheapest only as a warm refit."],
+      ["It is not the best outlier detector", "For spotting out-of-scope requests, the mean similarity to a point's 15 nearest neighbours scores 0.97 (AUC). Distance to the dyf group centre scores 0.91."]
+    ];
+    $("l-list").innerHTML = rows.map(function (r) { return "<li><h3>" + r[0] + "</h3><p>" + r[1] + "</p></li>"; }).join("");
+  })();
+  $("f-run").textContent = "Figures replay " + (SAME ? "one recorded run" : "two recorded runs") + ", seed " + DG.meta.seed + ", tree (" + DG.meta.tree.num_bits + " bits, depth " + DG.meta.tree.max_depth + ", minimum leaf " + DG.meta.tree.min_leaf_size + "): " +
+    (SAME ? [DG] : [DG, RQ]).map(function (R) { return R.meta.dataset + " (" + R.meta.embedding + ")"; }).join("; ") + ".";
+
+  // ---- redraw on theme change
+  function retheme() { readTheme(); scatters.forEach(function (s) { s.draw(); }); cRender(); }
+  if (window.matchMedia) { var mq = window.matchMedia("(prefers-color-scheme: dark)"); if (mq.addEventListener) mq.addEventListener("change", retheme); }
+  if (window.MutationObserver) {
+    new MutationObserver(retheme).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    new MutationObserver(retheme).observe(document.body, { attributes: true, attributeFilter: ["class"] });
+  }
+  }
+})();
+</script>
 <script id="quarto-html-after-body" type="application/javascript">
   window.document.addEventListener("DOMContentLoaded", function (event) {
     // Ensure there is a toggle, if there isn't float one in the top right
     if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
-      const a = window.document.createElement('a');
-      a.classList.add('top-right');
-      a.classList.add('quarto-color-scheme-toggle');
-      a.href = "";
-      a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+      const toggle = window.document.createElement('button');
+      toggle.type = "button";
+      toggle.setAttribute("role", "switch");
+      toggle.setAttribute("aria-checked", "false");
+      toggle.classList.add('top-right');
+      toggle.classList.add('quarto-color-scheme-toggle');
+      toggle.setAttribute("aria-label", "Toggle dark mode");
+      toggle.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
       const i = window.document.createElement("i");
       i.classList.add('bi');
-      a.appendChild(i);
-      window.document.body.appendChild(a);
+      toggle.appendChild(i);
+      // Put the toggle in a landmark of its own, so that landmark navigation
+      // can reach it.
+      //
+      // The container is always a fresh direct child of body, and the toggle is
+      // never moved into page furniture that the theme or the author controls.
+      // The toggle is positioned against the page, so any ancestor that
+      // establishes a containing block captures it: a positioned element or a
+      // grid for position: absolute, and transform, filter, will-change or
+      // contain for position: fixed. A direct child of body has none of these
+      // to inherit, and the shift when one appears is silent and visual.
+      //
+      // ARIA says a document should have at most one banner, and axe reports a
+      // duplicate whether or not the banners carry distinct labels. So use a
+      // header when the page has no banner yet, and a named region otherwise.
+      //
+      // A header is a banner wherever it sits, unless it is inside sectioning
+      // content, so this cannot just look at the children of body: a custom
+      // page layout wraps the title block header in a plain div. An explicit
+      // role="banner" always counts.
+      const sectioning = 'article, aside, main, nav, section, [role="article"], [role="complementary"], [role="main"], [role="navigation"], [role="region"]';
+      const hasBanner = Array.from(
+        window.document.querySelectorAll('header:not([role]), [role="banner"]')
+      ).some(function(el) {
+        return el.hasAttribute("role") || el.closest(sectioning) === null;
+      });
+      const container = window.document.createElement(hasBanner ? "div" : "header");
+      if (hasBanner) {
+        container.setAttribute("role", "region");
+        container.setAttribute("aria-label", "Toggle dark mode");
+      }
+      container.classList.add('quarto-color-scheme-toggle-container');
+      container.appendChild(toggle);
+      window.document.body.appendChild(container);
     }
     setColorSchemeToggle(hasAlternateSentinel())
     const icon = "";
@@ -558,7 +1206,8 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
           return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
       }
       // Inspect non-navigation links and adorn them if external
-     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      window.quartoDecorateExternalLinks = function (root) {
+     var links = (root || window.document).querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
       for (var i=0; i<links.length; i++) {
         const link = links[i];
         if (!isInternal(link.href)) {
@@ -567,8 +1216,69 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
           if (link.dataset.originalHref !== undefined) {
             link.href = link.dataset.originalHref;
           }
+          if (!link.classList.contains('no-external-icon')) {
+          }
         }
       }
+      };
+      window.quartoDecorateExternalLinks(window.document);
+    // Esc closes the popup (WCAG 1.4.13) and focus leaving both trigger and
+    // popup closes it (WCAG 2.4.11); tippy handles neither for interactive popups.
+    const hideOnEscAndFocusOut = {
+      name: 'hideOnEscAndFocusOut',
+      defaultValue: true,
+      fn(instance) {
+        const dismiss = () => {
+          // A show scheduled by the trigger delay would otherwise reopen it
+          instance.clearDelayTimeouts();
+          instance.hide();
+        };
+        const onKeyDown = (event) => {
+          if (event.key !== 'Escape') {
+            return;
+          }
+          // Keep Esc from also reaching page handlers (e.g. reveal.js overview),
+          // except an open reveal.js slide menu, which Esc should close too.
+          // The menu handles keys only when its keyboard option is on.
+          const menuHandlesEsc = window.Reveal?.getPlugin?.('menu')?.isOpen() &&
+            window.Reveal.getConfig().menu?.keyboard !== false;
+          if (!menuHandlesEsc) {
+            event.stopPropagation();
+          }
+          if (instance.popper.contains(window.document.activeElement)) {
+            // Disabled while refocusing so the focus trigger does not reopen it
+            instance.disable();
+            instance.reference.focus();
+            instance.enable();
+          }
+          dismiss();
+        };
+        const onFocusOut = (event) => {
+          const target = event.relatedTarget;
+          if (target && !instance.reference.contains(target) &&
+              !instance.popper.contains(target)) {
+            dismiss();
+          }
+        };
+        // On the trigger too: a click trigger (code-annotations: select) has no
+        // blur handling. Attached for the instance's lifetime so leaving the
+        // trigger also cancels a show still pending on the trigger delay.
+        instance.reference.addEventListener('focusout', onFocusOut);
+        return {
+          onShow() {
+            window.document.addEventListener('keydown', onKeyDown, true);
+            instance.popper.addEventListener('focusout', onFocusOut);
+          },
+          onHide() {
+            window.document.removeEventListener('keydown', onKeyDown, true);
+            instance.popper.removeEventListener('focusout', onFocusOut);
+          },
+          onDestroy() {
+            instance.reference.removeEventListener('focusout', onFocusOut);
+          },
+        };
+      },
+    };
     function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
       const config = {
         allowHTML: true,
@@ -582,6 +1292,7 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
         interactiveBorder: 10,
         theme: 'quarto',
         placement: 'bottom-start',
+        plugins: [hideOnEscAndFocusOut],
       };
       if (contentFn) {
         config.content = contentFn;
@@ -744,44 +1455,54 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
           const lineIds = lines.map((line) => {
             return targetCell + "-" + line;
           })
-          let top = null;
-          let height = null;
-          let parent = null;
+          // Each band is positioned against its own containing block, which is
+          // not the offsetParent of the lines, so place it from client rects.
+          const placeBand = (band, firstEl, lastEl, codeBlock) => {
+            const container = band.offsetParent;
+            if (container === null) {
+              return;
+            }
+            const containerRect = container.getBoundingClientRect();
+            // Reveal.js scales slides with a transform, so convert client
+            // pixels back to the CSS pixels of the container.
+            const scale = containerRect.height / container.offsetHeight || 1;
+            const firstRect = firstEl.getBoundingClientRect();
+            const lastRect = lastEl.getBoundingClientRect();
+            const top = (firstRect.top - containerRect.top) / scale - container.clientTop + container.scrollTop;
+            const height = (lastRect.bottom - firstRect.top) / scale;
+            band.style.top = top - 2 + "px";
+            band.style.height = height + 4 + "px";
+            if (codeBlock) {
+              // Without the copy button wrapper, the containing block is wider
+              // than the code block, so span the code block explicitly.
+              const blockRect = codeBlock.getBoundingClientRect();
+              band.style.left = (blockRect.left - containerRect.left) / scale - container.clientLeft + container.scrollLeft + "px";
+              band.style.width = blockRect.width / scale + "px";
+            }
+          };
           if (lineIds.length > 0) {
-              //compute the position of the single el (top and bottom and make a div)
-              const el = window.document.getElementById(lineIds[0]);
-              top = el.offsetTop;
-              height = el.offsetHeight;
-              parent = el.parentElement.parentElement;
-            if (lineIds.length > 1) {
-              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
-              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
-              height = bottom - top;
+            const el = window.document.getElementById(lineIds[0]);
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const parent = el.parentElement.parentElement;
+            // cook up a div (if necessary) and position it
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
             }
-            if (top !== null && height !== null && parent !== null) {
-              // cook up a div (if necessary) and position it 
-              let div = window.document.getElementById("code-annotation-line-highlight");
-              if (div === null) {
-                div = window.document.createElement("div");
-                div.setAttribute("id", "code-annotation-line-highlight");
-                div.style.position = 'absolute';
-                parent.appendChild(div);
-              }
-              div.style.top = top - 2 + "px";
-              div.style.height = height + 4 + "px";
-              div.style.left = 0;
-              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
-              if (gutterDiv === null) {
-                gutterDiv = window.document.createElement("div");
-                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
-                gutterDiv.style.position = 'absolute';
-                const codeCell = window.document.getElementById(targetCell);
-                const gutter = codeCell.querySelector('.code-annotation-gutter');
-                gutter.appendChild(gutterDiv);
-              }
-              gutterDiv.style.top = top - 2 + "px";
-              gutterDiv.style.height = height + 4 + "px";
+            placeBand(div, el, lastEl, parent.closest("div.sourceCode") || parent);
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
             }
+            placeBand(gutterDiv, el, lastEl);
             selectedAnnoteEl = annoteEl;
           }
         };
@@ -879,6 +1600,9 @@ gtag('config', 'G-QXBFEQPED2', { 'anonymize_ip': true});
       }
     }
   });
+  </script>
+  <script type="application/javascript">
+  window.quartoScrollableRegionsLabels = {"code":"Scrollable code","output":"Scrollable output"};
   </script>
 </div> <!-- /content -->
 

@@ -24,8 +24,9 @@ Two things worth knowing before reading further:
 
 - [Getting started](https://dyf.io/getting-started.html): installation, the typical
   build-index-search path, and code recipes for each major feature.
-- [How it works](https://dyf.io/how-it-works.html): the two-stage PCA-based LSH algorithm,
-  the metrics it produces, and what Dense / Bridge / Orphan actually mean.
+- [How it works](https://dyf.io/#how): the pipeline step by step with a formula per step
+  (normalise, a tree of top-3 principal-component cuts, a leaf graph, Louvain communities at
+  a chosen resolution, nearest-centre reassignment), replayed on one recorded run.
 - [API reference](https://dyf.io/reference/): every public class and function.
 - [README](https://github.com/jdonaldson/dyf/blob/main/README.md): the fastest orientation,
   including the CLI and the measured performance table.
