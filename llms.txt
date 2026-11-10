@@ -1,9 +1,10 @@
 # dyf
 
-> Index embedding spaces and see their structure. Builds a density-based LSH tree over
-> your embeddings, writes it to a `.dyf` file that opens in ~5 ms without loading data,
-> searches it with a Rust kernel, and exposes the topology that tree discovers along the
-> way — which regions are dense, which items bridge between concepts, which are unique.
+> A clustering lens for embeddings, and an index you can search. Fits a tree over your
+> embeddings once; from that fit you can group the corpus at any level of detail by changing
+> one `resolution` setting, without fitting again. The same tree is written to a `.dyf` file
+> that opens in ~5 ms without loading data and is searched with a Rust kernel. It can also
+> label items Dense, Bridge or Orphan by where they sit.
 
 Python package, MIT, pre-v1. `pip install dyf`.
 
