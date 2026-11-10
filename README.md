@@ -10,8 +10,10 @@ few broad groups or hundreds of narrow ones, by changing a single `resolution` s
 without fitting again. The same tree is written to a `.dyf` file that opens in ~5 ms
 without loading data and is searched with a Rust kernel.
 
-See it on real data at **[dyf.io](https://dyf.io)**: 50,000 CIFAR-100 photos, one fit,
-sixteen levels of detail, with the pipeline replayed step by step.
+[![One dyf fit of 50,000 CIFAR-100 photos shown at resolution 0.5 (11 groups), 2 (26 groups) and 16 (101 groups), beside the 20 human superclass labels.](https://raw.githubusercontent.com/jdonaldson/dyf/main/assets/readme/dyf-lens-cifar100-three-levels.png)](https://dyf.io)
+
+Drag the resolution yourself at **[dyf.io](https://dyf.io)**: the same fit at sixteen
+levels of detail, with the pipeline replayed step by step.
 
 ## What it does
 
@@ -301,6 +303,8 @@ real run, with a formula for each.
 Steps 1 to 3 run once. Changing `resolution` repeats only steps 4 and 5, and the tree from
 step 2 is also the search index.
 
+![The pipeline on the CIFAR-100 run in five panels: the embeddings, the first cut into 8 cells, the 2,009 leaves, the leaf graph, and the 17 groups at resolution 1.](https://raw.githubusercontent.com/jdonaldson/dyf/main/assets/readme/dyf-pipeline-five-steps.png)
+
 `DensityClassifier` is a separate entry point with its own two-stage PCA hash: items in
 well-populated buckets are Dense, items in sparse buckets that share structure at a coarser
 resolution are recovered as Bridges, and the rest are Orphans.
@@ -340,6 +344,11 @@ What works is a few labels: pick the resolution whose partition agrees best with
 randomly labelled items, and you land within 0.02 ARI of the best resolution in the sweep,
 closer than knowing the true number of classes would get you (`benchmarks/cut_audit_2026_11/`).
 Run `compute_louvain_hierarchy` for the sweep, label fifty items, choose the level that agrees.
+
+![Agreement with labels against resolution on CIFAR-100: the 20 superclasses are best matched at resolution 2 (26 groups, 0.31) and the 100 classes at resolution 16 (101 groups, 0.26), each level with k-means told the true number of groups.](https://raw.githubusercontent.com/jdonaldson/dyf/main/assets/readme/dyf-agreement-by-resolution.png)
+
+On CIFAR-100 the two label layers peak at different resolutions of one fit, and each peak
+matches k-means told the true number of groups. No single setting serves both.
 
 ## Performance
 
