@@ -9,6 +9,8 @@ project:
     - llms.txt
     - gallery/cifar100-deck/
     - gallery/cifar100-deck-thumb.jpg
+    # The homepage replays a recorded dyf run; index.qmd's script fetches it from here.
+    - lens/
 
 # Freeze computational pages: render locally, commit _freeze/, and CI (quarto basics,
 # no heavy deps) just assembles the stored output instead of re-executing the cells.
@@ -29,8 +31,6 @@ website:
         text: Home
       - href: getting-started.qmd
         text: Getting Started
-      - href: how-it-works.qmd
-        text: How It Works
       - href: gallery/index.qmd
         text: Gallery
       - href: reference/index.qmd
@@ -52,6 +52,12 @@ format:
       light: kate
       dark: zenburn
     toc: true
+    # Fonts for the theme (custom.scss / custom-dark.scss name them; this loads them).
+    include-in-header:
+      text: |
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
 
 quartodoc:
   package: dyf

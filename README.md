@@ -370,7 +370,7 @@ with LazyIndex("index.dyf") as idx:
 
 ## Documentation
 
-- **[How It Works](https://dyf.io/how-it-works.html)** — the algorithm, metrics, and Dense/Bridge/Orphan explained
+- **[How It Works](https://dyf.io/#how)** — the pipeline step by step, replayed on a recorded run, with a formula per step
 - **[Getting Started](https://dyf.io/getting-started.html)** — code recipes and examples
 - **[API Reference](https://dyf.io/reference/)** — full documentation for all classes and functions
 

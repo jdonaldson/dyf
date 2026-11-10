@@ -1,86 +1,15 @@
 ---
-title: "DYF — Density Yields Features"
-title-block-banner: true
+pagetitle: "dyf: a clustering lens for embeddings"
+description-meta: "dyf fits once and then changes the level of detail freely: coarse groups, fine groups, a search index and a partition you can keep as data arrives."
+page-layout: custom
+aliases:
+  - how-it-works.html
+toc: false
+format:
+  html:
+    include-in-header: _lens_header.html
+    include-after-body: _lens_body.html
 ---
 
-DYF discovers structure in embedding spaces using density-based LSH.
-Every item gets classified as **Dense** (core), **Bridge** (connector), or **Orphan** (unique) — no k to pick, no hyperparameters to tune.
-
-```bash
-pip install dyf
-```
-
-**[GitHub](https://github.com/jdonaldson/dyf)** | **[PyPI](https://pypi.org/project/dyf/)** | **[How It Works](how-it-works.html)** | **[API Reference](reference/index.html)** | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/jdonaldson/dyf/blob/main/docs/notebooks/quickstart.ipynb)
-
-## Quick start
-
-```python
-from dyf import DensityClassifierFull
-
-classifier = DensityClassifierFull.from_texts(
-    texts=documents,       # any list of strings
-    categories=categories, # optional grouping
-)
-
-print(classifier.report())
-# Dense:  8,420 (84.2%) — core topics
-# Bridge:   980 (9.8%)  — cross-topic items
-# Orphan:   600 (6.0%)  — unique outliers
-```
-
-## Build & search indexes
-
-DYF writes `.dyf` files — memory-mapped indexes with zero startup cost:
-
-```python
-from dyf import build_dyf_tree, write_lazy_index, LazyIndex
-
-tree = build_dyf_tree(embeddings, max_depth=4, num_bits=3, min_leaf_size=8)
-
-write_lazy_index(tree, embeddings, "index.dyf",
-                 quantization="float16",
-                 stored_fields={"title": titles},
-                 metadata={"model": "nomic-embed-text-v1.5"})
-
-with LazyIndex("index.dyf") as idx:
-    result = idx.search(query_embedding, k=10, nprobe="auto")
-    print(result.indices, result.scores)
-    print(result.fields["title"])
-```
-
-## How it works
-
-Two-stage PCA-based LSH:
-
-1. **Random bucketing** — throw random hyperplanes through embedding space
-2. **Compute centroids** — average embeddings per bucket
-3. **PCA on centroids** — learn directions that separate clusters (fast: hundreds of rows, not millions)
-4. **Re-hash** — project all embeddings onto learned hyperplanes
-
-Bucket sizes reveal density. Centroid similarity reveals centrality.
-Stability under perturbation reveals bridges.
-
-See [How It Works](how-it-works.html) for the full algorithm, metrics, and the connection to Krapivin et al. (2025).
-
-## What you can do with it
-
-- **Semantic navigation** — trace paths between concepts through bridge items
-- **Structure discovery** — see how data organizes itself without imposing a taxonomy
-- **Anomaly detection** — surface orphans and bridges that span multiple domains
-- **Index building** — `.dyf` files for instant-open, memory-mapped approximate search
-
-## Performance
-
-| Dataset | Time | Per item |
-|---------|------|----------|
-| 60K embeddings (384d) | ~60ms | 1.0 µs |
-
-Rust-accelerated via PyO3.
-
-## Installation
-
-```bash
-pip install dyf          # core
-pip install dyf[io]      # + serialization
-pip install dyf[full]    # + embedding generation, LLM labeling
-```
+<!-- The homepage is generated: `python benchmarks/site_explainer_2026_11/build_how_dyf_works_page.py --docs`.
+     It replays one recorded dyf run (lens/*.json). Edit the template in that directory, not the includes. -->
