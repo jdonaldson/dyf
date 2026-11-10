@@ -14,8 +14,14 @@ $btn-hover: #555;
 $coral-red: #e94560;
 $golden-amber: #f9a826;
 
+// Type — the same three faces as the homepage (loaded by a <link> in _quarto.yml)
+$font-family-sans-serif: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+$headings-font-family: "Montserrat", "Avenir Next", "Segoe UI", sans-serif;
+$headings-font-weight: 700;
+$font-family-monospace: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
 // Bootstrap dark overrides
-$body-bg: $bg-dark;
+$body-bg: #19181b;
 $body-color: $fg;
 $link-color: $fg;
 $link-hover-color: #fff;

@@ -2,9 +2,30 @@
 title: "Getting Started"
 ---
 
-This guide walks through the core DYF workflow: fitting a classifier, inspecting results, and integrating with DataFrames.
+Short recipes for the main DYF workflows: groups at any level of detail, on-disk search indexes, and density classification.
 
-## Basic Usage
+## Groups at Any Level
+
+Fit the tree once, write it to a `.dyf` file, then ask for groups at whatever level of detail you need. Changing `resolution` does not refit the tree.
+
+```python
+from dyf import build_dyf_tree, write_lazy_index, LazyIndex, louvain_cluster_leaves
+
+tree = build_dyf_tree(embeddings, num_bits=3, max_depth=4, min_leaf_size=20)
+write_lazy_index(tree, embeddings, "items.dyf")
+
+with LazyIndex("items.dyf") as idx:
+    coarse = louvain_cluster_leaves(idx, layout_2d, embeddings, resolution=1.0)
+    fine = louvain_cluster_leaves(idx, layout_2d, embeddings, resolution=32.0)
+    print(coarse.n_groups, fine.n_groups)
+    labels = fine.point_labels          # one group id per item
+```
+
+`layout_2d` is any (n, 2) array, for example a UMAP layout. It is used only to name groups by position.
+
+The default `resolution=1.0` gives a coarse grouping. To choose a level, label about fifty items and keep the resolution whose groups agree with them best. The [homepage](index.qmd) shows why no single setting is right for every use.
+
+## Density Classification
 
 The fastest way to get started is with `DensityClassifier` (Rust-accelerated):
 

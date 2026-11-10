@@ -1,5 +1,5 @@
 ---
-title: "Parameter-Free Clustering Gallery"
+title: "Clustering Gallery"
 subtitle: "DYF produces a partition hierarchy, not a single k. Here's what that buys you across eight classic datasets."
 listing:
   id: gallery-listing
@@ -27,11 +27,11 @@ listing:
   sort-ui: false
 ---
 
-Every other clustering algorithm asks you to pick a number.
+Most clustering methods make you commit to one level of detail before you fit. K-means wants `k`, HDBSCAN wants `min_cluster_size`, DBSCAN wants `eps`, and a wrong choice means fitting again.
 
-K-means wants `k`. HDBSCAN wants `min_cluster_size`. DBSCAN wants `eps`. Louvain wants `resolution`. Each is a commitment to a single granularity — make the wrong pick and you either split a natural cluster in half or blur two together.
+DYF works like a lens. **Fit once, then change the level of detail.** The tree and its leaves are built one time. A single `resolution` setting then decides how the leaves are joined into groups, and changing it repeats only the cheapest steps.
 
-DYF's pitch is different. **Build the tree once, and you get the whole hierarchy.** At its finest leaves, DYF's Louvain step finds many fine-grained communities. Walk up the tree and those merge into progressively coarser partitions. You pick the resolution your downstream task needs — at query time, not at training time.
+The setting still has to be chosen. The default gives a coarse answer, and about fifty labelled items are enough to pick the level you mean. The [homepage](../index.qmd) shows both on CIFAR-100.
 
 ## What the gallery shows
 

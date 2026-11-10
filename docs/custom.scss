@@ -19,6 +19,16 @@ $border-light: #ccc;
 $coral-red: #e94560;
 $golden-amber: #f9a826;
 
+// Type — the same three faces as the homepage (loaded by a <link> in _quarto.yml)
+$font-family-sans-serif: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+$headings-font-family: "Montserrat", "Avenir Next", "Segoe UI", sans-serif;
+$headings-font-weight: 700;
+$font-family-monospace: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+// Page ground — the homepage's warm neutral
+$body-bg: #f6f5f4;
+$body-color: #1c1b1d;
+
 // Bootstrap overrides — neutral links, not coral
 $link-color: $fg-light;
 $link-hover-color: $fg-muted-light;
