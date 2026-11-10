@@ -4,38 +4,50 @@
 [![PyPI](https://img.shields.io/pypi/v/dyf)](https://pypi.org/project/dyf/)
 [![Python](https://img.shields.io/pypi/pyversions/dyf)](https://pypi.org/project/dyf/)
 
-**Index embedding spaces, and see their structure.** DYF builds a density-based LSH tree
-over your embeddings, writes it to a `.dyf` file that opens in ~5 ms without loading data,
-and searches it with a Rust kernel — while exposing the *topology* that tree discovers
-along the way:
+**A clustering lens for embeddings, and an index you can search.** DYF fits a tree over
+your embeddings once. From that one fit you can group the corpus at any level of detail, a
+few broad groups or hundreds of narrow ones, by changing a single `resolution` setting,
+without fitting again. The same tree is written to a `.dyf` file that opens in ~5 ms
+without loading data and is searched with a Rust kernel.
 
-- **Dense**: Core items in well-populated semantic regions
-- **Bridge**: Transitional items connecting different clusters
-- **Orphan**: Unique items with no semantic neighbors
+See it on real data at **[dyf.io](https://dyf.io)**: 50,000 CIFAR-100 photos, one fit,
+sixteen levels of detail, with the pipeline replayed step by step.
 
 ## What it does
 
-Two halves, and both matter:
+**Group at any level.** The tree's leaves are joined into groups at a `resolution` you
+choose, and changing it repeats only the two cheapest steps: 0.13 s after a 2.2 s fit on
+50,000 CLIP embeddings, where refitting k-means for 100 groups took 2.9 s. The default
+gives a coarse grouping; about fifty labelled items are enough to pick the level you mean.
+A refit can start from the previous groups (`init_centroids`), which keeps group ids
+stable as data arrives.
 
 **Index and search.** Build a tree, write a `.dyf`, query it. Indexes are self-describing
 (`dyf info corpus.dyf`), open lazily, and carry your own stored fields alongside the
 vectors. Ingest helpers turn source code, images or video into embeddings, or bring your
 own array.
 
-**Reveal structure.** The same tree that makes search fast also exposes how the corpus is
-organized — which regions are dense, which items bridge between concepts, which are truly
-unique, and what hierarchy falls out of the embeddings on their own.
+**Describe structure.** `DensityClassifier` labels each item by where it sits:
+
+- **Dense**: Core items in well-populated semantic regions
+- **Bridge**: Transitional items connecting different clusters
+- **Orphan**: Unique items with no semantic neighbors
 
 Use cases:
-- **Semantic navigation**: Find paths between concepts
-- **Structure discovery**: Understand how your data organizes itself
+- **Clustering at a level you choose**: coarse topics or fine intents from the same fit
+- **Groups that persist**: carry group ids forward as a corpus grows
+- **Index building**: instant-open on-disk indexes with your own stored fields
 - **Anomaly detection**: Identify orphans and bridges
-- **Index building**: Pre-compute structure for fast queries
 
 > **Scope.** dyf is not competing to be the fastest ANN retriever — on the pure
 > recall-vs-latency frontier, mature graph libraries (HNSW, pynndescent) win. Its strengths
 > are structure discovery, hierarchy, instant-open on-disk indexes, and reaching exact
 > recall on a single index by raising `nprobe`. See [Performance](#performance).
+>
+> It is also not the cheapest way to get one partition: a single k-means fit at a known
+> `k` is faster, and at the right level dyf ties k-means on agreement with labels rather
+> than beating it. What dyf adds is every level from one fit, without being told `k`. The
+> homepage lists the [results that went against it](https://dyf.io/#limits).
 >
 > Enrichment and the browser tour — UMAP projection, clustering, LLM labelling, narration —
 > live downstream in [dyfviz](https://github.com/jdonaldson/dyfviz), split out in 0.13.
@@ -96,6 +108,26 @@ pip install dyf[full]
 ```
 
 ## Quick Start
+
+### Group at Any Level
+
+```python
+from dyf import build_dyf_tree, write_lazy_index, LazyIndex, louvain_cluster_leaves
+
+tree = build_dyf_tree(embeddings, num_bits=3, max_depth=4, min_leaf_size=20)
+write_lazy_index(tree, embeddings, "items.dyf")
+
+with LazyIndex("items.dyf") as idx:
+    coarse = louvain_cluster_leaves(idx, layout_2d, embeddings, resolution=1.0)
+    fine = louvain_cluster_leaves(idx, layout_2d, embeddings, resolution=32.0)
+    print(coarse.n_groups, fine.n_groups)   # 22 and 151 on 23,850 intent utterances
+    labels = fine.point_labels              # one group id per item
+```
+
+`layout_2d` is any (n, 2) array, for example a UMAP layout; it is used only to name groups
+by position. The default `resolution=1.0` is coarse. To choose a level, label about fifty
+items and keep the resolution whose groups agree with them best
+(see [Resolution](#how-it-works) below).
 
 ### Discover Structure
 
@@ -253,14 +285,25 @@ print(labels['dense'][1234]['label'])  # "Machine Learning Papers"
 
 ## How It Works
 
-Two-stage PCA-based LSH:
+The grouping pipeline has five steps. The [homepage](https://dyf.io/#how) replays them on a
+real run, with a formula for each.
 
-1. **Initial bucketing**: PCA projections create semantic buckets
-2. **Density check**: Items in sparse buckets are candidates for reclassification
-3. **Recovery stage**: Coarser PCA finds structure among sparse items
-4. **Classification**: Dense (core), Bridge (recovered), Orphan (truly unique)
+1. **Normalise.** Every vector is scaled to length 1, so only its direction is used.
+2. **Tree.** Each node takes the top `num_bits` principal components of its own points and
+   gives every point one bit per component: which side of the cut it is on. That makes up
+   to 2^`num_bits` children. Splitting stops at `max_depth`, or when a node has fewer than
+   2 × `min_leaf_size` points.
+3. **Leaf graph.** Each leaf's centre is linked to its 10 most similar leaf centres.
+4. **Communities.** Louvain groups the leaves at the chosen `resolution`.
+5. **Reassignment.** Each point moves to the group whose centre it is most similar to, for
+   up to five rounds.
 
-The key insight: items that appear as outliers globally often share structure at coarser resolution. Bridges are these "misplaced" items - they connect different semantic regions.
+Steps 1 to 3 run once. Changing `resolution` repeats only steps 4 and 5, and the tree from
+step 2 is also the search index.
+
+`DensityClassifier` is a separate entry point with its own two-stage PCA hash: items in
+well-populated buckets are Dense, items in sparse buckets that share structure at a coarser
+resolution are recovered as Bridges, and the rest are Orphans.
 
 **Geometry: the tree partitions directions.** Every fit L2-normalises each row before PCA and
 hashing, so points with the same direction and different norms share a leaf. That is right for
@@ -370,8 +413,10 @@ with LazyIndex("index.dyf") as idx:
 
 ## Documentation
 
+- **[dyf.io](https://dyf.io)** — the lens on real data: drag the resolution, see the groups, see where dyf loses
 - **[How It Works](https://dyf.io/#how)** — the pipeline step by step, replayed on a recorded run, with a formula per step
 - **[Getting Started](https://dyf.io/getting-started.html)** — code recipes and examples
+- **[Gallery](https://dyf.io/gallery/)** — dyf against k-means and HDBSCAN on classic datasets
 - **[API Reference](https://dyf.io/reference/)** — full documentation for all classes and functions
 
 ## License

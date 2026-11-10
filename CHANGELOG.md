@@ -24,6 +24,15 @@ labels were already in hand and are now kept for one comparison.
 
 ### Documented
 
+**dyf.io and the README now describe dyf as a clustering lens, and describe the shipped
+pipeline.** The homepage replays one recorded run on CIFAR-100 (resolution scrubber, a
+seven-step pipeline replay with a formula per step, the agreement curve for both label layers,
+and the results that went against dyf). The How It Works page and the README's "two-stage
+PCA-based LSH" summary are gone: they described the older centroid-PCA fit, while the default
+since `fit_method="raw_pca"` is the top `num_bits` principal components of each node's own
+points. The gallery index no longer calls dyf parameter-free. Generator:
+`benchmarks/site_explainer_2026_11/`.
+
 **`compute_louvain_hierarchy` returned four undocumented keys; they now say what they mean.**
 `centroid_dist`, `nearest_other_dist`, `community_cohesion` and `community_embedding_centroids`
 were in the `LouvainHierarchy` type but not in the docstring. `community_cohesion` is the mean
